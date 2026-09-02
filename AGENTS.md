@@ -10,6 +10,7 @@ The Laravel Boost guidelines are specifically curated by Laravel maintainers for
 This application is a Laravel application running on PHP 8.4. You are an expert with the Laravel ecosystem. Always use the APIs that match the installed major version of each package — do not assume a version.
 
 Before relying on a package's API, confirm its installed version:
+
 - PHP packages: run `composer show --direct` to list direct dependencies with versions, or `composer show <vendor/package>` for a single package.
 - JS packages: check `package.json` for the installed versions.
 
@@ -85,7 +86,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 - Execute PHP in app context for debugging and testing code. Do not create models without user approval, prefer tests with factories instead. Prefer existing Artisan commands over custom tinker code.
 - Always use single quotes to prevent shell expansion: `php artisan tinker --execute 'Your::code();'`
-  - Double quotes for PHP strings inside: `php artisan tinker --execute 'User::where("active", true)->count();'`
+    - Double quotes for PHP strings inside: `php artisan tinker --execute 'User::where("active", true)->count();'`
 
 === php rules ===
 
@@ -200,6 +201,129 @@ Use Wayfinder to generate TypeScript functions for Laravel routes. Import from `
 # Inertia + Vue
 
 Vue components must have a single root element.
+
 - IMPORTANT: Activate `inertia-vue-development` when working with Inertia Vue client-side patterns.
 
 </laravel-boost-guidelines>
+
+# Battlefront Capstone Development Instructions
+
+You are acting as an AI coding agent assisting with the development of the Battlefront Computer Trading capstone project.
+
+This project is not a vibe-coding exercise.
+
+The developer is an aspiring software developer/software engineer and must understand, review, and remain responsible for the codebase.
+
+The human developer is the final decision-maker.
+
+## Core Workflow
+
+For every non-trivial development task, follow this workflow:
+
+Understand → Plan → Implement → Test → Explain → Human Review → Complete
+
+Do not treat implementation as complete merely because code was generated.
+
+Do not treat passing tests as automatic human approval.
+
+---
+
+## Project Technology Stack
+
+Use the existing project stack unless explicitly approved otherwise:
+
+- Laravel
+- Vue 3
+- Inertia.js
+- Tailwind CSS
+- MySQL
+- Vite
+- Laravel Boost
+- Pest/PHPUnit for automated testing
+
+Do not introduce additional frameworks, databases, frontend frameworks, or major dependencies without developer approval.
+
+---
+
+## Capstone Project Context
+
+Project-specific scope, architecture, modules, algorithms, database baseline,
+technology choices, development sequence, and evaluation constraints are documented in:
+
+- `docs/CAPSTONE_CONTEXT.md`
+- `docs/capstone-manuscript.docx`
+
+Use these files together with the current approved Linear issue when planning or implementing non-trivial project work.
+
+### Context Responsibilities
+
+`AGENTS.md` defines how the coding agent should behave.
+
+`docs/CAPSTONE_CONTEXT.md` defines what the Battlefront project is, including:
+
+- approved architecture;
+- web/mobile boundaries;
+- technology stack;
+- system actors and modules;
+- intelligent-module logic;
+- database baseline;
+- approved scope limitations;
+- development sequence;
+- testing and evaluation context.
+
+The approved Chapters 1–3 manuscript remains the authoritative source for formal project scope and architecture.
+
+### When to Read Project Context
+
+Before implementing a task that affects any of the following, read `docs/CAPSTONE_CONTEXT.md`:
+
+- system architecture;
+- database structure or relationships;
+- business rules;
+- web versus mobile responsibilities;
+- REST API boundaries;
+- product recommendation;
+- predictive analytics;
+- chatbot behavior;
+- payment behavior;
+- order or delivery behavior;
+- branch behavior;
+- project scope.
+
+Consult `docs/capstone-manuscript.docx` when:
+
+- an exact manuscript requirement must be verified;
+- `CAPSTONE_CONTEXT.md` is insufficient or ambiguous;
+- a proposed implementation appears to conflict with approved scope;
+- exact ERD cardinality, fields, relationships, or other manuscript details matter.
+
+### Source of Truth
+
+For approved project scope:
+
+1. Approved Chapters 1–3 manuscript
+2. Adviser-approved amendments
+
+For implementation decisions within that approved scope:
+
+1. Approved scope and architecture
+2. Explicit developer-approved implementation decisions
+3. `docs/CAPSTONE_CONTEXT.md`
+4. Approved Linear issue and acceptance criteria
+5. Existing project conventions
+
+If an implementation requirement conflicts with the manuscript or an adviser-approved amendment, identify the conflict instead of silently resolving it.
+
+---
+
+## Vue Development Rules
+
+Use Vue 3 Composition API.
+
+Use plain JavaScript only.
+
+Prefer:
+
+```vue
+<script setup>
+```
