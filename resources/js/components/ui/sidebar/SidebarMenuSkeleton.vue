@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Skeleton } from '@/components/ui/skeleton';
 const props = defineProps({
     "showIcon": { type: Boolean },
-    "class": null,
+    "class": {},
 });
 const width = computed(() => {
     return `${Math.floor(Math.random() * 40) + 50}%`;

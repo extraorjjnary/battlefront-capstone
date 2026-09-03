@@ -2,7 +2,7 @@
 import { reactiveOmit } from "@vueuse/core";
 import { AvatarFallback } from "reka-ui";
 import { cn } from "@/lib/utils";
-const props = defineProps({ ...AvatarFallback.props, "class": null, });
+const props = defineProps({ ...AvatarFallback.props, "class": {}, });
 const delegatedProps = reactiveOmit(props, "class");
 </script>
 

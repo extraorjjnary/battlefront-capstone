@@ -3,7 +3,7 @@ import { reactiveOmit } from "@vueuse/core";
 import { NavigationMenuRoot, useForwardPropsEmits } from "reka-ui";
 import { cn } from "@/lib/utils";
 import NavigationMenuViewport from "./NavigationMenuViewport.vue";
-const props = defineProps({ ...NavigationMenuRoot.props, "class": null,
+const props = defineProps({ ...NavigationMenuRoot.props, "class": {},
     "viewport": { type: Boolean, default: true }, });
 const emits = defineEmits(NavigationMenuRoot.emits);
 const delegatedProps = reactiveOmit(props, "class", "viewport");

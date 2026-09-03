@@ -7,7 +7,7 @@ import SheetOverlay from "./SheetOverlay.vue";
 defineOptions({
     inheritAttrs: false,
 });
-const props = defineProps({ ...DialogContent.props, "class": null,
+const props = defineProps({ ...DialogContent.props, "class": {},
     "side": { type: String, default: "right" }, });
 const emits = defineEmits(DialogContent.emits);
 const delegatedProps = reactiveOmit(props, "class", "side");

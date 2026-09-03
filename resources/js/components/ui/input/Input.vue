@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 const props = defineProps({
     "defaultValue": { type: [String, Number] },
     "modelValue": { type: [String, Number] },
-    "class": null,
+    "class": {},
 });
 const emits = defineEmits(['update:modelValue']);
 const modelValue = useVModel(props, "modelValue", emits, {

@@ -2,7 +2,7 @@
 import { AvatarRoot } from "reka-ui";
 import { cn } from "@/lib/utils";
 const props = defineProps({
-    "class": null,
+    "class": {},
 });
 </script>
 

@@ -7,7 +7,7 @@ import { provideSidebarContext, SIDEBAR_COOKIE_MAX_AGE, SIDEBAR_COOKIE_NAME, SID
 const props = defineProps({
     "defaultOpen": { type: Boolean, default: !defaultDocument?.cookie.includes(`${SIDEBAR_COOKIE_NAME}=false`) },
     "open": { type: Boolean, default: undefined },
-    "class": null,
+    "class": {},
 });
 const emits = defineEmits(['update:open']);
 const isMobile = useMediaQuery("(max-width: 768px)");

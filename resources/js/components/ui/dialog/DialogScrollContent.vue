@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 defineOptions({
     inheritAttrs: false,
 });
-const props = defineProps({ ...DialogContent.props, "class": null, });
+const props = defineProps({ ...DialogContent.props, "class": {}, });
 const emits = defineEmits(DialogContent.emits);
 const delegatedProps = reactiveOmit(props, "class");
 const forwarded = useForwardPropsEmits(delegatedProps, emits);

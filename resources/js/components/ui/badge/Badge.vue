@@ -3,8 +3,8 @@ import { reactiveOmit } from "@vueuse/core";
 import { Primitive } from "reka-ui";
 import { cn } from "@/lib/utils";
 import { badgeVariants } from ".";
-const props = defineProps({ ...Primitive.props, "variant": null,
-    "class": null, });
+const props = defineProps({ ...Primitive.props, "variant": {},
+    "class": {}, });
 const delegatedProps = reactiveOmit(props, "class");
 </script>
 

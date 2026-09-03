@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 defineOptions({
     inheritAttrs: false,
 });
-const props = defineProps({ ...DropdownMenuContent.props, "class": null,
+const props = defineProps({ ...DropdownMenuContent.props, "class": {},
     "sideOffset": { default: 4 }, });
 const emits = defineEmits(DropdownMenuContent.emits);
 const delegatedProps = reactiveOmit(props, "class");

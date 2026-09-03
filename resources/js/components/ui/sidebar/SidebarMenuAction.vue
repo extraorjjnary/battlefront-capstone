@@ -2,7 +2,7 @@
 import { Primitive } from "reka-ui";
 import { cn } from "@/lib/utils";
 const props = defineProps({ ...Primitive.props, "showOnHover": { type: Boolean },
-    "class": null,
+    "class": {},
     "as": { default: "button" }, });
 </script>
 

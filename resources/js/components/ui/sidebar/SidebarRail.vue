@@ -2,7 +2,7 @@
 import { cn } from "@/lib/utils";
 import { useSidebar } from "./utils";
 const props = defineProps({
-    "class": null,
+    "class": {},
 });
 const { toggleSidebar } = useSidebar();
 </script>

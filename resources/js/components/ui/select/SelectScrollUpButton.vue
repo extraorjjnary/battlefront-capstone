@@ -3,7 +3,7 @@ import { ChevronUp } from "@lucide/vue";
 import { reactiveOmit } from "@vueuse/core";
 import { SelectScrollUpButton, useForwardProps } from "reka-ui";
 import { cn } from "@/lib/utils";
-const props = defineProps({ ...SelectScrollUpButton.props, "class": null, });
+const props = defineProps({ ...SelectScrollUpButton.props, "class": {}, });
 const delegatedProps = reactiveOmit(props, "class");
 const forwardedProps = useForwardProps(delegatedProps);
 </script>

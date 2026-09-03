@@ -2,7 +2,7 @@
 import { reactiveOmit } from "@vueuse/core";
 import { Label } from "reka-ui";
 import { cn } from "@/lib/utils";
-const props = defineProps({ ...Label.props, "class": null, });
+const props = defineProps({ ...Label.props, "class": {}, });
 const delegatedProps = reactiveOmit(props, "class");
 </script>
 

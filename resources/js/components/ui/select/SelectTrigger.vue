@@ -3,7 +3,7 @@ import { ChevronDown } from "@lucide/vue";
 import { reactiveOmit } from "@vueuse/core";
 import { SelectIcon, SelectTrigger, useForwardProps } from "reka-ui";
 import { cn } from "@/lib/utils";
-const props = defineProps({ ...SelectTrigger.props, "class": null,
+const props = defineProps({ ...SelectTrigger.props, "class": {},
     "size": { type: String, default: "default" }, });
 const delegatedProps = reactiveOmit(props, "class", "size");
 const forwardedProps = useForwardProps(delegatedProps);

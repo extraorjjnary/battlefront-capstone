@@ -2,7 +2,7 @@
 import { cn } from "@/lib/utils";
 import { Separator } from '@/components/ui/separator';
 const props = defineProps({
-    "class": null,
+    "class": {},
 });
 </script>
 

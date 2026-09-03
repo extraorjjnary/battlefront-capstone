@@ -2,7 +2,7 @@
 import { cn } from "@/lib/utils";
 import { Input } from '@/components/ui/input';
 const props = defineProps({
-    "class": null,
+    "class": {},
 });
 </script>
 

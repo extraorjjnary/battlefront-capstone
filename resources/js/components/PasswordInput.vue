@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 defineOptions({ inheritAttrs: false });
 const props = defineProps({
-    class: null,
+    class: {},
 });
 const showPassword = ref(false);
 const inputRef = useTemplateRef('inputRef');

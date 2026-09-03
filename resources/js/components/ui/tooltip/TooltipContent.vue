@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 defineOptions({
     inheritAttrs: false,
 });
-const props = defineProps({ ...TooltipContent.props, "class": null,
+const props = defineProps({ ...TooltipContent.props, "class": {},
     "sideOffset": { default: 4 }, });
 const emits = defineEmits(TooltipContent.emits);
 const delegatedProps = reactiveOmit(props, "class");

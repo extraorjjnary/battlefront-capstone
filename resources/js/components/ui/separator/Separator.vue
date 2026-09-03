@@ -2,7 +2,7 @@
 import { reactiveOmit } from "@vueuse/core";
 import { Separator } from "reka-ui";
 import { cn } from "@/lib/utils";
-const props = defineProps({ ...Separator.props, "class": null,
+const props = defineProps({ ...Separator.props, "class": {},
     "orientation": { default: "horizontal" },
     "decorative": { default: true }, });
 const delegatedProps = reactiveOmit(props, "class");

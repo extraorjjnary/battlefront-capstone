@@ -3,7 +3,7 @@ import { Link } from '@inertiajs/vue3';
 defineProps({
     href: { required: true },
     tabindex: { type: Number },
-    method: null,
+    method: {},
     as: { type: String },
 });
 </script>

@@ -2,7 +2,7 @@
 import { reactiveOmit } from "@vueuse/core";
 import { NavigationMenuIndicator, useForwardProps } from "reka-ui";
 import { cn } from "@/lib/utils";
-const props = defineProps({ ...NavigationMenuIndicator.props, "class": null, });
+const props = defineProps({ ...NavigationMenuIndicator.props, "class": {}, });
 const delegatedProps = reactiveOmit(props, "class");
 const forwardedProps = useForwardProps(delegatedProps);
 </script>

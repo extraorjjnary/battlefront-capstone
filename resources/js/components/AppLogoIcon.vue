@@ -3,7 +3,7 @@ defineOptions({
     inheritAttrs: false,
 });
 defineProps({
-    className: null,
+    className: {},
 });
 </script>
 

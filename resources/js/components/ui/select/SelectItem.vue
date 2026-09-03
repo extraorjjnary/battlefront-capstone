@@ -3,7 +3,7 @@ import { Check } from "@lucide/vue";
 import { reactiveOmit } from "@vueuse/core";
 import { SelectItem, SelectItemIndicator, SelectItemText, useForwardProps } from "reka-ui";
 import { cn } from "@/lib/utils";
-const props = defineProps({ ...SelectItem.props, "class": null, });
+const props = defineProps({ ...SelectItem.props, "class": {}, });
 const delegatedProps = reactiveOmit(props, "class");
 const forwardedProps = useForwardProps(delegatedProps);
 </script>

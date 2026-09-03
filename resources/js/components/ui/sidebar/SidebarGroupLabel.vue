@@ -1,7 +1,7 @@
 <script setup>
 import { Primitive } from "reka-ui";
 import { cn } from "@/lib/utils";
-const props = defineProps({ ...Primitive.props, "class": null, });
+const props = defineProps({ ...Primitive.props, "class": {}, });
 </script>
 
 <template>

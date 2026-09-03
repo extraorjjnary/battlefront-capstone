@@ -2,7 +2,7 @@
 import { reactiveOmit } from "@vueuse/core";
 import { DialogOverlay } from "reka-ui";
 import { cn } from "@/lib/utils";
-const props = defineProps({ ...DialogOverlay.props, "class": null, });
+const props = defineProps({ ...DialogOverlay.props, "class": {}, });
 const delegatedProps = reactiveOmit(props, "class");
 </script>
 

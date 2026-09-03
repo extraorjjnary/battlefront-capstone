@@ -2,9 +2,9 @@
 import { Primitive } from "reka-ui";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from ".";
-const props = defineProps({ ...Primitive.props, "variant": null,
-    "size": null,
-    "class": null,
+const props = defineProps({ ...Primitive.props, "variant": {},
+    "size": {},
+    "class": {},
     "as": { default: "button" }, });
 </script>
 

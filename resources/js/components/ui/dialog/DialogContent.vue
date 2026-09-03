@@ -7,7 +7,7 @@ import DialogOverlay from "./DialogOverlay.vue";
 defineOptions({
     inheritAttrs: false,
 });
-const props = defineProps({ ...DialogContent.props, "class": null,
+const props = defineProps({ ...DialogContent.props, "class": {},
     "showCloseButton": { type: Boolean, default: true }, });
 const emits = defineEmits(DialogContent.emits);
 const delegatedProps = reactiveOmit(props, "class");

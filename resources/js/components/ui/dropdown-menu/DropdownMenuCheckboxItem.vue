@@ -3,7 +3,7 @@ import { Check } from "@lucide/vue";
 import { reactiveOmit } from "@vueuse/core";
 import { DropdownMenuCheckboxItem, DropdownMenuItemIndicator, useForwardPropsEmits } from "reka-ui";
 import { cn } from "@/lib/utils";
-const props = defineProps({ ...DropdownMenuCheckboxItem.props, "class": null, });
+const props = defineProps({ ...DropdownMenuCheckboxItem.props, "class": {}, });
 const emits = defineEmits(DropdownMenuCheckboxItem.emits);
 const delegatedProps = reactiveOmit(props, "class");
 const forwarded = useForwardPropsEmits(delegatedProps, emits);

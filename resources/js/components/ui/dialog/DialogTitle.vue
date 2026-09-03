@@ -2,7 +2,7 @@
 import { reactiveOmit } from "@vueuse/core";
 import { DialogTitle, useForwardProps } from "reka-ui";
 import { cn } from "@/lib/utils";
-const props = defineProps({ ...DialogTitle.props, "class": null, });
+const props = defineProps({ ...DialogTitle.props, "class": {}, });
 const delegatedProps = reactiveOmit(props, "class");
 const forwardedProps = useForwardProps(delegatedProps);
 </script>

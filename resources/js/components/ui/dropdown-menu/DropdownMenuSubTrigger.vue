@@ -3,7 +3,7 @@ import { ChevronRight } from "@lucide/vue";
 import { reactiveOmit } from "@vueuse/core";
 import { DropdownMenuSubTrigger, useForwardProps } from "reka-ui";
 import { cn } from "@/lib/utils";
-const props = defineProps({ ...DropdownMenuSubTrigger.props, "class": null,
+const props = defineProps({ ...DropdownMenuSubTrigger.props, "class": {},
     "inset": { type: Boolean }, });
 const delegatedProps = reactiveOmit(props, "class", "inset");
 const forwardedProps = useForwardProps(delegatedProps);

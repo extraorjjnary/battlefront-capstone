@@ -3,7 +3,7 @@ import { Circle } from "@lucide/vue";
 import { reactiveOmit } from "@vueuse/core";
 import { DropdownMenuItemIndicator, DropdownMenuRadioItem, useForwardPropsEmits } from "reka-ui";
 import { cn } from "@/lib/utils";
-const props = defineProps({ ...DropdownMenuRadioItem.props, "class": null, });
+const props = defineProps({ ...DropdownMenuRadioItem.props, "class": {}, });
 const emits = defineEmits(DropdownMenuRadioItem.emits);
 const delegatedProps = reactiveOmit(props, "class");
 const forwarded = useForwardPropsEmits(delegatedProps, emits);

@@ -2,8 +2,8 @@
 import { cn } from "@/lib/utils";
 import { alertVariants } from ".";
 const props = defineProps({
-    "class": null,
-    "variant": null,
+    "class": {},
+    "variant": {},
 });
 </script>
 

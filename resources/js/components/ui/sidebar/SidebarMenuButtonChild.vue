@@ -5,7 +5,7 @@ import { sidebarMenuButtonVariants } from ".";
 const props = defineProps({ ...Primitive.props, "variant": { default: "default" },
     "size": { default: "default" },
     "isActive": { type: Boolean },
-    "class": null,
+    "class": {},
     "as": { default: "button" }, });
 </script>
 

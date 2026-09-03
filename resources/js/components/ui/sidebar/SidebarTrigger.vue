@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from '@/components/ui/button';
 import { useSidebar } from "./utils";
 const props = defineProps({
-    "class": null,
+    "class": {},
 });
 const { isMobile, state, toggleSidebar } = useSidebar();
 </script>

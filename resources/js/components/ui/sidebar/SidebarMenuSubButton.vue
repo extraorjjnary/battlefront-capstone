@@ -3,7 +3,7 @@ import { Primitive } from "reka-ui";
 import { cn } from "@/lib/utils";
 const props = defineProps({ ...Primitive.props, "size": { type: String, default: "md" },
     "isActive": { type: Boolean },
-    "class": null,
+    "class": {},
     "as": { default: "a" }, });
 </script>
 

@@ -3,7 +3,7 @@ import { DialogClose } from "reka-ui";
 import { cn } from "@/lib/utils";
 import { Button } from '@/components/ui/button';
 const props = defineProps({
-    "class": null,
+    "class": {},
     "showCloseButton": { type: Boolean, default: false },
 });
 </script>

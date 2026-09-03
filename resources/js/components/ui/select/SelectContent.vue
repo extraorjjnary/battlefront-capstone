@@ -6,7 +6,7 @@ import { SelectScrollDownButton, SelectScrollUpButton } from ".";
 defineOptions({
     inheritAttrs: false,
 });
-const props = defineProps({ ...SelectContent.props, "class": null,
+const props = defineProps({ ...SelectContent.props, "class": {},
     "position": { default: "popper" }, });
 const emits = defineEmits(SelectContent.emits);
 const delegatedProps = reactiveOmit(props, "class");

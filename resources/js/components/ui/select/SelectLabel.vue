@@ -1,7 +1,7 @@
 <script setup>
 import { SelectLabel } from "reka-ui";
 import { cn } from "@/lib/utils";
-const props = defineProps({ ...SelectLabel.props, "class": null, });
+const props = defineProps({ ...SelectLabel.props, "class": {}, });
 </script>
 
 <template>
