@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup>
 import { Form, Head } from '@inertiajs/vue3';
 import SecurityController from '@/actions/App/Http/Controllers/Settings/SecurityController';
 import Heading from '@/components/Heading.vue';
@@ -7,14 +7,9 @@ import PasswordInput from '@/components/PasswordInput.vue';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { edit } from '@/routes/security';
-
-// oxfmt-ignore
-type Props = {
-    passwordRules: string;
-} ;
-
-const props = defineProps<Props>();
-
+const props = defineProps({
+    passwordRules: { type: String, required: true },
+});
 defineOptions({
     layout: {
         breadcrumbs: [

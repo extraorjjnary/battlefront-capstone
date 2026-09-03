@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup>
 import { Form, Head } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import InputError from '@/components/InputError.vue';
@@ -8,20 +8,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { update } from '@/routes/password';
-
 defineOptions({
     layout: {
         title: 'Reset password',
         description: 'Please enter your new password below',
     },
 });
-
-const props = defineProps<{
-    token: string;
-    email: string;
-    passwordRules: string;
-}>();
-
+const props = defineProps({
+    token: { type: String, required: true },
+    email: { type: String, required: true },
+    passwordRules: { type: String, required: true },
+});
 const inputEmail = ref(props.email);
 </script>
 

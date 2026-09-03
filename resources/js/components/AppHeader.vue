@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup>
 import { Link, usePage } from '@inertiajs/vue3';
 import { BookOpen, Folder, LayoutGrid, Menu, Search } from '@lucide/vue';
 import { computed } from 'vue';
@@ -36,32 +36,22 @@ import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import { getInitials } from '@/composables/useInitials';
 import { toUrl } from '@/lib/utils';
 import { dashboard } from '@/routes';
-import type { BreadcrumbItem, NavItem } from '@/types';
-
-type Props = {
-    breadcrumbs?: BreadcrumbItem[];
-};
-
-const props = withDefaults(defineProps<Props>(), {
-    breadcrumbs: () => [],
+const props = defineProps({
+    breadcrumbs: { type: Array, default: () => [] },
 });
-
 const page = usePage();
 const auth = computed(() => page.props.auth);
 const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
-
 const activeItemStyles =
     'text-neutral-900 dark:bg-neutral-800 dark:text-neutral-100';
-
-const mainNavItems: NavItem[] = [
+const mainNavItems = [
     {
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
     },
 ];
-
-const rightNavItems: NavItem[] = [
+const rightNavItems = [
     {
         title: 'Repository',
         href: 'https://github.com/laravel/vue-starter-kit',

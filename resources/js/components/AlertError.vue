@@ -1,17 +1,11 @@
-<script setup lang="ts">
+<script setup>
 import { AlertCircle } from '@lucide/vue';
 import { computed } from 'vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-
-type Props = {
-    errors: string[];
-    title?: string;
-};
-
-const props = withDefaults(defineProps<Props>(), {
-    title: 'Something went wrong.',
+const props = defineProps({
+    errors: { type: Array, required: true },
+    title: { type: String, default: 'Something went wrong.' },
 });
-
 const uniqueErrors = computed(() => Array.from(new Set(props.errors)));
 </script>
 

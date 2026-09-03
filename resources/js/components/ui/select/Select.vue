@@ -1,11 +1,8 @@
-<script setup lang="ts">
-import type { SelectRootEmits, SelectRootProps } from "reka-ui"
-import { SelectRoot, useForwardPropsEmits } from "reka-ui"
-
-const props = defineProps<SelectRootProps>()
-const emits = defineEmits<SelectRootEmits>()
-
-const forwarded = useForwardPropsEmits(props, emits)
+<script setup>
+import { SelectRoot, useForwardPropsEmits } from "reka-ui";
+const props = defineProps(SelectRoot.props);
+const emits = defineEmits(SelectRoot.emits);
+const forwarded = useForwardPropsEmits(props, emits);
 </script>
 
 <template>

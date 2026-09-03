@@ -1,8 +1,6 @@
-<script setup lang="ts">
-import type { SelectGroupProps } from "reka-ui"
-import { SelectGroup } from "reka-ui"
-
-const props = defineProps<SelectGroupProps>()
+<script setup>
+import { SelectGroup } from "reka-ui";
+const props = defineProps(SelectGroup.props);
 </script>
 
 <template>

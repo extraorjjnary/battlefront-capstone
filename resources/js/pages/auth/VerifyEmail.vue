@@ -1,11 +1,10 @@
-<script setup lang="ts">
+<script setup>
 import { Form, Head } from '@inertiajs/vue3';
 import TextLink from '@/components/TextLink.vue';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import { logout } from '@/routes';
 import { send } from '@/routes/verification';
-
 defineOptions({
     layout: {
         title: 'Email verification',
@@ -13,10 +12,9 @@ defineOptions({
             'Please verify your email address by clicking on the link we just emailed to you.',
     },
 });
-
-defineProps<{
-    status?: string;
-}>();
+defineProps({
+    status: { type: String },
+});
 </script>
 
 <template>

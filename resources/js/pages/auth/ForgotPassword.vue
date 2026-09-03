@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup>
 import { Form, Head } from '@inertiajs/vue3';
 import InputError from '@/components/InputError.vue';
 import TextLink from '@/components/TextLink.vue';
@@ -8,17 +8,15 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { login } from '@/routes';
 import { email } from '@/routes/password';
-
 defineOptions({
     layout: {
         title: 'Forgot password',
         description: 'Enter your email to receive a password reset link',
     },
 });
-
-defineProps<{
-    status?: string;
-}>();
+defineProps({
+    status: { type: String },
+});
 </script>
 
 <template>

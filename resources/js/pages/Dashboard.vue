@@ -1,8 +1,7 @@
-<script setup lang="ts">
+<script setup>
 import { Head } from '@inertiajs/vue3';
 import PlaceholderPattern from '@/components/PlaceholderPattern.vue';
 import { dashboard } from '@/routes';
-
 defineOptions({
     layout: {
         breadcrumbs: [

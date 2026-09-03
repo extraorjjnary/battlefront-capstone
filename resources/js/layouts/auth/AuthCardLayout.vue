@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup>
 import { Link } from '@inertiajs/vue3';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import {
@@ -9,11 +9,10 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import { home } from '@/routes';
-
-defineProps<{
-    title?: string;
-    description?: string;
-}>();
+defineProps({
+    title: { type: String },
+    description: { type: String },
+});
 </script>
 
 <template>

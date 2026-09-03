@@ -1,15 +1,13 @@
-<script setup lang="ts">
+<script setup>
 import { Link, usePage } from '@inertiajs/vue3';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import { home } from '@/routes';
-
 const page = usePage();
 const name = page.props.name;
-
-defineProps<{
-    title?: string;
-    description?: string;
-}>();
+defineProps({
+    title: { type: String },
+    description: { type: String },
+});
 </script>
 
 <template>

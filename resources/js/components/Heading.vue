@@ -1,12 +1,8 @@
-<script setup lang="ts">
-type Props = {
-    title: string;
-    description?: string;
-    variant?: 'default' | 'small';
-};
-
-withDefaults(defineProps<Props>(), {
-    variant: 'default',
+<script setup>
+defineProps({
+    title: { type: String, required: true },
+    description: { type: String },
+    variant: { type: String, default: 'default' },
 });
 </script>
 

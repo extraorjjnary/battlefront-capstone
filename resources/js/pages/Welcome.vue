@@ -1,4 +1,4 @@
-<script setup lang="ts">
+<script setup>
 import { Head, Link } from '@inertiajs/vue3';
 import { dashboard, login } from '@/routes';
 import { register } from '@/routes';

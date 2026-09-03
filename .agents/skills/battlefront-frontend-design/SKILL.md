@@ -54,7 +54,7 @@ Simple layout elements such as page sections, product cards, navigation layouts,
 
 When adding a new shadcn-vue component:
 
-- Check whether it already exists in `resources/js/components/ui`.
+- Check whether it already exists in `resources/js/components/`.
 - Add only the component needed for the task.
 - Customize it according to the `battlefront-branding` skill.
 - Do not introduce default shadcn styling that conflicts with Battlefront's visual identity.
