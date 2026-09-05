@@ -1,3 +1,4 @@
 [mcp_servers.laravel-boost]
+startup_timeout_sec = 60
 command = "php"
 args = ["artisan", "boost:mcp"]

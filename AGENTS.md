@@ -236,6 +236,7 @@ Use the existing project stack unless explicitly approved otherwise:
 - Vue 3
 - Inertia.js
 - Tailwind CSS
+- Shadcn Vue
 - MySQL
 - Vite
 - Laravel Boost
