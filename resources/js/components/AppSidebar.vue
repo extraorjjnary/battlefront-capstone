@@ -1,8 +1,7 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, FolderGit2, LayoutGrid } from '@lucide/vue';
 import AppLogo from '@/components/AppLogo.vue';
-import NavFooter from '@/components/NavFooter.vue';
+import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import {
@@ -14,26 +13,10 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { useAppNavigation } from '@/composables/useAppNavigation';
 import { dashboard } from '@/routes';
-const mainNavItems = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
-];
-const footerNavItems = [
-    {
-        title: 'Repository',
-        href: 'https://github.com/laravel/vue-starter-kit',
-        icon: FolderGit2,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#vue',
-        icon: BookOpen,
-    },
-];
+
+const { mainNavItems, sectionLabel } = useAppNavigation();
 </script>
 
 <template>
@@ -41,9 +24,17 @@ const footerNavItems = [
         <SidebarHeader>
             <SidebarMenu>
                 <SidebarMenuItem>
-                    <SidebarMenuButton size="lg" as-child>
-                        <Link :href="dashboard()">
-                            <AppLogo />
+                    <SidebarMenuButton size="lg" as-child class="h-14">
+                        <Link
+                            :href="dashboard()"
+                            aria-label="Battlefront dashboard"
+                        >
+                            <AppLogo
+                                class="w-40 group-data-[collapsible=icon]:hidden"
+                            />
+                            <AppLogoIcon
+                                class="hidden size-8 group-data-[collapsible=icon]:block"
+                            />
                         </Link>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -51,11 +42,10 @@ const footerNavItems = [
         </SidebarHeader>
 
         <SidebarContent>
-            <NavMain :items="mainNavItems" />
+            <NavMain :items="mainNavItems" :label="sectionLabel" />
         </SidebarContent>
 
         <SidebarFooter>
-            <NavFooter :items="footerNavItems" />
             <NavUser />
         </SidebarFooter>
     </Sidebar>

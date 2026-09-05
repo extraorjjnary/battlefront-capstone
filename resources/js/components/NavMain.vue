@@ -10,13 +10,14 @@ import {
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
 defineProps({
     items: { type: Array, required: true },
+    label: { type: String, default: 'Navigation' },
 });
 const { isCurrentUrl } = useCurrentUrl();
 </script>
 
 <template>
     <SidebarGroup class="px-2 py-0">
-        <SidebarGroupLabel>Platform</SidebarGroupLabel>
+        <SidebarGroupLabel>{{ label }}</SidebarGroupLabel>
         <SidebarMenu>
             <SidebarMenuItem v-for="item in items" :key="item.title">
                 <SidebarMenuButton
