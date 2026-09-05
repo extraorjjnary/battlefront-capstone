@@ -146,6 +146,7 @@ Normal Inertia web functionality should therefore use:
 - Inertia responses;
 - page props;
 - Inertia forms;
+- Wayfinder
 - Inertia navigation/router features.
 
 A separate REST endpoint or Axios-based frontend architecture should not be assumed for ordinary Inertia web features.
@@ -244,6 +245,7 @@ System/database data remains authoritative for those facts.
 - Vue 3
 - Inertia.js
 - Tailwind CSS
+- Shadcn Vue
 - Vite
 - MySQL
 - Flutter
@@ -534,6 +536,33 @@ The **manuscript ERD remains authoritative** for:
 
 A relationship should not be inferred merely because it would be common in a typical e-commerce application.
 
+## EXT-6 ERD Confirmation Record
+
+EXT-6 reviewed Figure 6 of the approved manuscript against this context, the related Linear issues, and the existing Laravel authentication schema. Figure 6 is the authoritative logical ERD, but it does not specify all implementation details needed for migrations. In particular, it omits most string lengths, decimal precision, nullability, defaults, enum members, indexes, delete behavior, and lifecycle behavior.
+
+The following decisions are **approved implementation decisions within the existing manuscript scope**. They do not amend the manuscript:
+
+- use Laravel-compatible unsigned big integer primary and foreign keys rather than interpreting the ERD's generic `int` labels as a required physical storage size;
+- retain Laravel authentication infrastructure fields and tables required by the installed authentication features, including `email_verified_at`, `remember_token`, conventional timestamps, password reset tokens, and sessions;
+- add `forecasts.method` so persisted moving-average and least-squares linear-trend results can be distinguished;
+- use `DECIMAL(12,2)` for monetary values, matching unsigned integer types for quantities, and explicit foreign-key, uniqueness, and non-negative-value constraints where required by the approved relationships and business rules;
+- use the enum values `customer` and `administrator` for user roles, `pending`, `processing`, `completed`, and `cancelled` for order status, `pending`, `verified`, and `rejected` for payment status, `moving_average` and `linear_trend` for forecast method, and `product`, `order`, `store`, and `faq` for chatbot category.
+
+The following are **proposed schema amendments pending adviser confirmation**. They must not be treated as manuscript-authoritative or implemented merely because they appear in this context:
+
+- `branches.is_primary`, proposed to identify Sagay City as the sole primary operational branch;
+- lifecycle or deactivation fields for categories, products, and chatbot knowledge, proposed to preserve referenced records while removing them from active use;
+- any future product-to-product compatibility relationship, proposed only if verified catalog data requires relationships that cannot be represented safely through product tags.
+
+The following decisions remain unresolved and require human or adviser confirmation before their affected persistence work is considered final:
+
+- the exact payment methods Battlefront accepts for manual processing;
+- whether orders must snapshot recipient name, contact number, fulfillment method, and delivery address so later profile changes do not alter historical order information;
+- the exact columns, allowed compatibility types, directionality, and uniqueness rules for any future product compatibility relationship;
+- the exact form of lifecycle behavior if the proposed deactivation fields are approved.
+
+Until those decisions are resolved, dependent work must use only the manuscript fields and approved implementation decisions that are relevant to it. Pending amendments must remain visibly labeled and must not silently become schema requirements.
+
 ---
 
 # 12. Approved Scope Boundaries
@@ -690,6 +719,8 @@ Development is intended to be iterative and incremental rather than one large si
 - System evaluation
 
 This sequence represents the manuscript's general development progression and may be decomposed into smaller implementation issues.
+
+Use this sequence to organize Linear projects, issues, dependencies, and sub-issues. Do not treat the full sequence as authorization to implement multiple modules at once.
 
 ---
 
