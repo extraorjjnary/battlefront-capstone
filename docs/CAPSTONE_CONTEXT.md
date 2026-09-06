@@ -381,7 +381,7 @@ The design was selected because the newly deployed system does not initially hav
 - selected product category;
 - customer/product preferences;
 - product tags;
-- compatibility rules where applicable.
+- available Sagay inventory.
 
 ```text
 Customer Requirements
@@ -395,7 +395,9 @@ Consider Available Catalog / Inventory
 Suitable Product Results
 ```
 
-An example compatibility use case is matching compatible computer components where the stored product information supports such rules.
+Explicit PC-part compatibility checking and configurator behavior are outside the current capstone scope. The recommendation module does not use a dedicated product-to-product compatibility relationship or a `product_compatibilities` table.
+
+The current Chapters 1–3 manuscript source has already been revised to remove compatibility-based recommendation criteria and any promise of explicit compatibility checking. Its remaining references to product-compatibility inquiries in the Chapter I Introduction and Chapter III Research Locale describe Battlefront's existing staff-assisted business context rather than a system feature. No further manuscript revision is required for this scope decision unless the adviser requests additional clarification. The manuscript remains the authoritative scope source, with this developer-approved implementation decision recorded transparently.
 
 The module operates using Battlefront's internal product catalog and inventory data.
 
@@ -558,26 +560,23 @@ The following decisions are **approved implementation decisions within the exist
 - use Laravel-compatible unsigned big integer primary and foreign keys rather than interpreting the ERD's generic `int` labels as a required physical storage size;
 - retain Laravel authentication infrastructure fields and tables required by the installed authentication features, including `email_verified_at`, `remember_token`, conventional timestamps, password reset tokens, and sessions;
 - add `forecasts.method` so persisted moving-average and least-squares linear-trend results can be distinguished;
+- treat Sagay City as the sole operational branch for live sales and inventory, select it through application or configuration logic, and keep the `branches` schema aligned with the current manuscript ERD without adding `branches.is_primary`;
+- add an `is_active` boolean field with a default value of `true` to categories, products, and chatbot knowledge; use neither a lifecycle status enum nor Laravel soft deletes for these records;
 - use `DECIMAL(12,2)` for monetary values, matching unsigned integer types for quantities, and explicit foreign-key, uniqueness, and non-negative-value constraints where required by the approved relationships and business rules;
 - use the enum values `customer` and `administrator` for user roles, `pending`, `processing`, `completed`, and `cancelled` for order status, `pending`, `verified`, and `rejected` for payment status, `moving_average` and `linear_trend` for forecast method, and `product`, `order`, `store`, and `faq` for chatbot category.
 - expose **8:00 AM–6:00 PM** as the static customer-facing operating-hours value for all four branches through application configuration, without adding an `operating_hours` column to the manuscript ERD.
 - seed only confirmed branch addresses and contact numbers into the matching manuscript ERD fields; keep unavailable values null and do not invent placeholders.
 - keep branch email reference data in application configuration because the current manuscript ERD does not define a `branches.email` column.
+- keep deactivated categories, products, and chatbot knowledge in the database for historical and administrative reference, allow administrators to reactivate them, and prohibit physical deletion when historically referenced;
+- exclude inactive products from the customer catalog, cart eligibility, and recommendation results; exclude inactive categories and their products from customer browsing; and exclude inactive chatbot knowledge from chatbot retrieval;
+- keep recommendation behavior rule-based using budget, intended use, preferred brand, category, product preferences or tags, and Sagay inventory; do not implement a `product_compatibilities` table, product-to-product compatibility relationship, or dedicated compatibility-checking/configurator feature.
 
-The following are **proposed schema amendments pending adviser confirmation**. They must not be treated as manuscript-authoritative or implemented merely because they appear in this context:
+The following E-Commerce decisions were explicitly deferred from EXT-6 to focused blocking issues:
 
-- `branches.is_primary`, proposed to identify Sagay City as the sole primary operational branch;
-- lifecycle or deactivation fields for categories, products, and chatbot knowledge, proposed to preserve referenced records while removing them from active use;
-- any future product-to-product compatibility relationship, proposed only if verified catalog data requires relationships that cannot be represented safely through product tags.
+- EXT-80 must confirm the exact payment methods Battlefront accepts for manual processing before EXT-32 implements checkout payment-method validation;
+- EXT-81 must decide whether orders snapshot recipient name, contact number, fulfillment method, and delivery address before EXT-31 implements order persistence.
 
-The following decisions remain unresolved and require human or adviser confirmation before their affected persistence work is considered final:
-
-- the exact payment methods Battlefront accepts for manual processing;
-- whether orders must snapshot recipient name, contact number, fulfillment method, and delivery address so later profile changes do not alter historical order information;
-- the exact columns, allowed compatibility types, directionality, and uniqueness rules for any future product compatibility relationship;
-- the exact form of lifecycle behavior if the proposed deactivation fields are approved.
-
-Until those decisions are resolved, dependent work must use only the manuscript fields and approved implementation decisions that are relevant to it. Pending amendments must remain visibly labeled and must not silently become schema requirements.
+These decisions remain unresolved, but their explicit deferral and blocking relationships allow EXT-6 and the Core System schema-confirmation gate to close without allowing the affected E-Commerce work to guess requirements.
 
 ---
 
@@ -636,7 +635,9 @@ Outside scope:
 - external supplier pricing;
 - external supplier availability;
 - competitor pricing;
-- external market product availability.
+- external market product availability;
+- explicit PC-part compatibility checking or configurator behavior;
+- a dedicated product-to-product compatibility data model.
 
 ## Forecasting Data
 
