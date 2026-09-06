@@ -69,6 +69,19 @@ Battlefront also operates branches in:
 
 These additional branches are mainly represented through static store information such as location, address, contact information, and operating information supplied by the business.
 
+All four branches use the confirmed customer-facing operating-hours value **8:00 AM–6:00 PM**, based on the shared operating hours published in the business's Facebook bio. This is static reference information selected through application configuration; it does not authorize an `operating_hours` column outside the current manuscript ERD.
+
+## Current Branch Reference Data
+
+| Branch | Contact number | Email | Location |
+| --- | --- | --- | --- |
+| Sagay City | 0938 647 6046 | battlefrontcomputertrading@gmail.com | A, E Marañon St., Brgy. Poblacion II, Sagay City, Negros Occidental (beside LBC Sagay City), Sagay, Philippines 6122 |
+| Escalante City | Not yet confirmed | Not yet confirmed | Not yet confirmed; no official branch page is currently available |
+| San Carlos City | Not listed on the available official branch page | Not yet confirmed | Carmona St., Brgy. V, San Carlos City, Negros Occidental, San Carlos City, Philippines 6127 |
+| Guihulngan City | 0947 946 5723 | battlefrontcomputertrading@gmail.com | L&E Arcade, Larena St., Brgy. Poblacion, Guihulngan City, Guihulngan, Philippines 6214 |
+
+The same email address appears to be shared across branches, but it is currently confirmed only for Sagay City and Guihulngan City. Unconfirmed values must remain null or undisplayed instead of being copied to other branches as verified facts.
+
 Full operational detail such as live stock and order information is centered on the Sagay City branch.
 
 The approved system is not a multi-branch operational synchronization platform.
@@ -547,6 +560,9 @@ The following decisions are **approved implementation decisions within the exist
 - add `forecasts.method` so persisted moving-average and least-squares linear-trend results can be distinguished;
 - use `DECIMAL(12,2)` for monetary values, matching unsigned integer types for quantities, and explicit foreign-key, uniqueness, and non-negative-value constraints where required by the approved relationships and business rules;
 - use the enum values `customer` and `administrator` for user roles, `pending`, `processing`, `completed`, and `cancelled` for order status, `pending`, `verified`, and `rejected` for payment status, `moving_average` and `linear_trend` for forecast method, and `product`, `order`, `store`, and `faq` for chatbot category.
+- expose **8:00 AM–6:00 PM** as the static customer-facing operating-hours value for all four branches through application configuration, without adding an `operating_hours` column to the manuscript ERD.
+- seed only confirmed branch addresses and contact numbers into the matching manuscript ERD fields; keep unavailable values null and do not invent placeholders.
+- keep branch email reference data in application configuration because the current manuscript ERD does not define a `branches.email` column.
 
 The following are **proposed schema amendments pending adviser confirmation**. They must not be treated as manuscript-authoritative or implemented merely because they appear in this context:
 
@@ -577,6 +593,8 @@ Outside scope:
 Sagay City remains the primary operational branch.
 
 Escalante City, San Carlos City, and Guihulngan City are mainly customer-reference locations containing static branch/store information.
+
+The customer-facing operating-hours value for each listed branch is **8:00 AM–6:00 PM** and remains reference information rather than branch-specific operational customization.
 
 ## Payments
 
