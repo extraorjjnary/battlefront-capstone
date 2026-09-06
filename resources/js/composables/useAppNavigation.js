@@ -1,6 +1,7 @@
-import { LayoutDashboard, UserRound } from '@lucide/vue';
+import { Boxes, LayoutDashboard, UserRound } from '@lucide/vue';
 import { usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import InventoryController from '@/actions/App/Http/Controllers/Administration/InventoryController';
 import { dashboard } from '@/routes';
 import { edit as editProfile } from '@/routes/profile';
 
@@ -12,18 +13,31 @@ export function useAppNavigation() {
     const sectionLabel = computed(() =>
         isAdministrator.value ? 'Administration' : 'Customer',
     );
-    const mainNavItems = computed(() => [
-        {
-            title: 'Dashboard',
-            href: dashboard(),
-            icon: LayoutDashboard,
-        },
-        {
+    const mainNavItems = computed(() => {
+        const items = [
+            {
+                title: 'Dashboard',
+                href: dashboard(),
+                icon: LayoutDashboard,
+            },
+        ];
+
+        if (isAdministrator.value) {
+            items.push({
+                title: 'Inventory',
+                href: InventoryController.index(),
+                icon: Boxes,
+            });
+        }
+
+        items.push({
             title: 'Account',
             href: editProfile(),
             icon: UserRound,
-        },
-    ]);
+        });
+
+        return items;
+    });
 
     return {
         isAdministrator,

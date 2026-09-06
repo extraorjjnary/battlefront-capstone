@@ -1,0 +1,194 @@
+<?php
+
+use App\Models\Inventory;
+use App\Models\Product;
+use App\Models\User;
+use Inertia\Testing\AssertableInertia as Assert;
+
+test('guests are redirected when viewing inventory', function () {
+    $this->get(route('administration.inventory.index'))
+        ->assertRedirect(route('login'));
+});
+
+test('customers are forbidden from viewing inventory', function () {
+    $customer = User::factory()->customer()->create();
+
+    $this->actingAs($customer)
+        ->get(route('administration.inventory.index'))
+        ->assertForbidden();
+});
+
+test('administrators can view initialized and uninitialized product inventory', function () {
+    $administrator = User::factory()->administrator()->create();
+    $initializedProduct = Product::factory()->create([
+        'name' => 'AMD Ryzen 7 9700X',
+        'brand' => 'AMD',
+    ]);
+    Inventory::factory()->for($initializedProduct)->create([
+        'quantity' => 12,
+        'reorder_level' => 4,
+    ]);
+    Product::factory()->inactive()->create([
+        'name' => 'Legacy Graphics Card',
+        'brand' => 'Legacy Brand',
+    ]);
+
+    $response = $this
+        ->actingAs($administrator)
+        ->get(route('administration.inventory.index'));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->component('Administration/Inventory')
+        ->has('products.data', 2)
+        ->where('products.data.0.name', 'AMD Ryzen 7 9700X')
+        ->where('products.data.0.inventory.quantity', 12)
+        ->where('products.data.0.inventory.reorder_level', 4)
+        ->where('products.data.1.name', 'Legacy Graphics Card')
+        ->where('products.data.1.is_active', false)
+        ->where('products.data.1.inventory', null));
+});
+
+test('inventory products are paginated in stable name order', function () {
+    $administrator = User::factory()->administrator()->create();
+    Product::factory()->count(26)->sequence(
+        fn ($sequence): array => [
+            'name' => sprintf('Product %02d', 26 - $sequence->index),
+        ],
+    )->create();
+
+    $response = $this
+        ->actingAs($administrator)
+        ->get(route('administration.inventory.index'));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->has('products.data', 25)
+        ->where('products.total', 26)
+        ->where('products.last_page', 2)
+        ->where('products.data.0.name', 'Product 01')
+        ->where('products.data.24.name', 'Product 25'));
+});
+
+test('guests cannot update inventory', function () {
+    $inventory = Inventory::factory()->create([
+        'quantity' => 10,
+        'reorder_level' => 3,
+    ]);
+
+    $this->patch(route('administration.inventory.update', $inventory), [
+        'quantity' => 20,
+        'reorder_level' => 6,
+    ])->assertRedirect(route('login'));
+
+    $this->assertDatabaseHas('inventories', [
+        'id' => $inventory->id,
+        'quantity' => 10,
+        'reorder_level' => 3,
+    ]);
+});
+
+test('customers cannot update inventory', function () {
+    $customer = User::factory()->customer()->create();
+    $inventory = Inventory::factory()->create([
+        'quantity' => 10,
+        'reorder_level' => 3,
+    ]);
+
+    $this->actingAs($customer)
+        ->patch(route('administration.inventory.update', $inventory), [
+            'quantity' => 20,
+            'reorder_level' => 6,
+        ])
+        ->assertForbidden();
+
+    $this->assertDatabaseHas('inventories', [
+        'id' => $inventory->id,
+        'quantity' => 10,
+        'reorder_level' => 3,
+    ]);
+});
+
+test('administrators can update inventory stock values', function () {
+    $administrator = User::factory()->administrator()->create();
+    $inventory = Inventory::factory()->create([
+        'quantity' => 10,
+        'reorder_level' => 3,
+    ]);
+
+    $response = $this
+        ->actingAs($administrator)
+        ->from(route('administration.inventory.index'))
+        ->patch(route('administration.inventory.update', $inventory), [
+            'quantity' => 24,
+            'reorder_level' => 8,
+            'product_id' => Product::factory()->create()->id,
+        ]);
+
+    $response
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('administration.inventory.index'));
+    $this->assertDatabaseHas('inventories', [
+        'id' => $inventory->id,
+        'product_id' => $inventory->product_id,
+        'quantity' => 24,
+        'reorder_level' => 8,
+    ]);
+});
+
+test('invalid inventory values are rejected without changing stock', function (array $payload, array $errors) {
+    $administrator = User::factory()->administrator()->create();
+    $inventory = Inventory::factory()->create([
+        'quantity' => 10,
+        'reorder_level' => 3,
+    ]);
+
+    $response = $this
+        ->actingAs($administrator)
+        ->from(route('administration.inventory.index'))
+        ->patch(route('administration.inventory.update', $inventory), $payload);
+
+    $response
+        ->assertRedirect(route('administration.inventory.index'))
+        ->assertSessionHasErrors($errors);
+    $this->assertDatabaseHas('inventories', [
+        'id' => $inventory->id,
+        'quantity' => 10,
+        'reorder_level' => 3,
+    ]);
+})->with([
+    'required values' => [
+        [],
+        [
+            'quantity' => 'Enter the current quantity.',
+            'reorder_level' => 'Enter the reorder level.',
+        ],
+    ],
+    'negative quantity' => [
+        ['quantity' => -1, 'reorder_level' => 3],
+        ['quantity' => 'Quantity must be zero or greater.'],
+    ],
+    'negative reorder level' => [
+        ['quantity' => 10, 'reorder_level' => -1],
+        ['reorder_level' => 'Reorder level must be zero or greater.'],
+    ],
+    'fractional values' => [
+        ['quantity' => 1.5, 'reorder_level' => 2.5],
+        [
+            'quantity' => 'Quantity must be a whole number.',
+            'reorder_level' => 'Reorder level must be a whole number.',
+        ],
+    ],
+    'non-numeric values' => [
+        ['quantity' => 'many', 'reorder_level' => 'few'],
+        [
+            'quantity' => 'Quantity must be a whole number.',
+            'reorder_level' => 'Reorder level must be a whole number.',
+        ],
+    ],
+    'values beyond storage range' => [
+        ['quantity' => 4294967296, 'reorder_level' => 4294967296],
+        [
+            'quantity' => 'Quantity is too large.',
+            'reorder_level' => 'Reorder level is too large.',
+        ],
+    ],
+]);
