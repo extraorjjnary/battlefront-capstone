@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Product;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -14,7 +15,7 @@ return new class extends Migration
     {
         Schema::create('inventories', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('product_id')->unique()->constrained()->restrictOnDelete();
+            $table->foreignIdFor(Product::class)->unique()->constrained()->restrictOnDelete();
             $table->unsignedInteger('quantity');
             $table->unsignedInteger('reorder_level');
             $table->timestamp('last_updated')->useCurrent()->useCurrentOnUpdate();

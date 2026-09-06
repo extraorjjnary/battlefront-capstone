@@ -2,6 +2,7 @@
 
 use App\Models\Branch;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Schema;
 
 test('the branch schema follows the manuscript ERD', function () {
@@ -21,7 +22,8 @@ test('a user may belong to a branch', function () {
     $user = User::factory()->for($branch)->create();
 
     expect($user->branch->is($branch))->toBeTrue()
-        ->and($branch->users->first()->is($user))->toBeTrue();
+        ->and($branch->users->first()->is($user))->toBeTrue()
+        ->and(fn () => $branch->delete())->toThrow(QueryException::class);
 });
 
 test('branch reference data can be seeded repeatedly', function () {

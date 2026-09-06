@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Fortify\Features;
 
@@ -20,6 +21,32 @@ test('users can authenticate using the login screen', function () {
 
     $this->assertAuthenticated();
     $response->assertRedirect(route('dashboard', absolute: false));
+});
+
+test('database sessions retain nullable unconstrained user references', function () {
+    DB::table('sessions')->insert([
+        [
+            'id' => 'guest-session',
+            'user_id' => null,
+            'payload' => 'guest-payload',
+            'last_activity' => 1,
+        ],
+        [
+            'id' => 'missing-user-session',
+            'user_id' => PHP_INT_MAX,
+            'payload' => 'missing-user-payload',
+            'last_activity' => 1,
+        ],
+    ]);
+
+    $this->assertDatabaseHas('sessions', [
+        'id' => 'guest-session',
+        'user_id' => null,
+    ]);
+    $this->assertDatabaseHas('sessions', [
+        'id' => 'missing-user-session',
+        'user_id' => PHP_INT_MAX,
+    ]);
 });
 
 test('users with two factor enabled are redirected to two factor challenge', function () {
