@@ -1,0 +1,73 @@
+<?php
+
+use App\Models\Inventory;
+use App\Models\Product;
+use Carbon\CarbonInterface;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Schema;
+
+test('the inventory schema follows the approved ERD decisions', function () {
+    expect(Schema::getColumnListing('inventories'))->toEqualCanonicalizing([
+        'id',
+        'product_id',
+        'quantity',
+        'reorder_level',
+        'last_updated',
+    ]);
+});
+
+test('inventory persists valid stock values and casts', function () {
+    $inventory = Inventory::factory()->create([
+        'quantity' => 0,
+        'reorder_level' => 0,
+    ]);
+
+    $this->assertModelExists($inventory);
+    expect($inventory->quantity)->toBe(0)
+        ->and($inventory->quantity)->toBeInt()
+        ->and($inventory->reorder_level)->toBe(0)
+        ->and($inventory->reorder_level)->toBeInt()
+        ->and($inventory->last_updated)->toBeInstanceOf(CarbonInterface::class);
+});
+
+test('a product has at most one inventory record', function () {
+    $product = Product::factory()->create();
+    $inventory = Inventory::factory()->for($product)->create();
+
+    expect($inventory->product->is($product))->toBeTrue()
+        ->and($product->inventory->is($inventory))->toBeTrue()
+        ->and(fn () => Inventory::factory()->for($product)->create())
+        ->toThrow(QueryException::class)
+        ->and(fn () => $product->delete())
+        ->toThrow(QueryException::class);
+});
+
+test('a product may exist without an inventory record', function () {
+    $product = Product::factory()->create();
+
+    expect($product->inventory)->toBeNull();
+});
+
+test('negative inventory values are rejected', function (array $attributes) {
+    expect(fn () => Inventory::factory()->create($attributes))
+        ->toThrow(QueryException::class);
+})->with([
+    'negative quantity' => [['quantity' => -1, 'reorder_level' => 5]],
+    'negative reorder level' => [['quantity' => 5, 'reorder_level' => -1]],
+]);
+
+test('required inventory fields cannot be omitted', function (string $missingField) {
+    $attributes = [
+        'product_id' => Product::factory()->create()->id,
+        'quantity' => 5,
+        'reorder_level' => 2,
+    ];
+    unset($attributes[$missingField]);
+
+    expect(fn () => Inventory::query()->create($attributes))
+        ->toThrow(QueryException::class);
+})->with([
+    'product' => 'product_id',
+    'quantity' => 'quantity',
+    'reorder level' => 'reorder_level',
+]);

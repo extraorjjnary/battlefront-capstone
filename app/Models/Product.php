@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -26,6 +27,7 @@ use Illuminate\Support\Carbon;
  * @property bool $is_active
  * @property Carbon $created_at
  * @property-read Category $category
+ * @property-read Inventory|null $inventory
  * @property-read Collection<int, Tag> $tags
  */
 #[Fillable([
@@ -70,6 +72,17 @@ class Product extends Model
     {
         return $this->belongsTo(Category::class);
     }
+
+    /**
+     * Get the product's inventory record.
+     *
+     * @return HasOne<Inventory, $this>
+     */
+    public function inventory(): HasOne
+    {
+        return $this->hasOne(Inventory::class);
+    }
+
     /**
      * Get the tags assigned to the product.
      *
