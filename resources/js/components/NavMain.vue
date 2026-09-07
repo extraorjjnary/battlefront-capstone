@@ -12,7 +12,7 @@ defineProps({
     items: { type: Array, required: true },
     label: { type: String, default: 'Navigation' },
 });
-const { isCurrentUrl } = useCurrentUrl();
+const { isCurrentOrParentUrl, isCurrentUrl } = useCurrentUrl();
 </script>
 
 <template>
@@ -22,7 +22,13 @@ const { isCurrentUrl } = useCurrentUrl();
             <SidebarMenuItem v-for="item in items" :key="item.title">
                 <SidebarMenuButton
                     as-child
-                    :is-active="isCurrentUrl(item.href)"
+                    :is-active="
+                        item.activeRoutes
+                            ? item.activeRoutes.some((route) =>
+                                  isCurrentOrParentUrl(route),
+                              )
+                            : isCurrentUrl(item.href)
+                    "
                     :tooltip="item.title"
                 >
                     <Link :href="item.href">

@@ -1,7 +1,9 @@
-import { Boxes, LayoutDashboard, UserRound } from '@lucide/vue';
+import { Boxes, LayoutDashboard, PackageSearch, UserRound } from '@lucide/vue';
 import { usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import CategoryController from '@/actions/App/Http/Controllers/Administration/CategoryController';
 import InventoryController from '@/actions/App/Http/Controllers/Administration/InventoryController';
+import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import { dashboard } from '@/routes';
 import { edit as editProfile } from '@/routes/profile';
 
@@ -23,6 +25,15 @@ export function useAppNavigation() {
         ];
 
         if (isAdministrator.value) {
+            items.push({
+                title: 'Catalog',
+                href: ProductController.index(),
+                icon: PackageSearch,
+                activeRoutes: [
+                    ProductController.index(),
+                    CategoryController.index(),
+                ],
+            });
             items.push({
                 title: 'Inventory',
                 href: InventoryController.index(),
