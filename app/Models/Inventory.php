@@ -5,6 +5,8 @@ namespace App\Models;
 use Carbon\CarbonInterface;
 use Database\Factories\InventoryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -43,6 +45,17 @@ class Inventory extends Model
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class);
+    }
+
+    /**
+     * Scope a query to inventory below its reorder level.
+     *
+     * @param  Builder<Inventory>  $query
+     */
+    #[Scope]
+    protected function lowStock(Builder $query): void
+    {
+        $query->whereColumn('quantity', '<', 'reorder_level');
     }
 
     /**

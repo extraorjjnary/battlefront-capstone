@@ -39,13 +39,72 @@ test('administrators can view initialized and uninitialized product inventory', 
 
     $response->assertInertia(fn (Assert $page) => $page
         ->component('Administration/Inventory')
+        ->where('filters.stock', 'all')
+        ->where('low_stock_count', 0)
         ->has('products.data', 2)
         ->where('products.data.0.name', 'AMD Ryzen 7 9700X')
+        ->where('products.data.0.is_low_stock', false)
         ->where('products.data.0.inventory.quantity', 12)
         ->where('products.data.0.inventory.reorder_level', 4)
         ->where('products.data.1.name', 'Legacy Graphics Card')
         ->where('products.data.1.is_active', false)
+        ->where('products.data.1.is_low_stock', false)
         ->where('products.data.1.inventory', null));
+});
+
+test('administrators can filter products below their reorder level', function () {
+    $administrator = User::factory()->administrator()->create();
+    $lowStockProduct = Product::factory()->create(['name' => 'Low Stock Product']);
+    $inactiveLowStockProduct = Product::factory()->inactive()->create([
+        'name' => 'Inactive Low Stock Product',
+    ]);
+    $boundaryProduct = Product::factory()->create(['name' => 'Boundary Product']);
+    $availableProduct = Product::factory()->create(['name' => 'Available Product']);
+    Product::factory()->create(['name' => 'Uninitialized Product']);
+    Inventory::factory()->for($lowStockProduct)->create([
+        'quantity' => 4,
+        'reorder_level' => 5,
+    ]);
+    Inventory::factory()->for($inactiveLowStockProduct)->create([
+        'quantity' => 0,
+        'reorder_level' => 1,
+    ]);
+    Inventory::factory()->for($boundaryProduct)->create([
+        'quantity' => 5,
+        'reorder_level' => 5,
+    ]);
+    Inventory::factory()->for($availableProduct)->create([
+        'quantity' => 6,
+        'reorder_level' => 5,
+    ]);
+
+    $response = $this
+        ->actingAs($administrator)
+        ->get(route('administration.inventory.index', ['stock' => 'low']));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->component('Administration/Inventory')
+        ->where('filters.stock', 'low')
+        ->where('low_stock_count', 2)
+        ->where('products.total', 2)
+        ->where('products.data.0.name', 'Inactive Low Stock Product')
+        ->where('products.data.0.is_active', false)
+        ->where('products.data.0.is_low_stock', true)
+        ->where('products.data.1.name', 'Low Stock Product')
+        ->where('products.data.1.is_low_stock', true));
+});
+
+test('unknown stock filters show all products', function () {
+    $administrator = User::factory()->administrator()->create();
+    Product::factory()->count(2)->create();
+
+    $response = $this
+        ->actingAs($administrator)
+        ->get(route('administration.inventory.index', ['stock' => 'unexpected']));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->where('filters.stock', 'all')
+        ->where('products.total', 2));
 });
 
 test('inventory products are paginated in stable name order', function () {
@@ -66,6 +125,26 @@ test('inventory products are paginated in stable name order', function () {
         ->where('products.last_page', 2)
         ->where('products.data.0.name', 'Product 01')
         ->where('products.data.24.name', 'Product 25'));
+});
+
+test('low-stock pagination preserves the active filter', function () {
+    $administrator = User::factory()->administrator()->create();
+    Product::factory()
+        ->count(26)
+        ->has(Inventory::factory()->state([
+            'quantity' => 1,
+            'reorder_level' => 2,
+        ]))
+        ->create();
+
+    $response = $this
+        ->actingAs($administrator)
+        ->get(route('administration.inventory.index', ['stock' => 'low']));
+
+    $nextPageUrl = $response->inertiaProps('products.next_page_url');
+
+    expect($nextPageUrl)->toContain('page=2')
+        ->and($nextPageUrl)->toContain('stock=low');
 });
 
 test('guests cannot update inventory', function () {

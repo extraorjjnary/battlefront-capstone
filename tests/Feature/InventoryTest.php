@@ -48,6 +48,29 @@ test('a product may exist without an inventory record', function () {
     expect($product->inventory)->toBeNull();
 });
 
+test('low stock contains only quantities below their reorder level', function () {
+    $lowStockInventory = Inventory::factory()->create([
+        'quantity' => 4,
+        'reorder_level' => 5,
+    ]);
+    Inventory::factory()->create([
+        'quantity' => 5,
+        'reorder_level' => 5,
+    ]);
+    Inventory::factory()->create([
+        'quantity' => 6,
+        'reorder_level' => 5,
+    ]);
+    Inventory::factory()->create([
+        'quantity' => 0,
+        'reorder_level' => 0,
+    ]);
+
+    $lowStockInventoryIds = Inventory::query()->lowStock()->pluck('id')->all();
+
+    expect($lowStockInventoryIds)->toBe([$lowStockInventory->id]);
+});
+
 test('negative inventory values are rejected', function (array $attributes) {
     expect(fn () => Inventory::factory()->create($attributes))
         ->toThrow(QueryException::class);
