@@ -1,7 +1,14 @@
-import { Boxes, LayoutDashboard, PackageSearch, UserRound } from '@lucide/vue';
+import {
+    Boxes,
+    LayoutDashboard,
+    PackageSearch,
+    UsersRound,
+    UserRound,
+} from '@lucide/vue';
 import { usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import CategoryController from '@/actions/App/Http/Controllers/Administration/CategoryController';
+import CustomerController from '@/actions/App/Http/Controllers/Administration/CustomerController';
 import InventoryController from '@/actions/App/Http/Controllers/Administration/InventoryController';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import { dashboard } from '@/routes';
@@ -38,6 +45,11 @@ export function useAppNavigation() {
                 title: 'Inventory',
                 href: InventoryController.index(),
                 icon: Boxes,
+            });
+            items.push({
+                title: 'Customers',
+                href: CustomerController.index(),
+                icon: UsersRound,
             });
         }
 

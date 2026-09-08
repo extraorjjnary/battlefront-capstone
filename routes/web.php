@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Administration\CategoryActivationController;
 use App\Http\Controllers\Administration\CategoryController;
+use App\Http\Controllers\Administration\CustomerController;
 use App\Http\Controllers\Administration\InventoryController;
 use App\Http\Controllers\Administration\ProductActivationController;
 use App\Http\Controllers\Administration\ProductController;
@@ -31,6 +32,9 @@ Route::middleware(['auth', 'verified', 'can:access-administration'])
             ->name('inventory.index');
         Route::patch('inventory/{inventory}', [InventoryController::class, 'update'])
             ->name('inventory.update');
+
+        Route::resource('customers', CustomerController::class)
+            ->only(['index', 'show']);
     });
 
 require __DIR__.'/settings.php';
