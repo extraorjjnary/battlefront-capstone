@@ -33,11 +33,11 @@ Keep logo identity colors separate from interface colors. The first layer preser
 
 These anchors are visible in the source assets and describe the logo identity:
 
-| Role | Color | Use |
-| --- | --- | --- |
-| Logo red | `#FF0000` | Existing logo artwork only; do not recolor the assets or automatically use this as a UI surface |
-| Logo black | `#000000` | Existing logo artwork and intentional pure-black brand framing |
-| Logo white | `#FFFFFF` | Existing logo artwork and intentional maximum-contrast brand details |
+| Role       | Color     | Use                                                                                             |
+| ---------- | --------- | ----------------------------------------------------------------------------------------------- |
+| Logo red   | `#FF0000` | Existing logo artwork only; do not recolor the assets or automatically use this as a UI surface |
+| Logo black | `#000000` | Existing logo artwork and intentional pure-black brand framing                                  |
+| Logo white | `#FFFFFF` | Existing logo artwork and intentional maximum-contrast brand details                            |
 
 The artwork also contains antialiasing, highlights, shadows, and red/gray gradients. These remain part of the raster artwork, not standalone design tokens. Do not sample incidental pixels into additional colors or recreate the gradients in routine UI.
 
@@ -45,16 +45,16 @@ The artwork also contains antialiasing, highlights, shadows, and red/gray gradie
 
 Use this approved dark palette for branded application interfaces:
 
-| Role | Color | Use |
-| --- | --- | --- |
-| Primary red | `#EF1B1B` | Brand accents, active indicators, icons, links where contrast passes, and focus rings |
-| Dark red | `#B91C1C` | Solid primary-action surfaces and darker red interaction states |
-| Background | `#090B10` | Main page and application shell background |
-| Surface | `#111318` | Cards, panels, dialogs, and navigation surfaces |
-| Surface light | `#1B1E24` | Raised, selected, or secondary surfaces |
-| Primary text | `#F8FAFC` | Headings, body copy, labels, and high-emphasis content |
-| Muted text | `#9CA3AF` | Supporting text, metadata, placeholders, and secondary content |
-| Border | `#2A2E36` | Subtle dividers and nonessential surface separation |
+| Role          | Color     | Use                                                                                   |
+| ------------- | --------- | ------------------------------------------------------------------------------------- |
+| Primary red   | `#EF1B1B` | Brand accents, active indicators, icons, links where contrast passes, and focus rings |
+| Dark red      | `#B91C1C` | Solid primary-action surfaces and darker red interaction states                       |
+| Background    | `#090B10` | Main page and application shell background                                            |
+| Surface       | `#111318` | Cards, panels, dialogs, and navigation surfaces                                       |
+| Surface light | `#1B1E24` | Raised, selected, or secondary surfaces                                               |
+| Primary text  | `#F8FAFC` | Headings, body copy, labels, and high-emphasis content                                |
+| Muted text    | `#9CA3AF` | Supporting text, metadata, placeholders, and secondary content                        |
+| Border        | `#2A2E36` | Subtle dividers and nonessential surface separation                                   |
 
 Apply the UI layer through semantic roles rather than using raw values by convenience. Use red selectively so hierarchy remains clear, and never recolor the logo to match the softer UI reds. If a light theme is retained or introduced, keep its existing semantic neutral tokens until a separate light palette is explicitly approved; the logo identity layer remains unchanged.
 

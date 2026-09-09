@@ -1,35 +1,35 @@
 <script setup>
-import { Link, usePage } from "@inertiajs/vue3";
-import { Menu } from "@lucide/vue";
-import { computed } from "vue";
-import AppLogo from "@/components/AppLogo.vue";
-import AppLogoIcon from "@/components/AppLogoIcon.vue";
-import Breadcrumbs from "@/components/Breadcrumbs.vue";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import { Link, usePage } from '@inertiajs/vue3';
+import { Menu } from '@lucide/vue';
+import { computed } from 'vue';
+import AppLogo from '@/components/AppLogo.vue';
+import AppLogoIcon from '@/components/AppLogoIcon.vue';
+import Breadcrumbs from '@/components/Breadcrumbs.vue';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from '@/components/ui/dropdown-menu';
 import {
     NavigationMenu,
     NavigationMenuItem,
     NavigationMenuList,
     navigationMenuTriggerStyle,
-} from "@/components/ui/navigation-menu";
+} from '@/components/ui/navigation-menu';
 import {
     Sheet,
     SheetContent,
     SheetHeader,
     SheetTitle,
     SheetTrigger,
-} from "@/components/ui/sheet";
-import UserMenuContent from "@/components/UserMenuContent.vue";
-import { useAppNavigation } from "@/composables/useAppNavigation";
-import { useCurrentUrl } from "@/composables/useCurrentUrl";
-import { getInitials } from "@/composables/useInitials";
-import { dashboard } from "@/routes";
+} from '@/components/ui/sheet';
+import UserMenuContent from '@/components/UserMenuContent.vue';
+import { useAppNavigation } from '@/composables/useAppNavigation';
+import { useCurrentUrl } from '@/composables/useCurrentUrl';
+import { getInitials } from '@/composables/useInitials';
+import { dashboard } from '@/routes';
 const props = defineProps({
     breadcrumbs: { type: Array, default: () => [] },
 });
@@ -37,7 +37,7 @@ const page = usePage();
 const auth = computed(() => page.props.auth);
 const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
 const { mainNavItems } = useAppNavigation();
-const activeItemStyles = "bg-accent text-accent-foreground";
+const activeItemStyles = 'bg-accent text-accent-foreground';
 </script>
 
 <template>

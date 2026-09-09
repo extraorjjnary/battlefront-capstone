@@ -73,12 +73,12 @@ All four branches use the confirmed customer-facing operating-hours value **8:00
 
 ## Current Branch Reference Data
 
-| Branch | Contact number | Email | Location |
-| --- | --- | --- | --- |
-| Sagay City | 0938 647 6046 | battlefrontcomputertrading@gmail.com | A, E Marañon St., Brgy. Poblacion II, Sagay City, Negros Occidental (beside LBC Sagay City), Sagay, Philippines 6122 |
-| Escalante City | Not yet confirmed | Not yet confirmed | Not yet confirmed; no official branch page is currently available |
-| San Carlos City | Not listed on the available official branch page | Not yet confirmed | Carmona St., Brgy. V, San Carlos City, Negros Occidental, San Carlos City, Philippines 6127 |
-| Guihulngan City | 0947 946 5723 | battlefrontcomputertrading@gmail.com | L&E Arcade, Larena St., Brgy. Poblacion, Guihulngan City, Guihulngan, Philippines 6214 |
+| Branch          | Contact number                                   | Email                                | Location                                                                                                             |
+| --------------- | ------------------------------------------------ | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| Sagay City      | 0938 647 6046                                    | battlefrontcomputertrading@gmail.com | A, E Marañon St., Brgy. Poblacion II, Sagay City, Negros Occidental (beside LBC Sagay City), Sagay, Philippines 6122 |
+| Escalante City  | Not yet confirmed                                | Not yet confirmed                    | Not yet confirmed; no official branch page is currently available                                                    |
+| San Carlos City | Not listed on the available official branch page | Not yet confirmed                    | Carmona St., Brgy. V, San Carlos City, Negros Occidental, San Carlos City, Philippines 6127                          |
+| Guihulngan City | 0947 946 5723                                    | battlefrontcomputertrading@gmail.com | L&E Arcade, Larena St., Brgy. Poblacion, Guihulngan City, Guihulngan, Philippines 6214                               |
 
 The same email address appears to be shared across branches, but it is currently confirmed only for Sagay City and Guihulngan City. Unconfirmed values must remain null or undisplayed instead of being copied to other branches as verified facts.
 
