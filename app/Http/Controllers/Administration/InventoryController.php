@@ -30,15 +30,10 @@ class InventoryController extends Controller
                 'category:id,name',
                 'inventory:id,product_id,quantity,reorder_level,last_updated',
             ])
-            ->withExists([
-                'inventory as is_low_stock' => fn (Builder $query): Builder => $query->lowStock(),
-            ])
+            ->withExists('lowStockInventory as is_low_stock')
             ->when(
                 $stockFilter === 'low',
-                fn (Builder $query): Builder => $query->whereHas(
-                    'inventory',
-                    fn (Builder $inventoryQuery): Builder => $inventoryQuery->lowStock(),
-                ),
+                fn (Builder $query): Builder => $query->whereHas('lowStockInventory'),
             )
             ->orderBy('name')
             ->orderBy('id')
@@ -49,7 +44,7 @@ class InventoryController extends Controller
                 'name' => $product->name,
                 'brand' => $product->brand,
                 'is_active' => $product->is_active,
-                'is_low_stock' => (bool) $product->is_low_stock,
+                'is_low_stock' => $product->is_low_stock,
                 'category' => $product->category->name,
                 'inventory' => $product->inventory === null ? null : [
                     'id' => $product->inventory->id,

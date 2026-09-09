@@ -71,6 +71,31 @@ test('low stock contains only quantities below their reorder level', function ()
     expect($lowStockInventoryIds)->toBe([$lowStockInventory->id]);
 });
 
+test('products expose low stock through their constrained inventory relationship', function () {
+    $lowStockProduct = Product::factory()
+        ->has(Inventory::factory()->state([
+            'quantity' => 4,
+            'reorder_level' => 5,
+        ]))
+        ->create();
+    $boundaryProduct = Product::factory()
+        ->has(Inventory::factory()->state([
+            'quantity' => 5,
+            'reorder_level' => 5,
+        ]))
+        ->create();
+    $uninitializedProduct = Product::factory()->create();
+
+    $products = Product::query()
+        ->withExists('lowStockInventory as is_low_stock')
+        ->findMany([$lowStockProduct->id, $boundaryProduct->id, $uninitializedProduct->id])
+        ->keyBy('id');
+
+    expect($products[$lowStockProduct->id]->is_low_stock)->toBeTrue()
+        ->and($products[$boundaryProduct->id]->is_low_stock)->toBeFalse()
+        ->and($products[$uninitializedProduct->id]->is_low_stock)->toBeFalse();
+});
+
 test('negative inventory values are rejected', function (array $attributes) {
     expect(fn () => Inventory::factory()->create($attributes))
         ->toThrow(QueryException::class);

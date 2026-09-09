@@ -28,6 +28,8 @@ use Illuminate\Support\Carbon;
  * @property Carbon $created_at
  * @property-read Category $category
  * @property-read Inventory|null $inventory
+ * @property-read bool $is_low_stock
+ * @property-read Inventory|null $lowStockInventory
  * @property-read Collection<int, Tag> $tags
  */
 #[Fillable([
@@ -81,6 +83,19 @@ class Product extends Model
     public function inventory(): HasOne
     {
         return $this->hasOne(Inventory::class);
+    }
+
+    /**
+     * Get the product's inventory record when it is below its reorder level.
+     *
+     * @return HasOne<Inventory, $this>
+     */
+    public function lowStockInventory(): HasOne
+    {
+        $relation = $this->hasOne(Inventory::class);
+        $relation->getQuery()->lowStock();
+
+        return $relation;
     }
 
     /**

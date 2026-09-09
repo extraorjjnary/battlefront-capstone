@@ -1,13 +1,19 @@
 <script setup>
-import { Form, Head, Link } from "@inertiajs/vue3";
-import { Boxes, ChevronLeft, ChevronRight, Save, TriangleAlert } from "@lucide/vue";
-import InventoryController from "@/actions/App/Http/Controllers/Administration/InventoryController";
-import InputError from "@/components/InputError.vue";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Spinner } from "@/components/ui/spinner";
+import { Form, Head, Link } from '@inertiajs/vue3';
+import {
+    Boxes,
+    ChevronLeft,
+    ChevronRight,
+    Save,
+    TriangleAlert,
+} from '@lucide/vue';
+import InventoryController from '@/actions/App/Http/Controllers/Administration/InventoryController';
+import InputError from '@/components/InputError.vue';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
 
 const props = defineProps({
     products: { type: Object, required: true },
@@ -15,20 +21,20 @@ const props = defineProps({
     low_stock_count: { type: Number, required: true },
 });
 
-const dateFormatter = new Intl.DateTimeFormat("en-PH", {
-    dateStyle: "medium",
-    timeStyle: "short",
+const dateFormatter = new Intl.DateTimeFormat('en-PH', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
 });
 
 function formatLastUpdated(value) {
-    return value ? dateFormatter.format(new Date(value)) : "Not available";
+    return value ? dateFormatter.format(new Date(value)) : 'Not available';
 }
 
 function inventoryPage(page) {
     return InventoryController.index({
         query: {
             page,
-            stock: props.filters.stock === "low" ? "low" : undefined,
+            stock: props.filters.stock === 'low' ? 'low' : undefined,
         },
     });
 }
@@ -37,7 +43,7 @@ defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: "Inventory",
+                title: 'Inventory',
                 href: InventoryController.index(),
             },
         ],
@@ -48,8 +54,12 @@ defineOptions({
 <template>
     <Head title="Inventory" />
 
-    <main class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10">
-        <section class="border-border bg-card relative overflow-hidden border p-6">
+    <main
+        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
+    >
+        <section
+            class="border-border bg-card relative overflow-hidden border p-6"
+        >
             <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
             <div class="flex items-start gap-4">
                 <span
@@ -58,30 +68,41 @@ defineOptions({
                     <Boxes class="size-5" />
                 </span>
                 <div>
-                    <p class="text-primary text-xs font-semibold tracking-widest uppercase">
+                    <p
+                        class="text-primary text-xs font-semibold tracking-widest uppercase"
+                    >
                         Sagay City operation
                     </p>
-                    <h1 class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
+                    <h1
+                        class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
+                    >
                         Inventory management
                     </h1>
-                    <p class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6">
-                        Review current product stock and maintain the quantity and reorder level
-                        used by Battlefront operations. Stock is low when its quantity falls below
-                        its reorder level.
+                    <p
+                        class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6"
+                    >
+                        Review current product stock and maintain the quantity
+                        and reorder level used by Battlefront operations. Stock
+                        is low when its quantity falls below its reorder level.
                     </p>
                 </div>
             </div>
         </section>
 
         <section aria-labelledby="inventory-ledger-heading">
-            <div class="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div
+                class="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"
+            >
                 <div>
                     <p class="text-muted-foreground text-sm">
                         {{ products.total }}
-                        {{ filters.stock === "low" ? "low-stock" : "" }}
+                        {{ filters.stock === 'low' ? 'low-stock' : '' }}
                         products
                     </p>
-                    <h2 id="inventory-ledger-heading" class="text-xl font-semibold">
+                    <h2
+                        id="inventory-ledger-heading"
+                        class="text-xl font-semibold"
+                    >
                         Stock ledger
                     </h2>
                 </div>
@@ -92,20 +113,26 @@ defineOptions({
                     aria-label="Filter inventory by stock status"
                 >
                     <Button
-                        :variant="filters.stock === 'all' ? 'default' : 'outline'"
+                        :variant="
+                            filters.stock === 'all' ? 'default' : 'outline'
+                        "
                         size="sm"
                         as-child
                     >
                         <Link
                             :href="InventoryController.index()"
-                            :aria-current="filters.stock === 'all' ? 'page' : undefined"
+                            :aria-current="
+                                filters.stock === 'all' ? 'page' : undefined
+                            "
                             preserve-scroll
                         >
                             All products
                         </Link>
                     </Button>
                     <Button
-                        :variant="filters.stock === 'low' ? 'default' : 'outline'"
+                        :variant="
+                            filters.stock === 'low' ? 'default' : 'outline'
+                        "
                         size="sm"
                         as-child
                     >
@@ -115,13 +142,19 @@ defineOptions({
                                     query: { stock: 'low' },
                                 })
                             "
-                            :aria-current="filters.stock === 'low' ? 'page' : undefined"
+                            :aria-current="
+                                filters.stock === 'low' ? 'page' : undefined
+                            "
                             preserve-scroll
                         >
                             <TriangleAlert />
                             Low stock
-                            <span aria-hidden="true">{{ low_stock_count }}</span>
-                            <span class="sr-only"> {{ low_stock_count }} products </span>
+                            <span aria-hidden="true">{{
+                                low_stock_count
+                            }}</span>
+                            <span class="sr-only">
+                                {{ low_stock_count }} products
+                            </span>
                         </Link>
                     </Button>
                 </div>
@@ -133,23 +166,30 @@ defineOptions({
             >
                 <div>
                     <template v-if="filters.stock === 'low'">
-                        <TriangleAlert class="text-muted-foreground mx-auto size-8" />
+                        <TriangleAlert
+                            class="text-muted-foreground mx-auto size-8"
+                        />
                         <p class="mt-3 font-medium">No low-stock products</p>
                         <p class="text-muted-foreground mt-1 text-sm">
-                            Initialized products are currently at or above their reorder levels.
+                            Initialized products are currently at or above their
+                            reorder levels.
                         </p>
                     </template>
                     <template v-else>
                         <Boxes class="text-muted-foreground mx-auto size-8" />
                         <p class="mt-3 font-medium">No products available</p>
                         <p class="text-muted-foreground mt-1 text-sm">
-                            Products will appear here after they are added to the catalog.
+                            Products will appear here after they are added to
+                            the catalog.
                         </p>
                     </template>
                 </div>
             </div>
 
-            <div v-else class="border-border bg-card divide-border divide-y border">
+            <div
+                v-else
+                class="border-border bg-card divide-border divide-y border"
+            >
                 <article
                     v-for="product in products.data"
                     :key="product.id"
@@ -160,8 +200,12 @@ defineOptions({
                             <h3 class="truncate font-semibold">
                                 {{ product.name }}
                             </h3>
-                            <Badge :variant="product.is_active ? 'secondary' : 'outline'">
-                                {{ product.is_active ? "Active" : "Inactive" }}
+                            <Badge
+                                :variant="
+                                    product.is_active ? 'secondary' : 'outline'
+                                "
+                            >
+                                {{ product.is_active ? 'Active' : 'Inactive' }}
                             </Badge>
                             <Badge
                                 v-if="product.is_low_stock"
@@ -175,15 +219,26 @@ defineOptions({
                         <p class="text-muted-foreground mt-1 text-sm">
                             {{ product.brand }} · {{ product.category }}
                         </p>
-                        <p v-if="product.inventory" class="text-muted-foreground mt-3 text-xs">
+                        <p
+                            v-if="product.inventory"
+                            class="text-muted-foreground mt-3 text-xs"
+                        >
                             Last updated
-                            {{ formatLastUpdated(product.inventory.last_updated) }}
+                            {{
+                                formatLastUpdated(
+                                    product.inventory.last_updated,
+                                )
+                            }}
                         </p>
                     </div>
 
                     <Form
                         v-if="product.inventory"
-                        v-bind="InventoryController.update.form(product.inventory.id)"
+                        v-bind="
+                            InventoryController.update.form(
+                                product.inventory.id,
+                            )
+                        "
                         :options="{ preserveScroll: true }"
                         class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-start"
                         v-slot="{ errors, processing }"
@@ -208,7 +263,9 @@ defineOptions({
                         </div>
 
                         <div class="grid gap-2">
-                            <Label :for="`reorder-level-${product.inventory.id}`">
+                            <Label
+                                :for="`reorder-level-${product.inventory.id}`"
+                            >
                                 Reorder level
                             </Label>
                             <Input
@@ -240,10 +297,13 @@ defineOptions({
                         <div>
                             <Badge variant="outline">Not initialized</Badge>
                             <p class="text-muted-foreground mt-2 text-sm">
-                                This product does not have an inventory record yet.
+                                This product does not have an inventory record
+                                yet.
                             </p>
                         </div>
-                        <span class="text-muted-foreground text-sm">No stock to update</span>
+                        <span class="text-muted-foreground text-sm"
+                            >No stock to update</span
+                        >
                     </div>
                 </article>
             </div>
@@ -253,8 +313,16 @@ defineOptions({
                 aria-label="Inventory pages"
                 class="mt-5 flex items-center justify-between gap-4"
             >
-                <Button v-if="products.current_page > 1" variant="outline" size="sm" as-child>
-                    <Link :href="inventoryPage(products.current_page - 1)" preserve-scroll>
+                <Button
+                    v-if="products.current_page > 1"
+                    variant="outline"
+                    size="sm"
+                    as-child
+                >
+                    <Link
+                        :href="inventoryPage(products.current_page - 1)"
+                        preserve-scroll
+                    >
                         <ChevronLeft />
                         Previous
                     </Link>
@@ -272,7 +340,10 @@ defineOptions({
                     size="sm"
                     as-child
                 >
-                    <Link :href="inventoryPage(products.current_page + 1)" preserve-scroll>
+                    <Link
+                        :href="inventoryPage(products.current_page + 1)"
+                        preserve-scroll
+                    >
                         Next
                         <ChevronRight />
                     </Link>
