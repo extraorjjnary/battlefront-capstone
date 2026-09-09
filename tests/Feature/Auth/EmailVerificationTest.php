@@ -18,6 +18,22 @@ test('email verification screen can be rendered', function () {
     $response->assertOk();
 });
 
+test('unverified customers are redirected from the dashboard', function () {
+    $customer = User::factory()->customer()->unverified()->create();
+
+    $this->actingAs($customer)
+        ->get(route('dashboard'))
+        ->assertRedirect(route('verification.notice'));
+});
+
+test('unverified customers are redirected from administrator routes', function () {
+    $customer = User::factory()->customer()->unverified()->create();
+
+    $this->actingAs($customer)
+        ->get(route('administration.products.index'))
+        ->assertRedirect(route('verification.notice'));
+});
+
 test('email can be verified', function () {
     $user = User::factory()->unverified()->create();
 

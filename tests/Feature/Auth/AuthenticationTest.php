@@ -49,6 +49,15 @@ test('database sessions retain nullable unconstrained user references', function
     ]);
 });
 
+test('two factor factory state can be built while the feature is disabled', function () {
+    $user = User::factory()->withTwoFactor()->make();
+
+    expect(Features::enabled(Features::twoFactorAuthentication()))->toBeFalse()
+        ->and($user->two_factor_secret)->not->toBeNull()
+        ->and($user->two_factor_recovery_codes)->not->toBeNull()
+        ->and($user->two_factor_confirmed_at)->not->toBeNull();
+});
+
 test('users with two factor enabled are redirected to two factor challenge', function () {
     $this->skipUnlessFortifyHas(Features::twoFactorAuthentication());
 

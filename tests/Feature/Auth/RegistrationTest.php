@@ -2,6 +2,8 @@
 
 use App\Enums\UserRole;
 use App\Models\User;
+use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Support\Facades\Notification;
 use Laravel\Fortify\Features;
 
 beforeEach(function () {
@@ -27,6 +29,21 @@ test('new users can register', function () {
 
     expect(User::where('email', 'test@example.com')->firstOrFail()->role)
         ->toBe(UserRole::Customer);
+});
+
+test('new customers receive an email verification notification', function () {
+    Notification::fake();
+
+    $this->post(route('register.store'), [
+        'name' => 'Test Customer',
+        'email' => 'customer@example.com',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+    ]);
+
+    $customer = User::where('email', 'customer@example.com')->firstOrFail();
+
+    Notification::assertSentTo($customer, VerifyEmail::class);
 });
 
 test('registration cannot create an administrator', function () {
