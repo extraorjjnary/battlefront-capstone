@@ -27,8 +27,10 @@ test('new users can register', function () {
     $this->assertAuthenticated();
     $response->assertRedirect(route('dashboard', absolute: false));
 
-    expect(User::where('email', 'test@example.com')->firstOrFail()->role)
-        ->toBe(UserRole::Customer);
+    $user = User::where('email', 'test@example.com')->firstOrFail();
+
+    expect($user->role)->toBe(UserRole::Customer)
+        ->and($user->hasVerifiedEmail())->toBeFalse();
 });
 
 test('new customers receive an email verification notification', function () {
