@@ -6,9 +6,11 @@ use App\Http\Controllers\Administration\CustomerController;
 use App\Http\Controllers\Administration\InventoryController;
 use App\Http\Controllers\Administration\ProductActivationController;
 use App\Http\Controllers\Administration\ProductController;
+use App\Http\Controllers\BranchController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
+Route::get('branches', [BranchController::class, 'index'])->name('branches.index');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');

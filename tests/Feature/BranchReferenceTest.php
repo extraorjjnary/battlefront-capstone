@@ -32,7 +32,7 @@ test('branch reference data can be seeded repeatedly', function () {
 
     $this->seed();
 
-    expect(Branch::query()->count())->toBe(4)
+    expect(Branch::query()->count())->toBe(5)
         ->and(User::query()->where('email', 'test@example.com')->count())->toBe(1);
     $this->assertDatabaseHas('branches', [
         'city' => 'Sagay City',
@@ -47,10 +47,37 @@ test('branch reference data can be seeded repeatedly', function () {
         'contact_number' => '0947 946 5723',
     ]);
     $this->assertDatabaseHas('branches', [
+        'city' => 'Bacolod City',
+        'contact_number' => '0961 176 4608',
+    ]);
+    $this->assertDatabaseHas('branches', [
         'city' => 'Escalante City',
         'address' => null,
         'contact_number' => null,
     ]);
+
+    $branches = Branch::query()->get()->keyBy('city');
+
+    expect((float) $branches['Sagay City']->latitude)
+        ->toEqualWithDelta(10.893690028077906, 0.0000001)
+        ->and((float) $branches['Sagay City']->longitude)
+        ->toEqualWithDelta(123.41372677628254, 0.0000001)
+        ->and((float) $branches['Escalante City']->latitude)
+        ->toEqualWithDelta(10.84283002809064, 0.0000001)
+        ->and((float) $branches['Escalante City']->longitude)
+        ->toEqualWithDelta(123.49853947111953, 0.0000001)
+        ->and((float) $branches['San Carlos City']->latitude)
+        ->toEqualWithDelta(10.482947521818934, 0.0000001)
+        ->and((float) $branches['San Carlos City']->longitude)
+        ->toEqualWithDelta(123.42169185526996, 0.0000001)
+        ->and((float) $branches['Guihulngan City']->latitude)
+        ->toEqualWithDelta(10.119597, 0.0000001)
+        ->and((float) $branches['Guihulngan City']->longitude)
+        ->toEqualWithDelta(123.273872, 0.0000001)
+        ->and((float) $branches['Bacolod City']->latitude)
+        ->toEqualWithDelta(10.671754246079693, 0.0000001)
+        ->and((float) $branches['Bacolod City']->longitude)
+        ->toEqualWithDelta(122.9470409276533, 0.0000001);
 });
 
 test('branches expose configured reference information', function () {
@@ -65,10 +92,12 @@ test('branches expose configured reference information', function () {
             'is_operational' => true,
         ])
         ->and($branches['Sagay City']->is_operational)->toBeTrue()
+        ->and($branches['Bacolod City']->is_operational)->toBeFalse()
         ->and($branches['San Carlos City']->is_operational)->toBeFalse()
         ->and($branches->pluck('operating_hours')->unique()->all())->toBe(['8:00 AM–6:00 PM'])
         ->and($branches['Sagay City']->email)->toBe('battlefrontcomputertrading@gmail.com')
         ->and($branches['Guihulngan City']->email)->toBe('battlefrontcomputertrading@gmail.com')
+        ->and($branches['Bacolod City']->email)->toBe('battlefrontbacolod@gmail.com')
         ->and($branches['San Carlos City']->email)->toBeNull()
         ->and($branches['Escalante City']->email)->toBeNull();
 });

@@ -1,6 +1,7 @@
 import {
     Boxes,
     LayoutDashboard,
+    MapPin,
     PackageSearch,
     UsersRound,
     UserRound,
@@ -12,6 +13,7 @@ import CustomerController from '@/actions/App/Http/Controllers/Administration/Cu
 import InventoryController from '@/actions/App/Http/Controllers/Administration/InventoryController';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import { dashboard } from '@/routes';
+import { index as branchIndex } from '@/routes/branches';
 import { edit as editProfile } from '@/routes/profile';
 
 export function useAppNavigation() {
@@ -28,6 +30,11 @@ export function useAppNavigation() {
                 title: 'Dashboard',
                 href: dashboard(),
                 icon: LayoutDashboard,
+            },
+            {
+                title: 'Branches',
+                href: branchIndex(),
+                icon: MapPin,
             },
         ];
 

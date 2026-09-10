@@ -8,5 +8,7 @@ return [
     'branch_emails' => [
         'Sagay City' => 'battlefrontcomputertrading@gmail.com',
         'Guihulngan City' => 'battlefrontcomputertrading@gmail.com',
+        'Bacolod City' => 'battlefrontbacolod@gmail.com',
+
     ],
 ];
