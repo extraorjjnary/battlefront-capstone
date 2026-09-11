@@ -1,25 +1,57 @@
 <script setup>
-import { Form, Head, Link } from '@inertiajs/vue3';
+import { Form, Head, Link, router } from '@inertiajs/vue3';
 import {
     Boxes,
     ChevronLeft,
     ChevronRight,
     Save,
+    Search,
+    SlidersHorizontal,
     TriangleAlert,
+    X,
 } from '@lucide/vue';
+import { computed, ref, watch } from 'vue';
 import InventoryController from '@/actions/App/Http/Controllers/Administration/InventoryController';
 import InputError from '@/components/InputError.vue';
+import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 
 const props = defineProps({
     products: { type: Object, required: true },
     filters: { type: Object, required: true },
+    filter_options: { type: Object, required: true },
     low_stock_count: { type: Number, required: true },
 });
+
+const categoryId = ref(String(props.filters.category_id ?? 'all'));
+const stock = ref(props.filters.stock);
+
+const { search, isSearching, clearSearch, cancelPendingSearch } =
+    useDebouncedSearch({
+        initialSearch: props.filters.q,
+        currentSearch: () => props.filters.q,
+        route: InventoryController.index,
+        query: selectedFilters,
+    });
+
+const hasSearchInput = computed(() => Boolean(search.value.trim()));
+const hasAppliedFilters = computed(
+    () => props.filters.category_id !== null || props.filters.stock === 'low',
+);
+const hasActiveQuery = computed(
+    () => Boolean(props.filters.q) || hasAppliedFilters.value,
+);
 
 const dateFormatter = new Intl.DateTimeFormat('en-PH', {
     dateStyle: 'medium',
@@ -33,11 +65,67 @@ function formatLastUpdated(value) {
 function inventoryPage(page) {
     return InventoryController.index({
         query: {
+            q: props.filters.q ?? undefined,
+            category_id: props.filters.category_id ?? undefined,
             page,
             stock: props.filters.stock === 'low' ? 'low' : undefined,
         },
     });
 }
+
+function appliedFilters() {
+    return {
+        category_id: props.filters.category_id ?? undefined,
+        stock: props.filters.stock === 'low' ? 'low' : undefined,
+    };
+}
+
+function selectedFilters() {
+    return {
+        category_id: categoryId.value === 'all' ? undefined : categoryId.value,
+        stock: stock.value === 'low' ? 'low' : undefined,
+    };
+}
+
+function filtersAreCurrent() {
+    const selected = selectedFilters();
+    const applied = appliedFilters();
+
+    return Object.keys(selected).every(
+        (filter) =>
+            String(selected[filter] ?? '') === String(applied[filter] ?? ''),
+    );
+}
+
+function updateFilters() {
+    if (filtersAreCurrent()) {
+        return;
+    }
+
+    cancelPendingSearch();
+
+    router.visit(
+        InventoryController.index({
+            query: {
+                q: search.value.trim() || undefined,
+                ...selectedFilters(),
+            },
+        }),
+        {
+            preserveScroll: true,
+            preserveState: true,
+            replace: true,
+        },
+    );
+}
+
+function clearFilters() {
+    cancelPendingSearch();
+    categoryId.value = 'all';
+    stock.value = 'all';
+}
+
+watch([categoryId, stock], updateFilters);
 
 defineOptions({
     layout: {
@@ -108,71 +196,156 @@ defineOptions({
                 </div>
 
                 <div
-                    class="flex flex-wrap items-center gap-2"
-                    role="group"
-                    aria-label="Filter inventory by stock status"
+                    class="border-border bg-card flex items-center gap-3 border px-4 py-3"
                 >
-                    <Button
-                        :variant="
-                            filters.stock === 'all' ? 'default' : 'outline'
-                        "
-                        size="sm"
-                        as-child
-                    >
-                        <Link
-                            :href="InventoryController.index()"
-                            :aria-current="
-                                filters.stock === 'all' ? 'page' : undefined
-                            "
-                            preserve-scroll
-                        >
-                            All products
-                        </Link>
-                    </Button>
-                    <Button
-                        :variant="
-                            filters.stock === 'low' ? 'default' : 'outline'
-                        "
-                        size="sm"
-                        as-child
-                    >
-                        <Link
-                            :href="
-                                InventoryController.index({
-                                    query: { stock: 'low' },
-                                })
-                            "
-                            :aria-current="
-                                filters.stock === 'low' ? 'page' : undefined
-                            "
-                            preserve-scroll
-                        >
-                            <TriangleAlert />
-                            Low stock
-                            <span aria-hidden="true">{{
-                                low_stock_count
-                            }}</span>
-                            <span class="sr-only">
-                                {{ low_stock_count }} products
-                            </span>
-                        </Link>
-                    </Button>
+                    <TriangleAlert class="text-primary size-4" />
+                    <div>
+                        <p class="text-sm font-semibold tabular-nums">
+                            {{ low_stock_count }} low-stock products
+                        </p>
+                        <p class="text-muted-foreground text-xs">
+                            Across the full inventory
+                        </p>
+                    </div>
                 </div>
             </div>
+
+            <section
+                class="border-border bg-card mb-5 border p-5"
+                aria-labelledby="inventory-query-heading"
+            >
+                <div class="flex items-start gap-3">
+                    <span
+                        class="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center rounded-md"
+                    >
+                        <SlidersHorizontal class="size-4" />
+                    </span>
+                    <div>
+                        <h3 id="inventory-query-heading" class="font-semibold">
+                            Find inventory records
+                        </h3>
+                        <p class="text-muted-foreground mt-1 text-sm">
+                            Search immediately; category and stock attention
+                            update the ledger as they change.
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    class="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
+                >
+                    <div class="grid gap-2">
+                        <Label for="inventory-search">Search inventory</Label>
+                        <div class="relative">
+                            <Search
+                                class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+                            />
+                            <Input
+                                id="inventory-search"
+                                v-model="search"
+                                class="pl-9"
+                                maxlength="255"
+                                placeholder="Product name or brand"
+                                autocomplete="off"
+                            />
+                        </div>
+                        <p
+                            class="text-muted-foreground text-xs"
+                            aria-live="polite"
+                        >
+                            {{
+                                isSearching
+                                    ? 'Updating results...'
+                                    : 'Results update automatically as you type.'
+                            }}
+                        </p>
+                    </div>
+                    <Button
+                        v-if="hasSearchInput"
+                        type="button"
+                        variant="outline"
+                        class="sm:mb-5"
+                        @click="clearSearch"
+                    >
+                        <X />
+                        Clear search
+                    </Button>
+                </div>
+
+                <div
+                    class="border-border mt-5 grid gap-4 border-t pt-5 md:grid-cols-2"
+                >
+                    <div class="grid gap-2">
+                        <Label for="inventory-category">Category</Label>
+                        <Select v-model="categoryId">
+                            <SelectTrigger
+                                id="inventory-category"
+                                class="w-full"
+                            >
+                                <SelectValue placeholder="All categories" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all"
+                                    >All categories</SelectItem
+                                >
+                                <SelectItem
+                                    v-for="category in filter_options.categories"
+                                    :key="category.id"
+                                    :value="String(category.id)"
+                                >
+                                    {{ category.name }}
+                                    {{ category.is_active ? '' : '(Inactive)' }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div class="grid gap-2">
+                        <Label for="inventory-stock">Stock attention</Label>
+                        <Select v-model="stock">
+                            <SelectTrigger id="inventory-stock" class="w-full">
+                                <SelectValue placeholder="All products" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all"
+                                    >All products</SelectItem
+                                >
+                                <SelectItem value="low">
+                                    Low stock ({{ low_stock_count }})
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div
+                        class="flex flex-wrap gap-2 md:col-span-2 md:justify-end"
+                    >
+                        <Button
+                            v-if="hasAppliedFilters"
+                            type="button"
+                            variant="outline"
+                            @click="clearFilters"
+                        >
+                            <X />
+                            Clear filters
+                        </Button>
+                    </div>
+                </div>
+            </section>
 
             <div
                 v-if="products.data.length === 0"
                 class="border-border bg-card flex min-h-48 items-center justify-center border p-6 text-center"
             >
                 <div>
-                    <template v-if="filters.stock === 'low'">
+                    <template v-if="hasActiveQuery">
                         <TriangleAlert
                             class="text-muted-foreground mx-auto size-8"
                         />
-                        <p class="mt-3 font-medium">No low-stock products</p>
+                        <p class="mt-3 font-medium">
+                            No inventory records match this query
+                        </p>
                         <p class="text-muted-foreground mt-1 text-sm">
-                            Initialized products are currently at or above their
-                            reorder levels.
+                            Try another search term or clear the applied
+                            filters.
                         </p>
                     </template>
                     <template v-else>

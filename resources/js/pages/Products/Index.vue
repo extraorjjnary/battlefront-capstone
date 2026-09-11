@@ -1,17 +1,131 @@
 <script setup>
-import { Head, Link } from '@inertiajs/vue3';
-import { ArrowRight, Boxes, PackageSearch } from '@lucide/vue';
+import { Head, Link, router } from '@inertiajs/vue3';
+import {
+    ArrowRight,
+    Boxes,
+    PackageSearch,
+    Search,
+    SlidersHorizontal,
+    X,
+} from '@lucide/vue';
+import { computed, ref, watch } from 'vue';
 import CatalogPagination from '@/components/CatalogPagination.vue';
 import ProductImage from '@/components/catalog/ProductImage.vue';
 import ProductPrice from '@/components/catalog/ProductPrice.vue';
 import StockAvailability from '@/components/catalog/StockAvailability.vue';
 import StorefrontHeader from '@/components/StorefrontHeader.vue';
+import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { index as productIndex, show as productShow } from '@/routes/products';
 
-defineProps({
+const props = defineProps({
     products: { type: Object, required: true },
+    filters: { type: Object, required: true },
+    filter_options: { type: Object, required: true },
 });
+
+const categoryId = ref(String(props.filters.category_id ?? 'all'));
+const brand = ref(props.filters.brand ?? 'all');
+const tagId = ref(String(props.filters.tag_id ?? 'all'));
+
+const { search, isSearching, clearSearch, cancelPendingSearch } =
+    useDebouncedSearch({
+        initialSearch: props.filters.q,
+        currentSearch: () => props.filters.q,
+        route: productIndex,
+        query: selectedFilters,
+    });
+
+const hasSearch = computed(() => Boolean(props.filters.q));
+const hasSearchInput = computed(() => Boolean(search.value.trim()));
+const hasAppliedFilters = computed(() =>
+    ['category_id', 'brand', 'tag_id'].some(
+        (filter) => props.filters[filter] !== null,
+    ),
+);
+const hasActiveQuery = computed(
+    () => hasSearch.value || hasAppliedFilters.value,
+);
+
+function selectedValue(value) {
+    return value === 'all' ? undefined : value;
+}
+
+function catalogPage(options) {
+    return productIndex({
+        query: {
+            ...props.filters,
+            page: options.query.page,
+        },
+    });
+}
+
+function appliedFilters() {
+    return {
+        category_id: props.filters.category_id ?? undefined,
+        brand: props.filters.brand ?? undefined,
+        tag_id: props.filters.tag_id ?? undefined,
+    };
+}
+
+function selectedFilters() {
+    return {
+        category_id: selectedValue(categoryId.value),
+        brand: selectedValue(brand.value),
+        tag_id: selectedValue(tagId.value),
+    };
+}
+
+function filtersAreCurrent() {
+    const selected = selectedFilters();
+    const applied = appliedFilters();
+
+    return Object.keys(selected).every(
+        (filter) =>
+            String(selected[filter] ?? '') === String(applied[filter] ?? ''),
+    );
+}
+
+function updateFilters() {
+    if (filtersAreCurrent()) {
+        return;
+    }
+
+    cancelPendingSearch();
+
+    router.visit(
+        productIndex({
+            query: {
+                q: search.value.trim() || undefined,
+                ...selectedFilters(),
+            },
+        }),
+        {
+            preserveScroll: true,
+            preserveState: true,
+            replace: true,
+        },
+    );
+}
+
+function clearFilters() {
+    cancelPendingSearch();
+    categoryId.value = 'all';
+    brand.value = 'all';
+    tagId.value = 'all';
+}
+
+watch([categoryId, brand, tagId], updateFilters);
 </script>
 
 <template>
@@ -65,12 +179,176 @@ defineProps({
                     class="border-border mt-8 border-t pt-6 lg:mt-0 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-10"
                 >
                     <p class="text-muted-foreground text-sm font-medium">
-                        Products available to browse
+                        {{
+                            hasActiveQuery
+                                ? 'Products matching your catalog query'
+                                : 'Products available to browse'
+                        }}
                     </p>
                     <p class="mt-1 text-3xl font-bold">{{ products.total }}</p>
                     <p class="text-muted-foreground mt-2 text-sm leading-6">
                         Stock information reflects the current catalog record.
                     </p>
+                </div>
+            </section>
+
+            <section
+                class="border-border bg-card mt-8 border p-5 sm:p-6"
+                aria-labelledby="catalog-filters-heading"
+            >
+                <div class="flex items-start gap-3">
+                    <span
+                        class="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center"
+                    >
+                        <SlidersHorizontal class="size-4" aria-hidden="true" />
+                    </span>
+                    <div>
+                        <h2 id="catalog-filters-heading" class="font-bold">
+                            Find the right hardware
+                        </h2>
+                        <p class="text-muted-foreground mt-1 text-sm">
+                            Search product details or narrow the catalog by
+                            category, brand, and tag.
+                        </p>
+                    </div>
+                </div>
+
+                <div
+                    class="mt-6 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
+                >
+                    <div class="grid gap-2">
+                        <Label for="catalog-search">Search products</Label>
+                        <div class="relative">
+                            <Search
+                                class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+                                aria-hidden="true"
+                            />
+                            <Input
+                                id="catalog-search"
+                                v-model="search"
+                                class="pl-9"
+                                maxlength="255"
+                                placeholder="Name, brand, or description"
+                                autocomplete="off"
+                            />
+                        </div>
+                        <p
+                            class="text-muted-foreground text-xs"
+                            aria-live="polite"
+                        >
+                            {{
+                                isSearching
+                                    ? 'Updating results...'
+                                    : 'Results update automatically as you type.'
+                            }}
+                        </p>
+                    </div>
+
+                    <Button
+                        v-if="hasSearchInput"
+                        type="button"
+                        variant="outline"
+                        class="sm:mb-5"
+                        @click="clearSearch"
+                    >
+                        <X aria-hidden="true" />
+                        Clear search
+                    </Button>
+                </div>
+
+                <div class="border-border mt-6 border-t pt-6">
+                    <div>
+                        <h3 class="font-semibold">Filter products</h3>
+                        <p class="text-muted-foreground mt-1 text-sm">
+                            Category, brand, and tag selections update results
+                            automatically and remain separate from search.
+                        </p>
+                    </div>
+
+                    <div class="mt-4 grid gap-4 md:grid-cols-3">
+                        <div class="grid gap-2">
+                            <Label for="catalog-category">Category</Label>
+                            <Select v-model="categoryId">
+                                <SelectTrigger
+                                    id="catalog-category"
+                                    class="w-full"
+                                >
+                                    <SelectValue placeholder="All categories" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">
+                                        All categories
+                                    </SelectItem>
+                                    <SelectItem
+                                        v-for="category in filter_options.categories"
+                                        :key="category.id"
+                                        :value="String(category.id)"
+                                    >
+                                        {{ category.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div class="grid gap-2">
+                            <Label for="catalog-brand">Brand</Label>
+                            <Select v-model="brand">
+                                <SelectTrigger
+                                    id="catalog-brand"
+                                    class="w-full"
+                                >
+                                    <SelectValue placeholder="All brands" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">
+                                        All brands
+                                    </SelectItem>
+                                    <SelectItem
+                                        v-for="brandOption in filter_options.brands"
+                                        :key="brandOption"
+                                        :value="brandOption"
+                                    >
+                                        {{ brandOption }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div class="grid gap-2">
+                            <Label for="catalog-tag">Tag</Label>
+                            <Select v-model="tagId">
+                                <SelectTrigger id="catalog-tag" class="w-full">
+                                    <SelectValue placeholder="All tags" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all"
+                                        >All tags</SelectItem
+                                    >
+                                    <SelectItem
+                                        v-for="tag in filter_options.tags"
+                                        :key="tag.id"
+                                        :value="String(tag.id)"
+                                    >
+                                        {{ tag.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div
+                            class="flex flex-wrap gap-2 md:col-span-3 md:justify-end"
+                        >
+                            <Button
+                                v-if="hasAppliedFilters"
+                                type="button"
+                                variant="outline"
+                                @click="clearFilters"
+                            >
+                                <X aria-hidden="true" />
+                                Clear filters
+                            </Button>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -176,17 +454,46 @@ defineProps({
                         aria-hidden="true"
                     />
                     <p class="mt-4 font-semibold">
-                        No products are currently available to browse.
+                        {{
+                            hasActiveQuery
+                                ? 'No products match your search and filters.'
+                                : 'No products are currently available to browse.'
+                        }}
                     </p>
                     <p class="text-muted-foreground mt-1 text-sm">
-                        Please check again later for catalog updates.
+                        {{
+                            hasActiveQuery
+                                ? 'Try another search term or clear the applied filters.'
+                                : 'Please check again later for catalog updates.'
+                        }}
                     </p>
+                    <div
+                        v-if="hasActiveQuery"
+                        class="mt-5 flex flex-wrap justify-center gap-2"
+                    >
+                        <Button
+                            v-if="hasSearch"
+                            type="button"
+                            variant="outline"
+                            @click="clearSearch"
+                        >
+                            Clear search
+                        </Button>
+                        <Button
+                            v-if="hasAppliedFilters"
+                            type="button"
+                            variant="outline"
+                            @click="clearFilters"
+                        >
+                            Clear filters
+                        </Button>
+                    </div>
                 </div>
 
                 <CatalogPagination
                     :current-page="products.current_page"
                     :last-page="products.last_page"
-                    :route="productIndex"
+                    :route="catalogPage"
                     label="Product catalog pages"
                 />
             </section>

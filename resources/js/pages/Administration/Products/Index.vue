@@ -1,18 +1,63 @@
 <script setup>
-import { Form, Head, Link } from '@inertiajs/vue3';
-import { PackageSearch, Pencil, Plus, RotateCcw, Star } from '@lucide/vue';
+import { Form, Head, Link, router } from '@inertiajs/vue3';
+import {
+    PackageSearch,
+    Pencil,
+    Plus,
+    RotateCcw,
+    Search,
+    SlidersHorizontal,
+    Star,
+    X,
+} from '@lucide/vue';
+import { computed, ref, watch } from 'vue';
 import ProductActivationController from '@/actions/App/Http/Controllers/Administration/ProductActivationController';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import CatalogNavigation from '@/components/CatalogNavigation.vue';
 import CatalogPagination from '@/components/CatalogPagination.vue';
 import DeactivationDialog from '@/components/DeactivationDialog.vue';
+import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 
-defineProps({
+const props = defineProps({
     products: { type: Object, required: true },
+    filters: { type: Object, required: true },
+    filter_options: { type: Object, required: true },
 });
+
+const categoryId = ref(String(props.filters.category_id ?? 'all'));
+const brand = ref(props.filters.brand ?? 'all');
+const tagId = ref(String(props.filters.tag_id ?? 'all'));
+const status = ref(props.filters.status ?? 'all');
+
+const { search, isSearching, clearSearch, cancelPendingSearch } =
+    useDebouncedSearch({
+        initialSearch: props.filters.q,
+        currentSearch: () => props.filters.q,
+        route: ProductController.index,
+        query: selectedFilters,
+    });
+
+const hasSearchInput = computed(() => Boolean(search.value.trim()));
+const hasAppliedFilters = computed(() =>
+    ['category_id', 'brand', 'tag_id', 'status'].some(
+        (filter) => props.filters[filter] !== null,
+    ),
+);
+const hasActiveQuery = computed(
+    () => Boolean(props.filters.q) || hasAppliedFilters.value,
+);
 
 const currencyFormatter = new Intl.NumberFormat('en-PH', {
     style: 'currency',
@@ -26,6 +71,79 @@ function formatPrice(value) {
 function hideBrokenImage(event) {
     event.currentTarget.hidden = true;
 }
+
+function selectedValue(value) {
+    return value === 'all' ? undefined : value;
+}
+
+function appliedFilters() {
+    return {
+        category_id: props.filters.category_id ?? undefined,
+        brand: props.filters.brand ?? undefined,
+        tag_id: props.filters.tag_id ?? undefined,
+        status: props.filters.status ?? undefined,
+    };
+}
+
+function productPage(options) {
+    return ProductController.index({
+        query: {
+            ...props.filters,
+            page: options.query.page,
+        },
+    });
+}
+
+function selectedFilters() {
+    return {
+        category_id: selectedValue(categoryId.value),
+        brand: selectedValue(brand.value),
+        tag_id: selectedValue(tagId.value),
+        status: selectedValue(status.value),
+    };
+}
+
+function filtersAreCurrent() {
+    const selected = selectedFilters();
+    const applied = appliedFilters();
+
+    return Object.keys(selected).every(
+        (filter) =>
+            String(selected[filter] ?? '') === String(applied[filter] ?? ''),
+    );
+}
+
+function updateFilters() {
+    if (filtersAreCurrent()) {
+        return;
+    }
+
+    cancelPendingSearch();
+
+    router.visit(
+        ProductController.index({
+            query: {
+                q: search.value.trim() || undefined,
+                ...selectedFilters(),
+            },
+        }),
+        {
+            preserveScroll: true,
+            preserveState: true,
+            replace: true,
+        },
+    );
+}
+
+function clearFilters() {
+    cancelPendingSearch();
+    categoryId.value = 'all';
+    brand.value = 'all';
+    tagId.value = 'all';
+    status.value = 'all';
+}
+
+watch([categoryId, brand, tagId, status], updateFilters);
 
 defineOptions({
     layout: {
@@ -85,6 +203,155 @@ defineOptions({
             <CatalogNavigation />
         </section>
 
+        <section
+            class="border-border bg-card border p-5"
+            aria-labelledby="product-query-heading"
+        >
+            <div class="flex items-start gap-3">
+                <span
+                    class="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center rounded-md"
+                >
+                    <SlidersHorizontal class="size-4" />
+                </span>
+                <div>
+                    <h2 id="product-query-heading" class="font-semibold">
+                        Find catalog records
+                    </h2>
+                    <p class="text-muted-foreground mt-1 text-sm">
+                        Search immediately; catalog attributes and lifecycle
+                        status update results as they change.
+                    </p>
+                </div>
+            </div>
+
+            <div
+                class="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
+            >
+                <div class="grid gap-2">
+                    <Label for="admin-product-search">Search products</Label>
+                    <div class="relative">
+                        <Search
+                            class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+                        />
+                        <Input
+                            id="admin-product-search"
+                            v-model="search"
+                            class="pl-9"
+                            maxlength="255"
+                            placeholder="Name, brand, or description"
+                            autocomplete="off"
+                        />
+                    </div>
+                    <p class="text-muted-foreground text-xs" aria-live="polite">
+                        {{
+                            isSearching
+                                ? 'Updating results...'
+                                : 'Results update automatically as you type.'
+                        }}
+                    </p>
+                </div>
+                <Button
+                    v-if="hasSearchInput"
+                    type="button"
+                    variant="outline"
+                    class="sm:mb-5"
+                    @click="clearSearch"
+                >
+                    <X />
+                    Clear search
+                </Button>
+            </div>
+
+            <div
+                class="border-border mt-5 grid gap-4 border-t pt-5 md:grid-cols-2 xl:grid-cols-4"
+            >
+                <div class="grid gap-2">
+                    <Label for="admin-product-category">Category</Label>
+                    <Select v-model="categoryId">
+                        <SelectTrigger
+                            id="admin-product-category"
+                            class="w-full"
+                        >
+                            <SelectValue placeholder="All categories" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All categories</SelectItem>
+                            <SelectItem
+                                v-for="category in filter_options.categories"
+                                :key="category.id"
+                                :value="String(category.id)"
+                            >
+                                {{ category.name }}
+                                {{ category.is_active ? '' : '(Inactive)' }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div class="grid gap-2">
+                    <Label for="admin-product-brand">Brand</Label>
+                    <Select v-model="brand">
+                        <SelectTrigger id="admin-product-brand" class="w-full">
+                            <SelectValue placeholder="All brands" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All brands</SelectItem>
+                            <SelectItem
+                                v-for="brandOption in filter_options.brands"
+                                :key="brandOption"
+                                :value="brandOption"
+                            >
+                                {{ brandOption }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div class="grid gap-2">
+                    <Label for="admin-product-tag">Tag</Label>
+                    <Select v-model="tagId">
+                        <SelectTrigger id="admin-product-tag" class="w-full">
+                            <SelectValue placeholder="All tags" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All tags</SelectItem>
+                            <SelectItem
+                                v-for="tag in filter_options.tags"
+                                :key="tag.id"
+                                :value="String(tag.id)"
+                            >
+                                {{ tag.name }}
+                            </SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div class="grid gap-2">
+                    <Label for="admin-product-status">Status</Label>
+                    <Select v-model="status">
+                        <SelectTrigger id="admin-product-status" class="w-full">
+                            <SelectValue placeholder="All statuses" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All statuses</SelectItem>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="inactive">Inactive</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div
+                    class="flex flex-wrap gap-2 md:col-span-2 md:justify-end xl:col-span-4"
+                >
+                    <Button
+                        v-if="hasAppliedFilters"
+                        type="button"
+                        variant="outline"
+                        @click="clearFilters"
+                    >
+                        <X />
+                        Clear filters
+                    </Button>
+                </div>
+            </div>
+        </section>
+
         <section aria-labelledby="product-list-heading">
             <div class="mb-4">
                 <p class="text-muted-foreground text-sm">
@@ -103,12 +370,21 @@ defineOptions({
                     <PackageSearch
                         class="text-muted-foreground mx-auto size-9"
                     />
-                    <p class="mt-3 font-medium">No products available</p>
-                    <p class="text-muted-foreground mt-1 text-sm">
-                        Add the first Battlefront catalog product to get
-                        started.
+                    <p class="mt-3 font-medium">
+                        {{
+                            hasActiveQuery
+                                ? 'No products match this query'
+                                : 'No products available'
+                        }}
                     </p>
-                    <Button as-child class="mt-5">
+                    <p class="text-muted-foreground mt-1 text-sm">
+                        {{
+                            hasActiveQuery
+                                ? 'Try another search term or clear the applied filters.'
+                                : 'Add the first Battlefront catalog product to get started.'
+                        }}
+                    </p>
+                    <Button v-if="!hasActiveQuery" as-child class="mt-5">
                         <Link :href="ProductController.create()">
                             <Plus />
                             Add product
@@ -246,7 +522,7 @@ defineOptions({
             <CatalogPagination
                 :current-page="products.current_page"
                 :last-page="products.last_page"
-                :route="ProductController.index"
+                :route="productPage"
                 label="Product pages"
             />
         </section>

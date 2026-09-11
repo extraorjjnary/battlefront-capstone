@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\ProductCatalogIndexRequest;
+use App\Models\Category;
 use App\Models\Product;
 use App\Models\Tag;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -13,17 +16,21 @@ class ProductCatalogController extends Controller
     /**
      * Display the customer product catalog.
      */
-    public function index(): Response
+    public function index(ProductCatalogIndexRequest $request): Response
     {
-        $products = $this->catalogQuery()
+        $filters = $this->catalogFilters($request);
+
+        $products = $this->catalogQuery($filters)
             ->orderBy('name')
             ->orderBy('id')
             ->paginate(12)
-            ->withQueryString()
+            ->appends(array_filter($filters, fn (mixed $value): bool => $value !== null))
             ->through(fn (Product $product): array => $this->catalogData($product));
 
         return Inertia::render('Products/Index', [
             'products' => $products,
+            'filters' => $filters,
+            'filter_options' => $this->filterOptions(),
         ]);
     }
 
@@ -42,11 +49,12 @@ class ProductCatalogController extends Controller
     /**
      * Build the customer-safe product query with all presentation relationships.
      *
+     * @param  array{q?: string|null, category_id?: int|null, brand?: string|null, tag_id?: int|null}  $filters
      * @return Builder<Product>
      */
-    private function catalogQuery(): Builder
+    private function catalogQuery(array $filters = []): Builder
     {
-        return Product::query()
+        $query = Product::query()
             ->customerEligible()
             ->select([
                 'id',
@@ -65,6 +73,88 @@ class ProductCatalogController extends Controller
                 'tags:id,name',
             ])
             ->withExists('lowStockInventory as is_low_stock');
+
+        $query
+            ->when($filters['q'] ?? null, function (Builder $query, string $search): void {
+                $query->where(function (Builder $query) use ($search): void {
+                    $query
+                        ->whereLike('name', "%{$search}%")
+                        ->orWhereLike('brand', "%{$search}%")
+                        ->orWhereLike('description', "%{$search}%");
+                });
+            })
+            ->when(
+                $filters['category_id'] ?? null,
+                fn (Builder $query, int $categoryId): Builder => $query->where('category_id', $categoryId),
+            )
+            ->when(
+                $filters['brand'] ?? null,
+                fn (Builder $query, string $brand): Builder => $query->where('brand', $brand),
+            )
+            ->when(
+                $filters['tag_id'] ?? null,
+                fn (Builder $query, int $tagId): Builder => $query->whereHas(
+                    'tags',
+                    fn (Builder $query): Builder => $query->whereKey($tagId),
+                ),
+            );
+
+        return $query;
+    }
+
+    /**
+     * Convert validated catalog input into stable Inertia filter values.
+     *
+     * @return array{q: string|null, category_id: int|null, brand: string|null, tag_id: int|null}
+     */
+    private function catalogFilters(ProductCatalogIndexRequest $request): array
+    {
+        return [
+            'q' => $request->filled('q') ? $request->string('q')->toString() : null,
+            'category_id' => $request->filled('category_id') ? $request->integer('category_id') : null,
+            'brand' => $request->filled('brand') ? $request->string('brand')->toString() : null,
+            'tag_id' => $request->filled('tag_id') ? $request->integer('tag_id') : null,
+        ];
+    }
+
+    /**
+     * Get filter choices represented by customer-eligible catalog records.
+     *
+     * @return array{
+     *     categories: Collection<int, Category>,
+     *     brands: Collection<int, string>,
+     *     tags: Collection<int, Tag>
+     * }
+     */
+    private function filterOptions(): array
+    {
+        return [
+            'categories' => Category::query()
+                ->active()
+                ->whereIn(
+                    'id',
+                    Product::query()->customerEligible()->select('category_id'),
+                )
+                ->select(['id', 'name'])
+                ->orderBy('name')
+                ->orderBy('id')
+                ->get(),
+            'brands' => Product::query()
+                ->customerEligible()
+                ->select('brand')
+                ->distinct()
+                ->orderBy('brand')
+                ->pluck('brand'),
+            'tags' => Tag::query()
+                ->whereHas('products', fn (Builder $query): Builder => $query->whereIn(
+                    'products.id',
+                    Product::query()->customerEligible()->select('id'),
+                ))
+                ->select(['id', 'name'])
+                ->orderBy('name')
+                ->orderBy('id')
+                ->get(),
+        ];
     }
 
     /**

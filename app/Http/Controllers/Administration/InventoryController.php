@@ -4,12 +4,13 @@ namespace App\Http\Controllers\Administration;
 
 use App\Actions\Inventory\AdjustInventoryStock;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Administration\InventoryIndexRequest;
 use App\Http\Requests\Administration\UpdateInventoryRequest;
+use App\Models\Category;
 use App\Models\Inventory;
 use App\Models\Product;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -18,11 +19,13 @@ class InventoryController extends Controller
     /**
      * Display the administrator inventory ledger.
      */
-    public function index(Request $request): Response
+    public function index(InventoryIndexRequest $request): Response
     {
-        $stockFilter = $request->string('stock')->toString() === 'low'
-            ? 'low'
-            : 'all';
+        $filters = $request->validated();
+        $filters['category_id'] = $request->filled('category_id')
+            ? $request->integer('category_id')
+            : null;
+        $stockFilter = ($filters['stock'] ?? null) === 'low' ? 'low' : 'all';
 
         $products = Product::query()
             ->select(['id', 'name', 'category_id', 'brand', 'is_active'])
@@ -32,13 +35,25 @@ class InventoryController extends Controller
             ])
             ->withExists('lowStockInventory as is_low_stock')
             ->when(
+                $filters['q'] ?? null,
+                fn (Builder $query, string $search): Builder => $query->where(
+                    fn (Builder $query): Builder => $query
+                        ->where('name', 'like', "%{$search}%")
+                        ->orWhere('brand', 'like', "%{$search}%"),
+                ),
+            )
+            ->when(
+                $filters['category_id'] ?? null,
+                fn (Builder $query, int $categoryId): Builder => $query->where('category_id', $categoryId),
+            )
+            ->when(
                 $stockFilter === 'low',
                 fn (Builder $query): Builder => $query->whereHas('lowStockInventory'),
             )
             ->orderBy('name')
             ->orderBy('id')
             ->paginate(25)
-            ->withQueryString()
+            ->appends($filters)
             ->through(fn (Product $product): array => [
                 'id' => $product->id,
                 'name' => $product->name,
@@ -57,7 +72,16 @@ class InventoryController extends Controller
         return Inertia::render('Administration/Inventory', [
             'products' => $products,
             'filters' => [
+                'q' => $filters['q'] ?? null,
+                'category_id' => $filters['category_id'] ?? null,
                 'stock' => $stockFilter,
+            ],
+            'filter_options' => [
+                'categories' => Category::query()
+                    ->select(['id', 'name', 'is_active'])
+                    ->orderBy('name')
+                    ->orderBy('id')
+                    ->get(),
             ],
             'low_stock_count' => Inventory::query()->lowStock()->count(),
         ]);

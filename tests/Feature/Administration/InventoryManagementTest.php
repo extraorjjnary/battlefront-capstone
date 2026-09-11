@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Category;
 use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\User;
@@ -94,17 +95,65 @@ test('administrators can filter products below their reorder level', function ()
         ->where('products.data.1.is_low_stock', true));
 });
 
-test('unknown stock filters show all products', function () {
+test('invalid inventory filters are rejected', function () {
     $administrator = User::factory()->administrator()->create();
-    Product::factory()->count(2)->create();
+
+    $this->actingAs($administrator)
+        ->from(route('administration.inventory.index'))
+        ->get(route('administration.inventory.index', [
+            'category_id' => PHP_INT_MAX,
+            'stock' => 'unexpected',
+            'page' => 0,
+        ]))
+        ->assertRedirect(route('administration.inventory.index'))
+        ->assertSessionHasErrors(['category_id', 'stock', 'page']);
+});
+
+test('administrators can search and filter inventory records', function () {
+    $administrator = User::factory()->administrator()->create();
+    $processors = Category::factory()->create(['name' => 'Processors']);
+    $graphicsCards = Category::factory()->create(['name' => 'Graphics cards']);
+    $target = Product::factory()->for($processors)->inactive()->create([
+        'name' => 'Ryzen inventory item',
+        'brand' => 'AMD',
+    ]);
+    Inventory::factory()->for($target)->create([
+        'quantity' => 1,
+        'reorder_level' => 2,
+    ]);
+    $availableProduct = Product::factory()->for($processors)->create([
+        'name' => 'Ryzen available item',
+        'brand' => 'AMD',
+    ]);
+    Inventory::factory()->for($availableProduct)->create([
+        'quantity' => 3,
+        'reorder_level' => 2,
+    ]);
+    $otherCategory = Product::factory()->for($graphicsCards)->create([
+        'name' => 'Ryzen graphics card',
+        'brand' => 'AMD',
+    ]);
+    Inventory::factory()->for($otherCategory)->create([
+        'quantity' => 1,
+        'reorder_level' => 2,
+    ]);
 
     $response = $this
         ->actingAs($administrator)
-        ->get(route('administration.inventory.index', ['stock' => 'unexpected']));
+        ->get(route('administration.inventory.index', [
+            'q' => 'Ryzen',
+            'category_id' => $processors->id,
+            'stock' => 'low',
+        ]));
 
     $response->assertInertia(fn (Assert $page) => $page
-        ->where('filters.stock', 'all')
-        ->where('products.total', 2));
+        ->where('filters.q', 'Ryzen')
+        ->where('filters.category_id', $processors->id)
+        ->where('filters.stock', 'low')
+        ->has('products.data', 1)
+        ->where('products.data.0.id', $target->id)
+        ->where('products.data.0.is_active', false)
+        ->where('filter_options.categories.1.name', 'Processors'));
 });
 
 test('inventory products are paginated in stable name order', function () {
@@ -127,10 +176,13 @@ test('inventory products are paginated in stable name order', function () {
         ->where('products.data.24.name', 'Product 25'));
 });
 
-test('low-stock pagination preserves the active filter', function () {
+test('inventory pagination preserves the active query', function () {
     $administrator = User::factory()->administrator()->create();
+    $category = Category::factory()->create();
     Product::factory()
         ->count(26)
+        ->for($category)
+        ->state(['name' => 'Matching inventory product'])
         ->has(Inventory::factory()->state([
             'quantity' => 1,
             'reorder_level' => 2,
@@ -139,11 +191,17 @@ test('low-stock pagination preserves the active filter', function () {
 
     $response = $this
         ->actingAs($administrator)
-        ->get(route('administration.inventory.index', ['stock' => 'low']));
+        ->get(route('administration.inventory.index', [
+            'q' => 'Matching',
+            'category_id' => $category->id,
+            'stock' => 'low',
+        ]));
 
     $nextPageUrl = $response->inertiaProps('products.next_page_url');
 
     expect($nextPageUrl)->toContain('page=2')
+        ->and($nextPageUrl)->toContain('q=Matching')
+        ->and($nextPageUrl)->toContain("category_id={$category->id}")
         ->and($nextPageUrl)->toContain('stock=low');
 });
 

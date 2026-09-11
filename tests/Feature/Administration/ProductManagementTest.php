@@ -80,6 +80,99 @@ test('catalog products are paginated in stable name order', function () {
         ->where('products.data.11.name', 'Product 12'));
 });
 
+test('administrators can search and filter catalog records', function () {
+    $administrator = User::factory()->administrator()->create();
+    $processors = Category::factory()->create(['name' => 'Processors']);
+    $graphicsCards = Category::factory()->create(['name' => 'Graphics cards']);
+    $gaming = Tag::factory()->create(['name' => 'Gaming']);
+    $target = Product::factory()->for($processors)->inactive()->create([
+        'name' => 'Ryzen workstation processor',
+        'description' => 'Zen architecture for demanding workloads.',
+        'brand' => 'AMD',
+    ]);
+    $target->tags()->attach($gaming);
+    Product::factory()->for($processors)->inactive()->create([
+        'name' => 'Different processor',
+        'brand' => 'Intel',
+    ]);
+    Product::factory()->for($graphicsCards)->inactive()->create([
+        'name' => 'Zen graphics card',
+        'brand' => 'AMD',
+    ]);
+    Product::factory()->for($processors)->create([
+        'name' => 'Active Zen processor',
+        'brand' => 'AMD',
+    ])->tags()->attach($gaming);
+
+    $response = $this
+        ->actingAs($administrator)
+        ->get(route('administration.products.index', [
+            'q' => 'Zen',
+            'category_id' => $processors->id,
+            'brand' => 'AMD',
+            'tag_id' => $gaming->id,
+            'status' => 'inactive',
+        ]));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->where('filters.q', 'Zen')
+        ->where('filters.category_id', $processors->id)
+        ->where('filters.brand', 'AMD')
+        ->where('filters.tag_id', $gaming->id)
+        ->where('filters.status', 'inactive')
+        ->has('products.data', 1)
+        ->where('products.data.0.id', $target->id)
+        ->where('filter_options.categories.1.name', 'Processors')
+        ->where('filter_options.brands.0', 'AMD')
+        ->where('filter_options.tags.0.name', 'Gaming'));
+});
+
+test('catalog pagination preserves the active administration query', function () {
+    $administrator = User::factory()->administrator()->create();
+    $category = Category::factory()->create();
+    $tag = Tag::factory()->create();
+    $products = Product::factory()->count(13)->for($category)->create([
+        'name' => 'Matching catalog product',
+        'brand' => 'Battlefront',
+        'is_active' => true,
+    ]);
+
+    $products->each(fn (Product $product) => $product->tags()->attach($tag));
+
+    $response = $this
+        ->actingAs($administrator)
+        ->get(route('administration.products.index', [
+            'q' => 'Matching',
+            'category_id' => $category->id,
+            'brand' => 'Battlefront',
+            'tag_id' => $tag->id,
+            'status' => 'active',
+        ]));
+
+    $nextPageUrl = $response->inertiaProps('products.next_page_url');
+
+    expect($nextPageUrl)->toContain('page=2')
+        ->and($nextPageUrl)->toContain('q=Matching')
+        ->and($nextPageUrl)->toContain("category_id={$category->id}")
+        ->and($nextPageUrl)->toContain('brand=Battlefront')
+        ->and($nextPageUrl)->toContain("tag_id={$tag->id}")
+        ->and($nextPageUrl)->toContain('status=active');
+});
+
+test('invalid administration catalog filters are rejected', function () {
+    $administrator = User::factory()->administrator()->create();
+
+    $this->actingAs($administrator)
+        ->from(route('administration.products.index'))
+        ->get(route('administration.products.index', [
+            'category_id' => PHP_INT_MAX,
+            'status' => 'archived',
+            'page' => 0,
+        ]))
+        ->assertRedirect(route('administration.products.index'))
+        ->assertSessionHasErrors(['category_id', 'status', 'page']);
+});
+
 test('administrators can open product forms with approved category and tag options', function () {
     $administrator = User::factory()->administrator()->create();
     $category = Category::factory()->inactive()->create(['name' => 'Graphics cards']);

@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Administration;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Administration\ProductIndexRequest;
 use App\Http\Requests\Administration\SaveProductRequest;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\Tag;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -18,8 +20,16 @@ class ProductController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(): Response
+    public function index(ProductIndexRequest $request): Response
     {
+        $filters = $request->validated();
+        $filters['category_id'] = $request->filled('category_id')
+            ? $request->integer('category_id')
+            : null;
+        $filters['tag_id'] = $request->filled('tag_id')
+            ? $request->integer('tag_id')
+            : null;
+
         $products = Product::query()
             ->select([
                 'id',
@@ -36,10 +46,38 @@ class ProductController extends Controller
                 'category:id,name,is_active',
                 'tags:id,name',
             ])
+            ->when(
+                $filters['q'] ?? null,
+                fn (Builder $query, string $search): Builder => $query->where(
+                    fn (Builder $query): Builder => $query
+                        ->where('name', 'like', "%{$search}%")
+                        ->orWhere('brand', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%"),
+                ),
+            )
+            ->when(
+                $filters['category_id'] ?? null,
+                fn (Builder $query, int $categoryId): Builder => $query->where('category_id', $categoryId),
+            )
+            ->when(
+                $filters['brand'] ?? null,
+                fn (Builder $query, string $brand): Builder => $query->where('brand', $brand),
+            )
+            ->when(
+                $filters['tag_id'] ?? null,
+                fn (Builder $query, int $tagId): Builder => $query->whereHas(
+                    'tags',
+                    fn (Builder $query): Builder => $query->whereKey($tagId),
+                ),
+            )
+            ->when(
+                $filters['status'] ?? null,
+                fn (Builder $query, string $status): Builder => $query->where('is_active', $status === 'active'),
+            )
             ->orderBy('name')
             ->orderBy('id')
             ->paginate(12)
-            ->withQueryString()
+            ->appends($filters)
             ->through(fn (Product $product): array => [
                 'id' => $product->id,
                 'name' => $product->name,
@@ -63,6 +101,21 @@ class ProductController extends Controller
 
         return Inertia::render('Administration/Products/Index', [
             'products' => $products,
+            'filters' => [
+                'q' => $filters['q'] ?? null,
+                'category_id' => $filters['category_id'] ?? null,
+                'brand' => $filters['brand'] ?? null,
+                'tag_id' => $filters['tag_id'] ?? null,
+                'status' => $filters['status'] ?? null,
+            ],
+            'filter_options' => [
+                ...$this->productOptions(),
+                'brands' => Product::query()
+                    ->select('brand')
+                    ->distinct()
+                    ->orderBy('brand')
+                    ->pluck('brand'),
+            ],
         ]);
     }
 
@@ -71,7 +124,7 @@ class ProductController extends Controller
      */
     public function create(): Response
     {
-        return Inertia::render('Administration/Products/Create', $this->formOptions());
+        return Inertia::render('Administration/Products/Create', $this->productOptions());
     }
 
     /**
@@ -105,7 +158,7 @@ class ProductController extends Controller
         $product->load('tags:id,name');
 
         return Inertia::render('Administration/Products/Edit', [
-            ...$this->formOptions(),
+            ...$this->productOptions(),
             'product' => [
                 ...$product->only([
                     'id',
@@ -148,14 +201,14 @@ class ProductController extends Controller
     }
 
     /**
-     * Get the selectable category and tag options for the product form.
+     * Get the selectable category and tag options for product administration.
      *
      * @return array{
      *     categories: Collection<int, Category>,
      *     tags: Collection<int, Tag>
      * }
      */
-    private function formOptions(): array
+    private function productOptions(): array
     {
         return [
             'categories' => Category::query()
