@@ -61,7 +61,7 @@ class DevelopmentCatalogSeeder extends Seeder
             $tags[$tagName] = Tag::query()->updateOrCreate(['name' => $tagName]);
         }
 
-        /** @var list<array{name: string, category: string, brand: string, price: string, is_featured: bool, discount_price: string|null, is_active: bool, quantity: int, reorder_level: int, tags: list<string>}> $products */
+        /** @var list<array{name: string, category: string, brand: string, price: string, is_featured: bool, discount_price: string|null, image_path: string, is_active: bool, quantity: int, reorder_level: int, tags: list<string>}> $products */
         $products = [
             [
                 'name' => '[DEMO] NVIDIA Atlas Graphics Card',
@@ -70,6 +70,7 @@ class DevelopmentCatalogSeeder extends Seeder
                 'price' => '39999.00',
                 'is_featured' => true,
                 'discount_price' => '36999.00',
+                'image_path' => 'images/demo-products/graphics-card.png',
                 'is_active' => true,
                 'quantity' => 8,
                 'reorder_level' => 3,
@@ -82,6 +83,7 @@ class DevelopmentCatalogSeeder extends Seeder
                 'price' => '29999.00',
                 'is_featured' => false,
                 'discount_price' => null,
+                'image_path' => 'images/demo-products/graphics-card.png',
                 'is_active' => true,
                 'quantity' => 0,
                 'reorder_level' => 3,
@@ -94,6 +96,7 @@ class DevelopmentCatalogSeeder extends Seeder
                 'price' => '18999.00',
                 'is_featured' => false,
                 'discount_price' => '16999.00',
+                'image_path' => 'images/demo-products/processor.png',
                 'is_active' => true,
                 'quantity' => 12,
                 'reorder_level' => 4,
@@ -106,6 +109,7 @@ class DevelopmentCatalogSeeder extends Seeder
                 'price' => '12999.00',
                 'is_featured' => false,
                 'discount_price' => null,
+                'image_path' => 'images/demo-products/processor.png',
                 'is_active' => true,
                 'quantity' => 4,
                 'reorder_level' => 5,
@@ -118,6 +122,7 @@ class DevelopmentCatalogSeeder extends Seeder
                 'price' => '1499.00',
                 'is_featured' => true,
                 'discount_price' => '1199.00',
+                'image_path' => 'images/demo-products/peripherals.png',
                 'is_active' => true,
                 'quantity' => 25,
                 'reorder_level' => 5,
@@ -130,6 +135,7 @@ class DevelopmentCatalogSeeder extends Seeder
                 'price' => '4999.00',
                 'is_featured' => false,
                 'discount_price' => null,
+                'image_path' => 'images/demo-products/peripherals.png',
                 'is_active' => true,
                 'quantity' => 6,
                 'reorder_level' => 2,
@@ -142,6 +148,7 @@ class DevelopmentCatalogSeeder extends Seeder
                 'price' => '4599.00',
                 'is_featured' => false,
                 'discount_price' => null,
+                'image_path' => 'images/demo-products/storage.png',
                 'is_active' => true,
                 'quantity' => 15,
                 'reorder_level' => 5,
@@ -154,6 +161,7 @@ class DevelopmentCatalogSeeder extends Seeder
                 'price' => '2999.00',
                 'is_featured' => false,
                 'discount_price' => null,
+                'image_path' => 'images/demo-products/storage.png',
                 'is_active' => false,
                 'quantity' => 10,
                 'reorder_level' => 3,
@@ -171,7 +179,7 @@ class DevelopmentCatalogSeeder extends Seeder
                     'price' => $productData['price'],
                     'is_featured' => $productData['is_featured'],
                     'discount_price' => $productData['discount_price'],
-                    'image_url' => null,
+                    'image_url' => asset($productData['image_path']),
                     'is_active' => $productData['is_active'],
                 ],
             );

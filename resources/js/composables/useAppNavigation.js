@@ -14,6 +14,7 @@ import InventoryController from '@/actions/App/Http/Controllers/Administration/I
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import { dashboard } from '@/routes';
 import { index as branchIndex } from '@/routes/branches';
+import { index as productIndex } from '@/routes/products';
 import { edit as editProfile } from '@/routes/profile';
 
 export function useAppNavigation() {
@@ -57,6 +58,12 @@ export function useAppNavigation() {
                 title: 'Customers',
                 href: CustomerController.index(),
                 icon: UsersRound,
+            });
+        } else {
+            items.push({
+                title: 'Products',
+                href: productIndex(),
+                icon: PackageSearch,
             });
         }
 

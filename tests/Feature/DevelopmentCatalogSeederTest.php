@@ -29,7 +29,9 @@ test('the default seed workflow creates representative development catalog scena
             'NVIDIA',
             'Samsung',
         ])
-        ->and($products->pluck('image_url')->filter()->all())->toBeEmpty()
+        ->and($products->pluck('image_url')->every(
+            fn (string $imageUrl): bool => str_contains($imageUrl, '/images/demo-products/'),
+        ))->toBeTrue()
         ->and($products->pluck('description')->unique()->all())->toBe([
             'Synthetic development sample only; not a Battlefront stocked product.',
         ]);
@@ -39,6 +41,7 @@ test('the default seed workflow creates representative development catalog scena
         ->and($atlasGraphicsCard->price)->toBe('39999.00')
         ->and($atlasGraphicsCard->discount_price)->toBe('36999.00')
         ->and($atlasGraphicsCard->is_featured)->toBeTrue()
+        ->and($atlasGraphicsCard->image_url)->toEndWith('/images/demo-products/graphics-card.png')
         ->and($atlasGraphicsCard->inventory->quantity)->toBe(8)
         ->and($atlasGraphicsCard->inventory->reorder_level)->toBe(3)
         ->and($atlasGraphicsCard->tags->pluck('name')->sort()->values()->all())->toBe([
@@ -85,7 +88,7 @@ test('the default seed workflow can be rerun without duplicates and restores its
     $this->assertDatabaseCount('inventories', 8);
     expect($atlasGraphicsCard->price)->toBe('39999.00')
         ->and($atlasGraphicsCard->discount_price)->toBe('36999.00')
-        ->and($atlasGraphicsCard->image_url)->toBeNull()
+        ->and($atlasGraphicsCard->image_url)->toEndWith('/images/demo-products/graphics-card.png')
         ->and($atlasGraphicsCard->inventory->quantity)->toBe(8)
         ->and($atlasGraphicsCard->inventory->reorder_level)->toBe(3)
         ->and($atlasGraphicsCard->tags->pluck('name')->sort()->values()->all())->toBe([
@@ -93,6 +96,23 @@ test('the default seed workflow can be rerun without duplicates and restores its
             'Gaming',
             'High Performance',
         ]);
+});
+
+test('development catalog image references resolve to local mock assets', function () {
+    $this->seed();
+
+    $imagePaths = Product::query()
+        ->whereLike('name', '[DEMO]%')
+        ->pluck('image_url')
+        ->map(fn (string $imageUrl): string => parse_url($imageUrl, PHP_URL_PATH))
+        ->unique();
+
+    expect($imagePaths)->toHaveCount(4);
+
+    foreach ($imagePaths as $imagePath) {
+        expect($imagePath)->toStartWith('/images/demo-products/')
+            ->and(public_path(ltrim($imagePath, '/')))->toBeFile();
+    }
 });
 
 test('development catalog records are not seeded outside local and testing environments', function () {

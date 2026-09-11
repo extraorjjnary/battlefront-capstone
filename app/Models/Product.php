@@ -120,6 +120,22 @@ class Product extends Model
     }
 
     /**
+     * Scope a query to products eligible for customer browsing.
+     *
+     * @param  Builder<Product>  $query
+     */
+    #[Scope]
+    protected function customerEligible(Builder $query): void
+    {
+        $query
+            ->active()
+            ->whereIn(
+                'category_id',
+                Category::query()->active()->select('id'),
+            );
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

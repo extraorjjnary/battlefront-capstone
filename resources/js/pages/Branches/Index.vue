@@ -1,13 +1,9 @@
 <script setup>
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { Head } from '@inertiajs/vue3';
 import { Clock3, Mail, MapPin, Navigation, Phone } from '@lucide/vue';
-import { computed } from 'vue';
-import AppLogo from '@/components/AppLogo.vue';
 import BranchMap from '@/components/BranchMap.vue';
+import StorefrontHeader from '@/components/StorefrontHeader.vue';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { dashboard, home, login } from '@/routes';
-import { register } from '@/routes';
 
 defineProps({
     branches: {
@@ -15,9 +11,6 @@ defineProps({
         required: true,
     },
 });
-
-const page = usePage();
-const isAuthenticated = computed(() => Boolean(page.props.auth?.user));
 
 const availableValue = (value) => value ?? 'Not currently available';
 const phoneUrl = (phoneNumber) => `tel:${phoneNumber.replaceAll(' ', '')}`;
@@ -27,41 +20,7 @@ const phoneUrl = (phoneNumber) => `tel:${phoneNumber.replaceAll(' ', '')}`;
     <div class="bg-background text-foreground min-h-screen">
         <Head title="Branches" />
 
-        <header
-            class="border-border bg-background/95 sticky top-0 z-20 border-b backdrop-blur"
-        >
-            <div
-                class="mx-auto flex h-18 max-w-7xl items-center justify-between gap-2 px-4 sm:gap-6 sm:px-8"
-            >
-                <Link :href="home()" class="w-28 sm:w-52">
-                    <AppLogo />
-                </Link>
-
-                <nav class="flex items-center gap-2" aria-label="Primary">
-                    <span
-                        class="border-primary hidden border-b-2 px-2 py-2 text-sm font-semibold sm:inline"
-                    >
-                        Branches
-                    </span>
-                    <Button
-                        v-if="isAuthenticated"
-                        as-child
-                        size="sm"
-                        variant="outline"
-                    >
-                        <Link :href="dashboard()">Dashboard</Link>
-                    </Button>
-                    <template v-else>
-                        <Button as-child size="sm" variant="ghost">
-                            <Link :href="login()">Log in</Link>
-                        </Button>
-                        <Button as-child size="sm">
-                            <Link :href="register()">Register</Link>
-                        </Button>
-                    </template>
-                </nav>
-            </div>
-        </header>
+        <StorefrontHeader active-section="branches" />
 
         <main class="mx-auto max-w-7xl px-5 py-10 sm:px-8 sm:py-14">
             <section

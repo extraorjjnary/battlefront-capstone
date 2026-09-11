@@ -1,5 +1,5 @@
 <script setup>
-import { Head, Link } from "@inertiajs/vue3";
+import { Head, Link } from '@inertiajs/vue3';
 import {
     ArrowRight,
     Cpu,
@@ -11,43 +11,43 @@ import {
     PackageCheck,
     Search,
     SlidersHorizontal,
-} from "@lucide/vue";
-import AppLogo from "@/components/AppLogo.vue";
-import { Button } from "@/components/ui/button";
-import { dashboard, home, login, register } from "@/routes";
-import { index as branchIndex } from "@/routes/branches";
+} from '@lucide/vue';
+import StorefrontHeader from '@/components/StorefrontHeader.vue';
+import { Button } from '@/components/ui/button';
+import { dashboard, register } from '@/routes';
+import { index as branchIndex } from '@/routes/branches';
 
 const hardwareAreas = [
-    { name: "Processors", icon: Cpu },
-    { name: "Storage", icon: HardDrive },
-    { name: "Displays", icon: Monitor },
-    { name: "Peripherals", icon: Keyboard },
+    { name: 'Processors', icon: Cpu },
+    { name: 'Storage', icon: HardDrive },
+    { name: 'Displays', icon: Monitor },
+    { name: 'Peripherals', icon: Keyboard },
 ];
 
 const customerHighlights = [
     {
-        title: "Find the right hardware",
+        title: 'Find the right hardware',
         description:
-            "Explore computer products by category, brand, and the requirements that matter to your setup.",
+            'Explore computer products by category, brand, and the requirements that matter to your setup.',
         icon: Search,
     },
     {
-        title: "Choose with confidence",
+        title: 'Choose with confidence',
         description:
-            "Use guided, requirement-based recommendations to narrow down suitable products for your needs.",
+            'Use guided, requirement-based recommendations to narrow down suitable products for your needs.',
         icon: SlidersHorizontal,
     },
     {
-        title: "Keep track of your order",
+        title: 'Keep track of your order',
         description:
-            "Use your Battlefront account to manage purchases and follow order progress in one place.",
+            'Use your Battlefront account to manage purchases and follow order progress in one place.',
         icon: PackageCheck,
     },
 ];
 </script>
 
 <template>
-    <div class="dark min-h-screen bg-background text-foreground">
+    <div class="dark bg-background text-foreground min-h-screen">
         <Head title="Home">
             <meta
                 head-key="description"
@@ -56,54 +56,15 @@ const customerHighlights = [
             />
         </Head>
 
-        <header
-            class="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur"
-        >
-            <div
-                class="mx-auto flex h-18 max-w-7xl items-center justify-between gap-2 px-4 sm:gap-6 sm:px-8"
-            >
-                <Link
-                    :href="home()"
-                    aria-label="Battlefront Computer Trading home"
-                    class="w-24 rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4 focus-visible:ring-offset-background focus-visible:outline-none sm:w-52"
-                >
-                    <AppLogo />
-                </Link>
-
-                <nav
-                    class="flex items-center gap-1 sm:gap-2"
-                    aria-label="Primary"
-                >
-                    <Button as-child size="sm" variant="ghost">
-                        <Link :href="branchIndex()">Branches</Link>
-                    </Button>
-                    <Button
-                        v-if="$page.props.auth.user"
-                        as-child
-                        size="sm"
-                        variant="outline"
-                    >
-                        <Link :href="dashboard()">Dashboard</Link>
-                    </Button>
-                    <template v-else>
-                        <Button as-child size="sm" variant="ghost">
-                            <Link :href="login()">Log in</Link>
-                        </Button>
-                        <Button as-child size="sm">
-                            <Link :href="register()">Register</Link>
-                        </Button>
-                    </template>
-                </nav>
-            </div>
-        </header>
+        <StorefrontHeader />
 
         <main>
             <section
-                class="relative overflow-hidden border-b border-border"
+                class="border-border relative overflow-hidden border-b"
                 aria-labelledby="hero-heading"
             >
                 <div
-                    class="pointer-events-none absolute inset-0 opacity-35 bg-[linear-gradient(to_right,#2a2e36_1px,transparent_1px),linear-gradient(to_bottom,#2a2e36_1px,transparent_1px)] bg-size[48px_48px] mask-[linear-gradient(to_bottom,black,transparent_82%)]"
+                    class="bg-size[48px_48px] pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,#2a2e36_1px,transparent_1px),linear-gradient(to_bottom,#2a2e36_1px,transparent_1px)] mask-[linear-gradient(to_bottom,black,transparent_82%)] opacity-35"
                     aria-hidden="true"
                 />
 
@@ -112,7 +73,7 @@ const customerHighlights = [
                 >
                     <div>
                         <div
-                            class="mb-6 inline-flex items-center gap-2 border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-bold tracking-[0.18em] text-[#ef1b1b] uppercase"
+                            class="border-primary/40 bg-primary/10 mb-6 inline-flex items-center gap-2 border px-3 py-1.5 text-xs font-bold tracking-[0.18em] text-[#ef1b1b] uppercase"
                         >
                             <Cpu class="size-4" aria-hidden="true" />
                             Computer hardware, made clearer
@@ -127,7 +88,7 @@ const customerHighlights = [
                         </h1>
 
                         <p
-                            class="mt-6 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg sm:leading-8"
+                            class="text-muted-foreground mt-6 max-w-2xl text-base leading-7 sm:text-lg sm:leading-8"
                         >
                             Battlefront Computer Trading brings computer
                             hardware, guided product discovery, and local branch
@@ -162,11 +123,11 @@ const customerHighlights = [
                     </div>
 
                     <div
-                        class="border border-border bg-card shadow-2xl shadow-black/30"
+                        class="border-border bg-card border shadow-2xl shadow-black/30"
                         aria-label="Hardware categories"
                     >
                         <div
-                            class="flex items-center justify-between border-b border-border px-5 py-4"
+                            class="border-border flex items-center justify-between border-b px-5 py-4"
                         >
                             <div>
                                 <p
@@ -184,7 +145,7 @@ const customerHighlights = [
                             <div
                                 v-for="(area, index) in hardwareAreas"
                                 :key="area.name"
-                                class="group flex min-h-36 flex-col justify-between border-border p-5 motion-safe:transition-colors motion-safe:hover:bg-secondary/60 sm:min-h-44 sm:p-6"
+                                class="group border-border motion-safe:hover:bg-secondary/60 flex min-h-36 flex-col justify-between p-5 motion-safe:transition-colors sm:min-h-44 sm:p-6"
                                 :class="[
                                     index % 2 === 0 ? 'border-r' : '',
                                     index < 2 ? 'border-b' : '',
@@ -192,7 +153,7 @@ const customerHighlights = [
                             >
                                 <component
                                     :is="area.icon"
-                                    class="size-7 text-muted-foreground motion-safe:transition-colors motion-safe:group-hover:text-[#ef1b1b]"
+                                    class="text-muted-foreground size-7 motion-safe:transition-colors motion-safe:group-hover:text-[#ef1b1b]"
                                     aria-hidden="true"
                                 />
                                 <p class="text-sm font-semibold sm:text-base">
@@ -220,14 +181,14 @@ const customerHighlights = [
                     >
                         From the first search to your order
                     </h2>
-                    <p class="mt-4 leading-7 text-muted-foreground">
+                    <p class="text-muted-foreground mt-4 leading-7">
                         Battlefront is designed around the practical steps of
                         choosing computer hardware and staying informed after
                         checkout.
                     </p>
                 </div>
 
-                <div class="mt-10 grid border-y border-border lg:grid-cols-3">
+                <div class="border-border mt-10 grid border-y lg:grid-cols-3">
                     <article
                         v-for="(highlight, index) in customerHighlights"
                         :key="highlight.title"
@@ -243,7 +204,7 @@ const customerHighlights = [
                         ]"
                     >
                         <div
-                            class="flex size-11 items-center justify-center border border-primary/40 bg-primary/10 text-[#ef1b1b]"
+                            class="border-primary/40 bg-primary/10 flex size-11 items-center justify-center border text-[#ef1b1b]"
                         >
                             <component
                                 :is="highlight.icon"
@@ -254,20 +215,20 @@ const customerHighlights = [
                         <h3 class="mt-6 text-xl font-bold">
                             {{ highlight.title }}
                         </h3>
-                        <p class="mt-3 text-sm leading-6 text-muted-foreground">
+                        <p class="text-muted-foreground mt-3 text-sm leading-6">
                             {{ highlight.description }}
                         </p>
                     </article>
                 </div>
             </section>
 
-            <section class="border-y border-border bg-card">
+            <section class="border-border bg-card border-y">
                 <div
                     class="mx-auto grid max-w-7xl gap-8 px-5 py-12 sm:px-8 sm:py-16 lg:grid-cols-[1fr_auto] lg:items-center"
                 >
                     <div class="flex gap-5">
                         <div
-                            class="hidden size-12 shrink-0 items-center justify-center border border-primary/40 bg-primary/10 text-[#ef1b1b] sm:flex"
+                            class="border-primary/40 bg-primary/10 hidden size-12 shrink-0 items-center justify-center border text-[#ef1b1b] sm:flex"
                         >
                             <MapPinned class="size-6" aria-hidden="true" />
                         </div>
@@ -283,7 +244,7 @@ const customerHighlights = [
                                 Find the branch that works for you
                             </h2>
                             <p
-                                class="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground"
+                                class="text-muted-foreground mt-3 max-w-2xl text-sm leading-6"
                             >
                                 Review confirmed locations, contact details,
                                 operating hours, and mapped branches before you
@@ -304,9 +265,9 @@ const customerHighlights = [
 
         <footer class="mx-auto max-w-7xl px-5 py-8 sm:px-8">
             <div
-                class="flex flex-col gap-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between"
+                class="text-muted-foreground flex flex-col gap-4 text-sm sm:flex-row sm:items-center sm:justify-between"
             >
-                <p class="font-medium text-foreground">
+                <p class="text-foreground font-medium">
                     Battlefront Computer Trading
                 </p>
                 <p class="flex items-center gap-2">
