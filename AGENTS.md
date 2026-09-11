@@ -328,3 +328,10 @@ Prefer:
 ```vue
 <script setup>
 ```
+
+### Formatting and diff discipline
+
+- Keep diffs focused on the current issue.
+- Do not make cosmetic-only formatting changes.
+- Do not run frontend formatters unless required by the task.
+- Do not reorder Tailwind utility classes or change quote style unless the edited code actually requires it.
