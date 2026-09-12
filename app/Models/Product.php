@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
@@ -31,6 +32,7 @@ use Illuminate\Support\Carbon;
  * @property-read bool $is_low_stock
  * @property-read Inventory|null $lowStockInventory
  * @property-read Collection<int, Tag> $tags
+ * @property-read Collection<int, CartItem> $cartItems
  */
 #[Fillable([
     'name',
@@ -109,6 +111,16 @@ class Product extends Model
     }
 
     /**
+     * Get the cart items that reference the product.
+     *
+     * @return HasMany<CartItem, $this>
+     */
+    public function cartItems(): HasMany
+    {
+        return $this->hasMany(CartItem::class);
+    }
+
+    /**
      * Scope a query to active products.
      *
      * @param  Builder<Product>  $query
@@ -132,6 +144,22 @@ class Product extends Model
             ->whereIn(
                 'category_id',
                 Category::query()->active()->select('id'),
+            );
+    }
+
+    /**
+     * Scope a query to products that may be persisted in a customer cart.
+     *
+     * @param  Builder<Product>  $query
+     */
+    #[Scope]
+    protected function cartEligible(Builder $query): void
+    {
+        $query
+            ->customerEligible()
+            ->whereHas(
+                'inventory',
+                fn (Builder $inventoryQuery): Builder => $inventoryQuery->where('quantity', '>', 0),
             );
     }
 
