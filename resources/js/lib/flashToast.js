@@ -7,6 +7,16 @@ export function initializeFlashToast() {
         if (!data) {
             return;
         }
-        toast[data.type](data.message);
+
+        const options = data.action
+            ? {
+                  action: {
+                      label: data.action.label,
+                      onClick: () => router.visit(data.action.url),
+                  },
+              }
+            : undefined;
+
+        toast[data.type](data.message, options);
     });
 }

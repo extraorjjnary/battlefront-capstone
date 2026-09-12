@@ -205,6 +205,113 @@ test('inventory pagination preserves the active query', function () {
         ->and($nextPageUrl)->toContain('stock=low');
 });
 
+test('guests cannot initialize inventory', function () {
+    $product = Product::factory()->create();
+
+    $this->post(route('administration.products.inventory.store', $product), [
+        'quantity' => 10,
+        'reorder_level' => 3,
+    ])->assertRedirect(route('login'));
+
+    $this->assertDatabaseMissing('inventories', [
+        'product_id' => $product->id,
+    ]);
+});
+
+test('customers cannot initialize inventory', function () {
+    $customer = User::factory()->customer()->create();
+    $product = Product::factory()->create();
+
+    $this->actingAs($customer)
+        ->post(route('administration.products.inventory.store', $product), [
+            'quantity' => 10,
+            'reorder_level' => 3,
+        ])
+        ->assertForbidden();
+
+    $this->assertDatabaseMissing('inventories', [
+        'product_id' => $product->id,
+    ]);
+});
+
+test('administrators can initialize missing inventory', function () {
+    $administrator = User::factory()->administrator()->create();
+    $product = Product::factory()->create();
+    $otherProduct = Product::factory()->create();
+
+    $response = $this
+        ->actingAs($administrator)
+        ->from(route('administration.inventory.index', [
+            'q' => 'Temporary product search',
+            'stock' => 'low',
+        ]))
+        ->post(route('administration.products.inventory.store', $product), [
+            'quantity' => 12,
+            'reorder_level' => 4,
+            'product_id' => $otherProduct->id,
+        ]);
+
+    $response
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('administration.inventory.index'))
+        ->assertInertiaFlash('toast.message', 'Inventory initialized.');
+    $this->assertDatabaseHas('inventories', [
+        'product_id' => $product->id,
+        'quantity' => 12,
+        'reorder_level' => 4,
+    ]);
+    $this->assertDatabaseMissing('inventories', [
+        'product_id' => $otherProduct->id,
+    ]);
+});
+
+test('invalid initial inventory values are rejected without creating inventory', function () {
+    $administrator = User::factory()->administrator()->create();
+    $product = Product::factory()->create();
+
+    $response = $this
+        ->actingAs($administrator)
+        ->from(route('administration.inventory.index'))
+        ->post(route('administration.products.inventory.store', $product));
+
+    $response
+        ->assertRedirect(route('administration.inventory.index'))
+        ->assertSessionHasErrors([
+            'quantity' => 'Enter the current quantity.',
+            'reorder_level' => 'Enter the reorder level.',
+        ]);
+    $this->assertDatabaseMissing('inventories', [
+        'product_id' => $product->id,
+    ]);
+});
+
+test('initializing inventory twice preserves the existing stock values', function () {
+    $administrator = User::factory()->administrator()->create();
+    $inventory = Inventory::factory()->create([
+        'quantity' => 10,
+        'reorder_level' => 3,
+    ]);
+
+    $response = $this
+        ->actingAs($administrator)
+        ->from(route('administration.inventory.index'))
+        ->post(route('administration.products.inventory.store', $inventory->product), [
+            'quantity' => 20,
+            'reorder_level' => 6,
+        ]);
+
+    $response
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('administration.inventory.index'))
+        ->assertInertiaFlash('toast.message', 'Inventory is already initialized.');
+    expect(Inventory::query()->where('product_id', $inventory->product_id)->count())->toBe(1);
+    $this->assertDatabaseHas('inventories', [
+        'id' => $inventory->id,
+        'quantity' => 10,
+        'reorder_level' => 3,
+    ]);
+});
+
 test('guests cannot update inventory', function () {
     $inventory = Inventory::factory()->create([
         'quantity' => 10,

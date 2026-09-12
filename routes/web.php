@@ -28,6 +28,8 @@ Route::middleware(['auth', 'verified', 'can:access-administration'])
             ->except(['show', 'destroy']);
         Route::patch('products/{product}/activation', ProductActivationController::class)
             ->name('products.activation.update');
+        Route::post('products/{product}/inventory', [InventoryController::class, 'store'])
+            ->name('products.inventory.store');
 
         Route::resource('categories', CategoryController::class)
             ->except(['show', 'destroy']);

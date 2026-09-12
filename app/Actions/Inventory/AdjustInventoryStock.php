@@ -3,11 +3,26 @@
 namespace App\Actions\Inventory;
 
 use App\Models\Inventory;
+use App\Models\Product;
 use DomainException;
 use InvalidArgumentException;
 
 class AdjustInventoryStock
 {
+    /**
+     * Create the initial inventory record for a product.
+     */
+    public function initialize(Product $product, int $quantity, int $reorderLevel): Inventory
+    {
+        $this->ensureNonNegative($quantity, 'Quantity');
+        $this->ensureNonNegative($reorderLevel, 'Reorder level');
+
+        return $product->inventory()->firstOrCreate([], [
+            'quantity' => $quantity,
+            'reorder_level' => $reorderLevel,
+        ]);
+    }
+
     /**
      * Set the current quantity and reorder level.
      */

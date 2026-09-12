@@ -463,21 +463,67 @@ defineOptions({
                         </Button>
                     </Form>
 
-                    <div
+                    <Form
                         v-else
-                        class="border-border bg-muted/40 flex min-h-20 items-center justify-between gap-4 border p-4"
+                        v-bind="InventoryController.store.form(product.id)"
+                        :options="{
+                            preserveScroll: true,
+                            preserveState: 'errors',
+                        }"
+                        :error-bag="`initializeInventory${product.id}`"
+                        class="border-border bg-muted/40 grid gap-4 border p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-start"
+                        v-slot="{ errors, processing }"
                     >
-                        <div>
+                        <div class="sm:col-span-3">
                             <Badge variant="outline">Not initialized</Badge>
                             <p class="text-muted-foreground mt-2 text-sm">
                                 This product does not have an inventory record
                                 yet.
                             </p>
                         </div>
-                        <span class="text-muted-foreground text-sm"
-                            >No stock to update</span
-                        >
-                    </div>
+
+                        <div class="grid gap-2">
+                            <Label :for="`initial-quantity-${product.id}`">
+                                Initial quantity
+                            </Label>
+                            <Input
+                                :id="`initial-quantity-${product.id}`"
+                                name="quantity"
+                                type="number"
+                                min="0"
+                                max="4294967295"
+                                step="1"
+                                inputmode="numeric"
+                                :aria-invalid="Boolean(errors.quantity)"
+                                required
+                            />
+                            <InputError :message="errors.quantity" />
+                        </div>
+
+                        <div class="grid gap-2">
+                            <Label :for="`initial-reorder-level-${product.id}`">
+                                Reorder level
+                            </Label>
+                            <Input
+                                :id="`initial-reorder-level-${product.id}`"
+                                name="reorder_level"
+                                type="number"
+                                min="0"
+                                max="4294967295"
+                                step="1"
+                                inputmode="numeric"
+                                :aria-invalid="Boolean(errors.reorder_level)"
+                                required
+                            />
+                            <InputError :message="errors.reorder_level" />
+                        </div>
+
+                        <Button class="sm:mt-7" :disabled="processing">
+                            <Spinner v-if="processing" />
+                            <Save v-else />
+                            Initialize inventory
+                        </Button>
+                    </Form>
                 </article>
             </div>
 

@@ -136,15 +136,23 @@ class ProductController extends Controller
         $tagIds = $validated['tag_ids'] ?? [];
         unset($validated['tag_ids']);
 
-        DB::transaction(function () use ($validated, $tagIds): void {
+        $product = DB::transaction(function () use ($validated, $tagIds): Product {
             $product = Product::query()->create($validated);
 
             $product->tags()->sync($tagIds);
+
+            return $product;
         });
 
         Inertia::flash('toast', [
             'type' => 'success',
-            'message' => __('Product created.'),
+            'message' => __('Product created successfully'),
+            'action' => [
+                'label' => __('Go to Inventory'),
+                'url' => route('administration.inventory.index', [
+                    'q' => $product->name,
+                ]),
+            ],
         ]);
 
         return to_route('administration.products.index');

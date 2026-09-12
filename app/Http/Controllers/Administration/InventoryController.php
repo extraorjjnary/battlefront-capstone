@@ -88,6 +88,37 @@ class InventoryController extends Controller
     }
 
     /**
+     * Initialize inventory for a product that does not have a record yet.
+     */
+    public function store(
+        UpdateInventoryRequest $request,
+        Product $product,
+        AdjustInventoryStock $adjustInventoryStock,
+    ): RedirectResponse {
+        $inventory = $adjustInventoryStock->initialize(
+            $product,
+            $request->integer('quantity'),
+            $request->integer('reorder_level'),
+        );
+
+        if (! $inventory->wasRecentlyCreated) {
+            Inertia::flash('toast', [
+                'type' => 'error',
+                'message' => __('Inventory is already initialized.'),
+            ]);
+
+            return back();
+        }
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __('Inventory initialized.'),
+        ]);
+
+        return to_route('administration.inventory.index');
+    }
+
+    /**
      * Update an existing inventory record.
      */
     public function update(

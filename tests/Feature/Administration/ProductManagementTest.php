@@ -220,7 +220,13 @@ test('administrators can create products and attach validated tags', function ()
 
     $response
         ->assertSessionHasNoErrors()
-        ->assertRedirect(route('administration.products.index'));
+        ->assertRedirect(route('administration.products.index'))
+        ->assertInertiaFlash('toast.message', 'Product created successfully')
+        ->assertInertiaFlash('toast.action.label', 'Go to Inventory')
+        ->assertInertiaFlash(
+            'toast.action.url',
+            route('administration.inventory.index', ['q' => 'GeForce RTX 5070']),
+        );
     $product = Product::query()->where('name', 'GeForce RTX 5070')->firstOrFail();
     expect($product->is_active)->toBeTrue()
         ->and($product->inventory)->toBeNull()
