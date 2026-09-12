@@ -7,6 +7,7 @@ use App\Http\Controllers\Administration\InventoryController;
 use App\Http\Controllers\Administration\ProductActivationController;
 use App\Http\Controllers\Administration\ProductController;
 use App\Http\Controllers\BranchController;
+use App\Http\Controllers\CartItemController;
 use App\Http\Controllers\ProductCatalogController;
 use Illuminate\Support\Facades\Route;
 
@@ -19,6 +20,20 @@ Route::resource('products', ProductCatalogController::class)
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
 });
+
+Route::middleware(['auth', 'can:use-customer-cart'])
+    ->prefix('cart')
+    ->name('cart.')
+    ->group(function () {
+        Route::post('items', [CartItemController::class, 'store'])
+            ->name('items.store');
+        Route::patch('items/{cartItem}', [CartItemController::class, 'update'])
+            ->whereNumber('cartItem')
+            ->name('items.update');
+        Route::delete('items/{cartItem}', [CartItemController::class, 'destroy'])
+            ->whereNumber('cartItem')
+            ->name('items.destroy');
+    });
 
 Route::middleware(['auth', 'verified', 'can:access-administration'])
     ->prefix('administration')
