@@ -33,6 +33,7 @@ use Illuminate\Support\Carbon;
  * @property-read Inventory|null $lowStockInventory
  * @property-read Collection<int, Tag> $tags
  * @property-read Collection<int, CartItem> $cartItems
+ * @property-read Collection<int, OrderItem> $orderItems
  */
 #[Fillable([
     'name',
@@ -118,6 +119,16 @@ class Product extends Model
     public function cartItems(): HasMany
     {
         return $this->hasMany(CartItem::class);
+    }
+
+    /**
+     * Get the historical order items that reference the product.
+     *
+     * @return HasMany<OrderItem, $this>
+     */
+    public function orderItems(): HasMany
+    {
+        return $this->hasMany(OrderItem::class);
     }
 
     /**

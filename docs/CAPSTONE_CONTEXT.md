@@ -571,12 +571,13 @@ The following decisions are **approved implementation decisions within the exist
 - exclude inactive products from the customer catalog, cart eligibility, and recommendation results; exclude inactive categories and their products from customer browsing; and exclude inactive chatbot knowledge from chatbot retrieval;
 - keep recommendation behavior rule-based using budget, intended use, preferred brand, category, product preferences or tags, and Sagay inventory; do not implement a `product_compatibilities` table, product-to-product compatibility relationship, or dedicated compatibility-checking/configurator feature.
 
-The following E-Commerce decisions were explicitly deferred from EXT-6 to focused blocking issues:
+The E-Commerce decisions previously deferred from EXT-6 are resolved as follows:
 
-- EXT-80 must confirm the exact payment methods Battlefront accepts for manual processing before EXT-32 implements checkout payment-method validation;
-- EXT-81 must decide whether orders snapshot recipient name, contact number, fulfillment method, and delivery address before EXT-31 implements order persistence.
-
-These decisions remain unresolved, but their explicit deferral and blocking relationships allow EXT-6 and the Core System schema-confirmation gate to close without allowing the affected E-Commerce work to guess requirements.
+- orders snapshot required recipient name, contact number, and fulfillment method; delivery address is nullable in persistence, remains null for pickup, and is required for delivery later by checkout validation;
+- fulfillment methods are `pickup` and `delivery`;
+- manual payment methods are `cash`, `card_at_store`, `gcash`, and `maya`, stored in the string-backed `orders.payment_method` column;
+- GCash and Maya may reference nullable payment-proof evidence stored privately by default; cash and card-at-store do not require online payment proof;
+- checkout validation, order-placement transactions, payment verification, and stock deduction remain separate implementation work.
 
 ---
 
@@ -600,6 +601,8 @@ The customer-facing operating-hours value for each listed branch is **8:00 AM–
 The system supports:
 
 - payment-method selection;
+- cash, card-at-store, GCash, and Maya as manually processed payment methods;
+- private payment-proof evidence for GCash and Maya;
 - manual payment verification procedures determined by Battlefront.
 
 Outside scope:
@@ -616,6 +619,7 @@ The system supports:
 - order placement;
 - order monitoring;
 - order status tracking.
+- pickup and delivery fulfillment, with recipient and contact snapshots on the order.
 
 Actual delivery continues through Battlefront's existing business processes.
 
