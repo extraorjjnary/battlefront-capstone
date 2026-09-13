@@ -1,5 +1,5 @@
 <script setup>
-import { CheckCircle2, CircleHelp, CircleX, TriangleAlert } from '@lucide/vue';
+import { CheckCircle2, CircleX, TriangleAlert } from '@lucide/vue';
 import { computed } from 'vue';
 
 const props = defineProps({
@@ -22,27 +22,11 @@ const states = {
         icon: CircleX,
         class: 'border-border bg-muted text-muted-foreground',
     },
-    unavailable: {
-        label: 'Availability unavailable',
-        icon: CircleHelp,
-        class: 'border-border bg-muted text-muted-foreground',
-    },
 };
 
 const state = computed(
-    () => states[props.inventory.status] ?? states.unavailable,
+    () => states[props.inventory.status] ?? states.out_of_stock,
 );
-const quantityLabel = computed(() => {
-    if (props.inventory.status === 'low_stock') {
-        return `${props.inventory.quantity} left`;
-    }
-
-    if (props.inventory.status === 'in_stock') {
-        return `${props.inventory.quantity} available`;
-    }
-
-    return null;
-});
 </script>
 
 <template>
@@ -52,7 +36,5 @@ const quantityLabel = computed(() => {
     >
         <component :is="state.icon" class="size-3.5" aria-hidden="true" />
         {{ state.label }}
-        <span v-if="quantityLabel" aria-hidden="true">·</span>
-        <span v-if="quantityLabel">{{ quantityLabel }}</span>
     </span>
 </template>

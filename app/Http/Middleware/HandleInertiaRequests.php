@@ -42,6 +42,7 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
                 'can' => [
                     'accessAdministration' => $request->user()?->can('access-administration') ?? false,
+                    'useCustomerCart' => $request->user()?->can('use-customer-cart') ?? false,
                 ],
             ],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',

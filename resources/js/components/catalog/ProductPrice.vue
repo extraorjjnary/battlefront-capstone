@@ -1,16 +1,10 @@
 <script setup>
+import { formatCurrency } from '@/lib/currency';
+
 defineProps({
     price: { type: String, required: true },
     discountPrice: { type: String, default: null },
 });
-
-const priceFormatter = new Intl.NumberFormat('en-PH', {
-    style: 'currency',
-    currency: 'PHP',
-    minimumFractionDigits: 2,
-});
-
-const formatPrice = (value) => priceFormatter.format(Number(value));
 </script>
 
 <template>
@@ -19,10 +13,10 @@ const formatPrice = (value) => priceFormatter.format(Number(value));
             v-if="discountPrice"
             class="text-muted-foreground text-sm line-through"
         >
-            {{ formatPrice(price) }}
+            {{ formatCurrency(price) }}
         </span>
         <span class="text-xl font-bold tracking-tight">
-            {{ formatPrice(discountPrice ?? price) }}
+            {{ formatCurrency(discountPrice ?? price) }}
         </span>
     </div>
 </template>

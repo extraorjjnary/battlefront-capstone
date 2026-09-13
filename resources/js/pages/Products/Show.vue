@@ -1,17 +1,29 @@
 <script setup>
-import { Head, Link } from '@inertiajs/vue3';
-import { ArrowLeft, PackageOpen, Tag } from '@lucide/vue';
+import { Head, Link, usePage } from '@inertiajs/vue3';
+import { ArrowLeft, LogIn, PackageOpen, Tag } from '@lucide/vue';
+import { computed } from 'vue';
+import AddToCartForm from '@/components/cart/AddToCartForm.vue';
 import ProductImage from '@/components/catalog/ProductImage.vue';
 import ProductPrice from '@/components/catalog/ProductPrice.vue';
 import StockAvailability from '@/components/catalog/StockAvailability.vue';
 import StorefrontHeader from '@/components/StorefrontHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { login } from '@/routes';
 import { index as productIndex } from '@/routes/products';
 
-defineProps({
+const props = defineProps({
     product: { type: Object, required: true },
 });
+
+const page = usePage();
+const isAuthenticated = computed(() => Boolean(page.props.auth?.user));
+const canUseCustomerCart = computed(
+    () => page.props.auth?.can?.useCustomerCart === true,
+);
+const hasAvailableStock = computed(
+    () => Number(props.product.inventory.quantity) > 0,
+);
 </script>
 
 <template>
@@ -82,22 +94,55 @@ defineProps({
                         </p>
                         <StockAvailability :inventory="product.inventory" />
                         <p
-                            v-if="product.inventory.status === 'out_of_stock'"
+                            v-if="
+                                ['out_of_stock', 'unavailable'].includes(
+                                    product.inventory.status,
+                                )
+                            "
                             class="text-muted-foreground mt-3 text-sm leading-6"
                         >
                             This product remains in the catalog but is not
                             currently in stock.
                         </p>
-                        <p
-                            v-else-if="
-                                product.inventory.status === 'unavailable'
-                            "
-                            class="text-muted-foreground mt-3 text-sm leading-6"
-                        >
-                            Current stock information is not available. Contact
-                            Battlefront before visiting a branch.
-                        </p>
                     </div>
+
+                    <section
+                        v-if="hasAvailableStock && canUseCustomerCart"
+                        class="mt-7"
+                        aria-labelledby="add-to-cart-heading"
+                    >
+                        <h2 id="add-to-cart-heading" class="font-semibold">
+                            Add this product to your cart
+                        </h2>
+                        <p class="text-muted-foreground mt-1 text-sm leading-6">
+                            Choose a quantity. Current stock is checked again
+                            when you add it.
+                        </p>
+                        <AddToCartForm
+                            class="mt-4"
+                            :product-id="product.id"
+                            :available-quantity="product.inventory.quantity"
+                        />
+                    </section>
+
+                    <section
+                        v-else-if="hasAvailableStock && !isAuthenticated"
+                        class="border-border bg-secondary/40 mt-7 border p-4"
+                        aria-labelledby="customer-cart-heading"
+                    >
+                        <h2 id="customer-cart-heading" class="font-semibold">
+                            Ready to add this product?
+                        </h2>
+                        <p class="text-muted-foreground mt-1 text-sm leading-6">
+                            Log in with a customer account to use the cart.
+                        </p>
+                        <Button as-child class="mt-4">
+                            <Link :href="login()">
+                                <LogIn aria-hidden="true" />
+                                Log in to add to cart
+                            </Link>
+                        </Button>
+                    </section>
 
                     <section class="mt-7" aria-labelledby="description-heading">
                         <h2 id="description-heading" class="font-semibold">

@@ -7,6 +7,7 @@ use App\Http\Controllers\Administration\InventoryController;
 use App\Http\Controllers\Administration\ProductActivationController;
 use App\Http\Controllers\Administration\ProductController;
 use App\Http\Controllers\BranchController;
+use App\Http\Controllers\CartController;
 use App\Http\Controllers\CartItemController;
 use App\Http\Controllers\ProductCatalogController;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +26,8 @@ Route::middleware(['auth', 'can:use-customer-cart'])
     ->prefix('cart')
     ->name('cart.')
     ->group(function () {
+        Route::get('/', [CartController::class, 'index'])
+            ->name('index');
         Route::post('items', [CartItemController::class, 'store'])
             ->name('items.store');
         Route::patch('items/{cartItem}', [CartItemController::class, 'update'])

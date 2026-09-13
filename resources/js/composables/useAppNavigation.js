@@ -3,6 +3,7 @@ import {
     LayoutDashboard,
     MapPin,
     PackageSearch,
+    ShoppingCart,
     UsersRound,
     UserRound,
 } from '@lucide/vue';
@@ -14,6 +15,7 @@ import InventoryController from '@/actions/App/Http/Controllers/Administration/I
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import { dashboard } from '@/routes';
 import { index as branchIndex } from '@/routes/branches';
+import { index as cartIndex } from '@/routes/cart';
 import { index as productIndex } from '@/routes/products';
 import { edit as editProfile } from '@/routes/profile';
 
@@ -21,6 +23,9 @@ export function useAppNavigation() {
     const page = usePage();
     const isAdministrator = computed(
         () => page.props.auth?.can?.accessAdministration === true,
+    );
+    const canUseCustomerCart = computed(
+        () => page.props.auth?.can?.useCustomerCart === true,
     );
     const sectionLabel = computed(() =>
         isAdministrator.value ? 'Administration' : 'Customer',
@@ -64,6 +69,14 @@ export function useAppNavigation() {
                 title: 'Products',
                 href: productIndex(),
                 icon: PackageSearch,
+            });
+        }
+
+        if (canUseCustomerCart.value) {
+            items.push({
+                title: 'Cart',
+                href: cartIndex(),
+                icon: ShoppingCart,
             });
         }
 
