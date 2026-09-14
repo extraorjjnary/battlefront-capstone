@@ -6,9 +6,11 @@ Before planning or editing, find the row whose globs match the file's path and r
 | --- | --- |
 | app/**,database/**,resources/js/** | .ai/rules/app-js.md |
 | app/Models/** | .ai/rules/app-models.md |
+| app/Actions/Cart/**,app/Http/Controllers/*Checkout*,app/Http/Requests/ValidateCheckoutRequest.php,resources/js/pages/{Cart,Checkout}/**/*.vue | .ai/rules/cart-checkout.md |
 | app/Actions/Cart/** | .ai/rules/cart.md |
 | resources/js/{pages/Cart,components/cart}/**/*.vue | .ai/rules/cartcomponents-cart.md |
 | resources/js/components/catalog/StockAvailability.vue | .ai/rules/catalog.md |
+| config/battlefront.php,app/Http/Controllers/CheckoutController.php,resources/js/pages/Checkout/** | .ai/rules/checkout.md |
 | database/seeders/**,app/Http/Controllers/BranchController.php,resources/js/components/BranchMap.vue | .ai/rules/components.md |
 | routes/**,app/Http/Controllers/** | .ai/rules/controllers.md |
 | ** | .ai/rules/general.md |

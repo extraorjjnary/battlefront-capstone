@@ -11,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/currency';
 import { index as cartIndex } from '@/routes/cart';
+import { index as checkoutIndex } from '@/routes/checkout';
 import { index as productIndex } from '@/routes/products';
 
 defineProps({
@@ -65,7 +66,7 @@ defineOptions({
                         class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6"
                     >
                         Review current Battlefront pricing, stock, and
-                        quantities before moving to checkout in a later step.
+                        quantities before continuing to checkout.
                     </p>
                 </div>
             </div>
@@ -198,7 +199,34 @@ defineOptions({
                         server after every cart change.
                     </p>
 
-                    <Button as-child variant="outline" class="mt-6 w-full">
+                    <Button
+                        v-if="!cart.conflict_count"
+                        as-child
+                        class="mt-6 w-full"
+                    >
+                        <Link :href="checkoutIndex()">
+                            Proceed to checkout
+                            <ArrowRight aria-hidden="true" />
+                        </Link>
+                    </Button>
+                    <Button
+                        v-else
+                        class="mt-6 w-full"
+                        disabled
+                        aria-describedby="checkout-conflict-help"
+                    >
+                        Resolve cart issues first
+                    </Button>
+                    <p
+                        v-if="cart.conflict_count"
+                        id="checkout-conflict-help"
+                        class="text-muted-foreground mt-2 text-center text-xs"
+                    >
+                        Checkout becomes available after all marked items are
+                        updated or removed.
+                    </p>
+
+                    <Button as-child variant="outline" class="mt-3 w-full">
                         <Link :href="productIndex()">
                             Continue shopping
                             <ArrowRight aria-hidden="true" />
