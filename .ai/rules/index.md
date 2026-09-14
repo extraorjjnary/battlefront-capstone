@@ -21,5 +21,6 @@ Before planning or editing, find the row whose globs match the file's path and r
 | config/**,database/seeders/**,app/Models/Branch.php,resources/js/** | .ai/rules/models-js.md |
 | app/Models/**,database/migrations/**, app/Models/{Order,OrderItem}.php,database/migrations/*_create_order*_table.php | .ai/rules/models-migrations.md |
 | database/migrations/**,app/Models/** | .ai/rules/models.md |
+| app/Http/Controllers/OrderController.php,resources/js/pages/Orders/** | .ai/rules/orders.md |
 | app/Actions/{Cart,Order,Inventory}/**,app/Http/Controllers/OrderController.php,resources/js/pages/Checkout/** | .ai/rules/pages-checkout.md |
 | resources/js/app.js,resources/js/pages/** | .ai/rules/pages.md |

@@ -48,9 +48,13 @@ Route::middleware(['auth', 'can:use-customer-cart'])
             ->name('index');
     });
 
-Route::post('orders', [OrderController::class, 'store'])
-    ->middleware(['auth', 'can:use-customer-cart'])
-    ->name('orders.store');
+Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {
+    Route::post('orders', [OrderController::class, 'store'])
+        ->name('orders.store');
+    Route::get('orders/{order}', [OrderController::class, 'show'])
+        ->whereNumber('order')
+        ->name('orders.show');
+});
 
 Route::middleware(['auth', 'verified', 'can:access-administration'])
     ->prefix('administration')

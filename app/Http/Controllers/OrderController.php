@@ -7,12 +7,17 @@ use App\Actions\Order\PlaceOrder;
 use App\Enums\FulfillmentMethod;
 use App\Enums\PaymentMethod;
 use App\Http\Requests\ValidateCheckoutRequest;
+use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
+use Inertia\Response;
+use InvalidArgumentException;
 use Throwable;
 
 class OrderController extends Controller
@@ -34,7 +39,7 @@ class OrderController extends Controller
         );
 
         try {
-            $placeOrder->execute($customer, [
+            $order = $placeOrder->execute($customer, [
                 'recipient_name' => $validated['recipient_name'],
                 'contact_number' => $validated['contact_number'],
                 'fulfillment_method' => FulfillmentMethod::from($validated['fulfillment_method']),
@@ -59,7 +64,104 @@ class OrderController extends Controller
             'message' => 'Order placed successfully.',
         ]);
 
-        return to_route('cart.index');
+        return to_route('orders.show', $order);
+    }
+
+    /**
+     * Display a persisted order confirmation owned by the customer.
+     */
+    public function show(Request $request, int $order): Response
+    {
+        /** @var User $customer */
+        $customer = $request->user();
+        $persistedOrder = $customer->orders()
+            ->select([
+                'id',
+                'user_id',
+                'recipient_name',
+                'contact_number',
+                'fulfillment_method',
+                'delivery_address',
+                'total_amount',
+                'status',
+                'payment_status',
+                'payment_method',
+                'payment_proof_path',
+                'created_at',
+            ])
+            ->with([
+                'items' => fn ($query) => $query
+                    ->select(['id', 'order_id', 'product_id', 'quantity', 'price_at_time'])
+                    ->orderBy('id'),
+                'items.product:id,name,brand,image_url',
+            ])
+            ->whereKey($order)
+            ->firstOrFail();
+
+        return Inertia::render('Orders/Show', [
+            'order' => $this->orderData($persistedOrder),
+        ]);
+    }
+
+    /**
+     * Build the customer-safe order confirmation payload.
+     *
+     * @return array<string, mixed>
+     */
+    private function orderData(Order $order): array
+    {
+        return [
+            'id' => $order->id,
+            'reference' => '#'.$order->id,
+            'created_at' => $order->created_at->toIso8601String(),
+            'status' => [
+                'value' => $order->status->value,
+                'label' => $order->status->label(),
+            ],
+            'recipient' => [
+                'name' => $order->recipient_name,
+                'contact_number' => $order->contact_number,
+            ],
+            'fulfillment' => [
+                'value' => $order->fulfillment_method->value,
+                'label' => $order->fulfillment_method->label(),
+                'delivery_address' => $order->delivery_address,
+            ],
+            'payment' => [
+                'method' => [
+                    'value' => $order->payment_method->value,
+                    'label' => $order->payment_method->label(),
+                ],
+                'status' => [
+                    'value' => $order->payment_status->value,
+                    'label' => $order->payment_status->label(),
+                ],
+                'proof_submitted' => $order->payment_proof_path !== null,
+            ],
+            'items' => $order->items->map(function (OrderItem $item): array {
+                $unitPrice = $item->price_at_time;
+
+                if (! is_numeric($unitPrice)) {
+                    throw new InvalidArgumentException('Order item prices must be numeric.');
+                }
+
+                return [
+                    'id' => $item->id,
+                    'product' => [
+                        'id' => $item->product->id,
+                        'name' => $item->product->name,
+                        'brand' => $item->product->brand,
+                        'image_url' => $item->product->image_url,
+                    ],
+                    'quantity' => $item->quantity,
+                    'unit_price' => $unitPrice,
+                    'line_total' => bcmul($unitPrice, (string) $item->quantity, 2),
+                ];
+            })->values()->all(),
+            'item_count' => $order->items->count(),
+            'total_quantity' => $order->items->sum('quantity'),
+            'total' => $order->total_amount,
+        ];
     }
 
     /**

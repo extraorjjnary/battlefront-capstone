@@ -2,6 +2,7 @@
 
 use App\Actions\Cart\ManageCart;
 use App\Models\Inventory;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
@@ -332,10 +333,13 @@ test('all eligible fulfillment and payment combinations place an order', functio
         $payload['payment_proof'] = UploadedFile::fake()->image('proof.png');
     }
 
-    $this->actingAs($customer)
+    $response = $this->actingAs($customer)
         ->from(route('checkout.index'))
-        ->post(route('orders.store'), $payload)
-        ->assertRedirectToRoute('cart.index')
+        ->post(route('orders.store'), $payload);
+    $order = Order::query()->sole();
+
+    $response
+        ->assertRedirectToRoute('orders.show', $order)
         ->assertSessionHasNoErrors()
         ->assertInertiaFlash(
             'toast.message',
