@@ -4,6 +4,7 @@ import {
     Boxes,
     ChevronLeft,
     ChevronRight,
+    CircleX,
     Save,
     Search,
     SlidersHorizontal,
@@ -47,10 +48,19 @@ const { search, isSearching, clearSearch, cancelPendingSearch } =
 
 const hasSearchInput = computed(() => Boolean(search.value.trim()));
 const hasAppliedFilters = computed(
-    () => props.filters.category_id !== null || props.filters.stock === 'low',
+    () => props.filters.category_id !== null || props.filters.stock !== 'all',
 );
 const hasActiveQuery = computed(
     () => Boolean(props.filters.q) || hasAppliedFilters.value,
+);
+const stockFilterSummary = computed(
+    () =>
+        ({
+            in_stock: 'in-stock',
+            low: 'low-stock',
+            out_of_stock: 'out-of-stock',
+            not_initialized: 'not-initialized',
+        })[props.filters.stock] ?? '',
 );
 
 const dateFormatter = new Intl.DateTimeFormat('en-PH', {
@@ -68,7 +78,8 @@ function inventoryPage(page) {
             q: props.filters.q ?? undefined,
             category_id: props.filters.category_id ?? undefined,
             page,
-            stock: props.filters.stock === 'low' ? 'low' : undefined,
+            stock:
+                props.filters.stock === 'all' ? undefined : props.filters.stock,
         },
     });
 }
@@ -76,14 +87,14 @@ function inventoryPage(page) {
 function appliedFilters() {
     return {
         category_id: props.filters.category_id ?? undefined,
-        stock: props.filters.stock === 'low' ? 'low' : undefined,
+        stock: props.filters.stock === 'all' ? undefined : props.filters.stock,
     };
 }
 
 function selectedFilters() {
     return {
         category_id: categoryId.value === 'all' ? undefined : categoryId.value,
-        stock: stock.value === 'low' ? 'low' : undefined,
+        stock: stock.value === 'all' ? undefined : stock.value,
     };
 }
 
@@ -184,7 +195,7 @@ defineOptions({
                 <div>
                     <p class="text-muted-foreground text-sm">
                         {{ products.total }}
-                        {{ filters.stock === 'low' ? 'low-stock' : '' }}
+                        {{ stockFilterSummary }}
                         products
                     </p>
                     <h2
@@ -300,18 +311,23 @@ defineOptions({
                         </Select>
                     </div>
                     <div class="grid gap-2">
-                        <Label for="inventory-stock">Stock attention</Label>
+                        <Label for="inventory-stock">Stock status</Label>
                         <Select v-model="stock">
                             <SelectTrigger id="inventory-stock" class="w-full">
-                                <SelectValue placeholder="All products" />
+                                <SelectValue placeholder="All statuses" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="all"
-                                    >All products</SelectItem
+                                <SelectItem value="all">All</SelectItem>
+                                <SelectItem value="in_stock"
+                                    >In stock</SelectItem
                                 >
-                                <SelectItem value="low">
-                                    Low stock ({{ low_stock_count }})
-                                </SelectItem>
+                                <SelectItem value="low">Low stock</SelectItem>
+                                <SelectItem value="out_of_stock"
+                                    >Out of stock</SelectItem
+                                >
+                                <SelectItem value="not_initialized"
+                                    >Not initialized</SelectItem
+                                >
                             </SelectContent>
                         </Select>
                     </div>
@@ -381,7 +397,15 @@ defineOptions({
                                 {{ product.is_active ? 'Active' : 'Inactive' }}
                             </Badge>
                             <Badge
-                                v-if="product.is_low_stock"
+                                v-if="product.stock_status === 'out_of_stock'"
+                                variant="outline"
+                                class="border-destructive/50 text-destructive"
+                            >
+                                <CircleX />
+                                Out of stock
+                            </Badge>
+                            <Badge
+                                v-else-if="product.stock_status === 'low'"
                                 variant="outline"
                                 class="border-destructive/50 text-destructive"
                             >

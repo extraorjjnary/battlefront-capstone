@@ -26,7 +26,11 @@ class InventoryIndexRequest extends FormRequest
         return [
             'q' => ['nullable', 'string', 'max:255'],
             'category_id' => ['nullable', 'integer', 'exists:categories,id'],
-            'stock' => ['nullable', 'string', Rule::in(['all', 'low'])],
+            'stock' => [
+                'nullable',
+                'string',
+                Rule::in(['all', 'in_stock', 'low', 'out_of_stock', 'not_initialized']),
+            ],
             'page' => ['nullable', 'integer', 'min:1'],
         ];
     }

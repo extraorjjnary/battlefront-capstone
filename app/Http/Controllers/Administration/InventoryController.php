@@ -25,7 +25,7 @@ class InventoryController extends Controller
         $filters['category_id'] = $request->filled('category_id')
             ? $request->integer('category_id')
             : null;
-        $stockFilter = ($filters['stock'] ?? null) === 'low' ? 'low' : 'all';
+        $stockFilter = $filters['stock'] ?? 'all';
 
         $products = Product::query()
             ->select(['id', 'name', 'category_id', 'brand', 'is_active'])
@@ -48,7 +48,30 @@ class InventoryController extends Controller
             )
             ->when(
                 $stockFilter === 'low',
-                fn (Builder $query): Builder => $query->whereHas('lowStockInventory'),
+                fn (Builder $query): Builder => $query->whereHas(
+                    'lowStockInventory',
+                    fn (Builder $inventoryQuery): Builder => $inventoryQuery->where('quantity', '>', 0),
+                ),
+            )
+            ->when(
+                $stockFilter === 'in_stock',
+                fn (Builder $query): Builder => $query->whereHas(
+                    'inventory',
+                    fn (Builder $inventoryQuery): Builder => $inventoryQuery
+                        ->where('quantity', '>', 0)
+                        ->whereColumn('quantity', '>=', 'reorder_level'),
+                ),
+            )
+            ->when(
+                $stockFilter === 'out_of_stock',
+                fn (Builder $query): Builder => $query->whereHas(
+                    'inventory',
+                    fn (Builder $inventoryQuery): Builder => $inventoryQuery->where('quantity', 0),
+                ),
+            )
+            ->when(
+                $stockFilter === 'not_initialized',
+                fn (Builder $query): Builder => $query->doesntHave('inventory'),
             )
             ->orderBy('name')
             ->orderBy('id')
@@ -60,6 +83,12 @@ class InventoryController extends Controller
                 'brand' => $product->brand,
                 'is_active' => $product->is_active,
                 'is_low_stock' => $product->is_low_stock,
+                'stock_status' => match (true) {
+                    $product->inventory === null => 'not_initialized',
+                    $product->inventory->quantity === 0 => 'out_of_stock',
+                    $product->is_low_stock => 'low',
+                    default => 'in_stock',
+                },
                 'category' => $product->category->name,
                 'inventory' => $product->inventory === null ? null : [
                     'id' => $product->inventory->id,

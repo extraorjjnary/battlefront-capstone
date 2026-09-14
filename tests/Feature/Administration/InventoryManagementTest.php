@@ -53,7 +53,7 @@ test('administrators can view initialized and uninitialized product inventory', 
         ->where('products.data.1.inventory', null));
 });
 
-test('administrators can filter products below their reorder level', function () {
+test('administrators can filter products with low stock remaining', function () {
     $administrator = User::factory()->administrator()->create();
     $lowStockProduct = Product::factory()->create(['name' => 'Low Stock Product']);
     $inactiveLowStockProduct = Product::factory()->inactive()->create([
@@ -87,13 +87,45 @@ test('administrators can filter products below their reorder level', function ()
         ->component('Administration/Inventory')
         ->where('filters.stock', 'low')
         ->where('low_stock_count', 2)
-        ->where('products.total', 2)
-        ->where('products.data.0.name', 'Inactive Low Stock Product')
-        ->where('products.data.0.is_active', false)
+        ->where('products.total', 1)
+        ->where('products.data.0.name', 'Low Stock Product')
         ->where('products.data.0.is_low_stock', true)
-        ->where('products.data.1.name', 'Low Stock Product')
-        ->where('products.data.1.is_low_stock', true));
+        ->where('products.data.0.stock_status', 'low'));
 });
+
+test('administrators can filter inventory by stock status', function (string $stock, string $expectedName) {
+    $administrator = User::factory()->administrator()->create();
+    $inStockProduct = Product::factory()->create(['name' => 'In Stock Product']);
+    $lowStockProduct = Product::factory()->create(['name' => 'Low Stock Product']);
+    $outOfStockProduct = Product::factory()->create(['name' => 'Out Of Stock Product']);
+    Product::factory()->create(['name' => 'Uninitialized Product']);
+    Inventory::factory()->for($inStockProduct)->create([
+        'quantity' => 5,
+        'reorder_level' => 5,
+    ]);
+    Inventory::factory()->for($lowStockProduct)->create([
+        'quantity' => 4,
+        'reorder_level' => 5,
+    ]);
+    Inventory::factory()->for($outOfStockProduct)->create([
+        'quantity' => 0,
+        'reorder_level' => 5,
+    ]);
+
+    $response = $this
+        ->actingAs($administrator)
+        ->get(route('administration.inventory.index', ['stock' => $stock]));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->where('filters.stock', $stock)
+        ->where('products.total', 1)
+        ->where('products.data.0.name', $expectedName)
+        ->where('products.data.0.stock_status', $stock));
+})->with([
+    'in stock' => ['in_stock', 'In Stock Product'],
+    'out of stock' => ['out_of_stock', 'Out Of Stock Product'],
+    'not initialized' => ['not_initialized', 'Uninitialized Product'],
+]);
 
 test('invalid inventory filters are rejected', function () {
     $administrator = User::factory()->administrator()->create();

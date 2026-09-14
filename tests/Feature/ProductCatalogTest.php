@@ -39,6 +39,80 @@ test('guests can browse paginated customer eligible products in stable order', f
         ->not->toContain('Hidden category product');
 });
 
+test('catalog products are ordered by availability featured status name and id', function () {
+    $inStockZulu = Product::factory()->create([
+        'name' => 'Zulu in-stock product',
+        'is_featured' => true,
+    ]);
+    $inStockAlpha = Product::factory()->create(['name' => 'Alpha in-stock product']);
+    $inStockDuplicateFirst = Product::factory()->create(['name' => 'Same in-stock product']);
+    $inStockDuplicateSecond = Product::factory()->create(['name' => 'Same in-stock product']);
+    $lowStockZulu = Product::factory()->create([
+        'name' => 'Zulu low-stock product',
+        'is_featured' => true,
+    ]);
+    $lowStockAlpha = Product::factory()->create(['name' => 'Alpha low-stock product']);
+    $outOfStock = Product::factory()->create([
+        'name' => 'Zulu out-of-stock product',
+        'is_featured' => true,
+    ]);
+    $uninitialized = Product::factory()->create(['name' => 'Alpha out-of-stock product']);
+
+    Inventory::factory()->for($inStockZulu)->create([
+        'quantity' => 10,
+        'reorder_level' => 5,
+    ]);
+    Inventory::factory()->for($inStockAlpha)->create([
+        'quantity' => 5,
+        'reorder_level' => 5,
+    ]);
+    Inventory::factory()->for($inStockDuplicateFirst)->create([
+        'quantity' => 2,
+        'reorder_level' => 0,
+    ]);
+    Inventory::factory()->for($inStockDuplicateSecond)->create([
+        'quantity' => 2,
+        'reorder_level' => 0,
+    ]);
+    Inventory::factory()->for($lowStockZulu)->create([
+        'quantity' => 1,
+        'reorder_level' => 2,
+    ]);
+    Inventory::factory()->for($lowStockAlpha)->create([
+        'quantity' => 2,
+        'reorder_level' => 3,
+    ]);
+    Inventory::factory()->for($outOfStock)->create([
+        'quantity' => 0,
+        'reorder_level' => 3,
+    ]);
+
+    $response = $this->get(route('products.index'));
+
+    expect(collect($response->inertiaProps('products.data'))->pluck('id')->all())
+        ->toBe([
+            $inStockZulu->id,
+            $inStockAlpha->id,
+            $inStockDuplicateFirst->id,
+            $inStockDuplicateSecond->id,
+            $lowStockZulu->id,
+            $lowStockAlpha->id,
+            $outOfStock->id,
+            $uninitialized->id,
+        ]);
+    expect(collect($response->inertiaProps('products.data'))->pluck('inventory.status')->all())
+        ->toBe([
+            'in_stock',
+            'in_stock',
+            'in_stock',
+            'in_stock',
+            'low_stock',
+            'low_stock',
+            'out_of_stock',
+            'unavailable',
+        ]);
+});
+
 test('the catalog returns an explicit empty result when no products are eligible', function () {
     Product::factory()->inactive()->create();
 
