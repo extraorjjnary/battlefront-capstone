@@ -11,7 +11,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 test('guests are redirected from checkout', function (string $method) {
     $response = $method === 'get'
         ? $this->get(route('checkout.index'))
-        : $this->post(route('checkout.validate'));
+        : $this->post(route('orders.store'));
 
     $response->assertRedirectToRoute('login');
 })->with(['get', 'post']);
@@ -21,7 +21,7 @@ test('administrators are forbidden from checkout', function (string $method) {
 
     $response = $method === 'get'
         ? $this->actingAs($administrator)->get(route('checkout.index'))
-        : $this->actingAs($administrator)->post(route('checkout.validate'));
+        : $this->actingAs($administrator)->post(route('orders.store'));
 
     $response->assertForbidden();
 })->with(['get', 'post']);
@@ -43,14 +43,14 @@ test('checkout validation rejects a cart that is empty at submission time', func
 
     $this->actingAs($customer)
         ->from(route('checkout.index'))
-        ->post(route('checkout.validate'), [
+        ->post(route('orders.store'), [
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'pickup',
             'payment_method' => 'cash',
         ])
         ->assertSessionHasErrors([
-            'cart' => 'Add at least one available product before checking out.',
+            'cart' => 'Add at least one available product before placing an order.',
         ]);
 
     $this->assertDatabaseCount('orders', 0);
@@ -171,7 +171,7 @@ test('checkout rejects required and invalid fields with clear messages', functio
 
     $this->actingAs($customer)
         ->from(route('checkout.index'))
-        ->post(route('checkout.validate'))
+        ->post(route('orders.store'))
         ->assertRedirect(route('checkout.index'))
         ->assertSessionHasErrors([
             'recipient_name' => 'Enter the recipient name.',
@@ -189,7 +189,7 @@ test('delivery requires an address', function () {
 
     $this->actingAs($customer)
         ->from(route('checkout.index'))
-        ->post(route('checkout.validate'), [
+        ->post(route('orders.store'), [
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'delivery',
@@ -209,7 +209,7 @@ test('pickup rejects a delivery address', function () {
 
     $this->actingAs($customer)
         ->from(route('checkout.index'))
-        ->post(route('checkout.validate'), [
+        ->post(route('orders.store'), [
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'pickup',
@@ -229,7 +229,7 @@ test('delivery rejects payment methods that require paying at the store', functi
 
     $this->actingAs($customer)
         ->from(route('checkout.index'))
-        ->post(route('checkout.validate'), [
+        ->post(route('orders.store'), [
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'delivery',
@@ -249,7 +249,7 @@ test('gcash and maya require payment proof', function (string $paymentMethod) {
 
     $this->actingAs($customer)
         ->from(route('checkout.index'))
-        ->post(route('checkout.validate'), [
+        ->post(route('orders.store'), [
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'pickup',
@@ -268,7 +268,7 @@ test('cash and card at store reject online payment proof', function (string $pay
 
     $this->actingAs($customer)
         ->from(route('checkout.index'))
-        ->post(route('checkout.validate'), [
+        ->post(route('orders.store'), [
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'pickup',
@@ -288,7 +288,7 @@ test('payment proof must be a supported image no larger than five megabytes', fu
 
     $this->actingAs($customer)
         ->from(route('checkout.index'))
-        ->post(route('checkout.validate'), [
+        ->post(route('orders.store'), [
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'pickup',
@@ -307,7 +307,7 @@ test('payment proof must be a supported image no larger than five megabytes', fu
     ],
 ]);
 
-test('all eligible fulfillment and payment combinations validate without side effects', function (
+test('all eligible fulfillment and payment combinations place an order', function (
     string $fulfillmentMethod,
     string $paymentMethod,
     bool $requiresProof,
@@ -334,19 +334,20 @@ test('all eligible fulfillment and payment combinations validate without side ef
 
     $this->actingAs($customer)
         ->from(route('checkout.index'))
-        ->post(route('checkout.validate'), $payload)
-        ->assertRedirect(route('checkout.index'))
+        ->post(route('orders.store'), $payload)
+        ->assertRedirectToRoute('cart.index')
         ->assertSessionHasNoErrors()
         ->assertInertiaFlash(
             'toast.message',
-            'Checkout details are valid. Your order has not been placed yet.',
+            'Order placed successfully.',
         );
 
-    $this->assertDatabaseCount('orders', 0);
-    $this->assertDatabaseCount('order_items', 0);
-    expect($item->refresh()->quantity)->toBe(2)
-        ->and($inventory->refresh()->quantity)->toBe(3)
-        ->and(Storage::disk('local')->allFiles())->toBe([]);
+    $this->assertDatabaseCount('orders', 1);
+    $this->assertDatabaseCount('order_items', 1);
+    $this->assertModelMissing($item);
+    expect($inventory->refresh()->quantity)->toBe(1)
+        ->and($customer->refresh()->cart)->toBeNull()
+        ->and(Storage::disk('local')->allFiles())->toHaveCount($requiresProof ? 1 : 0);
 })->with([
     'pickup with cash' => ['pickup', 'cash', false],
     'pickup with card at store' => ['pickup', 'card_at_store', false],
@@ -357,6 +358,7 @@ test('all eligible fulfillment and payment combinations validate without side ef
 ]);
 
 test('checkout rechecks current stock on submission', function () {
+    Storage::fake('local');
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->create();
     $inventory = Inventory::factory()->for($product)->create(['quantity' => 2]);
@@ -365,17 +367,19 @@ test('checkout rechecks current stock on submission', function () {
 
     $this->actingAs($customer)
         ->from(route('checkout.index'))
-        ->post(route('checkout.validate'), [
+        ->post(route('orders.store'), [
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'pickup',
-            'payment_method' => 'cash',
+            'payment_method' => 'gcash',
+            'payment_proof' => UploadedFile::fake()->image('proof.png'),
         ])
         ->assertSessionHasErrors([
-            'cart' => 'Review unavailable products or quantities in your cart before checking out.',
+            'cart' => 'Review unavailable products or quantities in your cart before placing an order.',
         ]);
 
     expect($inventory->refresh()->quantity)->toBe(1);
     $this->assertDatabaseCount('orders', 0);
     $this->assertDatabaseCount('order_items', 0);
+    Storage::disk('local')->assertDirectoryEmpty('payment-proofs');
 });

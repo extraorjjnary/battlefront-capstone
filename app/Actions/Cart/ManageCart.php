@@ -180,6 +180,29 @@ class ManageCart
     }
 
     /**
+     * Reject a checkout line that is not eligible at its requested quantity.
+     */
+    public function ensureAvailableForCheckout(
+        Product $product,
+        Category $category,
+        ?Inventory $inventory,
+        int $requestedQuantity,
+    ): void {
+        $this->ensurePositiveQuantity($requestedQuantity);
+
+        $outcome = $this->evaluateAvailability(
+            $product,
+            $category,
+            $inventory,
+            $requestedQuantity,
+        );
+
+        if ($outcome !== CartAvailability::Available) {
+            throw new CartOperationException($outcome, $inventory?->quantity);
+        }
+    }
+
+    /**
      * Lock and return the current customer record.
      */
     private function lockCustomer(User $customer): User

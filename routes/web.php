@@ -10,8 +10,8 @@ use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CartItemController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\ProductCatalogController;
-use App\Http\Controllers\ValidateCheckoutController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
@@ -46,9 +46,11 @@ Route::middleware(['auth', 'can:use-customer-cart'])
     ->group(function () {
         Route::get('/', [CheckoutController::class, 'index'])
             ->name('index');
-        Route::post('validate', ValidateCheckoutController::class)
-            ->name('validate');
     });
+
+Route::post('orders', [OrderController::class, 'store'])
+    ->middleware(['auth', 'can:use-customer-cart'])
+    ->name('orders.store');
 
 Route::middleware(['auth', 'verified', 'can:access-administration'])
     ->prefix('administration')

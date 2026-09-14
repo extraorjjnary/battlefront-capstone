@@ -12,7 +12,7 @@ import {
     Upload,
 } from "@lucide/vue";
 import { computed, ref } from "vue";
-import ValidateCheckoutController from "@/actions/App/Http/Controllers/ValidateCheckoutController";
+import { store as storeOrder } from "@/actions/App/Http/Controllers/OrderController";
 import InputError from "@/components/InputError.vue";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -120,24 +120,15 @@ defineOptions({
         </section>
 
         <Form
-            v-bind="ValidateCheckoutController.form()"
+            v-bind="storeOrder.form()"
             :options="{ preserveScroll: true }"
             class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start"
-            v-slot="{ errors, processing, progress, recentlySuccessful }"
+            v-slot="{ errors, processing, progress }"
         >
             <div class="grid gap-6">
                 <Alert v-if="errors.cart" variant="destructive">
                     <AlertTitle>Your cart changed</AlertTitle>
                     <AlertDescription>{{ errors.cart }}</AlertDescription>
-                </Alert>
-
-                <Alert v-if="recentlySuccessful">
-                    <BadgeCheck class="size-4" aria-hidden="true" />
-                    <AlertTitle>Checkout details are valid</AlertTitle>
-                    <AlertDescription>
-                        Your order has not been placed yet. No inventory or cart
-                        items have been changed.
-                    </AlertDescription>
                 </Alert>
 
                 <section
@@ -522,14 +513,14 @@ defineOptions({
                 <Button type="submit" class="w-full" :disabled="processing">
                     <Spinner v-if="processing" />
                     <BadgeCheck v-else aria-hidden="true" />
-                    {{ processing ? "Validating..." : "Validate checkout" }}
+                    {{ processing ? "Placing order..." : "Place order" }}
                 </Button>
 
                 <p
                     class="text-muted-foreground mt-3 text-center text-xs leading-5"
                 >
-                    This check does not place an order, reserve stock, or clear
-                    your cart.
+                    Stock is deducted and your cart is cleared only after the
+                    complete order succeeds.
                 </p>
 
                 <Button as-child variant="outline" class="mt-5 w-full">
