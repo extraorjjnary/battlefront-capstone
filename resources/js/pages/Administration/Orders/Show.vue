@@ -429,7 +429,10 @@ defineOptions({
                                         :key="transition.value"
                                         :value="transition.value"
                                         :disabled="
-                                            transition.value === 'completed' &&
+                                            [
+                                                'processing',
+                                                'completed',
+                                            ].includes(transition.value) &&
                                             order.payment.status.value !==
                                                 'verified'
                                         "
@@ -440,12 +443,19 @@ defineOptions({
                             </Select>
                             <p
                                 v-if="
-                                    order.status.value === 'processing' &&
+                                    ['pending', 'processing'].includes(
+                                        order.status.value,
+                                    ) &&
                                     order.payment.status.value !== 'verified'
                                 "
                                 class="text-muted-foreground text-xs leading-5"
                             >
-                                Verify payment before completing this order.
+                                Verify payment before moving this order to
+                                {{
+                                    order.status.value === 'pending'
+                                        ? 'Processing'
+                                        : 'Completed'
+                                }}. Cancellation remains available.
                             </p>
                             <InputError
                                 :message="orderStatusForm.errors.status"

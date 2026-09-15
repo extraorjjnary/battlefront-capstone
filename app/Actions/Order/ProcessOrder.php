@@ -31,11 +31,11 @@ class ProcessOrder
             }
 
             if (
-                $status === OrderStatus::Completed
+                in_array($status, [OrderStatus::Processing, OrderStatus::Completed], strict: true)
                 && $lockedOrder->payment_status !== PaymentStatus::Verified
             ) {
                 throw ValidationException::withMessages([
-                    'status' => 'Verify payment before completing this order.',
+                    'status' => 'Verify payment before processing or completing this order.',
                 ]);
             }
 

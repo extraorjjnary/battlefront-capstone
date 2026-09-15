@@ -12,3 +12,6 @@ Administrator order status changes allow only pending to processing/cancelled an
 ## Require verified payment before order completion
 
 An order may transition from processing to completed only while payment_status is verified. Pending or rejected payment blocks completion, and payment cannot be rejected after an order is completed. Rejecting payment changes only payment_status and must never cancel the order or mutate inventory.
+
+## Require verified payment before order fulfillment transitions
+Require payment_status=verified before Pending may move to Processing and before Processing may move to Completed. Pending or rejected payment blocks both transitions; cancellation remains allowed, terminal/reverse transitions remain prohibited, and status processing must not mutate inventory.

@@ -144,13 +144,12 @@ test('administrator order directory is newest first and paginated', function () 
 test('administrators can apply approved order status transitions', function (
     OrderStatus $currentStatus,
     OrderStatus $nextStatus,
+    PaymentStatus $paymentStatus,
 ) {
     $administrator = User::factory()->administrator()->create();
     $order = Order::factory()->create([
         'status' => $currentStatus,
-        'payment_status' => $nextStatus === OrderStatus::Completed
-            ? PaymentStatus::Verified
-            : PaymentStatus::Pending,
+        'payment_status' => $paymentStatus,
     ]);
 
     $response = $this->actingAs($administrator)
@@ -165,34 +164,72 @@ test('administrators can apply approved order status transitions', function (
         ->assertInertiaFlash('toast.message', 'Order status updated.');
     expect($order->refresh()->status)->toBe($nextStatus);
 })->with([
-    'pending to processing' => [OrderStatus::Pending, OrderStatus::Processing],
-    'pending to cancelled' => [OrderStatus::Pending, OrderStatus::Cancelled],
-    'processing to completed' => [OrderStatus::Processing, OrderStatus::Completed],
-    'processing to cancelled' => [OrderStatus::Processing, OrderStatus::Cancelled],
+    'verified pending to processing' => [
+        OrderStatus::Pending,
+        OrderStatus::Processing,
+        PaymentStatus::Verified,
+    ],
+    'pending payment does not block cancellation' => [
+        OrderStatus::Pending,
+        OrderStatus::Cancelled,
+        PaymentStatus::Pending,
+    ],
+    'verified processing to completed' => [
+        OrderStatus::Processing,
+        OrderStatus::Completed,
+        PaymentStatus::Verified,
+    ],
+    'rejected payment does not block cancellation' => [
+        OrderStatus::Processing,
+        OrderStatus::Cancelled,
+        PaymentStatus::Rejected,
+    ],
 ]);
 
-test('pending or rejected payment blocks order completion', function (PaymentStatus $paymentStatus) {
+test('pending or rejected payment blocks order processing and completion', function (
+    OrderStatus $currentStatus,
+    OrderStatus $nextStatus,
+    PaymentStatus $paymentStatus,
+) {
     $administrator = User::factory()->administrator()->create();
     $order = Order::factory()->create([
-        'status' => OrderStatus::Processing,
+        'status' => $currentStatus,
         'payment_status' => $paymentStatus,
     ]);
 
     $response = $this->actingAs($administrator)
         ->from(route('administration.orders.show', $order))
         ->patch(route('administration.orders.status.update', $order), [
-            'status' => OrderStatus::Completed->value,
+            'status' => $nextStatus->value,
         ]);
 
     $response
         ->assertRedirect(route('administration.orders.show', $order))
         ->assertSessionHasErrors([
-            'status' => 'Verify payment before completing this order.',
+            'status' => 'Verify payment before processing or completing this order.',
         ]);
-    expect($order->refresh()->status)->toBe(OrderStatus::Processing);
+    expect($order->refresh()->status)->toBe($currentStatus);
 })->with([
-    'pending payment' => PaymentStatus::Pending,
-    'rejected payment' => PaymentStatus::Rejected,
+    'pending payment before processing' => [
+        OrderStatus::Pending,
+        OrderStatus::Processing,
+        PaymentStatus::Pending,
+    ],
+    'rejected payment before processing' => [
+        OrderStatus::Pending,
+        OrderStatus::Processing,
+        PaymentStatus::Rejected,
+    ],
+    'pending payment before completion' => [
+        OrderStatus::Processing,
+        OrderStatus::Completed,
+        PaymentStatus::Pending,
+    ],
+    'rejected payment before completion' => [
+        OrderStatus::Processing,
+        OrderStatus::Completed,
+        PaymentStatus::Rejected,
+    ],
 ]);
 
 test('administrators cannot apply unapproved order status transitions', function (
