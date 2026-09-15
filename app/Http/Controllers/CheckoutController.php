@@ -6,6 +6,7 @@ use App\Actions\Cart\CheckoutUnavailableException;
 use App\Actions\Cart\ReviewCheckoutCart;
 use App\Enums\FulfillmentMethod;
 use App\Enums\PaymentMethod;
+use App\Models\Branch;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -35,9 +36,20 @@ class CheckoutController extends Controller
             return to_route('cart.index');
         }
 
+        $pickupBranch = Branch::query()
+            ->select(['name', 'address', 'city', 'contact_number'])
+            ->operational()
+            ->sole();
+
         return Inertia::render('Checkout/Index', [
             'cart' => $cart,
             'customer' => ['name' => $customer->name],
+            'pickupLocation' => [
+                'name' => "{$pickupBranch->name} — {$pickupBranch->city}",
+                'address' => $pickupBranch->address,
+                'contact_number' => $pickupBranch->contact_number,
+                'operating_hours' => $pickupBranch->operating_hours,
+            ],
             'fulfillmentMethods' => array_map(
                 fn (FulfillmentMethod $method): array => [
                     'value' => $method->value,

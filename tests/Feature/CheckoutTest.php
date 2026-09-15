@@ -5,6 +5,7 @@ use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
+use Database\Seeders\BranchSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -58,7 +59,8 @@ test('checkout validation rejects a cart that is empty at submission time', func
     $this->assertDatabaseCount('order_items', 0);
 });
 
-test('checkout renders current customer items and supported options', function () {
+test('checkout renders current customer items, pickup location, and supported options', function () {
+    $this->seed(BranchSeeder::class);
     $customer = User::factory()->customer()->create(['name' => 'Alex Customer']);
     $otherCustomer = User::factory()->customer()->create();
     $product = Product::factory()->create([
@@ -78,6 +80,12 @@ test('checkout renders current customer items and supported options', function (
     $response->assertInertia(fn (Assert $page) => $page
         ->component('Checkout/Index')
         ->where('customer.name', 'Alex Customer')
+        ->where('pickupLocation', [
+            'name' => 'Battlefront Computer Trading — Sagay City',
+            'address' => 'A, E Marañon St., Brgy. Poblacion II, Sagay City, Negros Occidental (beside LBC Sagay City), Sagay, Philippines 6122',
+            'contact_number' => '0938 647 6046',
+            'operating_hours' => '8:00 AM–6:00 PM',
+        ])
         ->has('cart.items', 1)
         ->where('cart.items.0.id', $item->id)
         ->where('cart.items.0.product.name', 'Battlefront Processor')
@@ -132,6 +140,7 @@ test('checkout renders current customer items and supported options', function (
 });
 
 test('checkout uses separately configured receiving details for each wallet', function () {
+    $this->seed(BranchSeeder::class);
     config()->set('battlefront.payment_accounts.gcash', [
         'account_name' => 'Configured GCash Receiver',
         'account_number' => '0917 111 2222',

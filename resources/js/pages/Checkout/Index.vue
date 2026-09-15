@@ -3,9 +3,11 @@ import { Form, Head, Link } from "@inertiajs/vue3";
 import {
     ArrowLeft,
     BadgeCheck,
+    Clock3,
     CreditCard,
     MapPin,
     PackageCheck,
+    Phone,
     ShieldCheck,
     Store,
     Truck,
@@ -27,6 +29,7 @@ import { index as checkoutIndex } from "@/routes/checkout";
 const props = defineProps({
     cart: { type: Object, required: true },
     customer: { type: Object, required: true },
+    pickupLocation: { type: Object, required: true },
     fulfillmentMethods: { type: Array, required: true },
     paymentMethods: { type: Array, required: true },
 });
@@ -253,6 +256,74 @@ defineOptions({
                         </label>
                     </div>
                     <InputError :message="errors.fulfillment_method" />
+
+                    <div
+                        v-if="fulfillmentMethod === 'pickup'"
+                        class="border-border bg-secondary/40 grid gap-4 border p-4"
+                    >
+                        <div class="flex items-start gap-3">
+                            <Store
+                                class="text-primary mt-0.5 size-5 shrink-0"
+                                aria-hidden="true"
+                            />
+                            <div>
+                                <p
+                                    class="text-muted-foreground text-xs font-semibold tracking-wide uppercase"
+                                >
+                                    Pickup location
+                                </p>
+                                <p class="mt-1 font-semibold">
+                                    {{ pickupLocation.name }}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div
+                            class="border-border bg-background grid gap-3 border p-4 text-sm"
+                        >
+                            <div class="flex items-start gap-3">
+                                <MapPin
+                                    class="text-muted-foreground mt-0.5 size-4 shrink-0"
+                                    aria-hidden="true"
+                                />
+                                <p class="leading-6">
+                                    {{ pickupLocation.address }}
+                                </p>
+                            </div>
+                            <div
+                                v-if="
+                                    pickupLocation.contact_number ||
+                                    pickupLocation.operating_hours
+                                "
+                                class="border-border grid gap-3 border-t pt-3 sm:grid-cols-2"
+                            >
+                                <div
+                                    v-if="pickupLocation.contact_number"
+                                    class="flex items-center gap-3"
+                                >
+                                    <Phone
+                                        class="text-muted-foreground size-4 shrink-0"
+                                        aria-hidden="true"
+                                    />
+                                    <span class="tabular-nums">
+                                        {{ pickupLocation.contact_number }}
+                                    </span>
+                                </div>
+                                <div
+                                    v-if="pickupLocation.operating_hours"
+                                    class="flex items-center gap-3"
+                                >
+                                    <Clock3
+                                        class="text-muted-foreground size-4 shrink-0"
+                                        aria-hidden="true"
+                                    />
+                                    <span>
+                                        {{ pickupLocation.operating_hours }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <div
                         v-if="fulfillmentMethod === 'delivery'"
