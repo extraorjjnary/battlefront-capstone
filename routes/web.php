@@ -15,6 +15,7 @@ use App\Http\Controllers\CartController;
 use App\Http\Controllers\CartItemController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\OrderController;
+use App\Http\Controllers\OrderPaymentProofController as CustomerOrderPaymentProofController;
 use App\Http\Controllers\ProductCatalogController;
 use Illuminate\Support\Facades\Route;
 
@@ -57,6 +58,9 @@ Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {
         ->name('orders.index');
     Route::post('orders', [OrderController::class, 'store'])
         ->name('orders.store');
+    Route::post('orders/{order}/payment-proof', CustomerOrderPaymentProofController::class)
+        ->whereNumber('order')
+        ->name('orders.payment-proof.store');
     Route::get('orders/{order}', [OrderController::class, 'show'])
         ->whereNumber('order')
         ->name('orders.show');

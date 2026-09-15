@@ -41,6 +41,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency } from '@/lib/currency';
 import { orderStatusBadgeClass } from '@/lib/orderStatus';
 
@@ -55,6 +56,8 @@ const orderStatusForm = useForm({ status: '' });
 const paymentStatusForm = useForm({
     payment_status: '',
     manual_verification_confirmed: false,
+    rejection_reason: '',
+    rejection_note: '',
 });
 
 const selectedOrderTransition = computed(() =>
@@ -81,6 +84,11 @@ const paymentConfirmationDescription = computed(() =>
     paymentStatusForm.payment_status === 'verified'
         ? 'Confirm that the payment was manually cross-checked in the selected payment platform or account.'
         : 'Confirm that the payment could not be verified and should be rejected.',
+);
+const rejectingWalletPayment = computed(
+    () =>
+        paymentStatusForm.payment_status === 'rejected' &&
+        props.order.payment.method.requires_proof,
 );
 
 const dateFormatter = new Intl.DateTimeFormat('en-PH', {
@@ -129,6 +137,11 @@ function selectPaymentStatus(status) {
 
     if (status !== 'verified') {
         paymentStatusForm.manual_verification_confirmed = false;
+    }
+
+    if (status !== 'rejected') {
+        paymentStatusForm.rejection_reason = '';
+        paymentStatusForm.rejection_note = '';
     }
 }
 
@@ -688,6 +701,82 @@ defineOptions({
                             />
                         </div>
 
+                        <div v-if="rejectingWalletPayment" class="grid gap-4">
+                            <div class="grid gap-2">
+                                <Label for="rejection-reason">
+                                    Rejection reason
+                                </Label>
+                                <Select
+                                    v-model="paymentStatusForm.rejection_reason"
+                                >
+                                    <SelectTrigger
+                                        id="rejection-reason"
+                                        class="w-full"
+                                    >
+                                        <SelectValue
+                                            placeholder="Select reason"
+                                        />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem
+                                            v-for="reason in order.payment
+                                                .rejection_reasons"
+                                            :key="reason.value"
+                                            :value="reason.value"
+                                        >
+                                            {{ reason.label }}
+                                        </SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <InputError
+                                    :message="
+                                        paymentStatusForm.errors
+                                            .rejection_reason
+                                    "
+                                />
+                            </div>
+
+                            <div class="grid gap-2">
+                                <Label for="rejection-note">
+                                    Additional note
+                                    <span
+                                        v-if="
+                                            paymentStatusForm.rejection_reason !==
+                                            'other'
+                                        "
+                                        class="text-muted-foreground font-normal"
+                                    >
+                                        (optional)
+                                    </span>
+                                </Label>
+                                <Textarea
+                                    id="rejection-note"
+                                    v-model="paymentStatusForm.rejection_note"
+                                    maxlength="255"
+                                    rows="3"
+                                    placeholder="Add short context for the customer"
+                                />
+                                <div
+                                    class="flex items-start justify-between gap-3"
+                                >
+                                    <InputError
+                                        :message="
+                                            paymentStatusForm.errors
+                                                .rejection_note
+                                        "
+                                    />
+                                    <span
+                                        class="text-muted-foreground ml-auto text-xs tabular-nums"
+                                    >
+                                        {{
+                                            paymentStatusForm.rejection_note
+                                                .length
+                                        }}/255
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
                         <Button
                             type="button"
                             class="w-full"
@@ -698,16 +787,43 @@ defineOptions({
                                     'verified' &&
                                     (!paymentStatusForm.manual_verification_confirmed ||
                                         (order.payment.method.requires_proof &&
-                                            !order.payment.proof_available)))
+                                            !order.payment.proof_available))) ||
+                                (rejectingWalletPayment &&
+                                    (!paymentStatusForm.rejection_reason ||
+                                        (paymentStatusForm.rejection_reason ===
+                                            'other' &&
+                                            !paymentStatusForm.rejection_note.trim())))
                             "
                             @click="requestPaymentStatusUpdate"
                         >
                             Apply payment decision
                         </Button>
                     </div>
-                    <p v-else class="text-muted-foreground mt-4 text-sm">
-                        This payment decision is final for this order.
-                    </p>
+                    <div v-else class="mt-4 grid gap-3">
+                        <p class="text-muted-foreground text-sm">
+                            This payment decision is final for this review.
+                        </p>
+                        <div
+                            v-if="
+                                order.payment.status.value === 'rejected' &&
+                                order.payment.method.requires_proof
+                            "
+                            class="border-destructive/40 bg-destructive/10 text-destructive border p-3 text-sm"
+                        >
+                            <p class="font-semibold">
+                                {{
+                                    order.payment.rejection?.reason ??
+                                    'No rejection reason was recorded.'
+                                }}
+                            </p>
+                            <p
+                                v-if="order.payment.rejection?.note"
+                                class="mt-1 leading-5"
+                            >
+                                {{ order.payment.rejection.note }}
+                            </p>
+                        </div>
+                    </div>
 
                     <Dialog v-model:open="paymentConfirmationOpen">
                         <DialogContent>

@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Actions\Order\OrderPlacementException;
 use App\Actions\Order\PlaceOrder;
 use App\Enums\FulfillmentMethod;
+use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
+use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
 use App\Http\Requests\ValidateCheckoutRequest;
 use App\Models\Order;
@@ -120,6 +122,8 @@ class OrderController extends Controller
                 'payment_status',
                 'payment_method',
                 'payment_proof_path',
+                'payment_rejection_reason',
+                'payment_rejection_note',
                 'created_at',
             ])
             ->with([
@@ -207,6 +211,8 @@ class OrderController extends Controller
                 ],
                 'proof_submitted' => $order->payment_proof_path !== null,
                 'notice' => $this->paymentNotice($order),
+                'rejection' => $this->paymentRejectionData($order),
+                'can_resubmit_proof' => $this->canResubmitPaymentProof($order),
             ],
             'items' => $order->items->map(function (OrderItem $item): array {
                 $unitPrice = $item->price_at_time;
@@ -250,8 +256,47 @@ class OrderController extends Controller
         return match ($order->payment_status) {
             PaymentStatus::Pending => 'Your uploaded proof is awaiting manual verification by Battlefront.',
             PaymentStatus::Verified => 'Your payment has been manually verified by Battlefront.',
-            PaymentStatus::Rejected => 'Your submitted payment proof was not accepted. Contact Battlefront for assistance.',
+            PaymentStatus::Rejected => 'Your submitted payment proof was rejected. Upload a replacement for another manual review.',
         };
+    }
+
+    /**
+     * Build safe customer-facing rejection feedback.
+     *
+     * @return array{reason: string, note: string|null}|null
+     */
+    private function paymentRejectionData(Order $order): ?array
+    {
+        if ($order->payment_status !== PaymentStatus::Rejected) {
+            return null;
+        }
+
+        $rejectionNote = filled($order->payment_rejection_note)
+            ? trim($order->payment_rejection_note)
+            : null;
+        $rejectionReason = $order->payment_rejection_reason;
+
+        if ($rejectionReason === null || ($rejectionReason === PaymentRejectionReason::Other && $rejectionNote === null)) {
+            return [
+                'reason' => 'Battlefront could not verify the submitted payment proof.',
+                'note' => null,
+            ];
+        }
+
+        return [
+            'reason' => $rejectionReason->label(),
+            'note' => $rejectionNote,
+        ];
+    }
+
+    /**
+     * Determine whether the customer can submit replacement evidence.
+     */
+    private function canResubmitPaymentProof(Order $order): bool
+    {
+        return $order->payment_method->requiresPaymentProof()
+            && $order->payment_status === PaymentStatus::Rejected
+            && ! in_array($order->status, [OrderStatus::Completed, OrderStatus::Cancelled], strict: true);
     }
 
     /**

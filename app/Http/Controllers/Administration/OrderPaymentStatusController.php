@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Administration;
 
 use App\Actions\Order\ProcessOrder;
+use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\UpdateOrderPaymentStatusRequest;
@@ -23,6 +24,10 @@ class OrderPaymentStatusController extends Controller
         $processOrder->updatePaymentStatus(
             $order,
             PaymentStatus::from($request->validated('payment_status')),
+            $request->validated('rejection_reason') !== null
+                ? PaymentRejectionReason::from($request->validated('rejection_reason'))
+                : null,
+            $request->validated('rejection_note'),
         );
 
         Inertia::flash('toast', [

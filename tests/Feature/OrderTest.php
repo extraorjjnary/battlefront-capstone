@@ -3,6 +3,7 @@
 use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
+use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\User;
@@ -23,6 +24,8 @@ test('the order schema follows the approved ERD and checkout amendments', functi
         'payment_status',
         'payment_method',
         'payment_proof_path',
+        'payment_rejection_reason',
+        'payment_rejection_note',
         'created_at',
     ]);
 });
@@ -46,7 +49,19 @@ test('an order persists approved snapshots defaults and casts', function () {
         ->and($order->payment_status)->toBe(PaymentStatus::Pending)
         ->and($order->payment_method)->toBe(PaymentMethod::CardAtStore)
         ->and($order->payment_proof_path)->toBeNull()
+        ->and($order->payment_rejection_reason)->toBeNull()
+        ->and($order->payment_rejection_note)->toBeNull()
         ->and($order->created_at)->not->toBeNull();
+});
+
+test('wallet rejection feedback persists with an enum cast', function () {
+    $order = Order::factory()->paidWithGCash()->withRejectedPaymentProof()->create([
+        'payment_rejection_reason' => PaymentRejectionReason::ImageUnclear,
+        'payment_rejection_note' => 'The reference number is cropped.',
+    ]);
+
+    expect($order->payment_rejection_reason)->toBe(PaymentRejectionReason::ImageUnclear)
+        ->and($order->payment_rejection_note)->toBe('The reference number is cropped.');
 });
 
 test('a customer owns orders through reciprocal relationships', function () {

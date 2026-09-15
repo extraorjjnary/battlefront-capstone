@@ -4,6 +4,7 @@ use App\Actions\Cart\ManageCart;
 use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
+use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
 use App\Models\Inventory;
 use App\Models\Order;
@@ -81,6 +82,8 @@ test('customers see authoritative persisted order confirmation details', functio
             ],
             'proof_submitted' => true,
             'notice' => 'Your uploaded proof is awaiting manual verification by Battlefront.',
+            'rejection' => null,
+            'can_resubmit_proof' => false,
         ])
         ->has('order.items', 1)
         ->where('order.items.0.id', $item->id)
@@ -95,6 +98,49 @@ test('customers see authoritative persisted order confirmation details', functio
         ->where('isConfirmation', false)
         ->missing('order.payment_proof_path'));
 });
+
+test('customers see wallet rejection feedback and the resubmission capability', function () {
+    $customer = User::factory()->customer()->create();
+    $order = Order::factory()->for($customer)->paidWithGCash()->withRejectedPaymentProof()->create([
+        'status' => OrderStatus::Processing,
+        'payment_rejection_reason' => PaymentRejectionReason::AmountMismatch,
+        'payment_rejection_note' => 'The receipt shows a lower total than the order.',
+    ]);
+
+    $this->actingAs($customer)
+        ->get(route('orders.show', $order))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('order.payment.status.value', PaymentStatus::Rejected->value)
+            ->where('order.payment.rejection', [
+                'reason' => 'Payment amount does not match',
+                'note' => 'The receipt shows a lower total than the order.',
+            ])
+            ->where('order.payment.can_resubmit_proof', true)
+            ->missing('order.payment_proof_path'));
+});
+
+test('customers see safe fallback feedback when a legacy rejection has no usable explanation', function (
+    ?PaymentRejectionReason $reason,
+    ?string $note,
+) {
+    $customer = User::factory()->customer()->create();
+    $order = Order::factory()->for($customer)->paidWithMaya()->withRejectedPaymentProof()->create([
+        'payment_rejection_reason' => $reason,
+        'payment_rejection_note' => $note,
+    ]);
+
+    $this->actingAs($customer)
+        ->get(route('orders.show', $order))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('order.payment.rejection', [
+                'reason' => 'Battlefront could not verify the submitted payment proof.',
+                'note' => null,
+            ])
+            ->where('order.payment.can_resubmit_proof', true));
+})->with([
+    'missing reason' => [null, null],
+    'other without a note' => [PaymentRejectionReason::Other, '   '],
+]);
 
 test('customers cannot view another customers order confirmation', function () {
     $customer = User::factory()->customer()->create();

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
+use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
 use App\Enums\UserRole;
 use Database\Factories\OrderFactory;
@@ -31,6 +32,8 @@ use Illuminate\Support\Carbon;
  * @property PaymentStatus $payment_status
  * @property PaymentMethod $payment_method
  * @property string|null $payment_proof_path
+ * @property PaymentRejectionReason|null $payment_rejection_reason
+ * @property string|null $payment_rejection_note
  * @property Carbon $created_at
  * @property-read string $reference
  * @property-read User $user
@@ -47,6 +50,8 @@ use Illuminate\Support\Carbon;
     'payment_status',
     'payment_method',
     'payment_proof_path',
+    'payment_rejection_reason',
+    'payment_rejection_note',
 ])]
 #[Hidden(['payment_proof_path'])]
 class Order extends Model
@@ -137,6 +142,7 @@ class Order extends Model
             'status' => OrderStatus::class,
             'payment_status' => PaymentStatus::class,
             'payment_method' => PaymentMethod::class,
+            'payment_rejection_reason' => PaymentRejectionReason::class,
         ];
     }
 }

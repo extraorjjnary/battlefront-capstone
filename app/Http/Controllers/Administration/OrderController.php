@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Administration;
 
 use App\Enums\OrderStatus;
+use App\Enums\PaymentRejectionReason;
+use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -114,6 +116,18 @@ class OrderController extends Controller
                     ],
                     'proof_submitted' => $order->payment_proof_path !== null,
                     'proof_available' => $this->paymentProofIsAvailable($order),
+                    'rejection' => $order->payment_status === PaymentStatus::Rejected
+                        ? [
+                            'reason' => $order->payment_rejection_reason?->label(),
+                            'note' => $order->payment_rejection_note,
+                        ]
+                        : null,
+                    'rejection_reasons' => collect(PaymentRejectionReason::cases())
+                        ->map(fn (PaymentRejectionReason $reason): array => [
+                            'value' => $reason->value,
+                            'label' => $reason->label(),
+                        ])
+                        ->all(),
                 ],
                 'items' => $order->items->map(function (OrderItem $item): array {
                     $unitPrice = $item->price_at_time;

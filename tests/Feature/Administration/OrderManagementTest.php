@@ -3,6 +3,7 @@
 use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
+use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -105,6 +106,13 @@ test('administrators can review authoritative order processing details', functio
         ])
         ->where('order.payment.proof_submitted', true)
         ->where('order.payment.proof_available', true)
+        ->where('order.payment.rejection_reasons', [
+            ['value' => 'image_unclear', 'label' => 'Image is unclear'],
+            ['value' => 'amount_mismatch', 'label' => 'Payment amount does not match'],
+            ['value' => 'transaction_unverified', 'label' => 'Transaction could not be verified'],
+            ['value' => 'wrong_account_or_reference', 'label' => 'Wrong account or reference'],
+            ['value' => 'other', 'label' => 'Other'],
+        ])
         ->where('order.items.0.product.name', 'Battlefront Graphics Card')
         ->where('order.items.0.quantity', 2)
         ->where('order.items.0.unit_price', '1250.00')
@@ -288,10 +296,96 @@ test('administrators can reject missing or unverifiable payment evidence', funct
     $this->actingAs($administrator)
         ->patch(route('administration.orders.payment-status.update', $order), [
             'payment_status' => PaymentStatus::Rejected->value,
+            'rejection_reason' => PaymentRejectionReason::TransactionUnverified->value,
         ])
         ->assertSessionHasNoErrors();
 
     expect($order->refresh()->payment_status)->toBe(PaymentStatus::Rejected)
+        ->and($order->payment_rejection_reason)->toBe(PaymentRejectionReason::TransactionUnverified)
+        ->and($order->payment_rejection_note)->toBeNull()
+        ->and($order->status)->toBe(OrderStatus::Processing);
+});
+
+test('wallet rejection requires a predefined reason', function () {
+    $administrator = User::factory()->administrator()->create();
+    $order = Order::factory()->paidWithGCash()->create();
+
+    $this->actingAs($administrator)
+        ->from(route('administration.orders.show', $order))
+        ->patch(route('administration.orders.payment-status.update', $order), [
+            'payment_status' => PaymentStatus::Rejected->value,
+        ])
+        ->assertSessionHasErrors([
+            'rejection_reason' => 'Select why the payment proof was rejected.',
+        ]);
+
+    expect($order->refresh()->payment_status)->toBe(PaymentStatus::Pending)
+        ->and($order->payment_rejection_reason)->toBeNull();
+});
+
+test('other wallet rejection requires a short explanation', function () {
+    $administrator = User::factory()->administrator()->create();
+    $order = Order::factory()->paidWithMaya()->create();
+
+    $this->actingAs($administrator)
+        ->from(route('administration.orders.show', $order))
+        ->patch(route('administration.orders.payment-status.update', $order), [
+            'payment_status' => PaymentStatus::Rejected->value,
+            'rejection_reason' => PaymentRejectionReason::Other->value,
+        ])
+        ->assertSessionHasErrors([
+            'rejection_note' => 'Explain why the payment proof was rejected when selecting Other.',
+        ]);
+
+    expect($order->refresh()->payment_status)->toBe(PaymentStatus::Pending);
+});
+
+test('wallet rejection rejects invalid feedback', function (array $feedback, string $field, string $message) {
+    $administrator = User::factory()->administrator()->create();
+    $order = Order::factory()->paidWithGCash()->create();
+
+    $this->actingAs($administrator)
+        ->from(route('administration.orders.show', $order))
+        ->patch(route('administration.orders.payment-status.update', $order), [
+            'payment_status' => PaymentStatus::Rejected->value,
+            ...$feedback,
+        ])
+        ->assertSessionHasErrors([$field => $message]);
+
+    expect($order->refresh()->payment_status)->toBe(PaymentStatus::Pending);
+})->with([
+    'unknown reason' => [
+        ['rejection_reason' => 'customer_changed_mind'],
+        'rejection_reason',
+        'Select a valid payment-proof rejection reason.',
+    ],
+    'note over 255 characters' => [
+        [
+            'rejection_reason' => PaymentRejectionReason::ImageUnclear->value,
+            'rejection_note' => str_repeat('a', 256),
+        ],
+        'rejection_note',
+        'The rejection note may not exceed 255 characters.',
+    ],
+]);
+
+test('wallet rejection persists an optional short administrator note', function () {
+    $administrator = User::factory()->administrator()->create();
+    $order = Order::factory()->paidWithMaya()->create([
+        'status' => OrderStatus::Processing,
+    ]);
+
+    $this->actingAs($administrator)
+        ->patch(route('administration.orders.payment-status.update', $order), [
+            'payment_status' => PaymentStatus::Rejected->value,
+            'rejection_reason' => PaymentRejectionReason::WrongAccountOrReference->value,
+            'rejection_note' => 'The reference belongs to a different receiver.',
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect($order->refresh()->payment_status)->toBe(PaymentStatus::Rejected)
+        ->and($order->payment_rejection_reason)->toBe(PaymentRejectionReason::WrongAccountOrReference)
+        ->and($order->payment_rejection_note)->toBe('The reference belongs to a different receiver.')
         ->and($order->status)->toBe(OrderStatus::Processing);
 });
 

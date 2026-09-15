@@ -17,6 +17,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | ** | .ai/rules/general.md |
 | app/Http/Controllers/** | .ai/rules/http-controllers.md |
 | app/Http/Controllers/BranchController.php,resources/js/pages/Branches/**,resources/js/components/BranchMap.vue | .ai/rules/js-components.md |
+| app/Actions/Order/**,app/Http/Controllers/**/*Order*,resources/js/pages/**/Orders/** | .ai/rules/js-pages-orders.md |
 | config/**,app/Models/Branch.php,resources/js/** | .ai/rules/js.md |
 | database/migrations/** | .ai/rules/migrations.md |
 | config/**,database/seeders/**,app/Models/Branch.php,resources/js/** | .ai/rules/models-js.md |

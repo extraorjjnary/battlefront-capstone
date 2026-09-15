@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
+use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\User;
@@ -33,6 +34,8 @@ class OrderFactory extends Factory
             'payment_status' => PaymentStatus::Pending->value,
             'payment_method' => PaymentMethod::Cash->value,
             'payment_proof_path' => null,
+            'payment_rejection_reason' => null,
+            'payment_rejection_note' => null,
         ];
     }
 
@@ -66,6 +69,18 @@ class OrderFactory extends Factory
         return $this->state(fn (array $attributes): array => [
             'payment_method' => PaymentMethod::Maya->value,
             'payment_proof_path' => 'payment-proofs/'.fake()->uuid().'.jpg',
+        ]);
+    }
+
+    /**
+     * Indicate that submitted wallet evidence was rejected.
+     */
+    public function withRejectedPaymentProof(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'payment_status' => PaymentStatus::Rejected->value,
+            'payment_rejection_reason' => PaymentRejectionReason::TransactionUnverified->value,
+            'payment_rejection_note' => null,
         ]);
     }
 }

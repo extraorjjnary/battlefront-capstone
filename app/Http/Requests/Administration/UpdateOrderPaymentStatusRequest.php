@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Administration;
 
+use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
+use App\Models\Order;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -24,6 +26,11 @@ class UpdateOrderPaymentStatusRequest extends FormRequest
      */
     public function rules(): array
     {
+        $order = $this->route('order');
+        $rejectingWalletPayment = $order instanceof Order
+            && $order->payment_method->requiresPaymentProof()
+            && $this->input('payment_status') === PaymentStatus::Rejected->value;
+
         return [
             'payment_status' => [
                 'bail',
@@ -37,6 +44,18 @@ class UpdateOrderPaymentStatusRequest extends FormRequest
                 Rule::excludeIf($this->input('payment_status') !== PaymentStatus::Verified->value),
                 'required',
                 'accepted',
+            ],
+            'rejection_reason' => [
+                Rule::excludeIf(! $rejectingWalletPayment),
+                'required',
+                Rule::enum(PaymentRejectionReason::class),
+            ],
+            'rejection_note' => [
+                Rule::excludeIf(! $rejectingWalletPayment),
+                Rule::requiredIf($this->input('rejection_reason') === PaymentRejectionReason::Other->value),
+                'nullable',
+                'string',
+                'max:255',
             ],
         ];
     }
@@ -53,6 +72,10 @@ class UpdateOrderPaymentStatusRequest extends FormRequest
             'payment_status.enum' => 'Select verified or rejected for the payment decision.',
             'manual_verification_confirmed.required' => 'Confirm the manual payment check before marking this payment as verified.',
             'manual_verification_confirmed.accepted' => 'Confirm the manual payment check before marking this payment as verified.',
+            'rejection_reason.required' => 'Select why the payment proof was rejected.',
+            'rejection_reason.enum' => 'Select a valid payment-proof rejection reason.',
+            'rejection_note.required' => 'Explain why the payment proof was rejected when selecting Other.',
+            'rejection_note.max' => 'The rejection note may not exceed 255 characters.',
         ];
     }
 }

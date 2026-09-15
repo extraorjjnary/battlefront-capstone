@@ -1,27 +1,37 @@
 <script setup>
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, useForm } from '@inertiajs/vue3';
 import {
     ArrowRight,
     BadgeCheck,
     CalendarDays,
+    CircleAlert,
     CreditCard,
     PackageCheck,
     ReceiptText,
     Store,
     Truck,
+    Upload,
     UserRound,
 } from '@lucide/vue';
 import OrderController from '@/actions/App/Http/Controllers/OrderController';
+import OrderPaymentProofController from '@/actions/App/Http/Controllers/OrderPaymentProofController';
+import InputError from '@/components/InputError.vue';
 import ProductImage from '@/components/catalog/ProductImage.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
 import { formatCurrency } from '@/lib/currency';
 import { orderStatusBadgeClass } from '@/lib/orderStatus';
 import { index as productIndex } from '@/routes/products';
 
-defineProps({
+const props = defineProps({
     order: { type: Object, required: true },
     isConfirmation: { type: Boolean, required: true },
+});
+
+const replacementProofForm = useForm({
+    payment_proof: null,
 });
 
 const dateFormatter = new Intl.DateTimeFormat('en-PH', {
@@ -31,6 +41,20 @@ const dateFormatter = new Intl.DateTimeFormat('en-PH', {
 
 function formatOrderDate(value) {
     return dateFormatter.format(new Date(value));
+}
+
+function selectReplacementProof(event) {
+    replacementProofForm.payment_proof = event.target.files?.[0] ?? null;
+    replacementProofForm.clearErrors('payment_proof');
+}
+
+function submitReplacementProof() {
+    replacementProofForm.submit(OrderPaymentProofController(props.order.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            replacementProofForm.reset();
+        },
+    });
 }
 </script>
 
@@ -326,6 +350,104 @@ function formatOrderDate(value) {
                                 </div>
                             </div>
                         </dl>
+
+                        <div
+                            v-if="order.payment.rejection"
+                            class="border-destructive/40 bg-destructive/10 mt-5 border p-4"
+                        >
+                            <div
+                                class="text-destructive flex items-start gap-3"
+                            >
+                                <CircleAlert
+                                    class="mt-0.5 size-5 shrink-0"
+                                    aria-hidden="true"
+                                />
+                                <div class="min-w-0">
+                                    <p class="font-semibold">
+                                        Payment proof rejected
+                                    </p>
+                                    <p class="mt-2 text-sm font-medium">
+                                        {{ order.payment.rejection.reason }}
+                                    </p>
+                                    <p
+                                        v-if="order.payment.rejection.note"
+                                        class="mt-1 text-sm leading-5"
+                                    >
+                                        {{ order.payment.rejection.note }}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <form
+                                v-if="order.payment.can_resubmit_proof"
+                                class="border-destructive/30 mt-4 grid gap-3 border-t pt-4"
+                                @submit.prevent="submitReplacementProof"
+                            >
+                                <div class="grid gap-2">
+                                    <label
+                                        for="replacement-payment-proof"
+                                        class="text-sm font-semibold"
+                                    >
+                                        Replacement proof
+                                    </label>
+                                    <Input
+                                        id="replacement-payment-proof"
+                                        type="file"
+                                        accept="image/jpeg,image/png,image/webp"
+                                        :disabled="
+                                            replacementProofForm.processing
+                                        "
+                                        @change="selectReplacementProof"
+                                    />
+                                    <p
+                                        class="text-muted-foreground text-xs leading-5"
+                                    >
+                                        Upload a clear JPEG, PNG, or WebP image
+                                        up to 5 MB. Battlefront will review it
+                                        again manually.
+                                    </p>
+                                    <InputError
+                                        :message="
+                                            replacementProofForm.errors
+                                                .payment_proof
+                                        "
+                                    />
+                                </div>
+
+                                <progress
+                                    v-if="replacementProofForm.progress"
+                                    class="h-2 w-full accent-red-700"
+                                    :value="
+                                        replacementProofForm.progress.percentage
+                                    "
+                                    max="100"
+                                >
+                                    {{
+                                        replacementProofForm.progress
+                                            .percentage
+                                    }}%
+                                </progress>
+
+                                <Button
+                                    type="submit"
+                                    class="w-full bg-red-700 text-white hover:bg-red-800 focus-visible:ring-red-600/40 dark:bg-red-700 dark:hover:bg-red-600"
+                                    :disabled="
+                                        replacementProofForm.processing ||
+                                        !replacementProofForm.payment_proof
+                                    "
+                                >
+                                    <Spinner
+                                        v-if="replacementProofForm.processing"
+                                    />
+                                    <Upload v-else aria-hidden="true" />
+                                    {{
+                                        replacementProofForm.processing
+                                            ? 'Submitting proof...'
+                                            : 'Submit replacement proof'
+                                    }}
+                                </Button>
+                            </form>
+                        </div>
 
                         <div class="mt-6 grid gap-3">
                             <Button as-child>

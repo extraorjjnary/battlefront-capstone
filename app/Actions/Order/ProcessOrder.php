@@ -3,6 +3,7 @@
 namespace App\Actions\Order;
 
 use App\Enums\OrderStatus;
+use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
 use App\Models\Order;
 use Illuminate\Support\Facades\DB;
@@ -47,9 +48,13 @@ class ProcessOrder
     /**
      * Record an administrator's final manual payment decision.
      */
-    public function updatePaymentStatus(Order $order, PaymentStatus $paymentStatus): Order
-    {
-        return DB::transaction(function () use ($order, $paymentStatus): Order {
+    public function updatePaymentStatus(
+        Order $order,
+        PaymentStatus $paymentStatus,
+        ?PaymentRejectionReason $rejectionReason = null,
+        ?string $rejectionNote = null,
+    ): Order {
+        return DB::transaction(function () use ($order, $paymentStatus, $rejectionReason, $rejectionNote): Order {
             $lockedOrder = Order::query()
                 ->whereKey($order->getKey())
                 ->lockForUpdate()
@@ -86,7 +91,33 @@ class ProcessOrder
                 ]);
             }
 
-            $lockedOrder->update(['payment_status' => $paymentStatus]);
+            $rejectingWalletPayment = $paymentStatus === PaymentStatus::Rejected
+                && $lockedOrder->payment_method->requiresPaymentProof();
+            $normalizedRejectionNote = filled($rejectionNote)
+                ? trim($rejectionNote)
+                : null;
+
+            if ($rejectingWalletPayment && $rejectionReason === null) {
+                throw ValidationException::withMessages([
+                    'rejection_reason' => 'Select why the payment proof was rejected.',
+                ]);
+            }
+
+            if (
+                $rejectingWalletPayment
+                && $rejectionReason === PaymentRejectionReason::Other
+                && $normalizedRejectionNote === null
+            ) {
+                throw ValidationException::withMessages([
+                    'rejection_note' => 'Explain why the payment proof was rejected when selecting Other.',
+                ]);
+            }
+
+            $lockedOrder->update([
+                'payment_status' => $paymentStatus,
+                'payment_rejection_reason' => $rejectingWalletPayment ? $rejectionReason : null,
+                'payment_rejection_note' => $rejectingWalletPayment ? $normalizedRejectionNote : null,
+            ]);
 
             return $lockedOrder->refresh();
         }, attempts: 3);
