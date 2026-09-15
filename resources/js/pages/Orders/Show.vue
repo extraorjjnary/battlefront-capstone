@@ -16,6 +16,7 @@ import ProductImage from '@/components/catalog/ProductImage.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/currency';
+import { orderStatusBadgeClass } from '@/lib/orderStatus';
 import { index as productIndex } from '@/routes/products';
 
 defineProps({
@@ -102,7 +103,11 @@ function formatOrderDate(value) {
                         <p class="mt-1 text-2xl font-bold tabular-nums">
                             {{ order.reference }}
                         </p>
-                        <Badge variant="secondary" class="mt-2">
+                        <Badge
+                            variant="outline"
+                            class="mt-2"
+                            :class="orderStatusBadgeClass(order.status.value)"
+                        >
                             {{ order.status.label }}
                         </Badge>
                     </div>
@@ -302,7 +307,14 @@ function formatOrderDate(value) {
                                         {{ order.payment.method.label }}
                                     </dd>
                                     <dd class="mt-2">
-                                        <Badge variant="outline">
+                                        <Badge
+                                            variant="outline"
+                                            :class="
+                                                orderStatusBadgeClass(
+                                                    order.payment.status.value,
+                                                )
+                                            "
+                                        >
                                             {{ order.payment.status.label }}
                                         </Badge>
                                     </dd>

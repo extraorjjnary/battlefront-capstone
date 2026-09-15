@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
 import { formatCurrency } from '@/lib/currency';
+import { orderStatusBadgeClass } from '@/lib/orderStatus';
 
 const props = defineProps({
     order: { type: Object, required: true },
@@ -86,21 +87,6 @@ const dateFormatter = new Intl.DateTimeFormat('en-PH', {
     dateStyle: 'long',
     timeStyle: 'short',
 });
-
-function statusClass(status) {
-    return {
-        pending:
-            'border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-300',
-        processing:
-            'border-sky-500/50 bg-sky-500/10 text-sky-700 dark:text-sky-300',
-        completed:
-            'border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-        cancelled: 'border-destructive/50 bg-destructive/10 text-destructive',
-        verified:
-            'border-emerald-500/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-        rejected: 'border-destructive/50 bg-destructive/10 text-destructive',
-    }[status];
-}
 
 function selectOrderStatus(status) {
     selectedOrderStatus.value = status;
@@ -217,7 +203,9 @@ defineOptions({
                             </h1>
                             <Badge
                                 variant="outline"
-                                :class="statusClass(order.status.value)"
+                                :class="
+                                    orderStatusBadgeClass(order.status.value)
+                                "
                             >
                                 {{ order.status.label }}
                             </Badge>
@@ -542,7 +530,11 @@ defineOptions({
                             <Badge
                                 variant="outline"
                                 class="mt-2"
-                                :class="statusClass(order.payment.status.value)"
+                                :class="
+                                    orderStatusBadgeClass(
+                                        order.payment.status.value,
+                                    )
+                                "
                             >
                                 {{ order.payment.status.label }}
                             </Badge>

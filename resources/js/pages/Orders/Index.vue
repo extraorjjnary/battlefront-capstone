@@ -14,6 +14,7 @@ import CatalogPagination from '@/components/CatalogPagination.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/currency';
+import { orderStatusBadgeClass } from '@/lib/orderStatus';
 import { index as productIndex } from '@/routes/products';
 
 defineProps({
@@ -191,7 +192,14 @@ defineOptions({
                                     Order status
                                 </dt>
                                 <dd class="mt-2">
-                                    <Badge variant="secondary">
+                                    <Badge
+                                        variant="outline"
+                                        :class="
+                                            orderStatusBadgeClass(
+                                                order.status.value,
+                                            )
+                                        "
+                                    >
                                         {{ order.status.label }}
                                     </Badge>
                                 </dd>
@@ -212,7 +220,14 @@ defineOptions({
                                         {{ order.payment.method.label }}
                                     </dd>
                                     <dd class="mt-2">
-                                        <Badge variant="outline">
+                                        <Badge
+                                            variant="outline"
+                                            :class="
+                                                orderStatusBadgeClass(
+                                                    order.payment.status.value,
+                                                )
+                                            "
+                                        >
                                             {{ order.payment.status.label }}
                                         </Badge>
                                     </dd>
