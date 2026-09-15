@@ -5,46 +5,27 @@ import {
     BadgeCheck,
     CalendarDays,
     CreditCard,
-    LayoutDashboard,
     PackageCheck,
     ReceiptText,
     Store,
     Truck,
     UserRound,
 } from '@lucide/vue';
-import { computed } from 'vue';
+import OrderController from '@/actions/App/Http/Controllers/OrderController';
 import ProductImage from '@/components/catalog/ProductImage.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/currency';
-import { dashboard } from '@/routes';
 import { index as productIndex } from '@/routes/products';
 
-const props = defineProps({
+defineProps({
     order: { type: Object, required: true },
+    isConfirmation: { type: Boolean, required: true },
 });
 
 const dateFormatter = new Intl.DateTimeFormat('en-PH', {
     dateStyle: 'long',
     timeStyle: 'short',
-});
-
-const paymentNotice = computed(() => {
-    if (!['gcash', 'maya'].includes(props.order.payment.method.value)) {
-        return 'Payment will be handled when you collect your order.';
-    }
-
-    if (!props.order.payment.proof_submitted) {
-        return 'No payment proof is recorded for this order.';
-    }
-
-    return {
-        pending:
-            'Your uploaded proof is awaiting manual verification by Battlefront.',
-        verified: 'Your payment has been manually verified by Battlefront.',
-        rejected:
-            'Your submitted payment proof was not accepted. Contact Battlefront for assistance.',
-    }[props.order.payment.status.value];
 });
 
 function formatOrderDate(value) {
@@ -80,19 +61,34 @@ function formatOrderDate(value) {
                             <p
                                 class="text-primary text-xs font-semibold tracking-widest uppercase"
                             >
-                                Order confirmed
+                                {{
+                                    isConfirmation
+                                        ? 'Order confirmed'
+                                        : 'Customer order'
+                                }}
                             </p>
                             <h1
                                 id="confirmation-heading"
                                 class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
                             >
-                                Thank you for your order
+                                {{
+                                    isConfirmation
+                                        ? 'Thank you for your order'
+                                        : `Order ${order.reference}`
+                                }}
                             </h1>
                             <p
                                 class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6"
                             >
-                                Battlefront received your order. Keep the
-                                reference below when asking about its progress.
+                                <template v-if="isConfirmation">
+                                    Battlefront received your order. Keep the
+                                    reference below when asking about its
+                                    progress.
+                                </template>
+                                <template v-else>
+                                    Review the latest order and payment status
+                                    recorded by Battlefront.
+                                </template>
                             </p>
                         </div>
                     </div>
@@ -313,7 +309,7 @@ function formatOrderDate(value) {
                                     <dd
                                         class="text-muted-foreground mt-2 text-xs leading-5"
                                     >
-                                        {{ paymentNotice }}
+                                        {{ order.payment.notice }}
                                     </dd>
                                 </div>
                             </div>
@@ -321,15 +317,14 @@ function formatOrderDate(value) {
 
                         <div class="mt-6 grid gap-3">
                             <Button as-child>
-                                <Link :href="productIndex()">
-                                    Continue shopping
+                                <Link :href="OrderController.index()">
+                                    View order history
                                     <ArrowRight aria-hidden="true" />
                                 </Link>
                             </Button>
                             <Button as-child variant="outline">
-                                <Link :href="dashboard()">
-                                    <LayoutDashboard aria-hidden="true" />
-                                    Customer dashboard
+                                <Link :href="productIndex()">
+                                    Continue shopping
                                 </Link>
                             </Button>
                         </div>

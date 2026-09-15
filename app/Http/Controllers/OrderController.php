@@ -6,6 +6,7 @@ use App\Actions\Order\OrderPlacementException;
 use App\Actions\Order\PlaceOrder;
 use App\Enums\FulfillmentMethod;
 use App\Enums\PaymentMethod;
+use App\Enums\PaymentStatus;
 use App\Http\Requests\ValidateCheckoutRequest;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -22,6 +23,37 @@ use Throwable;
 
 class OrderController extends Controller
 {
+    /**
+     * Display the authenticated customer's order history.
+     */
+    public function index(Request $request): Response
+    {
+        /** @var User $customer */
+        $customer = $request->user();
+        $orders = $customer->orders()
+            ->select([
+                'id',
+                'user_id',
+                'fulfillment_method',
+                'total_amount',
+                'status',
+                'payment_status',
+                'payment_method',
+                'created_at',
+            ])
+            ->withCount('items')
+            ->withSum('items as total_quantity', 'quantity')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->paginate(10)
+            ->withQueryString()
+            ->through(fn (Order $order): array => $this->orderSummaryData($order));
+
+        return Inertia::render('Orders/Index', [
+            'orders' => $orders,
+        ]);
+    }
+
     /**
      * Place an order from the authenticated customer's checkout.
      */
@@ -64,7 +96,8 @@ class OrderController extends Controller
             'message' => 'Order placed successfully.',
         ]);
 
-        return to_route('orders.show', $order);
+        return to_route('orders.show', $order)
+            ->with('confirmed_order_id', $order->id);
     }
 
     /**
@@ -100,7 +133,43 @@ class OrderController extends Controller
 
         return Inertia::render('Orders/Show', [
             'order' => $this->orderData($persistedOrder),
+            'isConfirmation' => $request->session()->get('confirmed_order_id') === $persistedOrder->id,
         ]);
+    }
+
+    /**
+     * Build a compact order record for the customer history.
+     *
+     * @return array<string, mixed>
+     */
+    private function orderSummaryData(Order $order): array
+    {
+        return [
+            'id' => $order->id,
+            'reference' => $order->reference,
+            'created_at' => $order->created_at->toIso8601String(),
+            'status' => [
+                'value' => $order->status->value,
+                'label' => $order->status->label(),
+            ],
+            'fulfillment' => [
+                'value' => $order->fulfillment_method->value,
+                'label' => $order->fulfillment_method->label(),
+            ],
+            'payment' => [
+                'method' => [
+                    'value' => $order->payment_method->value,
+                    'label' => $order->payment_method->label(),
+                ],
+                'status' => [
+                    'value' => $order->payment_status->value,
+                    'label' => $order->payment_status->label(),
+                ],
+            ],
+            'item_count' => (int) $order->getAttribute('items_count'),
+            'total_quantity' => (int) ($order->getAttribute('total_quantity') ?? 0),
+            'total' => $order->total_amount,
+        ];
     }
 
     /**
@@ -112,7 +181,7 @@ class OrderController extends Controller
     {
         return [
             'id' => $order->id,
-            'reference' => '#'.$order->id,
+            'reference' => $order->reference,
             'created_at' => $order->created_at->toIso8601String(),
             'status' => [
                 'value' => $order->status->value,
@@ -137,6 +206,7 @@ class OrderController extends Controller
                     'label' => $order->payment_status->label(),
                 ],
                 'proof_submitted' => $order->payment_proof_path !== null,
+                'notice' => $this->paymentNotice($order),
             ],
             'items' => $order->items->map(function (OrderItem $item): array {
                 $unitPrice = $item->price_at_time;
@@ -162,6 +232,26 @@ class OrderController extends Controller
             'total_quantity' => $order->items->sum('quantity'),
             'total' => $order->total_amount,
         ];
+    }
+
+    /**
+     * Explain the current persisted payment state without exposing evidence.
+     */
+    private function paymentNotice(Order $order): string
+    {
+        if (! $order->payment_method->requiresPaymentProof()) {
+            return 'Payment will be handled when you collect your order.';
+        }
+
+        if ($order->payment_proof_path === null) {
+            return 'No payment proof is recorded for this order.';
+        }
+
+        return match ($order->payment_status) {
+            PaymentStatus::Pending => 'Your uploaded proof is awaiting manual verification by Battlefront.',
+            PaymentStatus::Verified => 'Your payment has been manually verified by Battlefront.',
+            PaymentStatus::Rejected => 'Your submitted payment proof was not accepted. Contact Battlefront for assistance.',
+        };
     }
 
     /**

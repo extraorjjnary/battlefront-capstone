@@ -11,6 +11,7 @@ use Database\Factories\OrderFactory;
 use DomainException;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -31,6 +32,7 @@ use Illuminate\Support\Carbon;
  * @property PaymentMethod $payment_method
  * @property string|null $payment_proof_path
  * @property Carbon $created_at
+ * @property-read string $reference
  * @property-read User $user
  * @property-read Collection<int, OrderItem> $items
  */
@@ -87,6 +89,18 @@ class Order extends Model
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    /**
+     * Get the customer-facing global order reference.
+     *
+     * @return Attribute<string, never>
+     */
+    protected function reference(): Attribute
+    {
+        return Attribute::make(
+            get: fn (mixed $value, array $attributes): string => sprintf('BF-%06d', $attributes['id']),
+        );
     }
 
     /**

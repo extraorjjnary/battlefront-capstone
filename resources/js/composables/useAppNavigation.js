@@ -3,6 +3,7 @@ import {
     LayoutDashboard,
     MapPin,
     PackageSearch,
+    ReceiptText,
     ShoppingCart,
     UsersRound,
     UserRound,
@@ -16,6 +17,7 @@ import ProductController from '@/actions/App/Http/Controllers/Administration/Pro
 import { dashboard } from '@/routes';
 import { index as branchIndex } from '@/routes/branches';
 import { index as cartIndex } from '@/routes/cart';
+import { index as orderIndex } from '@/routes/orders';
 import { index as productIndex } from '@/routes/products';
 import { edit as editProfile } from '@/routes/profile';
 
@@ -73,6 +75,12 @@ export function useAppNavigation() {
         }
 
         if (canUseCustomerCart.value) {
+            items.push({
+                title: 'Orders',
+                href: orderIndex(),
+                icon: ReceiptText,
+                activeRoutes: [orderIndex()],
+            });
             items.push({
                 title: 'Cart',
                 href: cartIndex(),

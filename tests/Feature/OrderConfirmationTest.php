@@ -40,6 +40,7 @@ test('customers see authoritative persisted order confirmation details', functio
         ->delivery()
         ->paidWithGCash()
         ->create([
+            'id' => 42,
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'delivery_address' => 'Sagay City, Negros Occidental',
@@ -58,7 +59,7 @@ test('customers see authoritative persisted order confirmation details', functio
     $response->assertInertia(fn (Assert $page) => $page
         ->component('Orders/Show')
         ->where('order.id', $order->id)
-        ->where('order.reference', '#'.$order->id)
+        ->where('order.reference', 'BF-000042')
         ->where('order.status', ['value' => 'pending', 'label' => 'Pending'])
         ->where('order.recipient', [
             'name' => 'Alex Customer',
@@ -79,6 +80,7 @@ test('customers see authoritative persisted order confirmation details', functio
                 'label' => 'Pending',
             ],
             'proof_submitted' => true,
+            'notice' => 'Your uploaded proof is awaiting manual verification by Battlefront.',
         ])
         ->has('order.items', 1)
         ->where('order.items.0.id', $item->id)
@@ -90,6 +92,7 @@ test('customers see authoritative persisted order confirmation details', functio
         ->where('order.item_count', 1)
         ->where('order.total_quantity', 2)
         ->where('order.total', '2500.00')
+        ->where('isConfirmation', false)
         ->missing('order.payment_proof_path'));
 });
 
@@ -117,8 +120,14 @@ test('refreshing confirmation does not place or deduct an order again', function
     $order = Order::query()->with('items')->sole();
 
     $placementResponse->assertRedirectToRoute('orders.show', $order);
-    $this->get(route('orders.show', $order))->assertOk();
-    $this->get(route('orders.show', $order))->assertOk();
+    $this->get(route('orders.show', $order))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Orders/Show')
+            ->where('isConfirmation', true));
+    $this->get(route('orders.show', $order))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Orders/Show')
+            ->where('isConfirmation', false));
 
     $this->assertDatabaseCount('orders', 1);
     $this->assertDatabaseCount('order_items', 1);

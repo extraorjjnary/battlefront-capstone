@@ -49,6 +49,8 @@ Route::middleware(['auth', 'can:use-customer-cart'])
     });
 
 Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {
+    Route::get('orders', [OrderController::class, 'index'])
+        ->name('orders.index');
     Route::post('orders', [OrderController::class, 'store'])
         ->name('orders.store');
     Route::get('orders/{order}', [OrderController::class, 'show'])
