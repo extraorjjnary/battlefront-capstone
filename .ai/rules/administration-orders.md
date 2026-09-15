@@ -1,0 +1,14 @@
+---
+paths:
+    - 'app/Actions/Order/**,app/Http/Controllers/Administration/Order*,resources/js/pages/Administration/Orders/**'
+---
+
+# Administration Orders
+
+## Keep administrator order processing manual and stock-neutral
+
+Administrator order status changes allow only pending to processing/cancelled and processing to completed/cancelled; completed/cancelled are terminal. Payment decisions are manual pending-to-verified/rejected decisions, with an explicit platform/account cross-check before verification and private proof served only through authorized admin routes. These workflows must not mutate inventory; EXT-33 remains the only initial stock deduction.
+
+## Require verified payment before order completion
+
+An order may transition from processing to completed only while payment_status is verified. Pending or rejected payment blocks completion, and payment cannot be rejected after an order is completed. Rejecting payment changes only payment_status and must never cancel the order or mutate inventory.

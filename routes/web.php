@@ -4,6 +4,10 @@ use App\Http\Controllers\Administration\CategoryActivationController;
 use App\Http\Controllers\Administration\CategoryController;
 use App\Http\Controllers\Administration\CustomerController;
 use App\Http\Controllers\Administration\InventoryController;
+use App\Http\Controllers\Administration\OrderController as AdministrationOrderController;
+use App\Http\Controllers\Administration\OrderPaymentProofController;
+use App\Http\Controllers\Administration\OrderPaymentStatusController;
+use App\Http\Controllers\Administration\OrderStatusController;
 use App\Http\Controllers\Administration\ProductActivationController;
 use App\Http\Controllers\Administration\ProductController;
 use App\Http\Controllers\BranchController;
@@ -81,6 +85,15 @@ Route::middleware(['auth', 'verified', 'can:access-administration'])
 
         Route::resource('customers', CustomerController::class)
             ->only(['index', 'show']);
+
+        Route::resource('orders', AdministrationOrderController::class)
+            ->only(['index', 'show']);
+        Route::patch('orders/{order}/status', [OrderStatusController::class, 'update'])
+            ->name('orders.status.update');
+        Route::patch('orders/{order}/payment-status', [OrderPaymentStatusController::class, 'update'])
+            ->name('orders.payment-status.update');
+        Route::get('orders/{order}/payment-proof', OrderPaymentProofController::class)
+            ->name('orders.payment-proof.show');
     });
 
 require __DIR__.'/settings.php';

@@ -155,16 +155,22 @@ test('a repeated placement cannot deduct initial stock twice', function () {
 });
 
 test('later order and payment status changes do not deduct stock again', function () {
+    $administrator = User::factory()->administrator()->create();
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->create();
     $inventory = Inventory::factory()->for($product)->create(['quantity' => 5]);
     (new ManageCart)->add($customer, $product->id, 2);
     $order = app(PlaceOrder::class)->execute($customer, validOrderPlacementData());
 
-    $order->update([
-        'status' => OrderStatus::Processing,
-        'payment_status' => PaymentStatus::Verified,
-    ]);
+    $this->actingAs($administrator)
+        ->patch(route('administration.orders.status.update', $order), [
+            'status' => OrderStatus::Processing->value,
+        ])
+        ->assertSessionHasNoErrors();
+    $this->patch(route('administration.orders.payment-status.update', $order), [
+        'payment_status' => PaymentStatus::Verified->value,
+        'manual_verification_confirmed' => '1',
+    ])->assertSessionHasNoErrors();
 
     expect($inventory->refresh()->quantity)->toBe(3)
         ->and($order->refresh()->status)->toBe(OrderStatus::Processing)

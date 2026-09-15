@@ -13,6 +13,7 @@ import { computed } from 'vue';
 import CategoryController from '@/actions/App/Http/Controllers/Administration/CategoryController';
 import CustomerController from '@/actions/App/Http/Controllers/Administration/CustomerController';
 import InventoryController from '@/actions/App/Http/Controllers/Administration/InventoryController';
+import AdministrationOrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import { dashboard } from '@/routes';
 import { index as branchIndex } from '@/routes/branches';
@@ -60,6 +61,11 @@ export function useAppNavigation() {
                 title: 'Inventory',
                 href: InventoryController.index(),
                 icon: Boxes,
+            });
+            items.push({
+                title: 'Orders',
+                href: AdministrationOrderController.index(),
+                icon: ReceiptText,
             });
             items.push({
                 title: 'Customers',

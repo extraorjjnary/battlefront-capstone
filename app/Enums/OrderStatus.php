@@ -21,4 +21,26 @@ enum OrderStatus: string
             self::Cancelled => 'Cancelled',
         };
     }
+
+    /**
+     * Get the administrator-approved next order statuses.
+     *
+     * @return list<self>
+     */
+    public function allowedTransitions(): array
+    {
+        return match ($this) {
+            self::Pending => [self::Processing, self::Cancelled],
+            self::Processing => [self::Completed, self::Cancelled],
+            self::Completed, self::Cancelled => [],
+        };
+    }
+
+    /**
+     * Determine whether this status may move to the requested status.
+     */
+    public function canTransitionTo(self $status): bool
+    {
+        return in_array($status, $this->allowedTransitions(), strict: true);
+    }
 }

@@ -4,6 +4,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 
 | Applies to | Rule file |
 | --- | --- |
+| app/Actions/Order/**,app/Http/Controllers/Administration/Order*,resources/js/pages/Administration/Orders/** | .ai/rules/administration-orders.md |
 | app/**,database/**,resources/js/** | .ai/rules/app-js.md |
 | app/Models/** | .ai/rules/app-models.md |
 | app/Actions/Cart/**,app/Http/Controllers/*Checkout*,app/Http/Requests/ValidateCheckoutRequest.php,resources/js/pages/{Cart,Checkout}/**/*.vue | .ai/rules/cart-checkout.md |
