@@ -9,8 +9,15 @@ import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { edit } from '@/routes/profile';
 import { send } from '@/routes/verification';
+
+const props = defineProps({
+    canManageDefaultDeliveryAddress: { type: Boolean, required: true },
+    defaultDeliveryAddress: { type: String, default: '' },
+});
+
 defineOptions({
     layout: {
         breadcrumbs: [
@@ -34,7 +41,7 @@ const user = computed(() => page.props.auth.user);
         <Heading
             variant="small"
             title="Profile"
-            description="Update your name and email address"
+            description="Update your account details and default delivery address"
         />
 
         <Form
@@ -69,6 +76,29 @@ const user = computed(() => page.props.auth.user);
                     placeholder="Email address"
                 />
                 <InputError class="mt-2" :message="errors.email" />
+            </div>
+
+            <div v-if="props.canManageDefaultDeliveryAddress" class="grid gap-2">
+                <Label for="default-delivery-address">
+                    Default delivery address (optional)
+                </Label>
+                <Textarea
+                    id="default-delivery-address"
+                    name="default_delivery_address"
+                    maxlength="255"
+                    autocomplete="street-address"
+                    :default-value="props.defaultDeliveryAddress"
+                    :aria-invalid="Boolean(errors.default_delivery_address)"
+                    placeholder="House or building, street, barangay, city, and province"
+                />
+                <p class="text-muted-foreground text-sm">
+                    This address will pre-fill delivery checkout and can still be
+                    changed for each order.
+                </p>
+                <InputError
+                    class="mt-2"
+                    :message="errors.default_delivery_address"
+                />
             </div>
 
             <div v-if="page.props.mustVerifyEmail && !user.email_verified_at">

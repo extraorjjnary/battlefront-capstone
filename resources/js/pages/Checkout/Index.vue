@@ -335,10 +335,20 @@ defineOptions({
                             name="delivery_address"
                             maxlength="255"
                             autocomplete="street-address"
+                            :default-value="
+                                customer.default_delivery_address ?? ''
+                            "
                             placeholder="House or building, street, barangay, city, and province"
                             :aria-invalid="Boolean(errors.delivery_address)"
                             required
                         />
+                        <p
+                            v-if="customer.default_delivery_address"
+                            class="text-muted-foreground text-xs leading-5"
+                        >
+                            Pre-filled from your profile. Changes here apply only
+                            to this order.
+                        </p>
                         <InputError :message="errors.delivery_address" />
                     </div>
                 </section>

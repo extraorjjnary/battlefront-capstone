@@ -43,7 +43,10 @@ class CheckoutController extends Controller
 
         return Inertia::render('Checkout/Index', [
             'cart' => $cart,
-            'customer' => ['name' => $customer->name],
+            'customer' => [
+                'name' => $customer->name,
+                'default_delivery_address' => $customer->default_delivery_address,
+            ],
             'pickupLocation' => [
                 'name' => "{$pickupBranch->name} — {$pickupBranch->city}",
                 'address' => $pickupBranch->address,

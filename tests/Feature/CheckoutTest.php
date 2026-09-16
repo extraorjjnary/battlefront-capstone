@@ -139,6 +139,24 @@ test('checkout renders current customer items, pickup location, and supported op
         ->not->toContain($otherProduct->id);
 });
 
+test('checkout provides the saved default delivery address for prefill', function () {
+    $this->seed(BranchSeeder::class);
+    $customer = User::factory()->customer()->create([
+        'default_delivery_address' => '12 Mabini Street, Sagay City',
+    ]);
+    $product = Product::factory()->create();
+    Inventory::factory()->for($product)->create(['quantity' => 2]);
+    (new ManageCart)->add($customer, $product->id, 1);
+
+    $this->actingAs($customer)
+        ->get(route('checkout.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where(
+                'customer.default_delivery_address',
+                '12 Mabini Street, Sagay City',
+            ));
+});
+
 test('checkout uses separately configured receiving details for each wallet', function () {
     $this->seed(BranchSeeder::class);
     config()->set('battlefront.payment_accounts.gcash', [
@@ -395,4 +413,61 @@ test('checkout rechecks current stock on submission', function () {
     $this->assertDatabaseCount('orders', 0);
     $this->assertDatabaseCount('order_items', 0);
     Storage::disk('local')->assertDirectoryEmpty('payment-proofs');
+});
+
+test('a checkout override is snapshotted without changing the profile default', function () {
+    Storage::fake('local');
+    $customer = User::factory()->customer()->create([
+        'default_delivery_address' => '12 Mabini Street, Sagay City',
+    ]);
+    $product = Product::factory()->create();
+    Inventory::factory()->for($product)->create(['quantity' => 2]);
+    (new ManageCart)->add($customer, $product->id, 1);
+
+    $this->actingAs($customer)
+        ->post(route('orders.store'), [
+            'recipient_name' => 'Alex Customer',
+            'contact_number' => '09171234567',
+            'fulfillment_method' => 'delivery',
+            'delivery_address' => '99 Lopez Jaena Street, Sagay City',
+            'payment_method' => 'gcash',
+            'payment_proof' => UploadedFile::fake()->image('proof.png'),
+        ])
+        ->assertSessionHasNoErrors();
+
+    $order = Order::query()->sole();
+
+    expect($order->delivery_address)
+        ->toBe('99 Lopez Jaena Street, Sagay City')
+        ->and($customer->refresh()->default_delivery_address)
+        ->toBe('12 Mabini Street, Sagay City');
+
+    $customer->update([
+        'default_delivery_address' => '45 Rizal Avenue, Escalante City',
+    ]);
+
+    expect($order->refresh()->delivery_address)
+        ->toBe('99 Lopez Jaena Street, Sagay City');
+});
+
+test('pickup ignores the saved default delivery address', function () {
+    $customer = User::factory()->customer()->create([
+        'default_delivery_address' => '12 Mabini Street, Sagay City',
+    ]);
+    $product = Product::factory()->create();
+    Inventory::factory()->for($product)->create(['quantity' => 2]);
+    (new ManageCart)->add($customer, $product->id, 1);
+
+    $this->actingAs($customer)
+        ->post(route('orders.store'), [
+            'recipient_name' => 'Alex Customer',
+            'contact_number' => '09171234567',
+            'fulfillment_method' => 'pickup',
+            'payment_method' => 'cash',
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect(Order::query()->sole()->delivery_address)->toBeNull()
+        ->and($customer->refresh()->default_delivery_address)
+        ->toBe('12 Mabini Street, Sagay City');
 });

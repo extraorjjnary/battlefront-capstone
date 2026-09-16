@@ -24,6 +24,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $email_verified_at
  * @property string $password
  * @property UserRole $role
+ * @property string|null $default_delivery_address
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
  * @property Carbon|null $two_factor_confirmed_at
@@ -34,8 +35,14 @@ use Illuminate\Support\Carbon;
  * @property-read Cart|null $cart
  * @property-read Collection<int, Order> $orders
  */
-#[Fillable(['name', 'email', 'password'])]
-#[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
+#[Fillable(['name', 'email', 'password', 'default_delivery_address'])]
+#[Hidden([
+    'password',
+    'default_delivery_address',
+    'two_factor_secret',
+    'two_factor_recovery_codes',
+    'remember_token',
+])]
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
