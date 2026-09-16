@@ -2,17 +2,24 @@
 
 namespace App\Actions\Order;
 
+use App\Actions\Inventory\AdjustInventoryStock;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
+use App\Models\Inventory;
 use App\Models\Order;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 
 class ProcessOrder
 {
+    public function __construct(
+        private readonly AdjustInventoryStock $adjustInventoryStock,
+    ) {}
+
     /**
      * Move an order through an approved administrator transition.
      */
@@ -39,10 +46,43 @@ class ProcessOrder
                 ]);
             }
 
+            if ($status === OrderStatus::Cancelled) {
+                $this->restoreInventory($lockedOrder);
+            }
+
             $lockedOrder->update(['status' => $status]);
 
             return $lockedOrder->refresh();
         }, attempts: 3);
+    }
+
+    /**
+     * Restore the quantities purchased by a cancelled order.
+     */
+    private function restoreInventory(Order $order): void
+    {
+        $orderItems = $order->items()
+            ->orderBy('product_id')
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+        $inventories = Inventory::query()
+            ->whereIn('product_id', $orderItems->pluck('product_id')->unique())
+            ->orderBy('product_id')
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('product_id');
+
+        foreach ($orderItems as $orderItem) {
+            /** @var Inventory|null $inventory */
+            $inventory = $inventories->get($orderItem->product_id);
+
+            if ($inventory === null) {
+                throw new LogicException('An order item has no inventory record to restore.');
+            }
+
+            $this->adjustInventoryStock->increase($inventory, $orderItem->quantity);
+        }
     }
 
     /**

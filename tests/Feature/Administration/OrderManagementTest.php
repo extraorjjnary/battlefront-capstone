@@ -1,14 +1,17 @@
 <?php
 
+use App\Actions\Order\ProcessOrder;
 use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
+use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\User;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -31,7 +34,10 @@ test('guests are redirected from administrator order workflows', function () {
 
 test('customers are forbidden from administrator order workflows', function () {
     $customer = User::factory()->customer()->create();
+    $product = Product::factory()->create();
+    $inventory = Inventory::factory()->for($product)->create(['quantity' => 4]);
     $order = Order::factory()->create();
+    OrderItem::factory()->for($order)->for($product)->create(['quantity' => 2]);
 
     $this->actingAs($customer)
         ->get(route('administration.orders.index'))
@@ -39,13 +45,16 @@ test('customers are forbidden from administrator order workflows', function () {
     $this->get(route('administration.orders.show', $order))
         ->assertForbidden();
     $this->patch(route('administration.orders.status.update', $order), [
-        'status' => OrderStatus::Processing->value,
+        'status' => OrderStatus::Cancelled->value,
     ])->assertForbidden();
     $this->patch(route('administration.orders.payment-status.update', $order), [
         'payment_status' => PaymentStatus::Rejected->value,
     ])->assertForbidden();
     $this->get(route('administration.orders.payment-proof.show', $order))
         ->assertForbidden();
+
+    expect($order->refresh()->status)->toBe(OrderStatus::Pending)
+        ->and($inventory->refresh()->quantity)->toBe(4);
 });
 
 test('administrators can review authoritative order processing details', function () {
@@ -186,6 +195,96 @@ test('administrators can apply approved order status transitions', function (
     ],
 ]);
 
+test('cancelling an eligible order restores its exact purchased quantities', function (OrderStatus $status) {
+    $administrator = User::factory()->administrator()->create();
+    $firstProduct = Product::factory()->create();
+    $secondProduct = Product::factory()->create();
+    $firstInventory = Inventory::factory()->for($firstProduct)->create(['quantity' => 3]);
+    $secondInventory = Inventory::factory()->for($secondProduct)->create(['quantity' => 7]);
+    $order = Order::factory()->create(['status' => $status]);
+    OrderItem::factory()->for($order)->for($firstProduct)->create(['quantity' => 2]);
+    OrderItem::factory()->for($order)->for($secondProduct)->create(['quantity' => 3]);
+
+    $this->actingAs($administrator)
+        ->patch(route('administration.orders.status.update', $order), [
+            'status' => OrderStatus::Cancelled->value,
+        ])
+        ->assertSessionHasNoErrors();
+
+    expect($order->refresh()->status)->toBe(OrderStatus::Cancelled)
+        ->and($firstInventory->refresh()->quantity)->toBe(5)
+        ->and($secondInventory->refresh()->quantity)->toBe(10);
+})->with([
+    'pending order' => OrderStatus::Pending,
+    'processing order' => OrderStatus::Processing,
+]);
+
+test('repeated cancellation cannot restore inventory more than once', function () {
+    $administrator = User::factory()->administrator()->create();
+    $product = Product::factory()->create();
+    $inventory = Inventory::factory()->for($product)->create(['quantity' => 4]);
+    $order = Order::factory()->create();
+    OrderItem::factory()->for($order)->for($product)->create(['quantity' => 2]);
+
+    $this->actingAs($administrator)
+        ->patch(route('administration.orders.status.update', $order), [
+            'status' => OrderStatus::Cancelled->value,
+        ])
+        ->assertSessionHasNoErrors();
+    $this->patch(route('administration.orders.status.update', $order), [
+        'status' => OrderStatus::Cancelled->value,
+    ])->assertSessionHasErrors([
+        'status' => 'This order cannot move to the selected status.',
+    ]);
+
+    expect($order->refresh()->status)->toBe(OrderStatus::Cancelled)
+        ->and($inventory->refresh()->quantity)->toBe(6);
+});
+
+test('completed orders cannot be cancelled or restore inventory', function () {
+    $administrator = User::factory()->administrator()->create();
+    $product = Product::factory()->create();
+    $inventory = Inventory::factory()->for($product)->create(['quantity' => 4]);
+    $order = Order::factory()->create(['status' => OrderStatus::Completed]);
+    OrderItem::factory()->for($order)->for($product)->create(['quantity' => 2]);
+
+    $this->actingAs($administrator)
+        ->patch(route('administration.orders.status.update', $order), [
+            'status' => OrderStatus::Cancelled->value,
+        ])
+        ->assertSessionHasErrors([
+            'status' => 'This order cannot move to the selected status.',
+        ]);
+
+    expect($order->refresh()->status)->toBe(OrderStatus::Completed)
+        ->and($inventory->refresh()->quantity)->toBe(4);
+});
+
+test('cancellation failure rolls back the status and restored inventory', function () {
+    $product = Product::factory()->create();
+    $inventory = Inventory::factory()->for($product)->create(['quantity' => 4]);
+    $order = Order::factory()->create();
+    OrderItem::factory()->for($order)->for($product)->create(['quantity' => 2]);
+    Event::listen(
+        'eloquent.updated: '.Order::class,
+        function (Order $updatedOrder): void {
+            if ($updatedOrder->status === OrderStatus::Cancelled) {
+                throw new RuntimeException('Forced cancellation failure.');
+            }
+        },
+    );
+
+    try {
+        expect(fn () => app(ProcessOrder::class)->updateStatus($order, OrderStatus::Cancelled))
+            ->toThrow(RuntimeException::class, 'Forced cancellation failure.');
+    } finally {
+        Event::forget('eloquent.updated: '.Order::class);
+    }
+
+    expect($order->refresh()->status)->toBe(OrderStatus::Pending)
+        ->and($inventory->refresh()->quantity)->toBe(4);
+});
+
 test('pending or rejected payment blocks order processing and completion', function (
     OrderStatus $currentStatus,
     OrderStatus $nextStatus,
@@ -325,10 +424,13 @@ test('administrators can manually verify wallet payment evidence', function () {
 test('administrators can reject missing or unverifiable payment evidence', function () {
     Storage::fake('local');
     $administrator = User::factory()->administrator()->create();
+    $product = Product::factory()->create();
+    $inventory = Inventory::factory()->for($product)->create(['quantity' => 4]);
     $order = Order::factory()->paidWithGCash()->create([
         'payment_proof_path' => null,
         'status' => OrderStatus::Processing,
     ]);
+    OrderItem::factory()->for($order)->for($product)->create(['quantity' => 2]);
 
     $this->actingAs($administrator)
         ->patch(route('administration.orders.payment-status.update', $order), [
@@ -340,7 +442,8 @@ test('administrators can reject missing or unverifiable payment evidence', funct
     expect($order->refresh()->payment_status)->toBe(PaymentStatus::Rejected)
         ->and($order->payment_rejection_reason)->toBe(PaymentRejectionReason::TransactionUnverified)
         ->and($order->payment_rejection_note)->toBeNull()
-        ->and($order->status)->toBe(OrderStatus::Processing);
+        ->and($order->status)->toBe(OrderStatus::Processing)
+        ->and($inventory->refresh()->quantity)->toBe(4);
 });
 
 test('wallet rejection requires a predefined reason', function () {

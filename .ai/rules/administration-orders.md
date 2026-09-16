@@ -15,3 +15,6 @@ An order may transition from processing to completed only while payment_status i
 
 ## Require verified payment before order fulfillment transitions
 Require payment_status=verified before Pending may move to Processing and before Processing may move to Completed. Pending or rejected payment blocks both transitions; cancellation remains allowed, terminal/reverse transitions remain prohibited, and status processing must not mutate inventory.
+
+## Restore stock only on explicit eligible cancellation
+EXT-83 supersedes the earlier stock-neutral cancellation rule. Explicit administrator transitions from pending or processing to cancelled must restore each order item's purchased quantity in the same transaction as the status change; completed/cancelled orders remain terminal, retries must not double-restock, and payment rejection alone remains stock-neutral.
