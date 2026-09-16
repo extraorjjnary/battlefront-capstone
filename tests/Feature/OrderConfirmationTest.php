@@ -99,6 +99,38 @@ test('customers see authoritative persisted order confirmation details', functio
         ->missing('order.payment_proof_path'));
 });
 
+test('customer order details use fulfillment-specific status labels', function (
+    FulfillmentMethod $fulfillmentMethod,
+    OrderStatus $status,
+    string $label,
+) {
+    $customer = User::factory()->customer()->create();
+    $order = Order::factory()->for($customer)->create([
+        'fulfillment_method' => $fulfillmentMethod,
+        'delivery_address' => $fulfillmentMethod === FulfillmentMethod::Delivery
+            ? 'Sagay City, Negros Occidental'
+            : null,
+        'status' => $status,
+    ]);
+
+    $this->actingAs($customer)
+        ->get(route('orders.show', $order))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('order.status', [
+                'value' => $status->value,
+                'label' => $label,
+            ]));
+})->with([
+    'pickup pending' => [FulfillmentMethod::Pickup, OrderStatus::Pending, 'Pending'],
+    'pickup processing' => [FulfillmentMethod::Pickup, OrderStatus::Processing, 'Preparing for pickup'],
+    'pickup completed' => [FulfillmentMethod::Pickup, OrderStatus::Completed, 'Picked up / Completed'],
+    'pickup cancelled' => [FulfillmentMethod::Pickup, OrderStatus::Cancelled, 'Cancelled'],
+    'delivery pending' => [FulfillmentMethod::Delivery, OrderStatus::Pending, 'Pending'],
+    'delivery processing' => [FulfillmentMethod::Delivery, OrderStatus::Processing, 'Preparing for delivery'],
+    'delivery completed' => [FulfillmentMethod::Delivery, OrderStatus::Completed, 'Delivered / Completed'],
+    'delivery cancelled' => [FulfillmentMethod::Delivery, OrderStatus::Cancelled, 'Cancelled'],
+]);
+
 test('customers see wallet rejection feedback and the resubmission capability', function () {
     $customer = User::factory()->customer()->create();
     $order = Order::factory()->for($customer)->paidWithGCash()->withRejectedPaymentProof()->create([

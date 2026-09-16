@@ -63,7 +63,7 @@ test('customers see only their orders with authoritative summaries', function ()
         ->where('orders.data.0.reference', 'BF-000042')
         ->where('orders.data.0.status', [
             'value' => OrderStatus::Processing->value,
-            'label' => 'Processing',
+            'label' => 'Preparing for delivery',
         ])
         ->where('orders.data.0.fulfillment', [
             'value' => FulfillmentMethod::Delivery->value,

@@ -152,10 +152,7 @@ class OrderController extends Controller
             'id' => $order->id,
             'reference' => $order->reference,
             'created_at' => $order->created_at->toIso8601String(),
-            'status' => [
-                'value' => $order->status->value,
-                'label' => $order->status->label(),
-            ],
+            'status' => $this->customerStatusData($order),
             'fulfillment' => [
                 'value' => $order->fulfillment_method->value,
                 'label' => $order->fulfillment_method->label(),
@@ -187,10 +184,7 @@ class OrderController extends Controller
             'id' => $order->id,
             'reference' => $order->reference,
             'created_at' => $order->created_at->toIso8601String(),
-            'status' => [
-                'value' => $order->status->value,
-                'label' => $order->status->label(),
-            ],
+            'status' => $this->customerStatusData($order),
             'recipient' => [
                 'name' => $order->recipient_name,
                 'contact_number' => $order->contact_number,
@@ -258,6 +252,31 @@ class OrderController extends Controller
             PaymentStatus::Verified => 'Your payment has been manually verified by Battlefront.',
             PaymentStatus::Rejected => 'Your submitted payment proof was rejected. Upload a replacement for another manual review.',
         };
+    }
+
+    /**
+     * Build fulfillment-aware status wording for customer order views.
+     *
+     * @return array{value: string, label: string}
+     */
+    private function customerStatusData(Order $order): array
+    {
+        $label = match ($order->status) {
+            OrderStatus::Processing => match ($order->fulfillment_method) {
+                FulfillmentMethod::Pickup => 'Preparing for pickup',
+                FulfillmentMethod::Delivery => 'Preparing for delivery',
+            },
+            OrderStatus::Completed => match ($order->fulfillment_method) {
+                FulfillmentMethod::Pickup => 'Picked up / Completed',
+                FulfillmentMethod::Delivery => 'Delivered / Completed',
+            },
+            default => $order->status->label(),
+        };
+
+        return [
+            'value' => $order->status->value,
+            'label' => $label,
+        ];
     }
 
     /**
