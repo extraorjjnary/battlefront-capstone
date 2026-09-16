@@ -130,13 +130,18 @@ test('administrators can review authoritative order processing details', functio
         ->missing('order.payment_proof_path'));
 });
 
-test('administrator order directory is newest first and paginated', function () {
+test('administrator order directory defaults to active orders newest first and paginated', function () {
     $administrator = User::factory()->administrator()->create();
-    Order::factory()->count(21)->sequence(
+    $activeOrders = Order::factory()->count(21)->sequence(
         fn ($sequence): array => [
             'created_at' => now()->subDays(20 - $sequence->index),
+            'status' => $sequence->index % 2 === 0
+                ? OrderStatus::Pending
+                : OrderStatus::Processing,
         ],
     )->create();
+    $completedOrder = Order::factory()->create(['status' => OrderStatus::Completed]);
+    $cancelledOrder = Order::factory()->create(['status' => OrderStatus::Cancelled]);
 
     $response = $this->actingAs($administrator)
         ->get(route('administration.orders.index'));
@@ -146,9 +151,155 @@ test('administrator order directory is newest first and paginated', function () 
         ->where('orders.total', 21)
         ->where('orders.per_page', 20)
         ->has('orders.data', 20)
-        ->where('orders.data.0.id', Order::query()->latest('created_at')->latest('id')->value('id'))
+        ->where('orders.data.0.id', $activeOrders->last()->id)
+        ->where('filters.status', 'active')
+        ->where('status_counts', [
+            'active' => 21,
+            'completed' => 1,
+            'cancelled' => 1,
+        ])
+        ->where('orders.data', fn ($orders): bool => $orders
+            ->pluck('id')
+            ->doesntContain($completedOrder->id)
+            && $orders->pluck('id')->doesntContain($cancelledOrder->id))
         ->missing('orders.data.0.payment_proof_path'));
 });
+
+test('administrator completed and cancelled views contain only their historical records', function (
+    string $view,
+    OrderStatus $includedStatus,
+) {
+    $administrator = User::factory()->administrator()->create();
+    $includedOrder = Order::factory()->create(['status' => $includedStatus]);
+    $otherOrders = collect(OrderStatus::cases())
+        ->reject(fn (OrderStatus $status): bool => $status === $includedStatus)
+        ->map(fn (OrderStatus $status): Order => Order::factory()->create(['status' => $status]));
+
+    $response = $this->actingAs($administrator)
+        ->get(route('administration.orders.index', ['status' => $view]));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->component('Administration/Orders/Index')
+        ->where('filters.status', $view)
+        ->where('orders.total', 1)
+        ->where('orders.data.0.id', $includedOrder->id)
+        ->where('orders.data.0.status.value', $includedStatus->value));
+
+    $this->assertModelExists($includedOrder);
+    $otherOrders->each(fn (Order $order) => $this->assertModelExists($order));
+})->with([
+    'completed history' => ['completed', OrderStatus::Completed],
+    'cancelled history' => ['cancelled', OrderStatus::Cancelled],
+]);
+
+test('administrator order search matches references customers and recipients', function () {
+    $administrator = User::factory()->administrator()->create();
+    $referenceOrder = Order::factory()->create();
+    $customer = User::factory()->customer()->create(['name' => 'Searchable Customer']);
+    $customerOrder = Order::factory()->for($customer)->create();
+    $recipientOrder = Order::factory()->create(['recipient_name' => 'Searchable Recipient']);
+    Order::factory()->create([
+        'recipient_name' => 'Unrelated Person',
+    ]);
+
+    $searches = [
+        $referenceOrder->reference => $referenceOrder->id,
+        'Searchable Customer' => $customerOrder->id,
+        'Searchable Recipient' => $recipientOrder->id,
+    ];
+
+    foreach ($searches as $search => $orderId) {
+        $this->actingAs($administrator)
+            ->get(route('administration.orders.index', ['q' => $search]))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('filters.q', $search)
+                ->where('orders.total', 1)
+                ->where('orders.data.0.id', $orderId));
+    }
+});
+
+test('administrator order filters narrow payment and fulfillment details', function () {
+    $administrator = User::factory()->administrator()->create();
+    $matchingOrder = Order::factory()->delivery()->paidWithGCash()->create([
+        'payment_status' => PaymentStatus::Verified,
+    ]);
+    Order::factory()->delivery()->paidWithMaya()->create([
+        'payment_status' => PaymentStatus::Verified,
+    ]);
+    Order::factory()->delivery()->paidWithGCash()->create([
+        'payment_status' => PaymentStatus::Pending,
+    ]);
+    Order::factory()->paidWithGCash()->create([
+        'payment_status' => PaymentStatus::Verified,
+    ]);
+
+    $response = $this->actingAs($administrator)
+        ->get(route('administration.orders.index', [
+            'payment_status' => PaymentStatus::Verified->value,
+            'payment_method' => PaymentMethod::GCash->value,
+            'fulfillment_method' => FulfillmentMethod::Delivery->value,
+        ]));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->where('orders.total', 1)
+        ->where('orders.data.0.id', $matchingOrder->id)
+        ->where('filters.payment_status', PaymentStatus::Verified->value)
+        ->where('filters.payment_method', PaymentMethod::GCash->value)
+        ->where('filters.fulfillment_method', FulfillmentMethod::Delivery->value));
+});
+
+test('administrator order pagination preserves directory filters', function () {
+    $administrator = User::factory()->administrator()->create();
+    $customer = User::factory()->customer()->create(['name' => 'Queue Customer']);
+    Order::factory()->count(21)->for($customer)->delivery()->paidWithGCash()->create([
+        'payment_status' => PaymentStatus::Verified,
+    ]);
+
+    $response = $this->actingAs($administrator)
+        ->get(route('administration.orders.index', [
+            'q' => 'Queue Customer',
+            'status' => 'active',
+            'payment_status' => PaymentStatus::Verified->value,
+            'payment_method' => PaymentMethod::GCash->value,
+            'fulfillment_method' => FulfillmentMethod::Delivery->value,
+        ]));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->where('orders.total', 21)
+        ->where('orders.next_page_url', function (?string $url): bool {
+            parse_str((string) parse_url($url ?? '', PHP_URL_QUERY), $query);
+
+            return ($query['page'] ?? null) === '2'
+                && ($query['q'] ?? null) === 'Queue Customer'
+                && ($query['status'] ?? null) === 'active'
+                && ($query['payment_status'] ?? null) === PaymentStatus::Verified->value
+                && ($query['payment_method'] ?? null) === PaymentMethod::GCash->value
+                && ($query['fulfillment_method'] ?? null) === FulfillmentMethod::Delivery->value;
+        }));
+});
+
+test('processing orders use context-aware fulfillment wording in the directory', function (
+    FulfillmentMethod $fulfillmentMethod,
+    string $operationalLabel,
+) {
+    $administrator = User::factory()->administrator()->create();
+    $order = Order::factory()->create([
+        'status' => OrderStatus::Processing,
+        'fulfillment_method' => $fulfillmentMethod,
+        'delivery_address' => $fulfillmentMethod === FulfillmentMethod::Delivery
+            ? 'Sagay City, Negros Occidental'
+            : null,
+    ]);
+
+    $this->actingAs($administrator)
+        ->get(route('administration.orders.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('orders.data.0.id', $order->id)
+            ->where('orders.data.0.fulfillment.operational_label', $operationalLabel));
+})->with([
+    'pickup' => [FulfillmentMethod::Pickup, 'Preparing for pickup'],
+    'delivery' => [FulfillmentMethod::Delivery, 'Preparing for delivery'],
+]);
 
 test('administrators can apply approved order status transitions', function (
     OrderStatus $currentStatus,

@@ -25,6 +25,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | database/migrations/**,app/Models/** | .ai/rules/models.md |
 | resources/js/lib/orderStatus.js,resources/js/pages/{Administration/Orders,Orders}/** | .ai/rules/orders-orders.md |
 | app/Http/Controllers/OrderController.php,resources/js/pages/Orders/** | .ai/rules/orders.md |
+| app/Http/Controllers/Administration/OrderController.php,resources/js/pages/Administration/Orders/Index.vue | .ai/rules/pages-administration-orders.md |
 | app/Actions/{Cart,Order,Inventory}/**,app/Http/Controllers/OrderController.php,resources/js/pages/Checkout/** | .ai/rules/pages-checkout.md |
 | app/Models/Order.php,app/Http/Controllers/OrderController.php,resources/js/pages/Orders/** | .ai/rules/pages-orders.md |
 | resources/js/app.js,resources/js/pages/** | .ai/rules/pages.md |
