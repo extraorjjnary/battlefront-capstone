@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AppearancePreference;
 use App\Enums\UserRole;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -24,6 +25,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $email_verified_at
  * @property string $password
  * @property UserRole $role
+ * @property AppearancePreference $appearance
  * @property string|null $default_delivery_address
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
@@ -35,7 +37,7 @@ use Illuminate\Support\Carbon;
  * @property-read Cart|null $cart
  * @property-read Collection<int, Order> $orders
  */
-#[Fillable(['name', 'email', 'password', 'default_delivery_address'])]
+#[Fillable(['name', 'email', 'password', 'default_delivery_address', 'appearance'])]
 #[Hidden([
     'password',
     'default_delivery_address',
@@ -54,6 +56,7 @@ class User extends Authenticatable implements MustVerifyEmail
      * @var array<string, mixed>
      */
     protected $attributes = [
+        'appearance' => 'system',
         'role' => 'customer',
     ];
 
@@ -67,6 +70,7 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'appearance' => AppearancePreference::class,
             'role' => UserRole::class,
         ];
     }
