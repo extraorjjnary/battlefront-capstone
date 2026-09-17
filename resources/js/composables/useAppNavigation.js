@@ -1,5 +1,6 @@
 import {
     Boxes,
+    ChartNoAxesCombined,
     LayoutDashboard,
     MapPin,
     PackageSearch,
@@ -15,6 +16,7 @@ import CustomerController from '@/actions/App/Http/Controllers/Administration/Cu
 import InventoryController from '@/actions/App/Http/Controllers/Administration/InventoryController';
 import AdministrationOrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
+import SalesReportController from '@/actions/App/Http/Controllers/Administration/SalesReportController';
 import { dashboard } from '@/routes';
 import { index as branchIndex } from '@/routes/branches';
 import { index as cartIndex } from '@/routes/cart';
@@ -66,6 +68,11 @@ export function useAppNavigation() {
                 title: 'Orders',
                 href: AdministrationOrderController.index(),
                 icon: ReceiptText,
+            });
+            items.push({
+                title: 'Sales reports',
+                href: SalesReportController.index(),
+                icon: ChartNoAxesCombined,
             });
             items.push({
                 title: 'Customers',

@@ -10,6 +10,7 @@ use App\Http\Controllers\Administration\OrderPaymentStatusController;
 use App\Http\Controllers\Administration\OrderStatusController;
 use App\Http\Controllers\Administration\ProductActivationController;
 use App\Http\Controllers\Administration\ProductController;
+use App\Http\Controllers\Administration\SalesReportController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CartItemController;
@@ -89,6 +90,9 @@ Route::middleware(['auth', 'verified', 'can:access-administration'])
 
         Route::resource('customers', CustomerController::class)
             ->only(['index', 'show']);
+
+        Route::get('reports/sales', [SalesReportController::class, 'index'])
+            ->name('reports.sales');
 
         Route::resource('orders', AdministrationOrderController::class)
             ->only(['index', 'show']);

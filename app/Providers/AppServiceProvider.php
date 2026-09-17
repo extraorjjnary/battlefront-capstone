@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Enums\UserRole;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -30,12 +31,12 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::define(
             'access-administration',
-            fn (User $user): bool => $user->isAdministrator(),
+            fn(User $user): bool => $user->isAdministrator(),
         );
 
         Gate::define(
             'use-customer-cart',
-            fn (User $user): bool => $user->role === UserRole::Customer,
+            fn(User $user): bool => $user->role === UserRole::Customer,
         );
     }
 
@@ -44,20 +45,23 @@ class AppServiceProvider extends ServiceProvider
      */
     protected function configureDefaults(): void
     {
+        Model::preventLazyLoading(! app()->isProduction());
+
         Date::use(CarbonImmutable::class);
 
         DB::prohibitDestructiveCommands(
             app()->isProduction(),
         );
 
-        Password::defaults(fn (): ?Password => app()->isProduction()
-            ? Password::min(12)
+        Password::defaults(
+            fn(): ?Password => app()->isProduction()
+                ? Password::min(12)
                 ->mixedCase()
                 ->letters()
                 ->numbers()
                 ->symbols()
                 ->uncompromised()
-            : null,
+                : null,
         );
     }
 }
