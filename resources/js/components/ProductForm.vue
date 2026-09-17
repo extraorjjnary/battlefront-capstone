@@ -1,7 +1,7 @@
 <script setup>
 import { Form, Link } from '@inertiajs/vue3';
 import { Image, Save } from '@lucide/vue';
-import { ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import CategoryController from '@/actions/App/Http/Controllers/Administration/CategoryController';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import InputError from '@/components/InputError.vue';
@@ -24,6 +24,7 @@ const props = defineProps({
     tags: { type: Array, required: true },
     product: { type: Object, default: null },
     form: { type: Object, required: true },
+    methodOverride: { type: String, default: null },
     submitLabel: { type: String, required: true },
 });
 
@@ -32,7 +33,27 @@ const categoryId = ref(
 );
 const isFeatured = ref(props.product?.is_featured ?? false);
 const selectedTagIds = ref([...(props.product?.tag_ids ?? [])]);
-const imageUrl = ref(props.product?.image_url ?? '');
+const selectedImagePreviewUrl = ref(null);
+const imagePreviewFailed = ref(false);
+const imagePreviewUrl = computed(
+    () => selectedImagePreviewUrl.value ?? props.product?.image_url ?? null,
+);
+
+function updateImagePreview(event) {
+    if (selectedImagePreviewUrl.value) {
+        URL.revokeObjectURL(selectedImagePreviewUrl.value);
+    }
+
+    const image = event.target.files?.[0];
+    selectedImagePreviewUrl.value = image ? URL.createObjectURL(image) : null;
+    imagePreviewFailed.value = false;
+}
+
+onBeforeUnmount(() => {
+    if (selectedImagePreviewUrl.value) {
+        URL.revokeObjectURL(selectedImagePreviewUrl.value);
+    }
+});
 
 function setTag(tagId, checked) {
     if (checked === true && !selectedTagIds.value.includes(tagId)) {
@@ -52,14 +73,16 @@ function firstTagError(errors) {
         Object.entries(errors).find(([key]) => key.startsWith('tag_ids.'))?.[1]
     );
 }
-
-function hideBrokenImage(event) {
-    event.currentTarget.hidden = true;
-}
 </script>
 
 <template>
     <Form v-bind="form" class="space-y-8" v-slot="{ errors, processing }">
+        <input
+            v-if="methodOverride"
+            type="hidden"
+            name="_method"
+            :value="methodOverride"
+        />
         <section aria-labelledby="product-details-heading" class="space-y-5">
             <div>
                 <h2 id="product-details-heading" class="font-semibold">
@@ -208,34 +231,36 @@ function hideBrokenImage(event) {
                 </div>
 
                 <div class="grid gap-2 md:col-span-2">
-                    <Label for="image_url">Product image URL</Label>
+                    <Label for="image">Product image</Label>
                     <div class="grid gap-4 sm:grid-cols-[1fr_7rem]">
                         <div>
                             <Input
-                                id="image_url"
-                                v-model="imageUrl"
-                                name="image_url"
-                                type="url"
-                                maxlength="255"
-                                placeholder="https://example.com/product.jpg"
-                                :aria-invalid="Boolean(errors.image_url)"
+                                id="image"
+                                name="image"
+                                type="file"
+                                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                                :aria-invalid="Boolean(errors.image)"
+                                @change="updateImagePreview"
                             />
-                            <InputError
-                                class="mt-2"
-                                :message="errors.image_url"
-                            />
+                            <p class="text-muted-foreground mt-2 text-sm">
+                                JPG, JPEG, PNG, or WebP up to 5 MB.
+                                <span v-if="product?.image_url">
+                                    Leave empty to keep the current image.
+                                </span>
+                            </p>
+                            <InputError class="mt-2" :message="errors.image" />
                         </div>
                         <div
                             class="border-border bg-muted/40 relative flex aspect-square items-center justify-center overflow-hidden border"
                         >
                             <Image class="text-muted-foreground size-7" />
                             <img
-                                v-if="imageUrl"
-                                :key="imageUrl"
-                                :src="imageUrl"
+                                v-if="imagePreviewUrl && !imagePreviewFailed"
+                                :key="imagePreviewUrl"
+                                :src="imagePreviewUrl"
                                 alt="Product image preview"
                                 class="absolute inset-0 size-full object-contain"
-                                @error="hideBrokenImage"
+                                @error="imagePreviewFailed = true"
                             />
                         </div>
                     </div>

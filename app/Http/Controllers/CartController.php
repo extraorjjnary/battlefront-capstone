@@ -67,7 +67,7 @@ class CartController extends Controller
                 'items' => fn ($query) => $query
                     ->select(['id', 'cart_id', 'product_id', 'quantity'])
                     ->orderBy('id'),
-                'items.product:id,name,brand,category_id,price,discount_price,image_url',
+                'items.product:id,name,brand,category_id,price,discount_price,image_path',
                 'items.product.category:id,name',
             ])
             ->first();

@@ -44,7 +44,7 @@ class ReviewCheckoutCart
                     'items' => fn ($query) => $query
                         ->select(['id', 'cart_id', 'product_id', 'quantity'])
                         ->orderBy('id'),
-                    'items.product:id,name,brand,image_url',
+                    'items.product:id,name,brand,image_path',
                 ])
                 ->first();
             $items = [];

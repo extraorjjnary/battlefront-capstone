@@ -12,8 +12,11 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use RuntimeException;
+use Throwable;
 
 class ProductController extends Controller
 {
@@ -38,7 +41,7 @@ class ProductController extends Controller
                 'brand',
                 'price',
                 'discount_price',
-                'image_url',
+                'image_path',
                 'is_featured',
                 'is_active',
             ])
@@ -134,15 +137,23 @@ class ProductController extends Controller
     {
         $validated = $request->validated();
         $tagIds = $validated['tag_ids'] ?? [];
-        unset($validated['tag_ids']);
+        unset($validated['tag_ids'], $validated['image']);
+        $imagePath = $this->storeImage($request);
+        $validated['image_path'] = $imagePath;
 
-        $product = DB::transaction(function () use ($validated, $tagIds): Product {
-            $product = Product::query()->create($validated);
+        try {
+            $product = DB::transaction(function () use ($validated, $tagIds): Product {
+                $product = Product::query()->create($validated);
 
-            $product->tags()->sync($tagIds);
+                $product->tags()->sync($tagIds);
 
-            return $product;
-        });
+                return $product;
+            });
+        } catch (Throwable $exception) {
+            $this->deleteManagedImage($imagePath);
+
+            throw $exception;
+        }
 
         Inertia::flash('toast', [
             'type' => 'success',
@@ -177,9 +188,9 @@ class ProductController extends Controller
                     'price',
                     'is_featured',
                     'discount_price',
-                    'image_url',
                     'is_active',
                 ]),
+                'image_url' => $product->image_url,
                 'tag_ids' => $product->tags->pluck('id')->all(),
             ],
         ]);
@@ -192,13 +203,31 @@ class ProductController extends Controller
     {
         $validated = $request->validated();
         $tagIds = $validated['tag_ids'] ?? [];
-        unset($validated['tag_ids']);
+        unset($validated['tag_ids'], $validated['image']);
+        $oldImagePath = $product->image_path;
+        $newImagePath = $request->hasFile('image')
+            ? $this->storeImage($request)
+            : null;
 
-        DB::transaction(function () use ($product, $validated, $tagIds): void {
-            $product->update($validated);
+        if ($newImagePath !== null) {
+            $validated['image_path'] = $newImagePath;
+        }
 
-            $product->tags()->sync($tagIds);
-        });
+        try {
+            DB::transaction(function () use ($product, $validated, $tagIds): void {
+                $product->update($validated);
+
+                $product->tags()->sync($tagIds);
+            });
+        } catch (Throwable $exception) {
+            $this->deleteManagedImage($newImagePath);
+
+            throw $exception;
+        }
+
+        if ($newImagePath !== null) {
+            $this->deleteManagedImage($oldImagePath);
+        }
 
         Inertia::flash('toast', [
             'type' => 'success',
@@ -230,5 +259,33 @@ class ProductController extends Controller
                 ->orderBy('id')
                 ->get(),
         ];
+    }
+
+    /**
+     * Store a validated product image on the public disk.
+     */
+    private function storeImage(SaveProductRequest $request): ?string
+    {
+        if (! $request->hasFile('image')) {
+            return null;
+        }
+
+        $path = $request->file('image')->storePublicly('products', 'public');
+
+        if ($path === false) {
+            throw new RuntimeException('The product image could not be stored.');
+        }
+
+        return $path;
+    }
+
+    /**
+     * Delete only product images managed by this upload flow.
+     */
+    private function deleteManagedImage(?string $path): void
+    {
+        if ($path !== null && str_starts_with($path, 'products/')) {
+            Storage::disk('public')->delete($path);
+        }
     }
 }

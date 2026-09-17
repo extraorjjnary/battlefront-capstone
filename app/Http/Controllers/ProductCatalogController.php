@@ -72,7 +72,7 @@ class ProductCatalogController extends Controller
                 'brand',
                 'price',
                 'discount_price',
-                'image_url',
+                'image_path',
                 'is_featured',
             ])
             ->with([

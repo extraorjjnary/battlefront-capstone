@@ -26,7 +26,7 @@ class ProductFactory extends Factory
             'price' => fake()->randomFloat(2, 0, 500000),
             'is_featured' => false,
             'discount_price' => null,
-            'image_url' => fake()->optional()->url(),
+            'image_path' => null,
         ];
     }
 

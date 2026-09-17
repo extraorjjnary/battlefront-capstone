@@ -5,6 +5,8 @@ use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\Tag;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('guests are redirected when viewing catalog products', function () {
@@ -198,10 +200,12 @@ test('administrators can open product forms with approved category and tag optio
             ->where('product.tag_ids.0', $tag->id));
 });
 
-test('administrators can create products and attach validated tags', function () {
+test('administrators can create products with an uploaded image and validated tags', function () {
+    Storage::fake('public');
     $administrator = User::factory()->administrator()->create();
     $category = Category::factory()->create();
     $tags = Tag::factory()->count(2)->create();
+    $image = UploadedFile::fake()->image('rtx-5070.webp')->size(1024);
 
     $response = $this
         ->actingAs($administrator)
@@ -212,7 +216,7 @@ test('administrators can create products and attach validated tags', function ()
             'brand' => 'NVIDIA',
             'price' => '39999.00',
             'discount_price' => '37999.50',
-            'image_url' => 'https://example.com/rtx-5070.jpg',
+            'image' => $image,
             'is_featured' => true,
             'is_active' => false,
             'tag_ids' => $tags->pluck('id')->all(),
@@ -230,7 +234,10 @@ test('administrators can create products and attach validated tags', function ()
     $product = Product::query()->where('name', 'GeForce RTX 5070')->firstOrFail();
     expect($product->is_active)->toBeTrue()
         ->and($product->inventory)->toBeNull()
+        ->and($product->image_path)->toStartWith('products/')
+        ->and($product->image_path)->not->toStartWith('http')
         ->and($product->tags->modelKeys())->toEqualCanonicalizing($tags->modelKeys());
+    Storage::disk('public')->assertExists($product->image_path);
     $this->assertDatabaseHas('products', [
         'id' => $product->id,
         'category_id' => $category->id,
@@ -298,13 +305,40 @@ test('product details reject invalid catalog values', function (array $payload, 
             'discount_price' => 'The discount price must be lower than the regular price.',
         ],
     ],
-    'unsupported image scheme' => [
-        ['image_url' => 'ftp://example.com/product.jpg'],
-        ['image_url' => 'Enter a valid HTTP or HTTPS image URL.'],
-    ],
     'duplicate tags' => [
         ['tag_ids' => [1, 1]],
         ['tag_ids.0' => 'Each tag may only be selected once.'],
+    ],
+]);
+
+test('product images reject invalid file types and files larger than 5 MB', function (UploadedFile $image, string $message) {
+    Storage::fake('public');
+    $administrator = User::factory()->administrator()->create();
+    $category = Category::factory()->create();
+
+    $this->actingAs($administrator)
+        ->from(route('administration.products.create'))
+        ->post(route('administration.products.store'), [
+            'name' => 'GeForce RTX 5070',
+            'category_id' => $category->id,
+            'brand' => 'NVIDIA',
+            'price' => '39999.00',
+            'is_featured' => false,
+            'image' => $image,
+        ])
+        ->assertRedirect(route('administration.products.create'))
+        ->assertSessionHasErrors(['image' => $message]);
+
+    $this->assertDatabaseMissing('products', ['name' => 'GeForce RTX 5070']);
+    Storage::disk('public')->assertDirectoryEmpty('products');
+})->with([
+    'invalid type' => [
+        fn (): UploadedFile => UploadedFile::fake()->image('product.gif'),
+        'The product image must be a JPG, JPEG, PNG, or WebP file.',
+    ],
+    'oversized image' => [
+        fn (): UploadedFile => UploadedFile::fake()->image('large.jpg')->size(5121),
+        'The product image may not be larger than 5 MB.',
     ],
 ]);
 
@@ -328,7 +362,6 @@ test('administrators can update product details and synchronize tags', function 
             'brand' => 'Updated brand',
             'price' => '10000.00',
             'discount_price' => null,
-            'image_url' => null,
             'is_featured' => false,
             'is_active' => true,
             'tag_ids' => [$newTag->id],
@@ -346,6 +379,62 @@ test('administrators can update product details and synchronize tags', function 
         'product_id' => $product->id,
         'tag_id' => $oldTag->id,
     ]);
+});
+
+test('updating a product without a new image keeps the existing image', function () {
+    Storage::fake('public');
+    $administrator = User::factory()->administrator()->create();
+    $category = Category::factory()->create();
+    $existingPath = 'products/existing-image.jpg';
+    Storage::disk('public')->put($existingPath, 'existing image');
+    $product = Product::factory()->for($category)->create([
+        'image_path' => $existingPath,
+    ]);
+
+    $this->actingAs($administrator)
+        ->post(route('administration.products.update', $product), [
+            '_method' => 'put',
+            'name' => 'Updated product',
+            'category_id' => $category->id,
+            'brand' => $product->brand,
+            'price' => $product->price,
+            'is_featured' => false,
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('administration.products.index'));
+
+    expect($product->refresh()->image_path)->toBe($existingPath);
+    Storage::disk('public')->assertExists($existingPath);
+});
+
+test('replacing a product image stores the new path and removes the old managed file', function () {
+    Storage::fake('public');
+    $administrator = User::factory()->administrator()->create();
+    $category = Category::factory()->create();
+    $oldPath = 'products/old-image.jpg';
+    Storage::disk('public')->put($oldPath, 'old image');
+    $product = Product::factory()->for($category)->create([
+        'image_path' => $oldPath,
+    ]);
+
+    $this->actingAs($administrator)
+        ->post(route('administration.products.update', $product), [
+            '_method' => 'put',
+            'name' => $product->name,
+            'category_id' => $category->id,
+            'brand' => $product->brand,
+            'price' => $product->price,
+            'is_featured' => false,
+            'image' => UploadedFile::fake()->image('replacement.png'),
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect(route('administration.products.index'));
+
+    $newPath = $product->refresh()->image_path;
+    expect($newPath)->toStartWith('products/')
+        ->and($newPath)->not->toBe($oldPath);
+    Storage::disk('public')->assertExists($newPath);
+    Storage::disk('public')->assertMissing($oldPath);
 });
 
 test('an invalid product relationship leaves details and tags unchanged', function () {

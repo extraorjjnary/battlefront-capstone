@@ -210,7 +210,7 @@ class OrderController extends Controller
             'items' => fn ($query) => $query
                 ->select(['id', 'order_id', 'product_id', 'quantity', 'price_at_time'])
                 ->orderBy('id'),
-            'items.product:id,name,brand,image_url',
+            'items.product:id,name,brand,image_path',
         ]);
 
         return Inertia::render('Administration/Orders/Show', [

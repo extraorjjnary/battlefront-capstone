@@ -15,7 +15,7 @@ test('the product schema follows the approved ERD decisions', function () {
         'price',
         'is_featured',
         'discount_price',
-        'image_url',
+        'image_path',
         'is_active',
         'created_at',
     ]);
@@ -28,7 +28,7 @@ test('a product persists with its approved defaults and casts', function () {
         'brand' => 'NVIDIA',
         'price' => '38999.90',
         'discount_price' => null,
-        'image_url' => null,
+        'image_path' => null,
     ]);
 
     $this->assertModelExists($product);

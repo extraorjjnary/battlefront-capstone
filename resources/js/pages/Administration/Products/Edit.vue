@@ -68,7 +68,11 @@ defineOptions({
                 :product="product"
                 :categories="categories"
                 :tags="tags"
-                :form="ProductController.update.form(product.id)"
+                :form="{
+                    action: ProductController.update.url(product.id),
+                    method: 'post',
+                }"
+                method-override="put"
                 submit-label="Save changes"
             />
         </section>

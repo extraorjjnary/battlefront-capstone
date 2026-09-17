@@ -179,7 +179,7 @@ class DevelopmentCatalogSeeder extends Seeder
                     'price' => $productData['price'],
                     'is_featured' => $productData['is_featured'],
                     'discount_price' => $productData['discount_price'],
-                    'image_url' => asset($productData['image_path']),
+                    'image_path' => $productData['image_path'],
                     'is_active' => $productData['is_active'],
                 ],
             );

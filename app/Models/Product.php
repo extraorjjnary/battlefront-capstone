@@ -6,6 +6,7 @@ use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * @property int $id
@@ -24,7 +26,8 @@ use Illuminate\Support\Carbon;
  * @property string $price
  * @property bool $is_featured
  * @property string|null $discount_price
- * @property string|null $image_url
+ * @property string|null $image_path
+ * @property-read string|null $image_url
  * @property bool $is_active
  * @property Carbon $created_at
  * @property-read Category $category
@@ -43,7 +46,7 @@ use Illuminate\Support\Carbon;
     'price',
     'is_featured',
     'discount_price',
-    'image_url',
+    'image_path',
     'is_active',
 ])]
 class Product extends Model
@@ -67,6 +70,26 @@ class Product extends Model
         'is_featured' => false,
         'is_active' => true,
     ];
+
+    /**
+     * Get the public URL for the product's relative image path.
+     *
+     * @return Attribute<string, never>|Attribute<null, never>
+     */
+    protected function imageUrl(): Attribute
+    {
+        return Attribute::get(function (): ?string {
+            if ($this->image_path === null) {
+                return null;
+            }
+
+            if (str_starts_with($this->image_path, 'images/demo-products/')) {
+                return asset($this->image_path);
+            }
+
+            return Storage::disk('public')->url($this->image_path);
+        });
+    }
 
     /**
      * Get the category that contains the product.

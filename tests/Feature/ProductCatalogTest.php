@@ -5,6 +5,7 @@ use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\Tag;
 use App\Models\User;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('guests can browse paginated customer eligible products in stable order', function () {
@@ -133,7 +134,7 @@ test('product details use authoritative catalog relationships and stock data', f
         'brand' => 'Battlefront Demo',
         'price' => '39999.00',
         'discount_price' => '36999.00',
-        'image_url' => 'https://example.test/products/atlas.png',
+        'image_path' => 'products/atlas.png',
         'is_featured' => true,
     ]);
     $product->tags()->attach([$performance->id, $gaming->id]);
@@ -151,13 +152,22 @@ test('product details use authoritative catalog relationships and stock data', f
             ->where('product.brand', 'Battlefront Demo')
             ->where('product.price', '39999.00')
             ->where('product.discount_price', '36999.00')
-            ->where('product.image_url', 'https://example.test/products/atlas.png')
+            ->where('product.image_url', Storage::disk('public')->url('products/atlas.png'))
             ->where('product.is_featured', true)
             ->where('product.category.name', 'Graphics Cards')
             ->where('product.tags.0.name', 'Gaming')
             ->where('product.tags.1.name', 'High Performance')
             ->where('product.inventory.quantity', 2)
             ->where('product.inventory.status', 'low_stock'));
+});
+
+test('products without an image expose the catalog fallback state', function () {
+    $product = Product::factory()->create(['image_path' => null]);
+
+    $this->get(route('products.show', $product))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Products/Show')
+            ->where('product.image_url', null));
 });
 
 test('product details distinguish out of stock and unavailable inventory', function (bool $hasInventory, string $expectedStatus) {
