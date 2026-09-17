@@ -10,6 +10,7 @@ use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\Sale;
 use App\Models\User;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
@@ -305,6 +306,7 @@ test('administrators can apply approved order status transitions', function (
     OrderStatus $currentStatus,
     OrderStatus $nextStatus,
     PaymentStatus $paymentStatus,
+    int $expectedSaleCount,
 ) {
     $administrator = User::factory()->administrator()->create();
     $order = Order::factory()->create([
@@ -322,29 +324,122 @@ test('administrators can apply approved order status transitions', function (
         ->assertSessionHasNoErrors()
         ->assertRedirect(route('administration.orders.show', $order))
         ->assertInertiaFlash('toast.message', 'Order status updated.');
-    expect($order->refresh()->status)->toBe($nextStatus);
+    expect($order->refresh()->status)->toBe($nextStatus)
+        ->and(Sale::query()->count())->toBe($expectedSaleCount);
 })->with([
     'verified pending to processing' => [
         OrderStatus::Pending,
         OrderStatus::Processing,
         PaymentStatus::Verified,
+        0,
     ],
     'pending payment does not block cancellation' => [
         OrderStatus::Pending,
         OrderStatus::Cancelled,
         PaymentStatus::Pending,
+        0,
     ],
     'verified processing to completed' => [
         OrderStatus::Processing,
         OrderStatus::Completed,
         PaymentStatus::Verified,
+        1,
     ],
     'rejected payment does not block cancellation' => [
         OrderStatus::Processing,
         OrderStatus::Cancelled,
         PaymentStatus::Rejected,
+        0,
     ],
 ]);
+
+test('completing an eligible order records one authoritative sale without changing inventory', function () {
+    $this->travelTo('2026-09-17 08:30:00');
+    $administrator = User::factory()->administrator()->create();
+    $firstProduct = Product::factory()->create(['price' => '1500.00']);
+    $secondProduct = Product::factory()->create(['price' => '750.00']);
+    $firstInventory = Inventory::factory()->for($firstProduct)->create(['quantity' => 3]);
+    $secondInventory = Inventory::factory()->for($secondProduct)->create(['quantity' => 7]);
+    $order = Order::factory()->create([
+        'total_amount' => '3200.00',
+        'status' => OrderStatus::Processing,
+        'payment_status' => PaymentStatus::Verified,
+    ]);
+    OrderItem::factory()->for($order)->for($firstProduct)->create([
+        'quantity' => 2,
+        'price_at_time' => '1000.00',
+    ]);
+    OrderItem::factory()->for($order)->for($secondProduct)->create([
+        'quantity' => 3,
+        'price_at_time' => '400.00',
+    ]);
+
+    $response = $this->actingAs($administrator)
+        ->patch(route('administration.orders.status.update', $order), [
+            'status' => OrderStatus::Completed->value,
+        ]);
+
+    $response
+        ->assertSessionHasNoErrors()
+        ->assertInertiaFlash('toast.message', 'Order status updated.');
+    $sale = Sale::query()->sole();
+    expect($order->refresh()->status)->toBe(OrderStatus::Completed)
+        ->and($sale->amount)->toBe('3200.00')
+        ->and($sale->sale_date->toDateString())->toBe('2026-09-17')
+        ->and($sale->order->is($order))->toBeTrue()
+        ->and($order->sale->is($sale))->toBeTrue()
+        ->and($sale->order->items()->orderBy('id')->pluck('quantity')->all())->toBe([2, 3])
+        ->and($sale->order->items()->orderBy('id')->pluck('price_at_time')->all())->toBe(['1000.00', '400.00'])
+        ->and($firstInventory->refresh()->quantity)->toBe(3)
+        ->and($secondInventory->refresh()->quantity)->toBe(7);
+});
+
+test('repeated completion processing cannot create duplicate sales', function () {
+    $administrator = User::factory()->administrator()->create();
+    $order = Order::factory()->create([
+        'status' => OrderStatus::Processing,
+        'payment_status' => PaymentStatus::Verified,
+    ]);
+
+    $this->actingAs($administrator)
+        ->patch(route('administration.orders.status.update', $order), [
+            'status' => OrderStatus::Completed->value,
+        ])
+        ->assertSessionHasNoErrors();
+    $this->patch(route('administration.orders.status.update', $order), [
+        'status' => OrderStatus::Completed->value,
+    ])->assertSessionHasErrors([
+        'status' => 'This order cannot move to the selected status.',
+    ]);
+
+    expect($order->refresh()->status)->toBe(OrderStatus::Completed)
+        ->and(Sale::query()->where('order_id', $order->id)->count())->toBe(1);
+});
+
+test('completion failure rolls back both the order status and sale', function () {
+    $product = Product::factory()->create();
+    $inventory = Inventory::factory()->for($product)->create(['quantity' => 4]);
+    $order = Order::factory()->create([
+        'status' => OrderStatus::Processing,
+        'payment_status' => PaymentStatus::Verified,
+    ]);
+    OrderItem::factory()->for($order)->for($product)->create(['quantity' => 2]);
+    Event::listen(
+        'eloquent.created: '.Sale::class,
+        fn (): never => throw new RuntimeException('Forced sale recording failure.'),
+    );
+
+    try {
+        expect(fn () => app(ProcessOrder::class)->updateStatus($order, OrderStatus::Completed))
+            ->toThrow(RuntimeException::class, 'Forced sale recording failure.');
+    } finally {
+        Event::forget('eloquent.created: '.Sale::class);
+    }
+
+    expect($order->refresh()->status)->toBe(OrderStatus::Processing)
+        ->and(Sale::query()->count())->toBe(0)
+        ->and($inventory->refresh()->quantity)->toBe(4);
+});
 
 test('cancelling an eligible order restores its exact purchased quantities', function (OrderStatus $status) {
     $administrator = User::factory()->administrator()->create();
@@ -458,7 +553,8 @@ test('pending or rejected payment blocks order processing and completion', funct
         ->assertSessionHasErrors([
             'status' => 'Verify payment before processing or completing this order.',
         ]);
-    expect($order->refresh()->status)->toBe($currentStatus);
+    expect($order->refresh()->status)->toBe($currentStatus)
+        ->and(Sale::query()->count())->toBe(0);
 })->with([
     'pending payment before processing' => [
         OrderStatus::Pending,

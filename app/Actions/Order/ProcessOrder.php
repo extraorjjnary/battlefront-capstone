@@ -52,6 +52,13 @@ class ProcessOrder
 
             $lockedOrder->update(['status' => $status]);
 
+            if ($status === OrderStatus::Completed) {
+                $lockedOrder->sale()->create([
+                    'amount' => $lockedOrder->total_amount,
+                    'sale_date' => today(),
+                ]);
+            }
+
             return $lockedOrder->refresh();
         }, attempts: 3);
     }
