@@ -2,8 +2,6 @@
 
 use App\Enums\UserRole;
 use App\Models\User;
-use Illuminate\Auth\Notifications\VerifyEmail;
-use Illuminate\Support\Facades\Notification;
 use Laravel\Fortify\Features;
 
 beforeEach(function () {
@@ -16,7 +14,7 @@ test('registration screen can be rendered', function () {
     $response->assertOk();
 });
 
-test('new users can register', function () {
+test('new customers can register and immediately access authenticated pages', function () {
     $response = $this->post(route('register.store'), [
         'name' => 'Test User',
         'email' => 'test@example.com',
@@ -30,22 +28,9 @@ test('new users can register', function () {
     $user = User::where('email', 'test@example.com')->firstOrFail();
 
     expect($user->role)->toBe(UserRole::Customer)
-        ->and($user->hasVerifiedEmail())->toBeFalse();
-});
+        ->and($user->email_verified_at)->toBeNull();
 
-test('new customers receive an email verification notification', function () {
-    Notification::fake();
-
-    $this->post(route('register.store'), [
-        'name' => 'Test Customer',
-        'email' => 'customer@example.com',
-        'password' => 'password',
-        'password_confirmation' => 'password',
-    ]);
-
-    $customer = User::where('email', 'customer@example.com')->firstOrFail();
-
-    Notification::assertSentTo($customer, VerifyEmail::class);
+    $this->get(route('dashboard'))->assertOk();
 });
 
 test('registration cannot create an administrator', function () {

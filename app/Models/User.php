@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Enums\AppearancePreference;
 use App\Enums\UserRole;
 use Database\Factories\UserFactory;
-use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Collection;
@@ -45,7 +44,7 @@ use Illuminate\Support\Carbon;
     'two_factor_recovery_codes',
     'remember_token',
 ])]
-class User extends Authenticatable implements MustVerifyEmail
+class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;

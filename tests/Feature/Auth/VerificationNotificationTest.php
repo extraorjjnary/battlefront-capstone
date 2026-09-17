@@ -3,32 +3,25 @@
 use App\Models\User;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Notification;
-use Laravel\Fortify\Features;
+use Illuminate\Support\Facades\Route;
 
-beforeEach(function () {
-    $this->skipUnlessFortifyHas(Features::emailVerification());
-});
-
-test('sends verification notification', function () {
+test('registration does not send an email verification notification', function () {
     Notification::fake();
 
-    $user = User::factory()->unverified()->create();
+    $this->post(route('register.store'), [
+        'name' => 'Test Customer',
+        'email' => 'customer@example.com',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+    ]);
 
-    $this->actingAs($user)
-        ->post(route('verification.send'))
-        ->assertRedirect(route('home'));
+    $customer = User::where('email', 'customer@example.com')->firstOrFail();
 
-    Notification::assertSentTo($user, VerifyEmail::class);
+    Notification::assertNotSentTo($customer, VerifyEmail::class);
 });
 
-test('does not send verification notification if email is verified', function () {
-    Notification::fake();
-
-    $user = User::factory()->create();
-
-    $this->actingAs($user)
-        ->post(route('verification.send'))
-        ->assertRedirect(route('dashboard', absolute: false));
-
-    Notification::assertNothingSent();
+test('email verification routes are not registered', function () {
+    expect(Route::has('verification.notice'))->toBeFalse()
+        ->and(Route::has('verification.verify'))->toBeFalse()
+        ->and(Route::has('verification.send'))->toBeFalse();
 });

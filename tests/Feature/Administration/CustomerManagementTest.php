@@ -38,11 +38,12 @@ test('administrators can view only customer accounts in stable name order', func
     $response->assertInertia(fn (Assert $page) => $page
         ->component('Administration/Customers/Index')
         ->has('customers.data', 2)
-        ->has('customers.data.0', 5)
+        ->has('customers.data.0', 4)
         ->where('customers.data.0.name', 'Alice Customer')
         ->where('customers.data.1.name', 'Zoe Customer')
         ->missing('customers.data.0.password')
         ->missing('customers.data.0.role')
+        ->missing('customers.data.0.is_email_verified')
         ->missing('customers.data.0.branch_id')
         ->missing('customers.data.0.remember_token')
         ->missing('customers.data.0.two_factor_secret')
@@ -83,12 +84,12 @@ test('administrators can view a minimal customer account record', function () {
 
     $response->assertInertia(fn (Assert $page) => $page
         ->component('Administration/Customers/Show')
-        ->has('customer', 5)
+        ->has('customer', 4)
         ->where('customer.id', $customer->id)
         ->where('customer.name', 'Jamie Customer')
         ->where('customer.email', 'jamie@example.com')
-        ->where('customer.is_email_verified', false)
         ->where('customer.created_at', '2026-09-01T08:30:00+00:00')
+        ->missing('customer.is_email_verified')
         ->missing('customer.password')
         ->missing('customer.role')
         ->missing('customer.branch_id')

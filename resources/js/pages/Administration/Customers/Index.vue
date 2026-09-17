@@ -1,10 +1,9 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowRight, BadgeCheck, CircleAlert, UsersRound } from '@lucide/vue';
+import { ArrowRight, UsersRound } from '@lucide/vue';
 import CustomerController from '@/actions/App/Http/Controllers/Administration/CustomerController';
 import CatalogPagination from '@/components/CatalogPagination.vue';
 import UserInfo from '@/components/UserInfo.vue';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 defineProps({
@@ -106,21 +105,6 @@ defineOptions({
                     <div
                         class="flex flex-wrap items-center gap-3 md:justify-end"
                     >
-                        <Badge
-                            v-if="customer.is_email_verified"
-                            variant="secondary"
-                        >
-                            <BadgeCheck />
-                            Email verified
-                        </Badge>
-                        <Badge
-                            v-else
-                            variant="outline"
-                            class="border-border text-muted-foreground"
-                        >
-                            <CircleAlert />
-                            Email unverified
-                        </Badge>
                         <span class="text-muted-foreground text-sm">
                             Joined {{ formatJoinedDate(customer.created_at) }}
                         </span>

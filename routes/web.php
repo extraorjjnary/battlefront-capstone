@@ -26,7 +26,7 @@ Route::resource('products', ProductCatalogController::class)
     ->only(['index', 'show'])
     ->where(['product' => '[0-9]+']);
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware('auth')->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
 });
 
@@ -67,7 +67,7 @@ Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {
         ->name('orders.show');
 });
 
-Route::middleware(['auth', 'verified', 'can:access-administration'])
+Route::middleware(['auth', 'can:access-administration'])
     ->prefix('administration')
     ->name('administration.')
     ->group(function () {

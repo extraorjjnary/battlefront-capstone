@@ -11,8 +11,8 @@ test('login screen can be rendered', function () {
     $response->assertOk();
 });
 
-test('users can authenticate using the login screen', function () {
-    $user = User::factory()->create();
+test('users can authenticate without a verified email', function () {
+    $user = User::factory()->unverified()->create();
 
     $response = $this->post(route('login.store'), [
         'email' => $user->email,
@@ -21,6 +21,8 @@ test('users can authenticate using the login screen', function () {
 
     $this->assertAuthenticated();
     $response->assertRedirect(route('dashboard', absolute: false));
+
+    $this->get(route('dashboard'))->assertOk();
 });
 
 test('database sessions retain nullable unconstrained user references', function () {

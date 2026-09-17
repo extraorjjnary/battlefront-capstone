@@ -1,16 +1,8 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3';
-import {
-    ArrowLeft,
-    BadgeCheck,
-    CalendarDays,
-    CircleAlert,
-    Mail,
-    UserRound,
-} from '@lucide/vue';
+import { ArrowLeft, CalendarDays, Mail, UserRound } from '@lucide/vue';
 import CustomerController from '@/actions/App/Http/Controllers/Administration/CustomerController';
 import UserInfo from '@/components/UserInfo.vue';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 
 defineProps({
@@ -99,7 +91,7 @@ defineOptions({
                     <UserInfo :user="customer" show-email />
                 </div>
 
-                <dl class="divide-border grid md:grid-cols-3 md:divide-x">
+                <dl class="divide-border grid md:grid-cols-2 md:divide-x">
                     <div class="border-border flex gap-3 p-5 max-md:border-b">
                         <Mail
                             class="text-muted-foreground mt-0.5 size-5 shrink-0"
@@ -110,37 +102,6 @@ defineOptions({
                             </dt>
                             <dd class="mt-1 truncate font-medium">
                                 {{ customer.email }}
-                            </dd>
-                        </div>
-                    </div>
-
-                    <div class="border-border flex gap-3 p-5 max-md:border-b">
-                        <BadgeCheck
-                            v-if="customer.is_email_verified"
-                            class="text-primary mt-0.5 size-5 shrink-0"
-                        />
-                        <CircleAlert
-                            v-else
-                            class="text-muted-foreground mt-0.5 size-5 shrink-0"
-                        />
-                        <div>
-                            <dt class="text-muted-foreground text-sm">
-                                Email status
-                            </dt>
-                            <dd class="mt-2">
-                                <Badge
-                                    :variant="
-                                        customer.is_email_verified
-                                            ? 'secondary'
-                                            : 'outline'
-                                    "
-                                >
-                                    {{
-                                        customer.is_email_verified
-                                            ? 'Verified'
-                                            : 'Unverified'
-                                    }}
-                                </Badge>
                             </dd>
                         </div>
                     </div>

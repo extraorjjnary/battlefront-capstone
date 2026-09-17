@@ -1,27 +1,25 @@
 <script setup>
-import { Form, Head, usePage } from '@inertiajs/vue3';
-import { Link } from '@inertiajs/vue3';
-import { computed } from 'vue';
-import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
-import Heading from '@/components/Heading.vue';
-import InputError from '@/components/InputError.vue';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { edit } from '@/routes/profile';
-import { send } from '@/routes/verification';
+import { Form, Head, usePage } from "@inertiajs/vue3";
+import { computed } from "vue";
+import ProfileController from "@/actions/App/Http/Controllers/Settings/ProfileController";
+import Heading from "@/components/Heading.vue";
+import InputError from "@/components/InputError.vue";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { edit } from "@/routes/profile";
 
 const props = defineProps({
     canManageDefaultDeliveryAddress: { type: Boolean, required: true },
-    defaultDeliveryAddress: { type: String, default: '' },
+    defaultDeliveryAddress: { type: String, default: "" },
 });
 
 defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: 'Profile settings',
+                title: "Profile settings",
                 href: edit(),
             },
         ],
@@ -77,7 +75,10 @@ const user = computed(() => page.props.auth.user);
                 <InputError class="mt-2" :message="errors.email" />
             </div>
 
-            <div v-if="props.canManageDefaultDeliveryAddress" class="grid gap-2">
+            <div
+                v-if="props.canManageDefaultDeliveryAddress"
+                class="grid gap-2"
+            >
                 <Label for="default-delivery-address">
                     Default delivery address (optional)
                 </Label>
@@ -91,8 +92,8 @@ const user = computed(() => page.props.auth.user);
                     placeholder="House or building, street, barangay, city, and province"
                 />
                 <p class="text-muted-foreground text-sm">
-                    This address will pre-fill delivery checkout and can still be
-                    changed for each order.
+                    This address will pre-fill delivery checkout and can still
+                    be changed for each order.
                 </p>
                 <InputError
                     class="mt-2"
@@ -100,28 +101,11 @@ const user = computed(() => page.props.auth.user);
                 />
             </div>
 
-            <div v-if="page.props.mustVerifyEmail && !user.email_verified_at">
-                <p class="text-muted-foreground -mt-4 text-sm">
-                    Your email address is unverified.
-                    <Link
-                        :href="send()"
-                        as="button"
-                        class="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
-                    >
-                        Click here to re-send the verification email.
-                    </Link>
-                </p>
-
-                <div
-                    v-if="page.props.status === 'verification-link-sent'"
-                    class="mt-2 text-sm font-medium text-green-600"
-                >
-                    A new verification link has been sent to your email address.
-                </div>
-            </div>
-
             <div class="flex items-center gap-4">
-                <Button :disabled="processing" data-test="update-profile-button"
+                <Button
+                    :disabled="processing"
+                    data-test="update-profile-button"
+                    class="cursor-pointer"
                     >Save</Button
                 >
             </div>

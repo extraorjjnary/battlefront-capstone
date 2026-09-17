@@ -18,7 +18,7 @@ class CustomerController extends Controller
         $this->authorize('viewAny', User::class);
 
         $customers = User::query()
-            ->select(['id', 'name', 'email', 'email_verified_at', 'created_at'])
+            ->select(['id', 'name', 'email', 'created_at'])
             ->where('role', UserRole::Customer)
             ->orderBy('name')
             ->orderBy('id')
@@ -50,7 +50,6 @@ class CustomerController extends Controller
      *     id: int,
      *     name: string,
      *     email: string,
-     *     is_email_verified: bool,
      *     created_at: string|null
      * }
      */
@@ -60,7 +59,6 @@ class CustomerController extends Controller
             'id' => $customer->id,
             'name' => $customer->name,
             'email' => $customer->email,
-            'is_email_verified' => $customer->email_verified_at !== null,
             'created_at' => $customer->created_at?->toIso8601String(),
         ];
     }

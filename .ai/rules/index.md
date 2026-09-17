@@ -7,6 +7,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/Order/**,app/Http/Controllers/Administration/Order*,resources/js/pages/Administration/Orders/** | .ai/rules/administration-orders.md |
 | app/**,database/**,resources/js/** | .ai/rules/app-js.md |
 | app/Models/** | .ai/rules/app-models.md |
+| app/Models/User.php,config/fortify.php,routes/**,app/Providers/FortifyServiceProvider.php,resources/js/pages/{auth,settings,Administration/Customers}/**,tests/Feature/{Auth,Settings,Administration}/** | .ai/rules/auth-settings-administration.md |
 | app/Actions/Cart/**,app/Http/Controllers/*Checkout*,app/Http/Requests/ValidateCheckoutRequest.php,resources/js/pages/{Cart,Checkout}/**/*.vue | .ai/rules/cart-checkout.md |
 | app/Actions/Cart/** | .ai/rules/cart.md |
 | resources/js/{pages/Cart,components/cart}/**/*.vue | .ai/rules/cartcomponents-cart.md |
