@@ -11,7 +11,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\OrderIndexRequest;
 use App\Models\Order;
 use App\Models\OrderItem;
-use Illuminate\Database\Eloquent\Builder;
+use App\Repositories\Order\AdministratorOrderRepository;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -20,6 +20,8 @@ use InvalidArgumentException;
 
 class OrderController extends Controller
 {
+    public function __construct(private readonly AdministratorOrderRepository $orderRepository) {}
+
     /**
      * Display the administrator order directory.
      */
@@ -29,24 +31,9 @@ class OrderController extends Controller
         $statusFilter = $filters['status'] ?? 'active';
         $filters['status'] = $statusFilter;
 
-        $filteredOrders = $this->applyIndexFilters(Order::query(), $filters);
-        $countsByStatus = (clone $filteredOrders)
-            ->selectRaw('status, COUNT(*) as aggregate')
-            ->groupBy('status')
-            ->pluck('aggregate', 'status');
-
-        $orders = $this->applyStatusFilter($filteredOrders, $statusFilter)
-            ->select([
-                'id', 'user_id', 'recipient_name', 'fulfillment_method',
-                'total_amount', 'status', 'payment_status', 'payment_method', 'created_at',
-            ])
-            ->with('user:id,name,email')
-            ->withCount('items')
-            ->withSum('items as total_quantity', 'quantity')
-            ->orderByDesc('created_at')
-            ->orderByDesc('id')
-            ->paginate(20)
-            ->appends($filters)
+        $directory = $this->orderRepository->directory($filters, $statusFilter);
+        $countsByStatus = $directory['counts'];
+        $orders = $directory['orders']
             ->through(fn (Order $order): array => [
                 'id' => $order->id,
                 'reference' => $order->reference,
@@ -114,78 +101,6 @@ class OrderController extends Controller
     }
 
     /**
-     * Apply filters shared by each administrator order view.
-     *
-     * @param  Builder<Order>  $query
-     * @param  array<string, mixed>  $filters
-     * @return Builder<Order>
-     */
-    private function applyIndexFilters(Builder $query, array $filters): Builder
-    {
-        return $query
-            ->when($filters['q'] ?? null, function (Builder $query, string $search): void {
-                $referenceId = $this->referenceIdFromSearch($search);
-
-                $query->where(function (Builder $query) use ($referenceId, $search): void {
-                    $query
-                        ->where('recipient_name', 'like', "%{$search}%")
-                        ->orWhereHas(
-                            'user',
-                            fn (Builder $userQuery): Builder => $userQuery->where('name', 'like', "%{$search}%"),
-                        );
-
-                    if ($referenceId !== null) {
-                        $query->orWhereKey($referenceId);
-                    }
-                });
-            })
-            ->when(
-                $filters['payment_status'] ?? null,
-                fn (Builder $query, string $status): Builder => $query->where('payment_status', $status),
-            )
-            ->when(
-                $filters['payment_method'] ?? null,
-                fn (Builder $query, string $method): Builder => $query->where('payment_method', $method),
-            )
-            ->when(
-                $filters['fulfillment_method'] ?? null,
-                fn (Builder $query, string $method): Builder => $query->where('fulfillment_method', $method),
-            );
-    }
-
-    /**
-     * Limit the administrator directory to the selected operational view.
-     *
-     * @param  Builder<Order>  $query
-     * @return Builder<Order>
-     */
-    private function applyStatusFilter(Builder $query, string $status): Builder
-    {
-        return match ($status) {
-            'completed' => $query->where('status', OrderStatus::Completed->value),
-            'cancelled' => $query->where('status', OrderStatus::Cancelled->value),
-            default => $query->whereIn('status', [
-                OrderStatus::Pending->value,
-                OrderStatus::Processing->value,
-            ]),
-        };
-    }
-
-    /**
-     * Resolve the numeric identifier from a complete public order reference.
-     */
-    private function referenceIdFromSearch(string $search): ?int
-    {
-        if (preg_match('/^BF-(\d+)$/i', trim($search), $matches) !== 1) {
-            return null;
-        }
-
-        $referenceId = (int) $matches[1];
-
-        return $referenceId > 0 ? $referenceId : null;
-    }
-
-    /**
      * Describe active fulfillment work without changing persisted statuses.
      */
     private function fulfillmentOperationalLabel(Order $order): string
@@ -205,13 +120,7 @@ class OrderController extends Controller
      */
     public function show(Order $order): Response
     {
-        $order->load([
-            'user:id,name,email',
-            'items' => fn ($query) => $query
-                ->select(['id', 'order_id', 'product_id', 'quantity', 'price_at_time'])
-                ->orderBy('id'),
-            'items.product:id,name,brand,image_path',
-        ]);
+        $order = $this->orderRepository->loadDetails($order);
 
         return Inertia::render('Administration/Orders/Show', [
             'order' => [

@@ -1,6 +1,6 @@
 ---
 paths:
-    - 'app/Actions/{Cart,Order,Inventory}/**,app/Http/Controllers/OrderController.php,resources/js/pages/Checkout/**'
+    - 'app/Actions/{Cart,Checkout,Order,Inventory}/**,app/Services/{Cart,Order}/**,app/Http/Controllers/OrderController.php,resources/js/pages/Checkout/**'
 ---
 
 # Pages Checkout

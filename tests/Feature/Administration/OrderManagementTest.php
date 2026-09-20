@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\Order\ProcessOrder;
 use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
@@ -12,6 +11,7 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\User;
+use App\Services\Order\OrderProcessingService;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -430,7 +430,7 @@ test('completion failure rolls back both the order status and sale', function ()
     );
 
     try {
-        expect(fn () => app(ProcessOrder::class)->updateStatus($order, OrderStatus::Completed))
+        expect(fn () => app(OrderProcessingService::class)->updateStatus($order, OrderStatus::Completed))
             ->toThrow(RuntimeException::class, 'Forced sale recording failure.');
     } finally {
         Event::forget('eloquent.created: '.Sale::class);
@@ -521,7 +521,7 @@ test('cancellation failure rolls back the status and restored inventory', functi
     );
 
     try {
-        expect(fn () => app(ProcessOrder::class)->updateStatus($order, OrderStatus::Cancelled))
+        expect(fn () => app(OrderProcessingService::class)->updateStatus($order, OrderStatus::Cancelled))
             ->toThrow(RuntimeException::class, 'Forced cancellation failure.');
     } finally {
         Event::forget('eloquent.updated: '.Order::class);

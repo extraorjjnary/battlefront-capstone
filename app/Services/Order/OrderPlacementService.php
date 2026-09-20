@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Actions\Order;
+namespace App\Services\Order;
 
 use App\Actions\Cart\CartOperationException;
-use App\Actions\Cart\ManageCart;
 use App\Actions\Inventory\AdjustInventoryStock;
+use App\Actions\Order\OrderPlacementException;
 use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
@@ -17,15 +17,16 @@ use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\Cart\CartService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
-class PlaceOrder
+class OrderPlacementService
 {
     public function __construct(
-        private readonly ManageCart $manageCart,
+        private readonly CartService $cartService,
         private readonly AdjustInventoryStock $adjustInventoryStock,
     ) {}
 
@@ -104,7 +105,7 @@ class PlaceOrder
                 $inventory = $inventories->get($product->id);
 
                 try {
-                    $this->manageCart->ensureAvailableForCheckout(
+                    $this->cartService->ensureAvailableForCheckout(
                         $product,
                         $category,
                         $inventory,

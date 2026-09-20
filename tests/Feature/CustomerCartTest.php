@@ -1,9 +1,9 @@
 <?php
 
-use App\Actions\Cart\ManageCart;
 use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\Cart\CartService;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('guests are redirected from the customer cart', function () {
@@ -53,10 +53,10 @@ test('customers see only their authoritative cart prices totals and stock confli
         ->for($discountedProduct)
         ->create(['quantity' => 3]);
     Inventory::factory()->for($otherProduct)->create(['quantity' => 5]);
-    $manageCart = new ManageCart;
-    $regularItem = $manageCart->add($customer, $regularProduct->id, 2);
-    $discountedItem = $manageCart->add($customer, $discountedProduct->id, 3);
-    $manageCart->add($otherCustomer, $otherProduct->id, 1);
+    $cartService = new CartService;
+    $regularItem = $cartService->add($customer, $regularProduct->id, 2);
+    $discountedItem = $cartService->add($customer, $discountedProduct->id, 3);
+    $cartService->add($otherCustomer, $otherProduct->id, 1);
     $discountedInventory->update(['quantity' => 1]);
 
     $response = $this->actingAs($customer)->get(route('cart.index'));

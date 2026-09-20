@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\Cart\ManageCart;
 use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
@@ -11,6 +10,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\Cart\CartService;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('guests are redirected from order confirmation', function () {
@@ -187,7 +187,7 @@ test('refreshing confirmation does not place or deduct an order again', function
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->create(['price' => '1500.00']);
     $inventory = Inventory::factory()->for($product)->create(['quantity' => 5]);
-    (new ManageCart)->add($customer, $product->id, 2);
+    (new CartService)->add($customer, $product->id, 2);
 
     $placementResponse = $this->actingAs($customer)->post(route('orders.store'), [
         'recipient_name' => 'Alex Customer',

@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Actions\Cart;
+namespace App\Services\Cart;
 
+use App\Actions\Cart\CartOperationException;
 use App\Enums\CartAvailability;
 use App\Enums\UserRole;
 use App\Models\Cart;
@@ -15,7 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
-class ManageCart
+class CartService
 {
     /**
      * Add a quantity of a product to the customer's cart.

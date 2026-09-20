@@ -2,8 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Order\DeletePaymentProof;
 use App\Actions\Order\OrderPlacementException;
-use App\Actions\Order\PlaceOrder;
+use App\Actions\Order\StorePaymentProof;
 use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
@@ -13,10 +14,9 @@ use App\Http\Requests\ValidateCheckoutRequest;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;
+use App\Services\Order\OrderPlacementService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -61,19 +61,21 @@ class OrderController extends Controller
      */
     public function store(
         ValidateCheckoutRequest $request,
-        PlaceOrder $placeOrder,
+        OrderPlacementService $orderPlacementService,
+        StorePaymentProof $storePaymentProof,
+        DeletePaymentProof $deletePaymentProof,
     ): RedirectResponse {
         /** @var User $customer */
         $customer = $request->user();
         $validated = $request->validated();
         $paymentMethod = PaymentMethod::from($validated['payment_method']);
-        $paymentProofPath = $this->storePaymentProof(
+        $paymentProofPath = $storePaymentProof->execute(
             $request->file('payment_proof'),
             $paymentMethod,
         );
 
         try {
-            $order = $placeOrder->execute($customer, [
+            $order = $orderPlacementService->execute($customer, [
                 'recipient_name' => $validated['recipient_name'],
                 'contact_number' => $validated['contact_number'],
                 'fulfillment_method' => FulfillmentMethod::from($validated['fulfillment_method']),
@@ -82,13 +84,13 @@ class OrderController extends Controller
                 'payment_proof_path' => $paymentProofPath,
             ]);
         } catch (OrderPlacementException $exception) {
-            $this->deletePaymentProof($paymentProofPath);
+            $deletePaymentProof->execute($paymentProofPath);
 
             throw ValidationException::withMessages([
                 'cart' => $exception->getMessage(),
             ]);
         } catch (Throwable $exception) {
-            $this->deletePaymentProof($paymentProofPath);
+            $deletePaymentProof->execute($paymentProofPath);
 
             throw $exception;
         }
@@ -316,37 +318,5 @@ class OrderController extends Controller
         return $order->payment_method->requiresPaymentProof()
             && $order->payment_status === PaymentStatus::Rejected
             && ! in_array($order->status, [OrderStatus::Completed, OrderStatus::Cancelled], strict: true);
-    }
-
-    /**
-     * Store required e-wallet evidence on the private disk.
-     */
-    private function storePaymentProof(
-        ?UploadedFile $paymentProof,
-        PaymentMethod $paymentMethod,
-    ): ?string {
-        if (! $paymentMethod->requiresPaymentProof()) {
-            return null;
-        }
-
-        $path = $paymentProof?->store('payment-proofs', 'local');
-
-        if (! is_string($path)) {
-            throw ValidationException::withMessages([
-                'payment_proof' => 'The payment proof could not be stored. Please try again.',
-            ]);
-        }
-
-        return $path;
-    }
-
-    /**
-     * Remove evidence that no committed order references.
-     */
-    private function deletePaymentProof(?string $paymentProofPath): void
-    {
-        if ($paymentProofPath !== null) {
-            Storage::disk('local')->delete($paymentProofPath);
-        }
     }
 }

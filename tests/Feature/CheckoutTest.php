@@ -1,10 +1,10 @@
 <?php
 
-use App\Actions\Cart\ManageCart;
 use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\Cart\CartService;
 use Database\Seeders\BranchSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -71,9 +71,9 @@ test('checkout renders current customer items, pickup location, and supported op
     $otherProduct = Product::factory()->create(['price' => '90000.00']);
     Inventory::factory()->for($product)->create(['quantity' => 5]);
     Inventory::factory()->for($otherProduct)->create(['quantity' => 5]);
-    $manageCart = new ManageCart;
-    $item = $manageCart->add($customer, $product->id, 2);
-    $manageCart->add($otherCustomer, $otherProduct->id, 1);
+    $cartService = new CartService;
+    $item = $cartService->add($customer, $product->id, 2);
+    $cartService->add($otherCustomer, $otherProduct->id, 1);
 
     $response = $this->actingAs($customer)->get(route('checkout.index'));
 
@@ -146,7 +146,7 @@ test('checkout provides the saved default delivery address for prefill', functio
     ]);
     $product = Product::factory()->create();
     Inventory::factory()->for($product)->create(['quantity' => 2]);
-    (new ManageCart)->add($customer, $product->id, 1);
+    (new CartService)->add($customer, $product->id, 1);
 
     $this->actingAs($customer)
         ->get(route('checkout.index'))
@@ -172,7 +172,7 @@ test('checkout uses separately configured receiving details for each wallet', fu
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->create();
     Inventory::factory()->for($product)->create(['quantity' => 2]);
-    (new ManageCart)->add($customer, $product->id, 1);
+    (new CartService)->add($customer, $product->id, 1);
 
     $response = $this->actingAs($customer)->get(route('checkout.index'));
 
@@ -195,7 +195,7 @@ test('checkout rejects required and invalid fields with clear messages', functio
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->create();
     Inventory::factory()->for($product)->create(['quantity' => 2]);
-    (new ManageCart)->add($customer, $product->id, 1);
+    (new CartService)->add($customer, $product->id, 1);
 
     $this->actingAs($customer)
         ->from(route('checkout.index'))
@@ -213,7 +213,7 @@ test('delivery requires an address', function () {
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->create();
     Inventory::factory()->for($product)->create(['quantity' => 2]);
-    (new ManageCart)->add($customer, $product->id, 1);
+    (new CartService)->add($customer, $product->id, 1);
 
     $this->actingAs($customer)
         ->from(route('checkout.index'))
@@ -233,7 +233,7 @@ test('pickup rejects a delivery address', function () {
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->create();
     Inventory::factory()->for($product)->create(['quantity' => 2]);
-    (new ManageCart)->add($customer, $product->id, 1);
+    (new CartService)->add($customer, $product->id, 1);
 
     $this->actingAs($customer)
         ->from(route('checkout.index'))
@@ -253,7 +253,7 @@ test('delivery rejects payment methods that require paying at the store', functi
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->create();
     Inventory::factory()->for($product)->create(['quantity' => 2]);
-    (new ManageCart)->add($customer, $product->id, 1);
+    (new CartService)->add($customer, $product->id, 1);
 
     $this->actingAs($customer)
         ->from(route('checkout.index'))
@@ -273,7 +273,7 @@ test('gcash and maya require payment proof', function (string $paymentMethod) {
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->create();
     Inventory::factory()->for($product)->create(['quantity' => 2]);
-    (new ManageCart)->add($customer, $product->id, 1);
+    (new CartService)->add($customer, $product->id, 1);
 
     $this->actingAs($customer)
         ->from(route('checkout.index'))
@@ -292,7 +292,7 @@ test('cash and card at store reject online payment proof', function (string $pay
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->create();
     Inventory::factory()->for($product)->create(['quantity' => 2]);
-    (new ManageCart)->add($customer, $product->id, 1);
+    (new CartService)->add($customer, $product->id, 1);
 
     $this->actingAs($customer)
         ->from(route('checkout.index'))
@@ -312,7 +312,7 @@ test('payment proof must be a supported image no larger than five megabytes', fu
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->create();
     Inventory::factory()->for($product)->create(['quantity' => 2]);
-    (new ManageCart)->add($customer, $product->id, 1);
+    (new CartService)->add($customer, $product->id, 1);
 
     $this->actingAs($customer)
         ->from(route('checkout.index'))
@@ -344,7 +344,7 @@ test('all eligible fulfillment and payment combinations place an order', functio
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->create();
     $inventory = Inventory::factory()->for($product)->create(['quantity' => 3]);
-    $item = (new ManageCart)->add($customer, $product->id, 2);
+    $item = (new CartService)->add($customer, $product->id, 2);
     $payload = [
         'recipient_name' => 'Alex Customer',
         'contact_number' => '09171234567',
@@ -393,7 +393,7 @@ test('checkout rechecks current stock on submission', function () {
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->create();
     $inventory = Inventory::factory()->for($product)->create(['quantity' => 2]);
-    (new ManageCart)->add($customer, $product->id, 2);
+    (new CartService)->add($customer, $product->id, 2);
     $inventory->update(['quantity' => 1]);
 
     $this->actingAs($customer)
@@ -422,7 +422,7 @@ test('a checkout override is snapshotted without changing the profile default', 
     ]);
     $product = Product::factory()->create();
     Inventory::factory()->for($product)->create(['quantity' => 2]);
-    (new ManageCart)->add($customer, $product->id, 1);
+    (new CartService)->add($customer, $product->id, 1);
 
     $this->actingAs($customer)
         ->post(route('orders.store'), [
@@ -456,7 +456,7 @@ test('pickup ignores the saved default delivery address', function () {
     ]);
     $product = Product::factory()->create();
     Inventory::factory()->for($product)->create(['quantity' => 2]);
-    (new ManageCart)->add($customer, $product->id, 1);
+    (new CartService)->add($customer, $product->id, 1);
 
     $this->actingAs($customer)
         ->post(route('orders.store'), [

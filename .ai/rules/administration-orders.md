@@ -1,6 +1,6 @@
 ---
 paths:
-    - 'app/Actions/Order/**,app/Http/Controllers/Administration/Order*,resources/js/pages/Administration/Orders/**'
+    - 'app/Actions/{Inventory,Order}/**,app/Services/Order/**,app/Http/Controllers/Administration/Order*,resources/js/pages/Administration/Orders/**'
 ---
 
 # Administration Orders

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Administration;
 
+use App\Actions\Product\CreateProduct;
+use App\Actions\Product\UpdateProduct;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\ProductIndexRequest;
 use App\Http\Requests\Administration\SaveProductRequest;
@@ -11,12 +13,8 @@ use App\Models\Tag;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
-use RuntimeException;
-use Throwable;
 
 class ProductController extends Controller
 {
@@ -133,27 +131,12 @@ class ProductController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(SaveProductRequest $request): RedirectResponse
+    public function store(SaveProductRequest $request, CreateProduct $createProduct): RedirectResponse
     {
         $validated = $request->validated();
         $tagIds = $validated['tag_ids'] ?? [];
         unset($validated['tag_ids'], $validated['image']);
-        $imagePath = $this->storeImage($request);
-        $validated['image_path'] = $imagePath;
-
-        try {
-            $product = DB::transaction(function () use ($validated, $tagIds): Product {
-                $product = Product::query()->create($validated);
-
-                $product->tags()->sync($tagIds);
-
-                return $product;
-            });
-        } catch (Throwable $exception) {
-            $this->deleteManagedImage($imagePath);
-
-            throw $exception;
-        }
+        $product = $createProduct->execute($validated, $tagIds, $request->file('image'));
 
         Inertia::flash('toast', [
             'type' => 'success',
@@ -199,35 +182,15 @@ class ProductController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(SaveProductRequest $request, Product $product): RedirectResponse
-    {
+    public function update(
+        SaveProductRequest $request,
+        Product $product,
+        UpdateProduct $updateProduct,
+    ): RedirectResponse {
         $validated = $request->validated();
         $tagIds = $validated['tag_ids'] ?? [];
         unset($validated['tag_ids'], $validated['image']);
-        $oldImagePath = $product->image_path;
-        $newImagePath = $request->hasFile('image')
-            ? $this->storeImage($request)
-            : null;
-
-        if ($newImagePath !== null) {
-            $validated['image_path'] = $newImagePath;
-        }
-
-        try {
-            DB::transaction(function () use ($product, $validated, $tagIds): void {
-                $product->update($validated);
-
-                $product->tags()->sync($tagIds);
-            });
-        } catch (Throwable $exception) {
-            $this->deleteManagedImage($newImagePath);
-
-            throw $exception;
-        }
-
-        if ($newImagePath !== null) {
-            $this->deleteManagedImage($oldImagePath);
-        }
+        $updateProduct->execute($product, $validated, $tagIds, $request->file('image'));
 
         Inertia::flash('toast', [
             'type' => 'success',
@@ -259,33 +222,5 @@ class ProductController extends Controller
                 ->orderBy('id')
                 ->get(),
         ];
-    }
-
-    /**
-     * Store a validated product image on the public disk.
-     */
-    private function storeImage(SaveProductRequest $request): ?string
-    {
-        if (! $request->hasFile('image')) {
-            return null;
-        }
-
-        $path = $request->file('image')->storePublicly('products', 'public');
-
-        if ($path === false) {
-            throw new RuntimeException('The product image could not be stored.');
-        }
-
-        return $path;
-    }
-
-    /**
-     * Delete only product images managed by this upload flow.
-     */
-    private function deleteManagedImage(?string $path): void
-    {
-        if ($path !== null && str_starts_with($path, 'products/')) {
-            Storage::disk('public')->delete($path);
-        }
     }
 }

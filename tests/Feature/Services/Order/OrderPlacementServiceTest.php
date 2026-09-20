@@ -1,8 +1,6 @@
 <?php
 
-use App\Actions\Cart\ManageCart;
 use App\Actions\Order\OrderPlacementException;
-use App\Actions\Order\PlaceOrder;
 use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
@@ -11,6 +9,8 @@ use App\Models\Inventory;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\Cart\CartService;
+use App\Services\Order\OrderPlacementService;
 use Illuminate\Support\Facades\Event;
 
 /**
@@ -44,11 +44,11 @@ test('places an order with current price snapshots and consumes stock and cart',
     ]);
     $regularInventory = Inventory::factory()->for($regularProduct)->create(['quantity' => 5]);
     $discountedInventory = Inventory::factory()->for($discountedProduct)->create(['quantity' => 4]);
-    $manageCart = new ManageCart;
-    $manageCart->add($customer, $regularProduct->id, 2);
-    $manageCart->add($customer, $discountedProduct->id, 3);
+    $cartService = new CartService;
+    $cartService->add($customer, $regularProduct->id, 2);
+    $cartService->add($customer, $discountedProduct->id, 3);
 
-    $order = app(PlaceOrder::class)->execute($customer, validOrderPlacementData([
+    $order = app(OrderPlacementService::class)->execute($customer, validOrderPlacementData([
         'fulfillment_method' => FulfillmentMethod::Delivery,
         'delivery_address' => 'Sagay City, Negros Occidental',
         'payment_method' => PaymentMethod::GCash,
@@ -85,9 +85,9 @@ test('rolls back order stock and cart changes when an order item fails', functio
     $secondProduct = Product::factory()->create(['price' => '200.00']);
     $firstInventory = Inventory::factory()->for($firstProduct)->create(['quantity' => 3]);
     $secondInventory = Inventory::factory()->for($secondProduct)->create(['quantity' => 3]);
-    $manageCart = new ManageCart;
-    $firstItem = $manageCart->add($customer, $firstProduct->id, 1);
-    $secondItem = $manageCart->add($customer, $secondProduct->id, 1);
+    $cartService = new CartService;
+    $firstItem = $cartService->add($customer, $firstProduct->id, 1);
+    $secondItem = $cartService->add($customer, $secondProduct->id, 1);
     Event::listen(
         'eloquent.creating: '.OrderItem::class,
         function (OrderItem $item) use ($secondProduct): void {
@@ -98,7 +98,7 @@ test('rolls back order stock and cart changes when an order item fails', functio
     );
 
     try {
-        expect(fn () => app(PlaceOrder::class)->execute($customer, validOrderPlacementData()))
+        expect(fn () => app(OrderPlacementService::class)->execute($customer, validOrderPlacementData()))
             ->toThrow(RuntimeException::class, 'Forced order item failure.');
     } finally {
         Event::forget('eloquent.creating: '.OrderItem::class);
@@ -118,13 +118,13 @@ test('prevents competing carts from overselling current stock', function () {
     $secondCustomer = User::factory()->customer()->create();
     $product = Product::factory()->create();
     $inventory = Inventory::factory()->for($product)->create(['quantity' => 3]);
-    $manageCart = new ManageCart;
-    $manageCart->add($firstCustomer, $product->id, 2);
-    $secondItem = $manageCart->add($secondCustomer, $product->id, 2);
+    $cartService = new CartService;
+    $cartService->add($firstCustomer, $product->id, 2);
+    $secondItem = $cartService->add($secondCustomer, $product->id, 2);
 
-    app(PlaceOrder::class)->execute($firstCustomer, validOrderPlacementData());
+    app(OrderPlacementService::class)->execute($firstCustomer, validOrderPlacementData());
 
-    expect(fn () => app(PlaceOrder::class)->execute($secondCustomer, validOrderPlacementData()))
+    expect(fn () => app(OrderPlacementService::class)->execute($secondCustomer, validOrderPlacementData()))
         ->toThrow(
             OrderPlacementException::class,
             'Review unavailable products or quantities in your cart before placing an order.',
@@ -139,12 +139,12 @@ test('a repeated placement cannot deduct initial stock twice', function () {
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->create();
     $inventory = Inventory::factory()->for($product)->create(['quantity' => 5]);
-    (new ManageCart)->add($customer, $product->id, 2);
-    $placeOrder = app(PlaceOrder::class);
+    (new CartService)->add($customer, $product->id, 2);
+    $orderPlacementService = app(OrderPlacementService::class);
 
-    $placeOrder->execute($customer, validOrderPlacementData());
+    $orderPlacementService->execute($customer, validOrderPlacementData());
 
-    expect(fn () => $placeOrder->execute($customer, validOrderPlacementData()))
+    expect(fn () => $orderPlacementService->execute($customer, validOrderPlacementData()))
         ->toThrow(
             OrderPlacementException::class,
             'Add at least one available product before placing an order.',
@@ -159,8 +159,8 @@ test('later order and payment status changes do not deduct stock again', functio
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->create();
     $inventory = Inventory::factory()->for($product)->create(['quantity' => 5]);
-    (new ManageCart)->add($customer, $product->id, 2);
-    $order = app(PlaceOrder::class)->execute($customer, validOrderPlacementData());
+    (new CartService)->add($customer, $product->id, 2);
+    $order = app(OrderPlacementService::class)->execute($customer, validOrderPlacementData());
 
     $this->actingAs($administrator)
         ->patch(route('administration.orders.payment-status.update', $order), [

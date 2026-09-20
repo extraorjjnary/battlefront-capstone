@@ -6,10 +6,9 @@ use App\Actions\Inventory\AdjustInventoryStock;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\InventoryIndexRequest;
 use App\Http\Requests\Administration\UpdateInventoryRequest;
-use App\Models\Category;
 use App\Models\Inventory;
 use App\Models\Product;
-use Illuminate\Database\Eloquent\Builder;
+use App\Repositories\Inventory\InventoryRepository;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -19,7 +18,7 @@ class InventoryController extends Controller
     /**
      * Display the administrator inventory ledger.
      */
-    public function index(InventoryIndexRequest $request): Response
+    public function index(InventoryIndexRequest $request, InventoryRepository $inventoryRepository): Response
     {
         $filters = $request->validated();
         $filters['category_id'] = $request->filled('category_id')
@@ -27,56 +26,7 @@ class InventoryController extends Controller
             : null;
         $stockFilter = $filters['stock'] ?? 'all';
 
-        $products = Product::query()
-            ->select(['id', 'name', 'category_id', 'brand', 'is_active'])
-            ->with([
-                'category:id,name',
-                'inventory:id,product_id,quantity,reorder_level,last_updated',
-            ])
-            ->withExists('lowStockInventory as is_low_stock')
-            ->when(
-                $filters['q'] ?? null,
-                fn (Builder $query, string $search): Builder => $query->where(
-                    fn (Builder $query): Builder => $query
-                        ->where('name', 'like', "%{$search}%")
-                        ->orWhere('brand', 'like', "%{$search}%"),
-                ),
-            )
-            ->when(
-                $filters['category_id'] ?? null,
-                fn (Builder $query, int $categoryId): Builder => $query->where('category_id', $categoryId),
-            )
-            ->when(
-                $stockFilter === 'low',
-                fn (Builder $query): Builder => $query->whereHas(
-                    'lowStockInventory',
-                    fn (Builder $inventoryQuery): Builder => $inventoryQuery->where('quantity', '>', 0),
-                ),
-            )
-            ->when(
-                $stockFilter === 'in_stock',
-                fn (Builder $query): Builder => $query->whereHas(
-                    'inventory',
-                    fn (Builder $inventoryQuery): Builder => $inventoryQuery
-                        ->where('quantity', '>', 0)
-                        ->whereColumn('quantity', '>=', 'reorder_level'),
-                ),
-            )
-            ->when(
-                $stockFilter === 'out_of_stock',
-                fn (Builder $query): Builder => $query->whereHas(
-                    'inventory',
-                    fn (Builder $inventoryQuery): Builder => $inventoryQuery->where('quantity', 0),
-                ),
-            )
-            ->when(
-                $stockFilter === 'not_initialized',
-                fn (Builder $query): Builder => $query->doesntHave('inventory'),
-            )
-            ->orderBy('name')
-            ->orderBy('id')
-            ->paginate(25)
-            ->appends($filters)
+        $products = $inventoryRepository->paginateProducts($filters, $stockFilter)
             ->through(fn (Product $product): array => [
                 'id' => $product->id,
                 'name' => $product->name,
@@ -106,13 +56,9 @@ class InventoryController extends Controller
                 'stock' => $stockFilter,
             ],
             'filter_options' => [
-                'categories' => Category::query()
-                    ->select(['id', 'name', 'is_active'])
-                    ->orderBy('name')
-                    ->orderBy('id')
-                    ->get(),
+                'categories' => $inventoryRepository->categories(),
             ],
-            'low_stock_count' => Inventory::query()->lowStock()->count(),
+            'low_stock_count' => $inventoryRepository->lowStockCount(),
         ]);
     }
 

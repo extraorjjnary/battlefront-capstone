@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Administration;
 
-use App\Actions\Order\ProcessOrder;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\UpdateOrderStatusRequest;
 use App\Models\Order;
+use App\Services\Order\OrderProcessingService;
 use Illuminate\Http\RedirectResponse;
 use Inertia\Inertia;
 
@@ -18,9 +18,9 @@ class OrderStatusController extends Controller
     public function update(
         UpdateOrderStatusRequest $request,
         Order $order,
-        ProcessOrder $processOrder,
+        OrderProcessingService $orderProcessingService,
     ): RedirectResponse {
-        $processOrder->updateStatus(
+        $orderProcessingService->updateStatus(
             $order,
             OrderStatus::from($request->validated('status')),
         );

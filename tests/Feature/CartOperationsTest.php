@@ -1,10 +1,10 @@
 <?php
 
-use App\Actions\Cart\ManageCart;
 use App\Models\CartItem;
 use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\Cart\CartService;
 use Illuminate\Support\Facades\Gate;
 
 test('only customers are authorized to use cart operations', function () {
@@ -92,7 +92,7 @@ test('cart mutation requests enforce positive integer quantities', function (str
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->create();
     Inventory::factory()->for($product)->create(['quantity' => 5]);
-    $item = (new ManageCart)->add($customer, $product->id, 2);
+    $item = (new CartService)->add($customer, $product->id, 2);
     $arguments = $routeName === 'cart.items.store' ? [] : [$item->id];
 
     $this->actingAs($customer)
@@ -134,7 +134,7 @@ test('stock changes are revalidated when a customer updates quantity', function 
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->create();
     $inventory = Inventory::factory()->for($product)->create(['quantity' => 5]);
-    $item = (new ManageCart)->add($customer, $product->id, 2);
+    $item = (new CartService)->add($customer, $product->id, 2);
     $inventory->update(['quantity' => 1]);
 
     $this->actingAs($customer)
