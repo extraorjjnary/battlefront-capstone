@@ -23,6 +23,24 @@ enum OrderStatus: string
     }
 
     /**
+     * Get the fulfillment-aware status label shown to customers.
+     */
+    public function customerLabel(FulfillmentMethod $fulfillmentMethod): string
+    {
+        return match ($this) {
+            self::Processing => match ($fulfillmentMethod) {
+                FulfillmentMethod::Pickup => 'Preparing for pickup',
+                FulfillmentMethod::Delivery => 'Preparing for delivery',
+            },
+            self::Completed => match ($fulfillmentMethod) {
+                FulfillmentMethod::Pickup => 'Picked up / Completed',
+                FulfillmentMethod::Delivery => 'Delivered / Completed',
+            },
+            default => $this->label(),
+        };
+    }
+
+    /**
      * Get the administrator-approved next order statuses.
      *
      * @return list<self>

@@ -263,21 +263,9 @@ class OrderController extends Controller
      */
     private function customerStatusData(Order $order): array
     {
-        $label = match ($order->status) {
-            OrderStatus::Processing => match ($order->fulfillment_method) {
-                FulfillmentMethod::Pickup => 'Preparing for pickup',
-                FulfillmentMethod::Delivery => 'Preparing for delivery',
-            },
-            OrderStatus::Completed => match ($order->fulfillment_method) {
-                FulfillmentMethod::Pickup => 'Picked up / Completed',
-                FulfillmentMethod::Delivery => 'Delivered / Completed',
-            },
-            default => $order->status->label(),
-        };
-
         return [
             'value' => $order->status->value,
-            'label' => $label,
+            'label' => $order->status->customerLabel($order->fulfillment_method),
         ];
     }
 

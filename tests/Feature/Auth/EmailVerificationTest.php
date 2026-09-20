@@ -11,7 +11,7 @@ test('unverified customers can access authenticated customer pages', function ()
 
     $this->actingAs($customer)
         ->get(route('dashboard'))
-        ->assertInertia(fn (Assert $page) => $page->component('Dashboard'));
+        ->assertInertia(fn (Assert $page) => $page->component('Dashboard/Customer'));
 });
 
 test('unverified administrators can access administrator pages', function () {
