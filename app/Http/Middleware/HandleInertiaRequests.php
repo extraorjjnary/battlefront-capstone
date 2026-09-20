@@ -36,6 +36,10 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $sidebarCookieName = $request->user() === null
+            ? null
+            : 'sidebar_state_'.$request->user()->getKey();
+
         return [
             ...parent::share($request),
             'name' => config('app.name'),
@@ -48,7 +52,9 @@ class HandleInertiaRequests extends Middleware
                     'useCustomerCart' => $request->user()?->can('use-customer-cart') ?? false,
                 ],
             ],
-            'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+            'sidebarOpen' => $sidebarCookieName === null
+                || ! $request->hasCookie($sidebarCookieName)
+                || $request->cookie($sidebarCookieName) === 'true',
         ];
     }
 }

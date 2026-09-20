@@ -27,7 +27,7 @@ const hasAvailableStock = computed(
 </script>
 
 <template>
-    <div class="dark bg-background text-foreground min-h-screen">
+    <div class="bg-background text-foreground min-h-screen">
         <Head :title="product.name">
             <meta
                 head-key="description"

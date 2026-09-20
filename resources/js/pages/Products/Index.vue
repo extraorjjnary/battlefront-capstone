@@ -129,7 +129,7 @@ watch([categoryId, brand, tagId], updateFilters);
 </script>
 
 <template>
-    <div class="dark bg-background text-foreground min-h-screen">
+    <div class="bg-background text-foreground min-h-screen">
         <Head title="Products">
             <meta
                 head-key="description"

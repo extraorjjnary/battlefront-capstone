@@ -1,15 +1,17 @@
 <script setup>
-import { defaultDocument, useEventListener, useMediaQuery, useVModel } from "@vueuse/core";
+import { usePage } from "@inertiajs/vue3";
+import { useEventListener, useMediaQuery, useVModel } from "@vueuse/core";
 import { TooltipProvider } from "reka-ui";
 import { computed, ref } from "vue";
 import { cn } from "@/lib/utils";
-import { provideSidebarContext, SIDEBAR_COOKIE_MAX_AGE, SIDEBAR_COOKIE_NAME, SIDEBAR_KEYBOARD_SHORTCUT, SIDEBAR_WIDTH, SIDEBAR_WIDTH_ICON } from "./utils";
+import { getSidebarCookieName, provideSidebarContext, SIDEBAR_COOKIE_MAX_AGE, SIDEBAR_KEYBOARD_SHORTCUT, SIDEBAR_WIDTH, SIDEBAR_WIDTH_ICON } from "./utils";
 const props = defineProps({
-    "defaultOpen": { type: Boolean, default: !defaultDocument?.cookie.includes(`${SIDEBAR_COOKIE_NAME}=false`) },
+    "defaultOpen": { type: Boolean, default: true },
     "open": { type: Boolean, default: undefined },
     "class": {},
 });
 const emits = defineEmits(['update:open']);
+const sidebarCookieName = getSidebarCookieName(usePage().props.auth.user?.id);
 const isMobile = useMediaQuery("(max-width: 768px)");
 const openMobile = ref(false);
 const open = useVModel(props, "open", emits, {
@@ -18,8 +20,9 @@ const open = useVModel(props, "open", emits, {
 });
 function setOpen(value) {
     open.value = value; // emits('update:open', value)
-    // This sets the cookie to keep the sidebar state.
-    document.cookie = `${SIDEBAR_COOKIE_NAME}=${open.value}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+    if (sidebarCookieName !== null) {
+        document.cookie = `${sidebarCookieName}=${open.value}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+    }
 }
 function setOpenMobile(value) {
     openMobile.value = value;
