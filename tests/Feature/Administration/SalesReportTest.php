@@ -88,7 +88,7 @@ test('administrators receive zero values and empty reports when no sales exist',
         ->where('kpis', [
             'total_sales' => 0,
             'total_revenue' => '0.00',
-            'completed_orders' => 0,
+            'average_order_value' => '0.00',
             'total_items_sold' => 0,
         ])
         ->where('top_products.labels', [])
@@ -125,7 +125,7 @@ test('sales KPIs and product and category reports use sale-backed order records'
         ->where('kpis', [
             'total_sales' => 2,
             'total_revenue' => '500.00',
-            'completed_orders' => 2,
+            'average_order_value' => '250.00',
             'total_items_sold' => 6,
         ])
         ->where('timeline.labels', ['Sep 2026'])
@@ -180,7 +180,8 @@ test('date boundaries are inclusive and adjacent dates are excluded', function (
 
     $response->assertInertia(fn (Assert $page) => $page
         ->where('kpis.total_sales', 2)
-        ->where('kpis.total_revenue', '300.00'));
+        ->where('kpis.total_revenue', '300.00')
+        ->where('kpis.average_order_value', '150.00'));
 });
 
 test('category filters update dependent aggregates while retaining category chart context', function () {
@@ -204,7 +205,7 @@ test('category filters update dependent aggregates while retaining category char
         ->where('kpis', [
             'total_sales' => 2,
             'total_revenue' => '400.00',
-            'completed_orders' => 2,
+            'average_order_value' => '200.00',
             'total_items_sold' => 5,
         ])
         ->where('timeline.sales', [2])
@@ -248,7 +249,7 @@ test('product filters update dependent aggregates while retaining product chart 
         ->where('kpis', [
             'total_sales' => 1,
             'total_revenue' => '100.00',
-            'completed_orders' => 1,
+            'average_order_value' => '100.00',
             'total_items_sold' => 1,
         ])
         ->where('timeline.sales', [1])
@@ -291,7 +292,7 @@ test('clearing cross filters restores the complete date-range report', function 
         ->where('kpis', [
             'total_sales' => 2,
             'total_revenue' => '500.00',
-            'completed_orders' => 2,
+            'average_order_value' => '250.00',
             'total_items_sold' => 6,
         ])
         ->where('products.total', 2)
@@ -314,7 +315,7 @@ test('incompatible product and category filters return defined empty aggregates'
         ->where('kpis', [
             'total_sales' => 0,
             'total_revenue' => '0.00',
-            'completed_orders' => 0,
+            'average_order_value' => '0.00',
             'total_items_sold' => 0,
         ])
         ->where('timeline.sales', array_fill(0, 30, 0))

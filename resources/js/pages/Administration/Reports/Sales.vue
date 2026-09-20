@@ -17,7 +17,6 @@ import {
     CalendarRange,
     ChartNoAxesCombined,
     CircleDollarSign,
-    PackageCheck,
     ReceiptText,
     ShoppingBasket,
     X,
@@ -114,10 +113,10 @@ const kpiCards = computed(() => [
         icon: CircleDollarSign,
     },
     {
-        label: 'Completed orders',
-        value: numberFormatter.format(props.kpis.completed_orders),
-        detail: 'Completed, sale-backed orders',
-        icon: PackageCheck,
+        label: 'Average order value',
+        value: formatCurrency(props.kpis.average_order_value),
+        detail: 'Average revenue per sale',
+        icon: ChartNoAxesCombined,
     },
     {
         label: 'Items sold',

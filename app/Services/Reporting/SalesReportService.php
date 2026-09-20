@@ -63,6 +63,8 @@ class SalesReportService
             ]);
         $categoryChart = $this->salesReportRepository->categories($dateRange, $productId);
         $categoryReport = $this->salesReportRepository->categories($dateRange, $productId, $categoryId);
+        $totalSales = (int) ($salesSummary->total_sales ?? 0);
+        $totalRevenue = (float) ($salesSummary->total_revenue ?? 0);
 
         return [
             'filters' => $normalizedFilters,
@@ -77,9 +79,11 @@ class SalesReportService
                 ],
             ],
             'kpis' => [
-                'total_sales' => (int) ($salesSummary->total_sales ?? 0),
-                'total_revenue' => $this->money($salesSummary->total_revenue ?? 0),
-                'completed_orders' => (int) ($salesSummary->completed_orders ?? 0),
+                'total_sales' => $totalSales,
+                'total_revenue' => $this->money($totalRevenue),
+                'average_order_value' => $this->money(
+                    $totalSales === 0 ? 0 : $totalRevenue / $totalSales,
+                ),
                 'total_items_sold' => (int) ($salesSummary->total_items_sold ?? 0),
             ],
             'timeline' => $this->timelineData(array_values($dailySales->all()), $from, $to, $period),

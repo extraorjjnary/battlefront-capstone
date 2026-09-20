@@ -2,7 +2,6 @@
 
 namespace App\Repositories\Reporting;
 
-use App\Enums\OrderStatus;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -20,27 +19,17 @@ class SalesReportRepository
     {
         if ($productId !== null || $categoryId !== null) {
             return $this->itemReportQuery($dateRange, $productId, $categoryId)
-                ->join('orders', 'orders.id', '=', 'sales.order_id')
                 ->selectRaw('COUNT(DISTINCT sales.id) as total_sales')
                 ->selectRaw('COALESCE(SUM(order_items.quantity * order_items.price_at_time), 0) as total_revenue')
-                ->selectRaw(
-                    'COUNT(DISTINCT CASE WHEN orders.status = ? THEN sales.order_id END) as completed_orders',
-                    [OrderStatus::Completed->value],
-                )
                 ->selectRaw('COALESCE(SUM(order_items.quantity), 0) as total_items_sold')
                 ->first();
         }
 
         $summary = DB::table('sales')
-            ->join('orders', 'orders.id', '=', 'sales.order_id')
             ->where('sales.sale_date', '>=', $dateRange[0])
             ->where('sales.sale_date', '<', $dateRange[1])
             ->selectRaw('COUNT(sales.id) as total_sales')
             ->selectRaw('COALESCE(SUM(sales.amount), 0) as total_revenue')
-            ->selectRaw(
-                'COUNT(CASE WHEN orders.status = ? THEN 1 END) as completed_orders',
-                [OrderStatus::Completed->value],
-            )
             ->first();
         $summary->total_items_sold = $this->itemReportQuery($dateRange)->sum('order_items.quantity');
 
