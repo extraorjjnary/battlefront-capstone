@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\Administration\CategoryActivationController;
 use App\Http\Controllers\Administration\CategoryController;
+use App\Http\Controllers\Administration\ChatbotKnowledgeActivationController;
+use App\Http\Controllers\Administration\ChatbotKnowledgeController;
 use App\Http\Controllers\Administration\CustomerController;
 use App\Http\Controllers\Administration\InventoryController;
 use App\Http\Controllers\Administration\OrderController as AdministrationOrderController;
@@ -83,6 +85,14 @@ Route::middleware(['auth', 'can:access-administration'])
             ->except(['show', 'destroy']);
         Route::patch('categories/{category}/activation', CategoryActivationController::class)
             ->name('categories.activation.update');
+
+        Route::resource('chatbot-knowledge', ChatbotKnowledgeController::class)
+            ->parameters(['chatbot-knowledge' => 'chatbotKnowledge'])
+            ->except('destroy');
+        Route::patch(
+            'chatbot-knowledge/{chatbotKnowledge}/activation',
+            ChatbotKnowledgeActivationController::class,
+        )->name('chatbot-knowledge.activation.update');
 
         Route::get('inventory', [InventoryController::class, 'index'])
             ->name('inventory.index');

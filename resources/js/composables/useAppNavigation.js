@@ -3,6 +3,7 @@ import {
     ChartNoAxesCombined,
     LayoutDashboard,
     MapPin,
+    MessageSquareText,
     PackageSearch,
     ReceiptText,
     ShoppingCart,
@@ -12,6 +13,7 @@ import {
 import { usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import CategoryController from '@/actions/App/Http/Controllers/Administration/CategoryController';
+import ChatbotKnowledgeController from '@/actions/App/Http/Controllers/Administration/ChatbotKnowledgeController';
 import CustomerController from '@/actions/App/Http/Controllers/Administration/CustomerController';
 import InventoryController from '@/actions/App/Http/Controllers/Administration/InventoryController';
 import AdministrationOrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
@@ -78,6 +80,12 @@ export function useAppNavigation() {
                 title: 'Customers',
                 href: CustomerController.index(),
                 icon: UsersRound,
+            });
+            items.push({
+                title: 'Chatbot knowledge',
+                href: ChatbotKnowledgeController.index(),
+                icon: MessageSquareText,
+                activeRoutes: [ChatbotKnowledgeController.index()],
             });
         } else {
             items.push({
