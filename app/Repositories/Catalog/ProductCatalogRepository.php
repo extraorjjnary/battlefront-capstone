@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\Tag;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
@@ -37,6 +38,51 @@ class ProductCatalogRepository
     public function findEligibleOrFail(int $productId): Product
     {
         return $this->catalogQuery()->findOrFail($productId);
+    }
+
+    /**
+     * Find customer-eligible products whose catalog attributes match every search term.
+     *
+     * @param  list<string>  $terms
+     * @return EloquentCollection<int, Product>
+     */
+    public function contextMatches(array $terms, int $limit = 5): EloquentCollection
+    {
+        return Product::query()
+            ->customerEligible()
+            ->select([
+                'id', 'name', 'description', 'category_id', 'brand',
+                'price', 'discount_price',
+            ])
+            ->with([
+                'category:id,name',
+                'inventory:id,product_id,quantity',
+                'tags:id,name',
+            ])
+            ->where(function (Builder $query) use ($terms): void {
+                foreach ($terms as $term) {
+                    $query->where(function (Builder $attributeQuery) use ($term): void {
+                        $attributeQuery
+                            ->whereLike('name', "%{$term}%")
+                            ->orWhereLike('brand', "%{$term}%")
+                            ->orWhereLike('description', "%{$term}%")
+                            ->orWhereHas(
+                                'category',
+                                fn (Builder $categoryQuery): Builder => $categoryQuery
+                                    ->whereLike('name', "%{$term}%"),
+                            )
+                            ->orWhereHas(
+                                'tags',
+                                fn (Builder $tagQuery): Builder => $tagQuery
+                                    ->whereLike('name', "%{$term}%"),
+                            );
+                    });
+                }
+            })
+            ->orderBy('name')
+            ->orderBy('id')
+            ->limit($limit)
+            ->get();
     }
 
     /**
