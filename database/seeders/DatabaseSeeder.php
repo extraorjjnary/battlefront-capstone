@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             BranchSeeder::class,
+            DevelopmentChatbotKnowledgeSeeder::class,
             DevelopmentCatalogSeeder::class,
         ]);
 
