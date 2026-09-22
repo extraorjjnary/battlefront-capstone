@@ -14,6 +14,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/Cart/**,app/Services/Cart/** | .ai/rules/cart.md |
 | resources/js/{pages/Cart,components/cart}/**/*.vue | .ai/rules/cartcomponents-cart.md |
 | resources/js/components/catalog/StockAvailability.vue | .ai/rules/catalog.md |
+| app/{Ai,Services/Chatbot}/** | .ai/rules/chatbot.md |
 | config/battlefront.php,app/Http/Controllers/CheckoutController.php,resources/js/pages/Checkout/** | .ai/rules/checkout.md |
 | database/seeders/**,app/Http/Controllers/BranchController.php,resources/js/components/BranchMap.vue | .ai/rules/components.md |
 | routes/**,app/Http/Controllers/** | .ai/rules/controllers.md |
