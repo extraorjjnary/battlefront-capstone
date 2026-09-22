@@ -23,16 +23,20 @@ use App\Http\Controllers\OrderPaymentProofController as CustomerOrderPaymentProo
 use App\Http\Controllers\ProductCatalogController;
 use Illuminate\Support\Facades\Route;
 
+// guest landing page
 Route::inertia('/', 'Welcome')->name('home');
+
 Route::get('branches', [BranchController::class, 'index'])->name('branches.index');
 Route::resource('products', ProductCatalogController::class)
     ->only(['index', 'show'])
     ->where(['product' => '[0-9]+']);
 
+// dynamic dashboard for customer and admin
 Route::middleware('auth')->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
 });
 
+// customer cart
 Route::middleware(['auth', 'can:use-customer-cart'])
     ->prefix('cart')
     ->name('cart.')
@@ -49,6 +53,7 @@ Route::middleware(['auth', 'can:use-customer-cart'])
             ->name('items.destroy');
     });
 
+// customer checkout preview
 Route::middleware(['auth', 'can:use-customer-cart'])
     ->prefix('checkout')
     ->name('checkout.')
@@ -57,6 +62,7 @@ Route::middleware(['auth', 'can:use-customer-cart'])
             ->name('index');
     });
 
+// customer orders
 Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {
     Route::get('orders', [OrderController::class, 'index'])
         ->name('orders.index');
@@ -70,22 +76,34 @@ Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {
         ->name('orders.show');
 });
 
+// administration authority
 Route::middleware(['auth', 'can:access-administration'])
     ->prefix('administration')
     ->name('administration.')
     ->group(function () {
+        // products
         Route::resource('products', ProductController::class)
             ->except(['show', 'destroy']);
         Route::patch('products/{product}/activation', ProductActivationController::class)
             ->name('products.activation.update');
+
+        // product inventory
         Route::post('products/{product}/inventory', [InventoryController::class, 'store'])
             ->name('products.inventory.store');
 
+        // categories
         Route::resource('categories', CategoryController::class)
             ->except(['show', 'destroy']);
         Route::patch('categories/{category}/activation', CategoryActivationController::class)
             ->name('categories.activation.update');
 
+        // inventories
+        Route::get('inventory', [InventoryController::class, 'index'])
+            ->name('inventory.index');
+        Route::patch('inventory/{inventory}', [InventoryController::class, 'update'])
+            ->name('inventory.update');
+
+        // chatbots
         Route::resource('chatbot-knowledge', ChatbotKnowledgeController::class)
             ->parameters(['chatbot-knowledge' => 'chatbotKnowledge'])
             ->except('destroy');
@@ -94,17 +112,11 @@ Route::middleware(['auth', 'can:access-administration'])
             ChatbotKnowledgeActivationController::class,
         )->name('chatbot-knowledge.activation.update');
 
-        Route::get('inventory', [InventoryController::class, 'index'])
-            ->name('inventory.index');
-        Route::patch('inventory/{inventory}', [InventoryController::class, 'update'])
-            ->name('inventory.update');
-
+        // preview customer orders
         Route::resource('customers', CustomerController::class)
             ->only(['index', 'show']);
 
-        Route::get('reports/sales', [SalesReportController::class, 'index'])
-            ->name('reports.sales');
-
+        // handling customer orders
         Route::resource('orders', AdministrationOrderController::class)
             ->only(['index', 'show']);
         Route::patch('orders/{order}/status', [OrderStatusController::class, 'update'])
@@ -113,6 +125,11 @@ Route::middleware(['auth', 'can:access-administration'])
             ->name('orders.payment-status.update');
         Route::get('orders/{order}/payment-proof', OrderPaymentProofController::class)
             ->name('orders.payment-proof.show');
+
+        // sales report
+        Route::get('reports/sales', [SalesReportController::class, 'index'])
+            ->name('reports.sales');
     });
 
+// profile settings
 require __DIR__.'/settings.php';
