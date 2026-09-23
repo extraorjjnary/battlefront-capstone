@@ -31,6 +31,18 @@ class ChatbotOrchestrationService
 
     private const PROVIDER_UNAVAILABLE = 'The chatbot is temporarily unavailable. Please try again later.';
 
+    private const SENSITIVE_INPUT = 'Please remove sensitive information from your question and try again.';
+
+    /** @var list<string> */
+    private const SENSITIVE_INPUT_PATTERNS = [
+        '/\b(?:password|passcode|api[\s_-]*(?:key|secret|token)|access[\s_-]*token|internal[\s_-]*note)\s*(?::|=|\bis\b)\s*\S+/iu',
+        '/\bbearer\s+[a-z0-9._~+\/=\-]+/iu',
+        '/\bpayment-proofs[\/\\\\]\S+/iu',
+        '/\bpayment[\s_-]*proof(?:[\s_-]*path)?\s*[:=]\s*\S+/iu',
+        '/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/iu',
+        '/(?<!\d)(?:\+63[\s-]?|0)9(?:[\s-]?\d){9}(?!\d)/u',
+    ];
+
     public function __construct(
         private CategorizeChatbotQuery $categorizeChatbotQuery,
         private ResolveProductContext $resolveProductContext,
@@ -60,6 +72,10 @@ class ChatbotOrchestrationService
 
         if ($category === ChatbotQueryCategory::Order && $customer === null) {
             return $this->fallback($category, self::UNAUTHENTICATED_ORDER);
+        }
+
+        if ($this->containsSensitiveInput($normalizedMessage)) {
+            return $this->fallback($category, self::SENSITIVE_INPUT);
         }
 
         $context = $this->resolveContext($category, $normalizedMessage, $customer);
@@ -133,6 +149,17 @@ class ChatbotOrchestrationService
             ChatbotQueryCategory::Faq => self::FAQ_INFORMATION_UNAVAILABLE,
             ChatbotQueryCategory::Unsupported => self::UNSUPPORTED_INQUIRY,
         };
+    }
+
+    private function containsSensitiveInput(string $message): bool
+    {
+        foreach (self::SENSITIVE_INPUT_PATTERNS as $pattern) {
+            if (preg_match($pattern, $message) === 1) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

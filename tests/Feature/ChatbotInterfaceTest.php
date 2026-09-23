@@ -1,6 +1,9 @@
 <?php
 
+use App\Actions\Chatbot\Context\ResolveFaqContext;
 use App\Actions\Chatbot\Context\ResolveOrderContext;
+use App\Actions\Chatbot\Context\ResolveProductContext;
+use App\Actions\Chatbot\Context\ResolveStoreContext;
 use App\Ai\Agents\ChatbotResponseAgent;
 use App\Enums\ChatbotCategory;
 use App\Models\Branch;
@@ -166,6 +169,7 @@ test('guest order inquiries require sign-in without resolving an order or callin
 })->with([
     'status' => ['Track my order %s.'],
     'payment' => ['Payment for %s?'],
+    'sensitive input' => ['Track my order %s. password: private-value'],
 ]);
 
 test('guests receive the existing validation error for blank questions', function () {
@@ -179,6 +183,35 @@ test('guests receive the existing validation error for blank questions', functio
     ChatbotResponseAgent::assertNeverPrompted();
     Http::assertNothingSent();
 });
+
+test('sensitive customer input returns a safe fallback before context or Gemini is called', function (string $message) {
+    Http::preventStrayRequests();
+    ChatbotResponseAgent::fake()->preventStrayPrompts();
+    mock(ResolveProductContext::class)->shouldNotReceive('execute');
+    mock(ResolveOrderContext::class)->shouldNotReceive('execute');
+    mock(ResolveStoreContext::class)->shouldNotReceive('execute');
+    mock(ResolveFaqContext::class)->shouldNotReceive('execute');
+
+    $this->postJson(route('chatbot.store'), ['message' => $message])
+        ->assertOk()
+        ->assertExactJson([
+            'message' => 'Please remove sensitive information from your question and try again.',
+            'source' => 'fallback',
+        ]);
+
+    ChatbotResponseAgent::assertNeverPrompted();
+    Http::assertNothingSent();
+})->with([
+    'labeled password' => ['Where is the Sagay store? password: private-value'],
+    'labeled API key' => ['Where is the Sagay store? api_key=private-value'],
+    'labeled API secret' => ['Where is the Sagay store? api-secret: private-value'],
+    'bearer token' => ['Where is the Sagay store? Bearer private-token'],
+    'payment proof path' => ['Where is the Sagay store? payment-proofs/private-proof.jpg'],
+    'email address' => ['Where is the Sagay store? person@example.com'],
+    'phone number' => ['Where is the Sagay store? 09171234567'],
+    'international phone number' => ['Where is the Sagay store? +63 917 123 4567'],
+    'internal note' => ['Where is the Sagay store? internal note: private detail'],
+]);
 
 test('customers can ask about their own order', function () {
     Http::preventStrayRequests();
@@ -318,3 +351,31 @@ test('customer requests are limited per account rather than per shared IP', func
     ChatbotResponseAgent::assertPromptedTimes(11);
     Http::assertNothingSent();
 });
+
+test('429 throttled requests never resolve context or prompt Gemini', function (bool $authenticated, int $requestLimit) {
+    Http::preventStrayRequests();
+    ChatbotResponseAgent::fake()->preventStrayPrompts();
+
+    if ($authenticated) {
+        $this->actingAs(User::factory()->customer()->create());
+    }
+
+    for ($attempt = 0; $attempt < $requestLimit; $attempt++) {
+        $this->postJson(route('chatbot.store'), ['message' => 'Tell me a joke.'])
+            ->assertOk();
+    }
+
+    mock(ResolveStoreContext::class)->shouldNotReceive('execute');
+
+    $this->postJson(route('chatbot.store'), ['message' => 'Where is the Sagay store?'])
+        ->assertTooManyRequests()
+        ->assertExactJson([
+            'message' => 'Too many questions. Please wait a minute and try again.',
+        ]);
+
+    ChatbotResponseAgent::assertNeverPrompted();
+    Http::assertNothingSent();
+})->with([
+    'guest IP limit' => [false, 5],
+    'customer account limit' => [true, 10],
+]);

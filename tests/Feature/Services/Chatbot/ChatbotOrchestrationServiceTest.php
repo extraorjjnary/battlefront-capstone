@@ -12,8 +12,12 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
 use App\Models\Branch;
+use App\Models\Category;
 use App\Models\ChatbotKnowledge;
+use App\Models\Inventory;
 use App\Models\Order;
+use App\Models\Product;
+use App\Models\Tag;
 use App\Models\User;
 use App\Services\Chatbot\ChatbotAiAdapter;
 use App\Services\Chatbot\ChatbotOrchestrationService;
@@ -84,6 +88,10 @@ test('returns predefined fallbacks without Gemini for empty and unsupported inqu
 ) {
     Http::preventStrayRequests();
     ChatbotResponseAgent::fake()->preventStrayPrompts();
+    mock(ResolveProductContext::class)->shouldNotReceive('execute');
+    mock(ResolveOrderContext::class)->shouldNotReceive('execute');
+    mock(ResolveStoreContext::class)->shouldNotReceive('execute');
+    mock(ResolveFaqContext::class)->shouldNotReceive('execute');
 
     $result = app(ChatbotOrchestrationService::class)->respond($message);
 
@@ -108,6 +116,121 @@ test('returns predefined fallbacks without Gemini for empty and unsupported inqu
         'I can only help with Battlefront products, your orders, store information, payment methods, pickup, and delivery.',
     ],
 ]);
+
+test('sends only matched catalog and Sagay inventory facts for a product inquiry', function () {
+    Http::preventStrayRequests();
+    ChatbotResponseAgent::fake(['The Aurelius Link Station is in stock.'])->preventStrayPrompts();
+    $category = Category::factory()->create(['name' => 'Networking']);
+    $product = Product::factory()->for($category)->create([
+        'name' => 'Aurelius Link Station',
+        'description' => 'Outdoor networking unit',
+        'brand' => 'Helios Labs',
+        'price' => '12999.00',
+        'discount_price' => null,
+        'image_path' => 'images/private-catalog-path.jpg',
+    ]);
+    $tag = Tag::factory()->create(['name' => 'Field Ready']);
+    $product->tags()->attach($tag);
+    Inventory::factory()->for($product)->create(['quantity' => 7]);
+    Product::factory()->create([
+        'name' => 'Unrelated Device',
+        'description' => 'Unrelated private product detail.',
+    ]);
+
+    app(ChatbotOrchestrationService::class)->respond('Is the Aurelius Link Station available?');
+
+    $expectedContext = [
+        'products' => [[
+            'name' => 'Aurelius Link Station',
+            'description' => 'Outdoor networking unit',
+            'brand' => 'Helios Labs',
+            'category' => 'Networking',
+            'tags' => ['Field Ready'],
+            'price' => '12999.00',
+            'discount_price' => null,
+            'is_demo' => false,
+            'inventory' => ['quantity' => 7, 'status' => 'in_stock'],
+        ]],
+    ];
+    ChatbotResponseAgent::assertPrompted(function (AgentPrompt $prompt) use ($expectedContext): bool {
+        return str_contains($prompt->prompt, json_encode($expectedContext, JSON_THROW_ON_ERROR))
+            && ! str_contains($prompt->prompt, 'images/private-catalog-path.jpg')
+            && ! str_contains($prompt->prompt, 'Unrelated private product detail.');
+    });
+    Http::assertNothingSent();
+});
+
+test('sends only approved reference facts for the requested store', function () {
+    Http::preventStrayRequests();
+    ChatbotResponseAgent::fake(['The Sagay store is open during the listed hours.'])->preventStrayPrompts();
+    config()->set('battlefront.operating_hours', '08:00-18:00');
+    config()->set('battlefront.branch_emails', ['Sagay City' => 'approved-store@example.test']);
+    Branch::factory()->create([
+        'city' => 'Sagay City',
+        'address' => 'Approved Sagay address',
+        'contact_number' => '0938 647 6046',
+        'latitude' => '10.123456',
+    ]);
+    Branch::factory()->create([
+        'city' => 'Other City',
+        'address' => 'Unrelated private branch detail.',
+    ]);
+
+    app(ChatbotOrchestrationService::class)->respond('Where is the Sagay store?');
+
+    $expectedContext = [
+        'branches' => [[
+            'name' => 'Battlefront Computer Trading',
+            'city' => 'Sagay City',
+            'address' => 'Approved Sagay address',
+            'contact_number' => '0938 647 6046',
+            'email' => 'approved-store@example.test',
+            'operating_hours' => '08:00-18:00',
+            'is_operational' => true,
+        ]],
+    ];
+    ChatbotResponseAgent::assertPrompted(function (AgentPrompt $prompt) use ($expectedContext): bool {
+        return str_contains($prompt->prompt, json_encode($expectedContext, JSON_THROW_ON_ERROR))
+            && ! str_contains($prompt->prompt, '10.123456')
+            && ! str_contains($prompt->prompt, 'Unrelated private branch detail.');
+    });
+    Http::assertNothingSent();
+});
+
+test('sends only matching active managed knowledge for an FAQ inquiry', function () {
+    Http::preventStrayRequests();
+    ChatbotResponseAgent::fake(['Approved payment guidance.'])->preventStrayPrompts();
+    ChatbotKnowledge::factory()->create([
+        'category' => ChatbotCategory::Faq,
+        'question_pattern' => 'What payment methods are accepted?',
+        'response_template' => 'Approved payment guidance.',
+    ]);
+    ChatbotKnowledge::factory()->inactive()->create([
+        'category' => ChatbotCategory::Faq,
+        'question_pattern' => 'What payment methods are accepted?',
+        'response_template' => 'Inactive private guidance.',
+    ]);
+    ChatbotKnowledge::factory()->create([
+        'category' => ChatbotCategory::Product,
+        'question_pattern' => 'What payment methods are accepted?',
+        'response_template' => 'Wrong-topic private guidance.',
+    ]);
+
+    app(ChatbotOrchestrationService::class)->respond('What payment methods are accepted?');
+
+    $expectedContext = [
+        'knowledge' => [[
+            'question_pattern' => 'What payment methods are accepted?',
+            'response_template' => 'Approved payment guidance.',
+        ]],
+    ];
+    ChatbotResponseAgent::assertPrompted(function (AgentPrompt $prompt) use ($expectedContext): bool {
+        return str_contains($prompt->prompt, json_encode($expectedContext, JSON_THROW_ON_ERROR))
+            && ! str_contains($prompt->prompt, 'Inactive private guidance.')
+            && ! str_contains($prompt->prompt, 'Wrong-topic private guidance.');
+    });
+    Http::assertNothingSent();
+});
 
 test('returns category-specific missing-context fallbacks without Gemini', function (
     string $message,
@@ -166,13 +289,19 @@ test('passes only minimized owned order context to Gemini', function () {
     ChatbotResponseAgent::fake([
         'Your order is being prepared for delivery.',
     ])->preventStrayPrompts();
-    $customer = User::factory()->customer()->create();
+    $customer = User::factory()->customer()->create([
+        'email' => 'private-customer@example.test',
+    ]);
     $order = Order::factory()->delivery()->paidWithGCash()->for($customer)->create([
         'status' => OrderStatus::Processing,
         'payment_rejection_reason' => PaymentRejectionReason::Other,
         'payment_rejection_note' => 'Private administrator feedback.',
         'payment_proof_path' => 'payment-proofs/private-proof.jpg',
         'created_at' => '2026-09-20 10:00:00',
+    ]);
+    $otherCustomer = User::factory()->customer()->create();
+    Order::factory()->for($otherCustomer)->create([
+        'recipient_name' => 'Unrelated private recipient',
     ]);
 
     $result = app(ChatbotOrchestrationService::class)->respond(
@@ -185,9 +314,18 @@ test('passes only minimized owned order context to Gemini', function () {
         'message' => 'Your order is being prepared for delivery.',
         'source' => 'gemini',
     ]);
-    ChatbotResponseAgent::assertPrompted(function (AgentPrompt $prompt) use ($order): bool {
-        return str_contains($prompt->prompt, $order->reference)
-            && str_contains($prompt->prompt, '"value":"processing"')
+    $expectedContext = [
+        'orders' => [[
+            'reference' => $order->reference,
+            'created_at' => '2026-09-20T10:00:00+00:00',
+            'status' => ['value' => 'processing', 'label' => 'Preparing for delivery'],
+            'fulfillment' => ['value' => 'delivery', 'label' => 'Delivery'],
+        ]],
+    ];
+    ChatbotResponseAgent::assertPrompted(function (AgentPrompt $prompt) use ($expectedContext): bool {
+        return str_contains($prompt->prompt, json_encode($expectedContext, JSON_THROW_ON_ERROR))
+            && ! str_contains($prompt->prompt, 'private-customer@example.test')
+            && ! str_contains($prompt->prompt, 'Unrelated private recipient')
             && ! str_contains($prompt->prompt, 'Private administrator feedback.')
             && ! str_contains($prompt->prompt, 'payment-proofs/private-proof.jpg')
             && ! str_contains($prompt->prompt, 'recipient_name')
