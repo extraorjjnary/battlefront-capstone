@@ -43,7 +43,7 @@ test('returns generated wording from minimized authoritative context', function 
         );
 
         return $prompt->provider()->name() === 'gemini'
-            && $prompt->model === 'gemini-2.5-flash'
+            && $prompt->model === 'gemini-3.5-flash-lite'
             && $prompt->timeout === 20
             && str_contains($prompt->prompt, '"Is the Aurelius Link Station available?"')
             && str_contains($prompt->prompt, $encodedContext)

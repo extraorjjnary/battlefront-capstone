@@ -186,6 +186,10 @@ class CategorizeChatbotQuery
             return ChatbotQueryCategory::Unsupported;
         }
 
+        if (preg_match('/\bbf\s*\d+\b/u', $normalizedMessage) === 1) {
+            return ChatbotQueryCategory::Order;
+        }
+
         /** @var list<array{category: ChatbotQueryCategory, phrases: list<string>}> $rules */
         $rules = [
             ['category' => ChatbotQueryCategory::Order, 'phrases' => self::ORDER_PHRASES],

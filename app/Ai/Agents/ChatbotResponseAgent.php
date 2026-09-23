@@ -11,7 +11,7 @@ use Laravel\Ai\Promptable;
 use Stringable;
 
 #[Provider(Lab::Gemini)]
-#[Model('gemini-2.5-flash')]
+#[Model('gemini-3.5-flash-lite')]
 #[Timeout(20)]
 class ChatbotResponseAgent implements Agent
 {

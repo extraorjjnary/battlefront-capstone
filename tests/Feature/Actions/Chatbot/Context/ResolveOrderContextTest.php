@@ -5,6 +5,7 @@ use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentRejectionReason;
+use App\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\User;
 
@@ -43,6 +44,65 @@ test('cannot retrieve another customers order by reference', function () {
     $context = (new ResolveOrderContext)->execute($customer, "Track {$foreignOrder->reference}");
 
     expect($context)->toBe(['orders' => []]);
+});
+
+test('normalizes shorthand and padded references to the owned canonical order reference', function (string $messageFormat) {
+    $customer = User::factory()->customer()->create();
+    $order = Order::factory()->for($customer)->create();
+
+    $context = (new ResolveOrderContext)->execute($customer, sprintf($messageFormat, $order->id));
+
+    expect($context['orders'])->toHaveCount(1)
+        ->and($context['orders'][0]['reference'])->toBe($order->reference);
+})->with([
+    'short reference' => ['BF-%d'],
+    'padded reference' => ['BF-%06d'],
+    'embedded short reference' => ['my BF-%d order'],
+    'punctuated reference' => ['status of BF/%d'],
+]);
+
+test('includes current payment method and status only for a specific owned payment inquiry', function () {
+    $customer = User::factory()->customer()->create();
+    $order = Order::factory()->delivery()->paidWithGCash()->for($customer)->create([
+        'payment_status' => PaymentStatus::Verified,
+        'payment_proof_path' => 'payment-proofs/private-proof.jpg',
+        'payment_rejection_note' => 'Private administrator note.',
+        'created_at' => '2026-09-20 10:00:00',
+    ]);
+
+    $context = (new ResolveOrderContext)->execute($customer, "Payment for BF-{$order->id}?");
+
+    expect($context)->toBe([
+        'orders' => [[
+            'reference' => $order->reference,
+            'created_at' => '2026-09-20T10:00:00+00:00',
+            'status' => [
+                'value' => 'pending',
+                'label' => 'Pending',
+            ],
+            'fulfillment' => [
+                'value' => 'delivery',
+                'label' => 'Delivery',
+            ],
+            'payment' => [
+                'method' => ['value' => 'gcash', 'label' => 'GCash'],
+                'status' => ['value' => 'verified', 'label' => 'Verified'],
+            ],
+        ]],
+    ]);
+});
+
+test('does not disclose payment context for a foreign reference or a guest', function () {
+    $customer = User::factory()->customer()->create();
+    $otherCustomer = User::factory()->customer()->create();
+    $foreignOrder = Order::factory()->paidWithMaya()->for($otherCustomer)->create();
+    $resolver = new ResolveOrderContext;
+
+    $foreignContext = $resolver->execute($customer, "Payment for BF-{$foreignOrder->id}?");
+    $guestContext = $resolver->execute(null, "Payment for BF-{$foreignOrder->id}?");
+
+    expect($foreignContext)->toBe(['orders' => []])
+        ->and($guestContext)->toBe(['orders' => []]);
 });
 
 test('returns no protected order data for guests and administrators', function () {

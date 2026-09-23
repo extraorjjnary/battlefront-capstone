@@ -156,7 +156,7 @@ onBeforeUnmount(() => {
             </p>
         </div>
 
-        <figure class="border-border bg-card overflow-hidden border shadow-sm">
+        <figure class="border-border bg-card isolate overflow-hidden border shadow-sm">
             <div class="relative min-h-96">
                 <div
                     ref="mapContainer"

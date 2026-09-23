@@ -16,6 +16,7 @@ use App\Http\Controllers\Administration\SalesReportController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CartItemController;
+use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\OrderController;
@@ -74,6 +75,11 @@ Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {
     Route::get('orders/{order}', [OrderController::class, 'show'])
         ->whereNumber('order')
         ->name('orders.show');
+});
+
+// customer chatbot
+Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {
+    Route::post('chatbot', [ChatbotController::class, 'store'])->name('chatbot.store');
 });
 
 // administration authority

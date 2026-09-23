@@ -21,6 +21,7 @@ class ResolveProductContext
         'availability',
         'can',
         'cost',
+        'currently',
         'do',
         'does',
         'for',
@@ -37,6 +38,7 @@ class ResolveProductContext
         'me',
         'much',
         'my',
+        'named',
         'need',
         'of',
         'on',
@@ -47,6 +49,7 @@ class ResolveProductContext
         'product',
         'products',
         'sell',
+        'selling',
         'show',
         'something',
         'stock',
@@ -73,6 +76,8 @@ class ResolveProductContext
      *     tags: list<string>,
      *     price: string,
      *     discount_price: string|null,
+     *     is_demo: bool,
+     *     demo_notice?: string,
      *     inventory: array{quantity: int|null, status: 'unavailable'|'out_of_stock'|'in_stock'}
      * }>}
      */
@@ -124,14 +129,18 @@ class ResolveProductContext
      *     tags: list<string>,
      *     price: string,
      *     discount_price: string|null,
+     *     is_demo: bool,
+     *     demo_notice?: string,
      *     inventory: array{quantity: int|null, status: 'unavailable'|'out_of_stock'|'in_stock'}
      * }
      */
     private function mapProduct(Product $product): array
     {
-        $quantity = $product->inventory?->quantity;
+        $isDemo = Str::startsWith($product->name, '[DEMO]')
+            || Str::startsWith((string) $product->image_path, 'images/demo-products/');
+        $quantity = $isDemo ? null : $product->inventory?->quantity;
 
-        return [
+        $context = [
             'name' => $product->name,
             'description' => $product->description,
             'brand' => $product->brand,
@@ -142,6 +151,7 @@ class ResolveProductContext
                 ->all()),
             'price' => $product->price,
             'discount_price' => $product->discount_price,
+            'is_demo' => $isDemo,
             'inventory' => [
                 'quantity' => $quantity,
                 'status' => match (true) {
@@ -151,5 +161,11 @@ class ResolveProductContext
                 },
             ],
         ];
+
+        if ($isDemo) {
+            $context['demo_notice'] = 'Demo item only; listed prices are samples and Battlefront stock is unconfirmed.';
+        }
+
+        return $context;
     }
 }

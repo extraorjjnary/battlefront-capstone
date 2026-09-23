@@ -10,12 +10,14 @@ use App\Enums\ChatbotCategory;
 use App\Enums\ChatbotQueryCategory;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentRejectionReason;
+use App\Enums\PaymentStatus;
 use App\Models\Branch;
 use App\Models\ChatbotKnowledge;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\Chatbot\ChatbotAiAdapter;
 use App\Services\Chatbot\ChatbotOrchestrationService;
+use Database\Seeders\DevelopmentCatalogSeeder;
 use Illuminate\Support\Facades\Http;
 use Laravel\Ai\Exceptions\AiException;
 use Laravel\Ai\Exceptions\ProviderConnectionException;
@@ -191,6 +193,65 @@ test('passes only minimized owned order context to Gemini', function () {
             && ! str_contains($prompt->prompt, 'recipient_name')
             && ! str_contains($prompt->prompt, 'contact_number')
             && ! str_contains($prompt->prompt, 'total_amount');
+    });
+    Http::assertNothingSent();
+});
+
+test('uses owned order payment context for a shorthand reference instead of generic FAQ knowledge', function () {
+    Http::preventStrayRequests();
+    ChatbotResponseAgent::fake([
+        'Your delivery order uses GCash and its payment is verified.',
+    ])->preventStrayPrompts();
+    $customer = User::factory()->customer()->create();
+    $order = Order::factory()->delivery()->paidWithGCash()->for($customer)->create([
+        'payment_status' => PaymentStatus::Verified,
+        'payment_proof_path' => 'payment-proofs/private-proof.jpg',
+        'payment_rejection_note' => 'Private administrator note.',
+    ]);
+
+    $result = app(ChatbotOrchestrationService::class)->respond(
+        "Payment for BF-{$order->id}?",
+        $customer,
+    );
+
+    expect($result)->toBe([
+        'category' => ChatbotQueryCategory::Order,
+        'message' => 'Your delivery order uses GCash and its payment is verified.',
+        'source' => 'gemini',
+    ]);
+    ChatbotResponseAgent::assertPrompted(function (AgentPrompt $prompt) use ($order): bool {
+        return str_contains($prompt->prompt, $order->reference)
+            && str_contains($prompt->prompt, '"fulfillment":{"value":"delivery","label":"Delivery"}')
+            && str_contains($prompt->prompt, '"method":{"value":"gcash","label":"GCash"}')
+            && str_contains($prompt->prompt, '"status":{"value":"verified","label":"Verified"}')
+            && ! str_contains($prompt->prompt, 'payment-proofs/private-proof.jpg')
+            && ! str_contains($prompt->prompt, 'Private administrator note.');
+    });
+    Http::assertNothingSent();
+});
+
+test('passes matched demo products to Gemini as unconfirmed samples instead of missing products', function () {
+    Http::preventStrayRequests();
+    ChatbotResponseAgent::fake([
+        'This is a demo listing; Battlefront stock is unconfirmed.',
+    ])->preventStrayPrompts();
+    $this->seed(DevelopmentCatalogSeeder::class);
+
+    $result = app(ChatbotOrchestrationService::class)->respond(
+        'Do you have Samsung product available currently?',
+    );
+
+    expect($result)->toBe([
+        'category' => ChatbotQueryCategory::Product,
+        'message' => 'This is a demo listing; Battlefront stock is unconfirmed.',
+        'source' => 'gemini',
+    ]);
+    ChatbotResponseAgent::assertPrompted(function (AgentPrompt $prompt): bool {
+        return str_contains($prompt->prompt, '[DEMO] Samsung Sprint NVMe SSD')
+            && str_contains($prompt->prompt, '"is_demo":true')
+            && str_contains($prompt->prompt, 'Battlefront stock is unconfirmed.')
+            && str_contains($prompt->prompt, '"quantity":null')
+            && ! str_contains($prompt->prompt, '"quantity":15');
     });
     Http::assertNothingSent();
 });

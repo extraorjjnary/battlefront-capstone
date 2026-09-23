@@ -48,41 +48,115 @@ class ProductCatalogRepository
      */
     public function contextMatches(array $terms, int $limit = 5): EloquentCollection
     {
+        $matches = new EloquentCollection;
+
+        if ($terms === [] || $limit < 1) {
+            return $matches;
+        }
+
+        $phrase = implode(' ', $terms);
+        $tiers = [
+            fn (Builder $query): Builder => $this->whereContextPhrase($query, $phrase, exact: true),
+            fn (Builder $query): Builder => $this->whereContextPhrase($query, $phrase),
+        ];
+
+        if (count($terms) > 1) {
+            $tiers[] = fn (Builder $query): Builder => $this->whereContextTerms($query, $terms);
+        }
+
+        $tiers[] = fn (Builder $query): Builder => $this->whereContextTerms($query, $terms, includeDescription: true);
+
+        foreach ($tiers as $tier) {
+            if ($matches->count() >= $limit) {
+                break;
+            }
+
+            $query = $this->contextQuery()
+                ->where(fn (Builder $query): Builder => $tier($query))
+                ->orderBy('name')
+                ->orderBy('id')
+                ->limit($limit - $matches->count());
+
+            if ($matches->isNotEmpty()) {
+                $query->whereNotIn('products.id', $matches->modelKeys());
+            }
+
+            foreach ($query->get() as $product) {
+                $matches->push($product);
+            }
+        }
+
+        return $matches;
+    }
+
+    /**
+     * @return Builder<Product>
+     */
+    private function contextQuery(): Builder
+    {
         return Product::query()
             ->customerEligible()
             ->select([
                 'id', 'name', 'description', 'category_id', 'brand',
-                'price', 'discount_price',
+                'price', 'discount_price', 'image_path',
             ])
             ->with([
                 'category:id,name',
                 'inventory:id,product_id,quantity',
                 'tags:id,name',
-            ])
-            ->where(function (Builder $query) use ($terms): void {
-                foreach ($terms as $term) {
-                    $query->where(function (Builder $attributeQuery) use ($term): void {
-                        $attributeQuery
-                            ->whereLike('name', "%{$term}%")
-                            ->orWhereLike('brand', "%{$term}%")
-                            ->orWhereLike('description', "%{$term}%")
-                            ->orWhereHas(
-                                'category',
-                                fn (Builder $categoryQuery): Builder => $categoryQuery
-                                    ->whereLike('name', "%{$term}%"),
-                            )
-                            ->orWhereHas(
-                                'tags',
-                                fn (Builder $tagQuery): Builder => $tagQuery
-                                    ->whereLike('name', "%{$term}%"),
-                            );
-                    });
+            ]);
+    }
+
+    /**
+     * @param  Builder<Product>  $query
+     * @return Builder<Product>
+     */
+    private function whereContextPhrase(Builder $query, string $phrase, bool $exact = false): Builder
+    {
+        $pattern = $exact ? $phrase : "%{$phrase}%";
+
+        $query
+            ->whereLike('name', $pattern)
+            ->orWhereLike('brand', $pattern)
+            ->orWhereHas(
+                'category',
+                fn (Builder $categoryQuery): Builder => $categoryQuery->whereLike('name', $pattern),
+            )
+            ->orWhereHas(
+                'tags',
+                fn (Builder $tagQuery): Builder => $tagQuery->whereLike('name', $pattern),
+            );
+
+        if ($exact) {
+            $query
+                ->orWhereLike('name', "[DEMO] {$phrase}")
+                ->orWhereHas(
+                    'category',
+                    fn (Builder $categoryQuery): Builder => $categoryQuery->whereLike('name', "[DEMO] {$phrase}"),
+                );
+        }
+
+        return $query;
+    }
+
+    /**
+     * @param  Builder<Product>  $query
+     * @param  list<string>  $terms
+     * @return Builder<Product>
+     */
+    private function whereContextTerms(Builder $query, array $terms, bool $includeDescription = false): Builder
+    {
+        foreach ($terms as $term) {
+            $query->where(function (Builder $attributeQuery) use ($term, $includeDescription): void {
+                $this->whereContextPhrase($attributeQuery, $term);
+
+                if ($includeDescription) {
+                    $attributeQuery->orWhereLike('description', "%{$term}%");
                 }
-            })
-            ->orderBy('name')
-            ->orderBy('id')
-            ->limit($limit)
-            ->get();
+            });
+        }
+
+        return $query;
     }
 
     /**
