@@ -2,6 +2,7 @@
 import { Link, usePage } from "@inertiajs/vue3";
 import { computed } from "vue";
 import AppLogo from "@/components/AppLogo.vue";
+import CustomerChatAssistant from "@/components/chatbot/CustomerChatAssistant.vue";
 import { Button } from "@/components/ui/button";
 import { dashboard, home, login, register } from "@/routes";
 import { index as branchIndex } from "@/routes/branches";
@@ -77,5 +78,6 @@ const storefrontLinks = [
                 </template>
             </nav>
         </div>
+        <CustomerChatAssistant />
     </header>
 </template>

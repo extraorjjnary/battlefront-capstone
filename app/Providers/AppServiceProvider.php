@@ -5,10 +5,14 @@ namespace App\Providers;
 use App\Enums\UserRole;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -31,13 +35,28 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::define(
             'access-administration',
-            fn(User $user): bool => $user->isAdministrator(),
+            fn (User $user): bool => $user->isAdministrator(),
         );
 
         Gate::define(
             'use-customer-cart',
-            fn(User $user): bool => $user->role === UserRole::Customer,
+            fn (User $user): bool => $user->role === UserRole::Customer,
         );
+
+        Gate::define(
+            'use-chatbot',
+            fn (?User $user): bool => $user === null || $user->role === UserRole::Customer,
+        );
+
+        RateLimiter::for('chatbot', function (Request $request): Limit {
+            $customer = $request->user();
+
+            return Limit::perMinute($customer === null ? 5 : 10)
+                ->by($customer === null ? 'guest:'.$request->ip() : 'customer:'.$customer->getKey())
+                ->response(fn (Request $request, array $headers): JsonResponse => response()->json([
+                    'message' => 'Too many questions. Please wait a minute and try again.',
+                ], 429, $headers));
+        });
     }
 
     /**
@@ -54,13 +73,13 @@ class AppServiceProvider extends ServiceProvider
         );
 
         Password::defaults(
-            fn(): ?Password => app()->isProduction()
+            fn (): ?Password => app()->isProduction()
                 ? Password::min(12)
-                ->mixedCase()
-                ->letters()
-                ->numbers()
-                ->symbols()
-                ->uncompromised()
+                    ->mixedCase()
+                    ->letters()
+                    ->numbers()
+                    ->symbols()
+                    ->uncompromised()
                 : null,
         );
     }

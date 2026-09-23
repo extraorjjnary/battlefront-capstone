@@ -15,7 +15,7 @@ class ChatbotController extends Controller
             'message' => ['required', 'string', 'max:1000'],
         ]);
 
-        /** @var User $customer */
+        /** @var User|null $customer */
         $customer = $request->user();
         $result = $chatbot->respond($validated['message'], $customer);
 

@@ -1,12 +1,20 @@
 <?php
 
+use App\Actions\Chatbot\Context\ResolveOrderContext;
 use App\Ai\Agents\ChatbotResponseAgent;
+use App\Enums\ChatbotCategory;
 use App\Models\Branch;
+use App\Models\Category;
+use App\Models\ChatbotKnowledge;
+use App\Models\Inventory;
 use App\Models\Order;
+use App\Models\Product;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Ai\Exceptions\AiException;
+
+use function Pest\Laravel\mock;
 
 test('customers can access the floating assistant on their dashboard', function () {
     $customer = User::factory()->customer()->create();
@@ -80,9 +88,114 @@ test('the chatbot rejects invalid messages without calling Gemini', function (ar
     'too long' => [['message' => str_repeat('a', 1001)]],
 ]);
 
-test('guests are redirected from chatbot submission', function () {
-    $this->post(route('chatbot.store'), ['message' => 'Where is the store?'])
-        ->assertRedirectToRoute('login');
+test('guests can ask about catalog products', function () {
+    Http::preventStrayRequests();
+    ChatbotResponseAgent::fake(['The Aurelius Link Station is available.'])->preventStrayPrompts();
+    $category = Category::factory()->create(['name' => 'Networking']);
+    $product = Product::factory()->for($category)->create([
+        'name' => 'Aurelius Link Station',
+        'brand' => 'Helios Labs',
+    ]);
+    Inventory::factory()->for($product)->create(['quantity' => 7]);
+
+    $this->postJson(route('chatbot.store'), ['message' => 'Is the Aurelius Link Station available?'])
+        ->assertOk()
+        ->assertExactJson([
+            'message' => 'The Aurelius Link Station is available.',
+            'source' => 'gemini',
+        ]);
+
+    ChatbotResponseAgent::assertPromptedTimes(1);
+    Http::assertNothingSent();
+});
+
+test('guests can ask about store information', function () {
+    Http::preventStrayRequests();
+    ChatbotResponseAgent::fake(['The Sagay store is at the confirmed address.'])->preventStrayPrompts();
+    Branch::factory()->create([
+        'city' => 'Sagay City',
+        'address' => 'Confirmed Sagay address',
+    ]);
+
+    $this->postJson(route('chatbot.store'), ['message' => 'Where is the Sagay store?'])
+        ->assertOk()
+        ->assertExactJson([
+            'message' => 'The Sagay store is at the confirmed address.',
+            'source' => 'gemini',
+        ]);
+
+    ChatbotResponseAgent::assertPromptedTimes(1);
+    Http::assertNothingSent();
+});
+
+test('guests can ask approved FAQ questions', function () {
+    Http::preventStrayRequests();
+    ChatbotResponseAgent::fake(['These are the approved payment methods.'])->preventStrayPrompts();
+    ChatbotKnowledge::factory()->create([
+        'category' => ChatbotCategory::Faq,
+        'question_pattern' => 'What payment methods are accepted?',
+        'response_template' => 'Approved payment guidance.',
+    ]);
+
+    $this->postJson(route('chatbot.store'), ['message' => 'What payment methods are accepted?'])
+        ->assertOk()
+        ->assertExactJson([
+            'message' => 'These are the approved payment methods.',
+            'source' => 'gemini',
+        ]);
+
+    ChatbotResponseAgent::assertPromptedTimes(1);
+    Http::assertNothingSent();
+});
+
+test('guest order inquiries require sign-in without resolving an order or calling Gemini', function (string $messageFormat) {
+    Http::preventStrayRequests();
+    ChatbotResponseAgent::fake()->preventStrayPrompts();
+    $order = Order::factory()->create();
+    mock(ResolveOrderContext::class)->shouldNotReceive('execute');
+
+    $this->postJson(route('chatbot.store'), ['message' => sprintf($messageFormat, $order->reference)])
+        ->assertOk()
+        ->assertExactJson([
+            'message' => 'Please sign in with a customer account to check order status.',
+            'source' => 'fallback',
+        ]);
+
+    ChatbotResponseAgent::assertNeverPrompted();
+    Http::assertNothingSent();
+})->with([
+    'status' => ['Track my order %s.'],
+    'payment' => ['Payment for %s?'],
+]);
+
+test('guests receive the existing validation error for blank questions', function () {
+    Http::preventStrayRequests();
+    ChatbotResponseAgent::fake()->preventStrayPrompts();
+
+    $this->postJson(route('chatbot.store'), ['message' => '   '])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('message');
+
+    ChatbotResponseAgent::assertNeverPrompted();
+    Http::assertNothingSent();
+});
+
+test('customers can ask about their own order', function () {
+    Http::preventStrayRequests();
+    ChatbotResponseAgent::fake(['Your order is pending.'])->preventStrayPrompts();
+    $customer = User::factory()->customer()->create();
+    $order = Order::factory()->for($customer)->create();
+
+    $this->actingAs($customer)
+        ->postJson(route('chatbot.store'), ['message' => "Track my order {$order->reference}."])
+        ->assertOk()
+        ->assertExactJson([
+            'message' => 'Your order is pending.',
+            'source' => 'gemini',
+        ]);
+
+    ChatbotResponseAgent::assertPromptedTimes(1);
+    Http::assertNothingSent();
 });
 
 test('administrators are forbidden from chatbot submission', function () {
@@ -148,5 +261,60 @@ test('another customers order never reaches Gemini through the chatbot endpoint'
         ]);
 
     ChatbotResponseAgent::assertNeverPrompted();
+    Http::assertNothingSent();
+});
+
+test('guest requests are rate limited before Gemini is called again', function () {
+    Http::preventStrayRequests();
+    ChatbotResponseAgent::fake(array_fill(0, 6, 'The Sagay store is open.'))->preventStrayPrompts();
+    Branch::factory()->create(['city' => 'Sagay City']);
+
+    for ($attempt = 0; $attempt < 5; $attempt++) {
+        $this->postJson(route('chatbot.store'), ['message' => 'What are the Sagay store hours?'])
+            ->assertOk();
+    }
+
+    $this->postJson(route('chatbot.store'), ['message' => 'What are the Sagay store hours?'])
+        ->assertTooManyRequests()
+        ->assertExactJson([
+            'message' => 'Too many questions. Please wait a minute and try again.',
+        ])
+        ->assertHeader('Retry-After');
+
+    ChatbotResponseAgent::assertPromptedTimes(5);
+
+    $this->withServerVariables(['REMOTE_ADDR' => '198.51.100.42'])
+        ->postJson(route('chatbot.store'), ['message' => 'What are the Sagay store hours?'])
+        ->assertOk();
+
+    ChatbotResponseAgent::assertPromptedTimes(6);
+    Http::assertNothingSent();
+});
+
+test('customer requests are limited per account rather than per shared IP', function () {
+    Http::preventStrayRequests();
+    ChatbotResponseAgent::fake(array_fill(0, 11, 'The Sagay store is open.'))->preventStrayPrompts();
+    Branch::factory()->create(['city' => 'Sagay City']);
+    $firstCustomer = User::factory()->customer()->create();
+    $secondCustomer = User::factory()->customer()->create();
+
+    $this->actingAs($firstCustomer);
+
+    for ($attempt = 0; $attempt < 10; $attempt++) {
+        $this->postJson(route('chatbot.store'), ['message' => 'What are the Sagay store hours?'])
+            ->assertOk();
+    }
+
+    $this->postJson(route('chatbot.store'), ['message' => 'What are the Sagay store hours?'])
+        ->assertTooManyRequests()
+        ->assertExactJson([
+            'message' => 'Too many questions. Please wait a minute and try again.',
+        ]);
+
+    $this->actingAs($secondCustomer)
+        ->postJson(route('chatbot.store'), ['message' => 'What are the Sagay store hours?'])
+        ->assertOk();
+
+    ChatbotResponseAgent::assertPromptedTimes(11);
     Http::assertNothingSent();
 });

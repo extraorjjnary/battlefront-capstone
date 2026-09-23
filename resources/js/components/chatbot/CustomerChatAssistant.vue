@@ -69,7 +69,13 @@ async function submitMessage() {
     void scrollToLatest();
 
     try {
-        const response = await inquiry.post(ChatbotController.store.url());
+        const response = await inquiry.post(ChatbotController.store.url(), {
+            onHttpException: (httpResponse) => {
+                if (httpResponse.status === 429) {
+                    requestError.value = JSON.parse(httpResponse.data).message;
+                }
+            },
+        });
 
         if (!response) {
             return;
@@ -86,7 +92,7 @@ async function submitMessage() {
         );
         inquiry.message = '';
     } catch {
-        requestError.value = 'Unable to send your question. Please try again.';
+        requestError.value ||= 'Unable to send your question. Please try again.';
     } finally {
         pendingMessage.value = '';
         void scrollToLatest();

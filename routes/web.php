@@ -77,10 +77,10 @@ Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {
         ->name('orders.show');
 });
 
-// customer chatbot
-Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {
-    Route::post('chatbot', [ChatbotController::class, 'store'])->name('chatbot.store');
-});
+// storefront chatbot
+Route::post('chatbot', [ChatbotController::class, 'store'])
+    ->middleware(['can:use-chatbot', 'throttle:chatbot'])
+    ->name('chatbot.store');
 
 // administration authority
 Route::middleware(['auth', 'can:access-administration'])

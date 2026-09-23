@@ -58,6 +58,10 @@ class ChatbotOrchestrationService
             return $this->fallback($category, self::UNSUPPORTED_INQUIRY);
         }
 
+        if ($category === ChatbotQueryCategory::Order && $customer === null) {
+            return $this->fallback($category, self::UNAUTHENTICATED_ORDER);
+        }
+
         $context = $this->resolveContext($category, $normalizedMessage, $customer);
 
         if ($this->hasNoContext($category, $context)) {
