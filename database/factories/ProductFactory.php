@@ -19,6 +19,7 @@ class ProductFactory extends Factory
     public function definition(): array
     {
         return [
+            'product_code' => fake()->unique()->regexify('TEST[A-Z0-9]{16}'),
             'name' => fake()->words(3, true),
             'description' => fake()->optional()->sentence(),
             'category_id' => Category::factory(),

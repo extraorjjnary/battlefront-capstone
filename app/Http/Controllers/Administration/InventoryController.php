@@ -29,6 +29,7 @@ class InventoryController extends Controller
         $products = $inventoryRepository->paginateProducts($filters, $stockFilter)
             ->through(fn (Product $product): array => [
                 'id' => $product->id,
+                'product_code' => $product->product_code,
                 'name' => $product->name,
                 'brand' => $product->brand,
                 'is_active' => $product->is_active,

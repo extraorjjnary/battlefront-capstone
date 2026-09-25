@@ -22,18 +22,25 @@ class CreateProduct
      */
     public function execute(array $attributes, array $tagIds, ?UploadedFile $image): Product
     {
-        $imagePath = $this->storeProductImage->execute($image);
-        $attributes['image_path'] = $imagePath;
+        $storedImage = null;
+        $productId = null;
 
         try {
-            return DB::transaction(function () use ($attributes, $tagIds): Product {
+            return DB::transaction(function () use ($attributes, $tagIds, $image, &$storedImage, &$productId): Product {
                 $product = Product::query()->create($attributes);
+                $productId = $product->id;
+                $storedImage = $this->storeProductImage->execute($image, $productId);
+                if ($storedImage !== null) {
+                    $product->update(['image_path' => $storedImage['path']]);
+                }
                 $product->tags()->sync($tagIds);
 
                 return $product;
             });
         } catch (Throwable $exception) {
-            $this->deleteManagedProductImage->execute($imagePath);
+            if ($storedImage !== null && $storedImage['created'] && $productId !== null) {
+                $this->deleteManagedProductImage->execute($storedImage['path'], $productId);
+            }
 
             throw $exception;
         }

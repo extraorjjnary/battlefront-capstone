@@ -96,6 +96,27 @@ function firstTagError(errors) {
 
             <div class="grid gap-5 md:grid-cols-2">
                 <div class="grid gap-2 md:col-span-2">
+                    <Label for="product_code">Product code</Label>
+                    <Input
+                        id="product_code"
+                        name="product_code"
+                        :default-value="product?.product_code"
+                        :readonly="product?.is_catalog_imported"
+                        maxlength="64"
+                        pattern="[A-Za-z0-9]{1,64}"
+                        :aria-invalid="Boolean(errors.product_code)"
+                        required
+                    />
+                    <p class="text-muted-foreground text-sm">
+                        {{
+                            product?.is_catalog_imported
+                                ? 'Imported codes are fixed so future imports update the same product.'
+                                : 'Use a unique code with 1 to 64 letters or digits.'
+                        }}
+                    </p>
+                    <InputError :message="errors.product_code" />
+                </div>
+                <div class="grid gap-2 md:col-span-2">
                     <Label for="name">Product name</Label>
                     <Input
                         id="name"
@@ -243,7 +264,9 @@ function firstTagError(errors) {
                                 @change="updateImagePreview"
                             />
                             <p class="text-muted-foreground mt-2 text-sm">
-                                JPG, JPEG, PNG, or WebP up to 5 MB.
+                                JPG, JPEG, PNG, or WebP up to 5 MB. Images are
+                                center-cropped to a square and saved as 1024 ×
+                                1024 WebP.
                                 <span v-if="product?.image_url">
                                     Leave empty to keep the current image.
                                 </span>
@@ -259,7 +282,7 @@ function firstTagError(errors) {
                                 :key="imagePreviewUrl"
                                 :src="imagePreviewUrl"
                                 alt="Product image preview"
-                                class="absolute inset-0 size-full object-contain"
+                                class="absolute inset-0 size-full object-cover"
                                 @error="imagePreviewFailed = true"
                             />
                         </div>

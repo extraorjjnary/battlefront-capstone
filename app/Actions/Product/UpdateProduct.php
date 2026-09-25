@@ -5,6 +5,7 @@ namespace App\Actions\Product;
 use App\Models\Product;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class UpdateProduct
@@ -22,26 +23,33 @@ class UpdateProduct
      */
     public function execute(Product $product, array $attributes, array $tagIds, ?UploadedFile $image): Product
     {
-        $oldImagePath = $product->image_path;
-        $newImagePath = $this->storeProductImage->execute($image);
-
-        if ($newImagePath !== null) {
-            $attributes['image_path'] = $newImagePath;
-        }
+        $storedImage = null;
 
         try {
-            DB::transaction(function () use ($product, $attributes, $tagIds): void {
-                $product->update($attributes);
-                $product->tags()->sync($tagIds);
+            DB::transaction(function () use ($product, $attributes, $tagIds, $image, &$storedImage): void {
+                $lockedProduct = Product::query()->lockForUpdate()->findOrFail($product->id);
+                if ($lockedProduct->is_catalog_imported && isset($attributes['product_code'])
+                    && $attributes['product_code'] !== $lockedProduct->product_code) {
+                    throw ValidationException::withMessages(['product_code' => 'Imported product codes cannot be changed.']);
+                }
+                $oldImagePath = $lockedProduct->image_path;
+                $storedImage = $this->storeProductImage->execute($image, $lockedProduct->id);
+                if ($storedImage !== null) {
+                    $attributes['image_path'] = $storedImage['path'];
+                }
+                $lockedProduct->update($attributes);
+                $lockedProduct->tags()->sync($tagIds);
+
+                if ($storedImage !== null && $storedImage['path'] !== $oldImagePath) {
+                    DB::afterCommit(fn () => $this->deleteManagedProductImage->execute($oldImagePath, $lockedProduct->id));
+                }
             });
         } catch (Throwable $exception) {
-            $this->deleteManagedProductImage->execute($newImagePath);
+            if ($storedImage !== null && $storedImage['created']) {
+                $this->deleteManagedProductImage->execute($storedImage['path'], $product->id);
+            }
 
             throw $exception;
-        }
-
-        if ($newImagePath !== null) {
-            $this->deleteManagedProductImage->execute($oldImagePath);
         }
 
         return $product->refresh();

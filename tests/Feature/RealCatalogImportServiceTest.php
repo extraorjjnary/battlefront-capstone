@@ -1,14 +1,21 @@
 <?php
 
+use App\Models\CartItem;
+use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\User;
+use App\Services\CatalogImagePipeline;
 use App\Services\RealCatalogImportService;
+use Database\Seeders\DevelopmentCatalogSeeder;
+use Illuminate\Database\QueryException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
 
 function realCatalogManifest(array $overrides = []): string
 {
     $disk = Storage::disk('public');
-    $path = 'products/graphics-card/00123.webp';
+    $path = $overrides['image_path'] ?? 'products/graphics-card/00123.webp';
     $disk->makeDirectory(dirname($path));
     $image = imagecreatetruecolor(1024, 1024);
     imagefill($image, 0, 0, imagecolorallocate($image, 25, 25, 25));
@@ -105,8 +112,8 @@ test('apply imports exact names and image paths by code without resetting existi
         $product->inventory()->update(['quantity' => 2]);
         $second = app(RealCatalogImportService::class)->execute($mapping, $manifest);
 
-        expect($first)->toBe(['created' => 1, 'updated' => 0])
-            ->and($second)->toBe(['created' => 0, 'updated' => 1])
+        expect($first)->toBe(['created' => 1, 'updated' => 0, 'demo_deleted' => 0, 'demo_retained' => 0])
+            ->and($second)->toBe(['created' => 0, 'updated' => 1, 'demo_deleted' => 0, 'demo_retained' => 0])
             ->and($product->refresh()->name)->toBe('Exact Product™')
             ->and($product->brand)->toBe('Biostar')
             ->and($product->image_path)->toBe('products/graphics-card/00123.webp')
@@ -162,6 +169,204 @@ test('verified quantity fills a blank spreadsheet cell without changing the sour
         $product = Product::query()->where('product_code', '00123')->firstOrFail();
         expect($product->name)->toBe('Exact Product™')
             ->and($product->inventory->quantity)->toBe(7);
+    } finally {
+        unlink($manifest);
+        unlink($mapping);
+    }
+});
+
+test('an admin replacement preserves its manifest image and survives future imports', function () {
+    Storage::fake('public');
+    $manifest = realCatalogManifest();
+    $mapping = realCatalogMapping();
+    $administrator = User::factory()->administrator()->create();
+
+    try {
+        $importer = app(RealCatalogImportService::class);
+        $importer->execute($mapping, $manifest);
+        $product = Product::query()->sole();
+        $manifestImage = $product->image_path;
+        $manifestBytes = Storage::disk('public')->get($manifestImage);
+        $manifestContents = file_get_contents($manifest);
+
+        $this->actingAs($administrator)->post(route('administration.products.update', $product), [
+            '_method' => 'put',
+            'product_code' => $product->product_code,
+            'name' => $product->name,
+            'category_id' => $product->category_id,
+            'brand' => $product->brand,
+            'price' => $product->price,
+            'is_featured' => false,
+            'image' => UploadedFile::fake()->image('admin.jpg', 640, 480),
+        ])->assertSessionHasNoErrors();
+        $adminImage = $product->refresh()->image_path;
+        $importer->execute($mapping, $manifest);
+
+        expect($product->refresh()->image_path)->toBe($adminImage)->not->toBe($manifestImage);
+        expect(Storage::disk('public')->get($manifestImage))->toBe($manifestBytes);
+        expect(file_get_contents($manifest))->toBe($manifestContents);
+        expect(app(CatalogImagePipeline::class)->audit($manifest)['issues'])->toBe([]);
+        Storage::disk('public')->assertExists($adminImage);
+
+        Storage::disk('public')->delete($adminImage);
+        $importer->execute($mapping, $manifest);
+        expect($product->refresh()->image_path)->toBe($adminImage);
+    } finally {
+        unlink($manifest);
+        unlink($mapping);
+    }
+});
+
+test('import retires only known demos and preserves order and cart history', function () {
+    Storage::fake('public');
+    $this->seed(DevelopmentCatalogSeeder::class);
+    $orderedProduct = Product::query()->where('name', '[DEMO] NVIDIA Atlas Graphics Card')->firstOrFail();
+    $cartProduct = Product::query()->where('name', '[DEMO] Intel Horizon Processor')->firstOrFail();
+    $orderItem = OrderItem::factory()->for($orderedProduct)->create(['quantity' => 2, 'price_at_time' => '100.00']);
+    $cartItem = CartItem::factory()->for($cartProduct)->create();
+    $inventory = $orderedProduct->inventory->getAttributes();
+    $unrelated = Product::factory()->create(['name' => '[DEMO] An unrelated admin product']);
+    $manifest = realCatalogManifest();
+    $mapping = realCatalogMapping();
+
+    try {
+        $result = app(RealCatalogImportService::class)->execute($mapping, $manifest);
+
+        expect($result)->toBe(['created' => 1, 'updated' => 0, 'demo_deleted' => 6, 'demo_retained' => 2]);
+        $this->assertDatabaseCount('products', 4);
+        $this->assertDatabaseCount('inventories', 3);
+        $this->assertDatabaseHas('order_items', ['id' => $orderItem->id, 'product_id' => $orderedProduct->id, 'quantity' => 2, 'price_at_time' => '100.00']);
+        $this->assertModelExists($cartItem);
+        $this->assertModelExists($unrelated);
+        expect($orderedProduct->refresh()->name)->toBe('NVIDIA Atlas Graphics Card');
+        expect($orderedProduct->is_active)->toBeFalse();
+        expect($orderedProduct->inventory->getAttributes())->toBe($inventory);
+        expect($cartProduct->refresh()->name)->toBe('Intel Horizon Processor');
+        expect($cartProduct->is_active)->toBeFalse();
+        expect($orderedProduct->category->name)->not->toContain('[DEMO]');
+        expect($orderedProduct->category->is_active)->toBeFalse();
+
+        app(RealCatalogImportService::class)->execute($mapping, $manifest);
+        $this->seed(DevelopmentCatalogSeeder::class);
+        $this->assertDatabaseCount('products', 4);
+    } finally {
+        unlink($manifest);
+        unlink($mapping);
+    }
+});
+
+test('incomplete supplemental data leaves demo products and all catalog tables untouched', function () {
+    Storage::fake('public');
+    $this->seed(DevelopmentCatalogSeeder::class);
+    $manifest = realCatalogManifest();
+    $mapping = realCatalogMapping([['00123', 'Exact Product™', 'Graphics Card', '', '', '1']]);
+    $before = Product::query()->orderBy('id')->get()->toArray();
+
+    try {
+        expect(fn () => app(RealCatalogImportService::class)->execute($mapping, $manifest))
+            ->toThrow(RuntimeException::class, 'Verified brands are missing for 1 products');
+
+        expect(Product::query()->orderBy('id')->get()->toArray())->toBe($before);
+        $this->assertDatabaseCount('categories', 4);
+        $this->assertDatabaseCount('inventories', 8);
+    } finally {
+        unlink($manifest);
+        unlink($mapping);
+    }
+});
+
+test('an import code cannot silently take over an administrator product', function () {
+    Storage::fake('public');
+    $product = Product::factory()->create(['product_code' => '00123']);
+    $original = $product->refresh()->getAttributes();
+    $manifest = realCatalogManifest();
+    $mapping = realCatalogMapping();
+
+    try {
+        expect(fn () => app(RealCatalogImportService::class)->execute($mapping, $manifest))
+            ->toThrow(RuntimeException::class, 'conflicts with an existing product');
+        expect($product->refresh()->getAttributes())->toBe($original);
+        $this->assertDatabaseCount('products', 1);
+        $this->assertDatabaseCount('inventories', 0);
+    } finally {
+        unlink($manifest);
+        unlink($mapping);
+    }
+});
+
+test('a database failure rolls back imported catalog changes before demo retirement', function () {
+    Storage::fake('public');
+    $manifest = realCatalogManifest();
+    $mapping = realCatalogMapping();
+
+    try {
+        $importer = app(RealCatalogImportService::class);
+        $importer->execute($mapping, $manifest);
+        $product = Product::query()->sole();
+        $product->update(['discount_price' => '7000.00']);
+        $state = json_decode(file_get_contents($manifest), true, flags: JSON_THROW_ON_ERROR);
+        $state['entries'][0]['price'] = '6000';
+        file_put_contents($manifest, json_encode($state, JSON_THROW_ON_ERROR));
+
+        expect(fn () => $importer->execute($mapping, $manifest))->toThrow(QueryException::class);
+
+        expect($product->refresh()->price)->toBe('7500.00');
+        expect($product->discount_price)->toBe('7000.00');
+        $this->assertDatabaseCount('inventories', 1);
+    } finally {
+        unlink($manifest);
+        unlink($mapping);
+    }
+});
+
+test('the private mapping records the approved temporary inventory values without changing the sources', function () {
+    $path = storage_path('app/imports/product_catalog/verified-product-details.csv');
+    $manifestPath = storage_path('app/private/product-catalog-images/manifest.json');
+    if (! is_file($path) || ! is_file($manifestPath)) {
+        $this->markTestSkipped('The private catalog data is unavailable.');
+    }
+    $handle = fopen($path, 'r');
+    $header = fgetcsv($handle, escape: '');
+    $rows = [];
+    while (($row = fgetcsv($handle, escape: '')) !== false) {
+        $rows[$row[0]] = array_combine($header, $row);
+    }
+    fclose($handle);
+    $manifest = json_decode(file_get_contents($manifestPath), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($rows)->toHaveCount(654);
+    foreach ($manifest['entries'] as $entry) {
+        $row = $rows[$entry['product_code']];
+        expect($row['product_name'])->toBe($entry['name'])->not->toContain('[DEMO]');
+        expect($row['reorder_level'])->toBe('1');
+        expect($row['quantity_override'])->toBe($entry['product_code'] === '80520996' ? '1' : '');
+    }
+    $source = collect($manifest['entries'])->firstWhere('product_code', '80520996');
+    expect($source['quantity'])->toBeNull();
+    $approvals = json_decode(file_get_contents(storage_path('app/private/product-catalog-images/development-value-approvals.json')), true, flags: JSON_THROW_ON_ERROR);
+    expect($approvals['reorder_level']['value'])->toBe(1);
+    expect($approvals['quantity_overrides'][0])->toMatchArray(['product_code' => '80520996', 'value' => 1]);
+});
+
+test('the real package name and approved temporary stock import exactly with test-only supplemental brand data', function () {
+    Storage::fake('public');
+    $name = 'BRAND NEW COMPUTER PACKAGE AMD RYZEN 5 5600G 16GB RAM/256GB SSD , 19\\ MONITOR';
+    $manifest = realCatalogManifest([
+        'product_code' => '80520996', 'name' => $name, 'category' => 'Bundles & Packages',
+        'category_slug' => 'bundles-packages', 'quantity' => null,
+        'image_path' => 'products/bundles-packages/80520996.webp',
+    ]);
+    $mapping = realCatalogMapping([['80520996', $name, 'Bundles & Packages', 'Test-only brand fixture', '1', '1']]);
+
+    try {
+        app(RealCatalogImportService::class)->execute($mapping, $manifest);
+
+        $product = Product::query()->sole();
+        expect($product->name)->toBe($name)->not->toContain('[DEMO]');
+        expect($product->product_code)->toBe('80520996');
+        expect($product->inventory->quantity)->toBe(1);
+        expect($product->inventory->reorder_level)->toBe(1);
+        expect($product->image_path)->toBe('products/bundles-packages/80520996.webp');
     } finally {
         unlink($manifest);
         unlink($mapping);

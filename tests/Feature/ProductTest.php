@@ -9,6 +9,7 @@ test('the product schema follows the approved ERD decisions', function () {
     expect(Schema::getColumnListing('products'))->toEqualCanonicalizing([
         'id',
         'product_code',
+        'is_catalog_imported',
         'name',
         'description',
         'category_id',
@@ -66,6 +67,7 @@ test('a product belongs to a required category', function () {
 
 test('required product fields cannot be omitted', function (string $missingField) {
     $attributes = [
+        'product_code' => 'MOUSE001',
         'name' => 'Wireless Mouse',
         'category_id' => Category::factory()->create()->id,
         'brand' => 'Logitech',
@@ -76,6 +78,7 @@ test('required product fields cannot be omitted', function (string $missingField
     expect(fn () => Product::query()->create($attributes))
         ->toThrow(QueryException::class);
 })->with([
+    'product code' => 'product_code',
     'name' => 'name',
     'category' => 'category_id',
     'brand' => 'brand',

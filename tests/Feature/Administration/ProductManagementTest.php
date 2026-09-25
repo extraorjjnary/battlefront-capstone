@@ -9,6 +9,68 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
+test('product codes are required and use the safe catalog format', function (mixed $code, string $message) {
+    $administrator = User::factory()->administrator()->create();
+    $category = Category::factory()->create();
+
+    $this->actingAs($administrator)->post(route('administration.products.store'), [
+        'product_code' => $code, 'name' => 'New product', 'category_id' => $category->id,
+        'brand' => 'Brand', 'price' => '100', 'is_featured' => false,
+    ])->assertSessionHasErrors(['product_code' => $message]);
+
+    $this->assertDatabaseCount('products', 0);
+})->with([
+    'null' => [null, 'Enter a product code.'],
+    'empty' => ['', 'Enter a product code.'],
+    'unsafe' => ['../unsafe', 'Use 1 to 64 letters or digits for the product code.'],
+    'whitespace' => ['AB CD', 'Use 1 to 64 letters or digits for the product code.'],
+    'too long' => [str_repeat('A', 65), 'Use 1 to 64 letters or digits for the product code.'],
+]);
+
+test('creating and updating cannot reuse another products code ignoring case', function (string $code) {
+    $administrator = User::factory()->administrator()->create();
+    $existing = Product::factory()->create(['product_code' => 'ABC123']);
+    $other = Product::factory()->create(['product_code' => 'OTHER']);
+    $payload = ['product_code' => $code, 'name' => 'Product', 'category_id' => $existing->category_id,
+        'brand' => 'Brand', 'price' => '100', 'is_featured' => false];
+
+    $this->actingAs($administrator)->post(route('administration.products.store'), $payload)
+        ->assertSessionHasErrors(['product_code' => 'This product code is already in use.']);
+    $this->put(route('administration.products.update', $other), $payload)
+        ->assertSessionHasErrors(['product_code' => 'This product code is already in use.']);
+
+    expect($other->refresh()->product_code)->toBe('OTHER');
+    $this->assertDatabaseCount('products', 2);
+})->with(['exact' => 'ABC123', 'case only' => 'abc123']);
+
+test('imported codes are visible and protected from changes and forged origin flags', function () {
+    $administrator = User::factory()->administrator()->create();
+    $product = Product::factory()->create(['product_code' => '000123', 'is_catalog_imported' => true]);
+
+    $this->actingAs($administrator)->get(route('administration.products.edit', $product))
+        ->assertInertia(fn (Assert $page) => $page->where('product.product_code', '000123')->where('product.is_catalog_imported', true));
+    $this->put(route('administration.products.update', $product), [
+        'product_code' => 'CHANGED', 'is_catalog_imported' => false,
+        'name' => $product->name, 'category_id' => $product->category_id,
+        'brand' => $product->brand, 'price' => $product->price, 'is_featured' => false,
+    ])->assertSessionHasErrors(['product_code' => 'Imported product codes cannot be changed.']);
+
+    expect($product->refresh()->product_code)->toBe('000123');
+    expect($product->is_catalog_imported)->toBeTrue();
+});
+
+test('administration product and inventory search returns matching product codes', function () {
+    $administrator = User::factory()->administrator()->create();
+    $product = Product::factory()->has(Inventory::factory())->create(['product_code' => '000123']);
+    Product::factory()->has(Inventory::factory())->create();
+
+    foreach (['administration.products.index', 'administration.inventory.index'] as $route) {
+        $this->actingAs($administrator)->get(route($route, ['q' => '000123']))
+            ->assertInertia(fn (Assert $page) => $page->has('products.data', 1)
+                ->where('products.data.0.id', $product->id)->where('products.data.0.product_code', '000123'));
+    }
+});
+
 test('guests are redirected when viewing catalog products', function () {
     $this->get(route('administration.products.index'))
         ->assertRedirect(route('login'));
@@ -210,6 +272,7 @@ test('administrators can create products with an uploaded image and validated ta
     $response = $this
         ->actingAs($administrator)
         ->post(route('administration.products.store'), [
+            'product_code' => 'RTX5070',
             'name' => 'GeForce RTX 5070',
             'description' => 'A graphics card for modern games.',
             'category_id' => $category->id,
@@ -253,6 +316,7 @@ test('product details reject invalid catalog values', function (array $payload, 
     $administrator = User::factory()->administrator()->create();
     $category = Category::factory()->create();
     $validPayload = [
+        'product_code' => 'RTX5070',
         'name' => 'GeForce RTX 5070',
         'category_id' => $category->id,
         'brand' => 'NVIDIA',
@@ -272,6 +336,7 @@ test('product details reject invalid catalog values', function (array $payload, 
         ->assertRedirect(route('administration.products.create'))
         ->assertSessionHasErrors($errors);
     $this->assertDatabaseMissing('products', [
+        'product_code' => 'RTX5070',
         'name' => 'GeForce RTX 5070',
     ]);
 })->with([
@@ -319,6 +384,7 @@ test('product images reject invalid file types and files larger than 5 MB', func
     $this->actingAs($administrator)
         ->from(route('administration.products.create'))
         ->post(route('administration.products.store'), [
+            'product_code' => 'RTX5070',
             'name' => 'GeForce RTX 5070',
             'category_id' => $category->id,
             'brand' => 'NVIDIA',
@@ -356,6 +422,7 @@ test('administrators can update product details and synchronize tags', function 
     $response = $this
         ->actingAs($administrator)
         ->put(route('administration.products.update', $product), [
+            'product_code' => 'UPDATED001',
             'name' => 'Updated product name',
             'description' => null,
             'category_id' => $newCategory->id,
@@ -394,6 +461,7 @@ test('updating a product without a new image keeps the existing image', function
     $this->actingAs($administrator)
         ->post(route('administration.products.update', $product), [
             '_method' => 'put',
+            'product_code' => 'UPDATED001',
             'name' => 'Updated product',
             'category_id' => $category->id,
             'brand' => $product->brand,
@@ -420,6 +488,7 @@ test('replacing a product image stores the new path and removes the old managed 
     $this->actingAs($administrator)
         ->post(route('administration.products.update', $product), [
             '_method' => 'put',
+            'product_code' => $product->product_code,
             'name' => $product->name,
             'category_id' => $category->id,
             'brand' => $product->brand,
@@ -451,6 +520,7 @@ test('an invalid product relationship leaves details and tags unchanged', functi
         ->actingAs($administrator)
         ->from(route('administration.products.edit', $product))
         ->put(route('administration.products.update', $product), [
+            'product_code' => 'UPDATED001',
             'name' => 'Changed product',
             'category_id' => $category->id,
             'brand' => $product->brand,

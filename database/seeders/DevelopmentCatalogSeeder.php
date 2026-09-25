@@ -19,7 +19,7 @@ class DevelopmentCatalogSeeder extends Seeder
      */
     public function run(): void
     {
-        if (! App::environment(['local', 'testing'])) {
+        if (! App::environment(['local', 'testing']) || Product::query()->where('is_catalog_imported', true)->exists()) {
             return;
         }
 
@@ -173,6 +173,7 @@ class DevelopmentCatalogSeeder extends Seeder
             $product = Product::query()->updateOrCreate(
                 ['name' => $productData['name']],
                 [
+                    'product_code' => 'DEV'.strtoupper(substr(hash('sha256', $productData['name']), 0, 16)),
                     'description' => $productDescription,
                     'category_id' => $categories[$productData['category']]->id,
                     'brand' => $productData['brand'],

@@ -2,7 +2,8 @@
 
 namespace App\Services;
 
-use App\Actions\Product\OptimizeGeneratedProductImage;
+use App\Actions\Product\OptimizeProductImage;
+use App\Models\Product;
 use Illuminate\Support\Facades\Storage;
 use JsonException;
 use RuntimeException;
@@ -10,7 +11,7 @@ use Throwable;
 
 class CatalogImagePipeline
 {
-    public function __construct(private readonly OptimizeGeneratedProductImage $optimizer) {}
+    public function __construct(private readonly OptimizeProductImage $optimizer) {}
 
     /**
      * @return array<string, mixed>|null
@@ -201,7 +202,7 @@ class CatalogImagePipeline
         }
 
         foreach (Storage::disk('public')->allFiles('products') as $path) {
-            if (preg_match('~^products/[^/]+/[^/]+$~', $path) && ! isset($expectedPaths[strtolower($path)])) {
+            if (! str_starts_with($path, 'products/admin/') && preg_match('~^products/[^/]+/[^/]+$~', $path) && ! isset($expectedPaths[strtolower($path)])) {
                 $issues[] = "Unmapped catalog image: $path";
             }
         }
@@ -289,8 +290,8 @@ class CatalogImagePipeline
         $code = $entry['product_code'] ?? null;
         $slug = $entry['category_slug'] ?? null;
         $path = $entry['image_path'] ?? null;
-        if (! is_string($code) || ! preg_match('/^[A-Za-z0-9]{1,64}$/D', $code)
-            || ! is_string($slug) || ! preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', $slug)
+        if (! is_string($code) || ! preg_match(Product::CODE_PATTERN, $code)
+            || ! is_string($slug) || $slug === 'admin' || ! preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/D', $slug)
             || $path !== "products/$slug/$code.webp") {
             throw new RuntimeException('The catalog image manifest contains an unsafe product image path.');
         }

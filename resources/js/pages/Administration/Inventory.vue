@@ -256,7 +256,7 @@ defineOptions({
                                 v-model="search"
                                 class="pl-9"
                                 maxlength="255"
-                                placeholder="Product name or brand"
+                                placeholder="Product code, name, or brand"
                                 autocomplete="off"
                             />
                         </div>
@@ -414,7 +414,8 @@ defineOptions({
                             </Badge>
                         </div>
                         <p class="text-muted-foreground mt-1 text-sm">
-                            {{ product.brand }} · {{ product.category }}
+                            {{ product.product_code }} · {{ product.brand }} ·
+                            {{ product.category }}
                         </p>
                         <p
                             v-if="product.inventory"

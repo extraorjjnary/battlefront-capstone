@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Administration;
 
 use App\Models\Category;
+use App\Models\Product;
 use App\Models\Tag;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -25,7 +26,17 @@ class SaveProductRequest extends FormRequest
      */
     public function rules(): array
     {
+        $product = $this->route('product');
+        $importedCodeRule = $product instanceof Product && $product->is_catalog_imported
+            ? [Rule::in([$product->product_code])]
+            : [];
+
         return [
+            'product_code' => [
+                'bail', 'required', 'string', 'regex:'.Product::CODE_PATTERN,
+                Rule::unique(Product::class, 'product_code')->ignore($product instanceof Product ? $product : null),
+                ...$importedCodeRule,
+            ],
             'name' => ['bail', 'required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'category_id' => [
@@ -70,6 +81,10 @@ class SaveProductRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'product_code.required' => 'Enter a product code.',
+            'product_code.regex' => 'Use 1 to 64 letters or digits for the product code.',
+            'product_code.unique' => 'This product code is already in use.',
+            'product_code.in' => 'Imported product codes cannot be changed.',
             'name.required' => 'Enter a product name.',
             'category_id.required' => 'Select a category.',
             'category_id.exists' => 'Select a valid category.',

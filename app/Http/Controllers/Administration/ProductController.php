@@ -34,6 +34,7 @@ class ProductController extends Controller
         $products = Product::query()
             ->select([
                 'id',
+                'product_code',
                 'name',
                 'category_id',
                 'brand',
@@ -52,6 +53,7 @@ class ProductController extends Controller
                 fn (Builder $query, string $search): Builder => $query->where(
                     fn (Builder $query): Builder => $query
                         ->where('name', 'like', "%{$search}%")
+                        ->orWhere('product_code', 'like', "%{$search}%")
                         ->orWhere('brand', 'like', "%{$search}%")
                         ->orWhere('description', 'like', "%{$search}%"),
                 ),
@@ -81,6 +83,7 @@ class ProductController extends Controller
             ->appends($filters)
             ->through(fn (Product $product): array => [
                 'id' => $product->id,
+                'product_code' => $product->product_code,
                 'name' => $product->name,
                 'brand' => $product->brand,
                 'price' => $product->price,
@@ -164,6 +167,8 @@ class ProductController extends Controller
             'product' => [
                 ...$product->only([
                     'id',
+                    'product_code',
+                    'is_catalog_imported',
                     'name',
                     'description',
                     'category_id',

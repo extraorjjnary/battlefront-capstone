@@ -238,7 +238,7 @@ defineOptions({
                             v-model="search"
                             class="pl-9"
                             maxlength="255"
-                            placeholder="Name, brand, or description"
+                            placeholder="Code, name, brand, or description"
                             autocomplete="off"
                         />
                     </div>
@@ -431,7 +431,8 @@ defineOptions({
                             </Badge>
                         </div>
                         <p class="text-muted-foreground mt-1 text-sm">
-                            {{ product.brand }} · {{ product.category.name }}
+                            {{ product.product_code }} · {{ product.brand }} ·
+                            {{ product.category.name }}
                             <span v-if="!product.category.is_active">
                                 (Inactive category)
                             </span>

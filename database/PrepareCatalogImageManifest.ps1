@@ -134,7 +134,7 @@ foreach ($file in $files) {
                 throw "Category mismatch in $($file.Name) row $rowNumber."
             }
             $fileCategory = $category
-            if (-not $slug -or ($slugs.ContainsKey($slug) -and $slugs[$slug] -cne $category)) {
+            if (-not $slug -or $slug -ceq 'admin' -or ($slugs.ContainsKey($slug) -and $slugs[$slug] -cne $category)) {
                 throw "Category folder collision for $category."
             }
             $slugs[$slug] = $category

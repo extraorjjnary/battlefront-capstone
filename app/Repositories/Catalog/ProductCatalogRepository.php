@@ -48,7 +48,7 @@ class ProductCatalogRepository
      */
     public function contextMatches(array $terms, int $limit = 5): EloquentCollection
     {
-        $matches = new EloquentCollection;
+        $matches = (new Product)->newCollection();
 
         if ($terms === [] || $limit < 1) {
             return $matches;

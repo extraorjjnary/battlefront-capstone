@@ -19,7 +19,8 @@ use Illuminate\Support\Facades\Storage;
 
 /**
  * @property int $id
- * @property string|null $product_code
+ * @property string $product_code
+ * @property bool $is_catalog_imported
  * @property string $name
  * @property string|null $description
  * @property int $category_id
@@ -53,6 +54,8 @@ use Illuminate\Support\Facades\Storage;
 ])]
 class Product extends Model
 {
+    public const CODE_PATTERN = '/^[A-Za-z0-9]{1,64}$/D';
+
     /** @use HasFactory<ProductFactory> */
     use HasFactory;
 
@@ -69,6 +72,7 @@ class Product extends Model
      * @var array<string, mixed>
      */
     protected $attributes = [
+        'is_catalog_imported' => false,
         'is_featured' => false,
         'is_active' => true,
     ];
@@ -207,6 +211,7 @@ class Product extends Model
     protected function casts(): array
     {
         return [
+            'is_catalog_imported' => 'boolean',
             'price' => 'decimal:2',
             'is_featured' => 'boolean',
             'discount_price' => 'decimal:2',

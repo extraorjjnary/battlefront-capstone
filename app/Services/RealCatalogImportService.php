@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Actions\Product\ProductImagePaths;
+use App\Actions\Product\RetireDemoCatalog;
 use App\Models\Category;
 use App\Models\Inventory;
 use App\Models\Product;
@@ -11,7 +13,10 @@ use RuntimeException;
 
 class RealCatalogImportService
 {
-    public function __construct(private readonly CatalogImagePipeline $images) {}
+    public function __construct(
+        private readonly CatalogImagePipeline $images,
+        private readonly RetireDemoCatalog $retireDemoCatalog,
+    ) {}
 
     public function writeTemplate(string $outputPath, ?string $manifestPath = null): int
     {
@@ -61,6 +66,10 @@ class RealCatalogImportService
 
         foreach ($entries as $entry) {
             $code = $entry['product_code'];
+            $existing = Product::query()->where('product_code', $code)->first();
+            if ($existing !== null && (! $existing->is_catalog_imported || $existing->product_code !== $code)) {
+                throw new RuntimeException("Product code $code conflicts with an existing product. No products were imported.");
+            }
             if (! isset($mapping[$code])) {
                 throw new RuntimeException("Verified product details are missing for code $code.");
             }
@@ -131,7 +140,7 @@ class RealCatalogImportService
     }
 
     /**
-     * @return array{created: int, updated: int}
+     * @return array{created: int, updated: int, demo_deleted: int, demo_retained: int}
      */
     public function execute(string $mappingPath, ?string $manifestPath = null): array
     {
@@ -142,15 +151,22 @@ class RealCatalogImportService
             $updated = 0;
             foreach ($prepared as $row) {
                 $category = Category::query()->firstOrCreate(['name' => $row['category']]);
-                $product = Product::query()->firstOrNew(['product_code' => $row['product_code']]);
+                $product = Product::query()->where('product_code', $row['product_code'])->lockForUpdate()->first()
+                    ?? new Product(['product_code' => $row['product_code']]);
                 $isNew = ! $product->exists;
+                if (! $isNew && (! $product->is_catalog_imported || $product->product_code !== $row['product_code'])) {
+                    throw new RuntimeException("Product code {$row['product_code']} conflicts with an existing product.");
+                }
                 $product->fill([
                     'name' => $row['name'],
                     'category_id' => $category->id,
                     'brand' => $row['brand'],
                     'price' => $row['price'],
-                    'image_path' => $row['image_path'],
                 ]);
+                if (! ProductImagePaths::isAdminOwned($product->image_path, $product->id)) {
+                    $product->image_path = $row['image_path'];
+                }
+                $product->is_catalog_imported = true;
                 $product->save();
 
                 Inventory::query()->firstOrCreate(
@@ -171,7 +187,7 @@ class RealCatalogImportService
                 }
             }
 
-            return ['created' => $created, 'updated' => $updated];
+            return ['created' => $created, 'updated' => $updated, ...$this->retireDemoCatalog->execute()];
         });
     }
 
@@ -196,6 +212,8 @@ class RealCatalogImportService
             }
 
             $mapping = [];
+            $seenCodes = [];
+            $missingBrands = [];
             while (($cells = fgetcsv($handle, 0, ',', '"', '')) !== false) {
                 if ($cells === [null]) {
                     continue;
@@ -206,11 +224,16 @@ class RealCatalogImportService
 
                 [$code, $name, $category, $brand, $quantityOverride, $reorderLevel] = $cells;
                 $brand = trim($brand);
-                if (! preg_match('/^[A-Za-z0-9]{1,64}$/D', $code) || isset($mapping[$code])
-                    || $brand === '' || mb_strlen($brand) > 255
+                if (! preg_match(Product::CODE_PATTERN, $code) || isset($seenCodes[strtolower($code)])
+                    || mb_strlen($brand) > 255
                     || ! $this->isUnsignedInventoryValue($reorderLevel)
                     || ($quantityOverride !== '' && ! $this->isUnsignedInventoryValue($quantityOverride))) {
                     throw new RuntimeException("Invalid or duplicate verified product details for code $code.");
+                }
+
+                $seenCodes[strtolower($code)] = true;
+                if ($brand === '') {
+                    $missingBrands[] = $code;
                 }
 
                 $mapping[$code] = [
@@ -220,6 +243,10 @@ class RealCatalogImportService
                     'quantity_override' => $quantityOverride,
                     'reorder_level' => $reorderLevel,
                 ];
+            }
+
+            if ($missingBrands !== []) {
+                throw new RuntimeException('Verified brands are missing for '.count($missingBrands).' products (including '.implode(', ', array_slice($missingBrands, 0, 10)).'). Complete the supplemental CSV before importing.');
             }
 
             return $mapping;

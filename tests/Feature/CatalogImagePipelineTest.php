@@ -147,15 +147,16 @@ test('ingest refuses to overwrite an image at a pending product path', function 
     }
 });
 
-test('ingest rejects a source that cannot support a square detail image', function () {
+test('ingest center crops and upscales a non-square source', function () {
     Storage::fake('public');
     $manifest = catalogImageManifest();
     $source = catalogImageSource(800, 600);
 
     try {
-        expect(fn () => app(CatalogImagePipeline::class)->ingest('A001', $source, $manifest))
-            ->toThrow(RuntimeException::class, 'The generated source must be square and at least 1024 pixels wide.');
-        Storage::disk('public')->assertMissing('products/graphics-card/A001.webp');
+        $path = app(CatalogImagePipeline::class)->ingest('A001', $source, $manifest);
+        $details = getimagesize(Storage::disk('public')->path($path));
+        expect([$details[0], $details[1], $details['mime']])->toBe([1024, 1024, 'image/webp']);
+        expect(app(CatalogImagePipeline::class)->audit($manifest)['issues'])->toBe([]);
     } finally {
         unlink($source);
         unlink($manifest);
@@ -231,5 +232,35 @@ test('the ingest command requires explicit visual approval', function () {
     } finally {
         unlink($source);
         unlink($manifest);
+    }
+});
+
+test('the manifest cannot claim the reserved admin image namespace', function () {
+    Storage::fake('public');
+    $manifest = catalogImageManifest(['category_slug' => 'admin', 'image_path' => 'products/admin/A001.webp']);
+
+    try {
+        expect(fn () => app(CatalogImagePipeline::class)->audit($manifest))
+            ->toThrow(RuntimeException::class, 'unsafe product image path');
+    } finally {
+        unlink($manifest);
+    }
+});
+
+test('audit ignores admin uploads while continuing to verify manifest images', function () {
+    Storage::fake('public');
+    $manifest = catalogImageManifest();
+    $source = catalogImageSource();
+
+    try {
+        app(CatalogImagePipeline::class)->ingest('A001', $source, $manifest);
+        Storage::disk('public')->put('products/admin/1/'.str_repeat('a', 64).'.webp', 'independent admin upload');
+        Storage::disk('public')->put('products/legacy.jpg', 'legacy admin upload');
+
+        expect(app(CatalogImagePipeline::class)->audit($manifest)['issues'])->toBe([]);
+    } finally {
+        unlink($source);
+        unlink($manifest);
+        unlink($manifest.'.lock');
     }
 });

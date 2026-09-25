@@ -4,8 +4,24 @@ use App\Models\Product;
 use App\Models\Tag;
 use Database\Seeders\DevelopmentCatalogSeeder;
 
-test('the default seed workflow creates representative development catalog scenarios', function () {
+test('default seeding does not recreate demo products', function () {
     $this->seed();
+
+    $this->assertDatabaseCount('products', 0);
+    $this->assertDatabaseCount('inventories', 0);
+});
+
+test('explicit demo seeding does not mix synthetic stock into an imported catalog', function () {
+    Product::factory()->create(['is_catalog_imported' => true]);
+
+    $this->seed(DevelopmentCatalogSeeder::class);
+
+    $this->assertDatabaseCount('products', 1);
+    $this->assertDatabaseCount('inventories', 0);
+});
+
+test('the explicit development seed workflow creates representative development catalog scenarios', function () {
+    $this->seed(DevelopmentCatalogSeeder::class);
 
     $products = Product::query()
         ->with(['category', 'inventory', 'tags'])
@@ -63,8 +79,8 @@ test('the default seed workflow creates representative development catalog scena
         ->and(Product::active()->whereKey($inactiveStorageProduct)->doesntExist())->toBeTrue();
 });
 
-test('the default seed workflow can be rerun without duplicates and restores its scenarios', function () {
-    $this->seed();
+test('the explicit development seed workflow can be rerun without duplicates and restores its scenarios', function () {
+    $this->seed(DevelopmentCatalogSeeder::class);
     $atlasGraphicsCard = Product::query()->where('name', '[DEMO] NVIDIA Atlas Graphics Card')->firstOrFail();
     $mechanicalTag = Tag::query()->where('name', 'Mechanical')->firstOrFail();
     $atlasGraphicsCard->update([
@@ -78,7 +94,7 @@ test('the default seed workflow can be rerun without duplicates and restores its
     ]);
     $atlasGraphicsCard->tags()->sync([$mechanicalTag->id]);
 
-    $this->seed();
+    $this->seed(DevelopmentCatalogSeeder::class);
 
     $atlasGraphicsCard->refresh()->load(['inventory', 'tags']);
     $this->assertDatabaseCount('categories', 4);
@@ -99,7 +115,7 @@ test('the default seed workflow can be rerun without duplicates and restores its
 });
 
 test('development catalog image references resolve to local mock assets', function () {
-    $this->seed();
+    $this->seed(DevelopmentCatalogSeeder::class);
 
     $imagePaths = Product::query()
         ->whereLike('name', '[DEMO]%')

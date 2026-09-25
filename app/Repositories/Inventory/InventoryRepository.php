@@ -20,7 +20,7 @@ class InventoryRepository
     public function paginateProducts(array $filters, string $stockFilter): LengthAwarePaginator
     {
         return Product::query()
-            ->select(['id', 'name', 'category_id', 'brand', 'is_active'])
+            ->select(['id', 'product_code', 'name', 'category_id', 'brand', 'is_active'])
             ->with([
                 'category:id,name',
                 'inventory:id,product_id,quantity,reorder_level,last_updated',
@@ -31,6 +31,7 @@ class InventoryRepository
                 fn (Builder $query, string $search): Builder => $query->where(
                     fn (Builder $query): Builder => $query
                         ->where('name', 'like', "%{$search}%")
+                        ->orWhere('product_code', 'like', "%{$search}%")
                         ->orWhere('brand', 'like', "%{$search}%"),
                 ),
             )
