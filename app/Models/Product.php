@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Storage;
 
 /**
  * @property int $id
+ * @property string|null $product_code
  * @property string $name
  * @property string|null $description
  * @property int $category_id
@@ -39,6 +40,7 @@ use Illuminate\Support\Facades\Storage;
  * @property-read Collection<int, OrderItem> $orderItems
  */
 #[Fillable([
+    'product_code',
     'name',
     'description',
     'category_id',

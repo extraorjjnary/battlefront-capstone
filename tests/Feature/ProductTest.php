@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Schema;
 test('the product schema follows the approved ERD decisions', function () {
     expect(Schema::getColumnListing('products'))->toEqualCanonicalizing([
         'id',
+        'product_code',
         'name',
         'description',
         'category_id',
@@ -19,6 +20,17 @@ test('the product schema follows the approved ERD decisions', function () {
         'is_active',
         'created_at',
     ]);
+});
+
+test('spreadsheet product codes persist exactly and remain unique', function () {
+    $first = Product::factory()->create(['product_code' => '00123']);
+    $second = Product::factory()->create(['product_code' => 'SIX001601001999888']);
+
+    expect($first->refresh()->product_code)->toBe('00123')
+        ->and($second->refresh()->product_code)->toBe('SIX001601001999888');
+
+    expect(fn () => Product::factory()->create(['product_code' => '00123']))
+        ->toThrow(QueryException::class);
 });
 
 test('a product persists with its approved defaults and casts', function () {
