@@ -16,7 +16,7 @@ class ReviewCheckoutCart
      * Build a checkout-ready snapshot from current cart state.
      *
      * @return array{
-     *     items: list<array{id: int, quantity: int, product: array{id: int, name: string, brand: string, image_url: string|null}, unit_price: string, line_total: string}>,
+     *     items: list<array{id: int, quantity: int, product: array{id: int, name: string, brand: string|null, image_url: string|null}, unit_price: string, line_total: string}>,
      *     item_count: int,
      *     total_quantity: int,
      *     total: string

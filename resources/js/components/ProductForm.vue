@@ -132,15 +132,14 @@ function firstTagError(errors) {
                 </div>
 
                 <div class="grid gap-2">
-                    <Label for="brand">Brand</Label>
+                    <Label for="brand">Brand (optional)</Label>
                     <Input
                         id="brand"
                         name="brand"
                         :default-value="product?.brand"
                         maxlength="255"
-                        placeholder="AMD"
+                        placeholder="Enter a verified brand"
                         :aria-invalid="Boolean(errors.brand)"
-                        required
                     />
                     <InputError :message="errors.brand" />
                 </div>

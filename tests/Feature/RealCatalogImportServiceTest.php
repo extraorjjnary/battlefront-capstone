@@ -128,6 +128,32 @@ test('apply imports exact names and image paths by code without resetting existi
     }
 });
 
+test('blank verified brands import as null and later admin-entered brands survive blank reimports', function () {
+    Storage::fake('public');
+    $manifest = realCatalogManifest();
+    $mapping = realCatalogMapping([['00123', 'Exact Product™', 'Graphics Card', '', '', '3']]);
+
+    try {
+        $importer = app(RealCatalogImportService::class);
+        $first = $importer->execute($mapping, $manifest);
+        $product = Product::query()->sole();
+
+        expect($first['created'])->toBe(1);
+        expect($product->brand)->toBeNull();
+        expect($product->inventory->reorder_level)->toBe(3);
+
+        $product->update(['brand' => 'Verified later']);
+        $second = $importer->execute($mapping, $manifest);
+
+        expect($second['updated'])->toBe(1);
+        expect($product->refresh()->brand)->toBe('Verified later');
+        $this->assertDatabaseCount('products', 1);
+    } finally {
+        unlink($manifest);
+        unlink($mapping);
+    }
+});
+
 test('missing verified quantity blocks an import before any product is created', function () {
     Storage::fake('public');
     $manifest = realCatalogManifest(['quantity' => null]);
@@ -255,16 +281,16 @@ test('import retires only known demos and preserves order and cart history', fun
     }
 });
 
-test('incomplete supplemental data leaves demo products and all catalog tables untouched', function () {
+test('incomplete reorder levels leave demo products and all catalog tables untouched', function () {
     Storage::fake('public');
     $this->seed(DevelopmentCatalogSeeder::class);
     $manifest = realCatalogManifest();
-    $mapping = realCatalogMapping([['00123', 'Exact Product™', 'Graphics Card', '', '', '1']]);
+    $mapping = realCatalogMapping([['00123', 'Exact Product™', 'Graphics Card', '', '', '']]);
     $before = Product::query()->orderBy('id')->get()->toArray();
 
     try {
         expect(fn () => app(RealCatalogImportService::class)->execute($mapping, $manifest))
-            ->toThrow(RuntimeException::class, 'Verified brands are missing for 1 products');
+            ->toThrow(RuntimeException::class, 'Invalid or duplicate verified product details for code 00123.');
 
         expect(Product::query()->orderBy('id')->get()->toArray())->toBe($before);
         $this->assertDatabaseCount('categories', 4);

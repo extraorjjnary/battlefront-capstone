@@ -115,6 +115,7 @@ class ProductController extends Controller
             'filter_options' => [
                 ...$this->productOptions(),
                 'brands' => Product::query()
+                    ->whereNotNull('brand')
                     ->select('brand')
                     ->distinct()
                     ->orderBy('brand')

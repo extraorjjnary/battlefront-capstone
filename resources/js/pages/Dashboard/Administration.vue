@@ -337,11 +337,12 @@ defineOptions({
                                             {{ product.name }}
                                         </p>
                                         <p
+                                            v-if="product.brand || !product.is_active"
                                             class="text-muted-foreground mt-1 text-xs"
                                         >
                                             {{ product.brand }}
                                             <span v-if="!product.is_active">
-                                                · Inactive
+                                                {{ product.brand ? '· Inactive' : 'Inactive' }}
                                             </span>
                                         </p>
                                     </div>

@@ -124,6 +124,16 @@ test('the catalog returns an explicit empty result when no products are eligible
             ->where('products.total', 0));
 });
 
+test('the catalog includes products without verified brands but omits null brand filters', function () {
+    $product = Product::factory()->create(['brand' => null]);
+
+    $this->get(route('products.index'))->assertInertia(fn (Assert $page) => $page
+        ->component('Products/Index')
+        ->where('products.data.0.id', $product->id)
+        ->where('products.data.0.brand', null)
+        ->has('filter_options.brands', 0));
+});
+
 test('product details use authoritative catalog relationships and stock data', function () {
     $category = Category::factory()->create(['name' => 'Graphics Cards']);
     $gaming = Tag::factory()->create(['name' => 'Gaming']);

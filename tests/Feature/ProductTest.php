@@ -81,9 +81,17 @@ test('required product fields cannot be omitted', function (string $missingField
     'product code' => 'product_code',
     'name' => 'name',
     'category' => 'category_id',
-    'brand' => 'brand',
     'price' => 'price',
 ]);
+
+test('a product may have an unknown brand without weakening price constraints', function () {
+    $product = Product::factory()->create(['brand' => null]);
+
+    expect($product->refresh()->brand)->toBeNull();
+    $this->assertDatabaseHas('products', ['id' => $product->id, 'brand' => null]);
+    expect(fn () => Product::factory()->create(['brand' => null, 'price' => '-1.00']))
+        ->toThrow(QueryException::class);
+});
 
 test('the active scope retains inactive products and allows reactivation', function () {
     $activeProduct = Product::factory()->create();

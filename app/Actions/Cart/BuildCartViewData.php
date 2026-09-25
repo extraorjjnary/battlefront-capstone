@@ -19,7 +19,7 @@ class BuildCartViewData
      *     items: list<array{
      *         id: int,
      *         quantity: int,
-     *         product: array{id: int, name: string, brand: string, image_url: string|null, category: string, price: string, discount_price: string|null},
+     *         product: array{id: int, name: string, brand: string|null, image_url: string|null, category: string, price: string, discount_price: string|null},
      *         unit_price: string,
      *         line_total: string,
      *         availability: array{status: string, available_quantity: int|null}

@@ -70,6 +70,7 @@ const hasAvailableStock = computed(
                     </div>
 
                     <p
+                        v-if="product.brand"
                         class="text-primary mt-7 text-xs font-bold tracking-[0.18em] uppercase"
                     >
                         {{ product.brand }}

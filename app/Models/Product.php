@@ -24,7 +24,7 @@ use Illuminate\Support\Facades\Storage;
  * @property string $name
  * @property string|null $description
  * @property int $category_id
- * @property string $brand
+ * @property string|null $brand
  * @property string $price
  * @property bool $is_featured
  * @property string|null $discount_price

@@ -45,7 +45,7 @@ class SaveProductRequest extends FormRequest
                 'integer',
                 Rule::exists(Category::class, 'id'),
             ],
-            'brand' => ['bail', 'required', 'string', 'max:255'],
+            'brand' => ['bail', 'nullable', 'string', 'max:255'],
             'price' => [
                 'bail',
                 'required',
@@ -88,7 +88,6 @@ class SaveProductRequest extends FormRequest
             'name.required' => 'Enter a product name.',
             'category_id.required' => 'Select a category.',
             'category_id.exists' => 'Select a valid category.',
-            'brand.required' => 'Enter the product brand.',
             'price.required' => 'Enter the regular price.',
             'price.numeric' => 'The regular price must be a number.',
             'price.decimal' => 'Use no more than two decimal places for the regular price.',

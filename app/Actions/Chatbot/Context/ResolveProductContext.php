@@ -71,7 +71,7 @@ class ResolveProductContext
      * @return array{products: list<array{
      *     name: string,
      *     description: string|null,
-     *     brand: string,
+     *     brand: string|null,
      *     category: string,
      *     tags: list<string>,
      *     price: string,
@@ -124,7 +124,7 @@ class ResolveProductContext
      * @return array{
      *     name: string,
      *     description: string|null,
-     *     brand: string,
+     *     brand: string|null,
      *     category: string,
      *     tags: list<string>,
      *     price: string,

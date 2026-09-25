@@ -312,6 +312,23 @@ test('administrators can create products with an uploaded image and validated ta
     ]);
 });
 
+test('administrators can create a product without an unverified brand', function () {
+    $administrator = User::factory()->administrator()->create();
+    $category = Category::factory()->create();
+
+    $this->actingAs($administrator)->post(route('administration.products.store'), [
+        'product_code' => 'NOBRAND001',
+        'name' => 'Product awaiting brand verification',
+        'category_id' => $category->id,
+        'brand' => '',
+        'price' => '100.00',
+        'is_featured' => false,
+    ])->assertSessionHasNoErrors();
+
+    $product = Product::query()->where('product_code', 'NOBRAND001')->firstOrFail();
+    expect($product->brand)->toBeNull();
+});
+
 test('product details reject invalid catalog values', function (array $payload, array $errors) {
     $administrator = User::factory()->administrator()->create();
     $category = Category::factory()->create();
@@ -344,14 +361,12 @@ test('product details reject invalid catalog values', function (array $payload, 
         [
             'name' => null,
             'category_id' => null,
-            'brand' => null,
             'price' => null,
             'is_featured' => null,
         ],
         [
             'name' => 'Enter a product name.',
             'category_id' => 'Select a category.',
-            'brand' => 'Enter the product brand.',
             'price' => 'Enter the regular price.',
             'is_featured' => 'Choose whether this is a featured product.',
         ],
@@ -446,6 +461,24 @@ test('administrators can update product details and synchronize tags', function 
         'product_id' => $product->id,
         'tag_id' => $oldTag->id,
     ]);
+});
+
+test('administrators can add a verified brand to an imported product', function () {
+    $administrator = User::factory()->administrator()->create();
+    $product = Product::factory()->create(['brand' => null]);
+    $product->is_catalog_imported = true;
+    $product->save();
+
+    $this->actingAs($administrator)->put(route('administration.products.update', $product), [
+        'product_code' => $product->product_code,
+        'name' => $product->name,
+        'category_id' => $product->category_id,
+        'brand' => 'Verified Brand',
+        'price' => $product->price,
+        'is_featured' => false,
+    ])->assertSessionHasNoErrors();
+
+    expect($product->refresh()->brand)->toBe('Verified Brand');
 });
 
 test('updating a product without a new image keeps the existing image', function () {

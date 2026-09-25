@@ -431,7 +431,9 @@ defineOptions({
                             </Badge>
                         </div>
                         <p class="text-muted-foreground mt-1 text-sm">
-                            {{ product.product_code }} · {{ product.brand }} ·
+                            {{ product.product_code }}<span v-if="product.brand">
+                                · {{ product.brand }}</span
+                            > ·
                             {{ product.category.name }}
                             <span v-if="!product.category.is_active">
                                 (Inactive category)

@@ -109,6 +109,7 @@ const availabilityCopy = computed(() => {
                         </Badge>
                     </div>
                     <p
+                        v-if="item.product.brand"
                         class="text-muted-foreground mt-3 text-xs font-semibold tracking-wide uppercase"
                     >
                         {{ item.product.brand }}

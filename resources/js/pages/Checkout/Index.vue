@@ -546,7 +546,10 @@ defineOptions({
                                 {{ item.product.name }}
                             </p>
                             <p class="text-muted-foreground mt-1 text-xs">
-                                {{ item.product.brand }} · Qty
+                                <template v-if="item.product.brand">
+                                    {{ item.product.brand }} ·
+                                </template>
+                                Qty
                                 {{ item.quantity }}
                             </p>
                         </div>

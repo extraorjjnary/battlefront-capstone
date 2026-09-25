@@ -188,6 +188,7 @@ function submitReplacementProof() {
                             >
                                 <div class="min-w-0">
                                     <p
+                                        v-if="item.product.brand"
                                         class="text-primary text-xs font-semibold tracking-wide uppercase"
                                     >
                                         {{ item.product.brand }}

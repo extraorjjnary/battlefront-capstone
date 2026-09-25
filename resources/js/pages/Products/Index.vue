@@ -407,6 +407,7 @@ watch([categoryId, brand, tagId], updateFilters);
 
                             <div>
                                 <p
+                                    v-if="product.brand"
                                     class="text-muted-foreground text-xs font-semibold tracking-wide uppercase"
                                 >
                                     {{ product.brand }}

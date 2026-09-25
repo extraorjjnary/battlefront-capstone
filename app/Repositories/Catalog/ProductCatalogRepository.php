@@ -178,6 +178,7 @@ class ProductCatalogRepository
                 ->get(),
             'brands' => Product::query()
                 ->customerEligible()
+                ->whereNotNull('brand')
                 ->select('brand')
                 ->distinct()
                 ->orderBy('brand')

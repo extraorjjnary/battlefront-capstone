@@ -64,7 +64,7 @@ class ProductCatalogController extends Controller
      *     id: int,
      *     name: string,
      *     description: string|null,
-     *     brand: string,
+     *     brand: string|null,
      *     price: string,
      *     discount_price: string|null,
      *     image_url: string|null,

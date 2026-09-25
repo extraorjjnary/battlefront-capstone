@@ -122,7 +122,7 @@ class RealCatalogImportService
                 'product_code' => $code,
                 'name' => $name,
                 'category' => $category,
-                'brand' => $details['brand'],
+                'brand' => $details['brand'] === '' ? null : $details['brand'],
                 'price' => $price,
                 'quantity' => (int) $quantity,
                 'reorder_level' => (int) $details['reorder_level'],
@@ -160,7 +160,7 @@ class RealCatalogImportService
                 $product->fill([
                     'name' => $row['name'],
                     'category_id' => $category->id,
-                    'brand' => $row['brand'],
+                    'brand' => $row['brand'] ?? $product->brand,
                     'price' => $row['price'],
                 ]);
                 if (! ProductImagePaths::isAdminOwned($product->image_path, $product->id)) {
@@ -213,7 +213,6 @@ class RealCatalogImportService
 
             $mapping = [];
             $seenCodes = [];
-            $missingBrands = [];
             while (($cells = fgetcsv($handle, 0, ',', '"', '')) !== false) {
                 if ($cells === [null]) {
                     continue;
@@ -232,10 +231,6 @@ class RealCatalogImportService
                 }
 
                 $seenCodes[strtolower($code)] = true;
-                if ($brand === '') {
-                    $missingBrands[] = $code;
-                }
-
                 $mapping[$code] = [
                     'name' => $name,
                     'category' => $category,
@@ -243,10 +238,6 @@ class RealCatalogImportService
                     'quantity_override' => $quantityOverride,
                     'reorder_level' => $reorderLevel,
                 ];
-            }
-
-            if ($missingBrands !== []) {
-                throw new RuntimeException('Verified brands are missing for '.count($missingBrands).' products (including '.implode(', ', array_slice($missingBrands, 0, 10)).'). Complete the supplemental CSV before importing.');
             }
 
             return $mapping;
