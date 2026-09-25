@@ -78,7 +78,7 @@ class ResolveProductContext
      *     discount_price: string|null,
      *     is_demo: bool,
      *     demo_notice?: string,
-     *     inventory: array{quantity: int|null, status: 'unavailable'|'out_of_stock'|'in_stock'}
+     *     inventory: array{quantity: int|null, status: 'unavailable'|'out_of_stock'|'low_stock'|'in_stock'}
      * }>}
      */
     public function execute(string $message): array
@@ -131,7 +131,7 @@ class ResolveProductContext
      *     discount_price: string|null,
      *     is_demo: bool,
      *     demo_notice?: string,
-     *     inventory: array{quantity: int|null, status: 'unavailable'|'out_of_stock'|'in_stock'}
+     *     inventory: array{quantity: int|null, status: 'unavailable'|'out_of_stock'|'low_stock'|'in_stock'}
      * }
      */
     private function mapProduct(Product $product): array
@@ -157,6 +157,7 @@ class ResolveProductContext
                 'status' => match (true) {
                     $quantity === null => 'unavailable',
                     $quantity === 0 => 'out_of_stock',
+                    $quantity < $product->inventory->reorder_level => 'low_stock',
                     default => 'in_stock',
                 },
             ],

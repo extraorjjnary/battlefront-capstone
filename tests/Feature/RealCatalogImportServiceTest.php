@@ -101,7 +101,7 @@ test('dry run validates complete images and verified details without changing pr
     }
 });
 
-test('apply imports exact names and image paths by code without resetting existing stock', function () {
+test('reimport updates the verified reorder level without resetting existing quantity', function () {
     Storage::fake('public');
     $manifest = realCatalogManifest();
     $mapping = realCatalogMapping();
@@ -109,7 +109,12 @@ test('apply imports exact names and image paths by code without resetting existi
     try {
         $first = app(RealCatalogImportService::class)->execute($mapping, $manifest);
         $product = Product::query()->where('product_code', '00123')->firstOrFail();
-        $product->inventory()->update(['quantity' => 2]);
+        $product->inventory()->update(['quantity' => 2, 'reorder_level' => 7]);
+        $administratorProduct = Product::factory()->create();
+        $administratorInventory = $administratorProduct->inventory()->create([
+            'quantity' => 9,
+            'reorder_level' => 4,
+        ]);
         $second = app(RealCatalogImportService::class)->execute($mapping, $manifest);
 
         expect($first)->toBe(['created' => 1, 'updated' => 0, 'demo_deleted' => 0, 'demo_retained' => 0])
@@ -121,7 +126,9 @@ test('apply imports exact names and image paths by code without resetting existi
             ->and($product->inventory->quantity)->toBe(2)
             ->and($product->inventory->reorder_level)->toBe(3)
             ->and($product->tags->pluck('name')->sort()->values()->all())->toBe(['Gaming', 'Mid-Range', 'Productivity']);
-        $this->assertDatabaseCount('products', 1);
+        expect($administratorInventory->refresh()->quantity)->toBe(9);
+        expect($administratorInventory->reorder_level)->toBe(4);
+        $this->assertDatabaseCount('products', 2);
     } finally {
         unlink($manifest);
         unlink($mapping);
@@ -364,13 +371,13 @@ test('the private mapping records the approved temporary inventory values withou
     foreach ($manifest['entries'] as $entry) {
         $row = $rows[$entry['product_code']];
         expect($row['product_name'])->toBe($entry['name'])->not->toContain('[DEMO]');
-        expect($row['reorder_level'])->toBe('1');
+        expect($row['reorder_level'])->toBe('2');
         expect($row['quantity_override'])->toBe($entry['product_code'] === '80520996' ? '1' : '');
     }
     $source = collect($manifest['entries'])->firstWhere('product_code', '80520996');
     expect($source['quantity'])->toBeNull();
     $approvals = json_decode(file_get_contents(storage_path('app/private/product-catalog-images/development-value-approvals.json')), true, flags: JSON_THROW_ON_ERROR);
-    expect($approvals['reorder_level']['value'])->toBe(1);
+    expect($approvals['reorder_level']['value'])->toBe(2);
     expect($approvals['quantity_overrides'][0])->toMatchArray(['product_code' => '80520996', 'value' => 1]);
 });
 
@@ -382,7 +389,7 @@ test('the real package name and approved temporary stock import exactly with tes
         'category_slug' => 'bundles-packages', 'quantity' => null,
         'image_path' => 'products/bundles-packages/80520996.webp',
     ]);
-    $mapping = realCatalogMapping([['80520996', $name, 'Bundles & Packages', 'Test-only brand fixture', '1', '1']]);
+    $mapping = realCatalogMapping([['80520996', $name, 'Bundles & Packages', 'Test-only brand fixture', '1', '2']]);
 
     try {
         app(RealCatalogImportService::class)->execute($mapping, $manifest);
@@ -391,7 +398,7 @@ test('the real package name and approved temporary stock import exactly with tes
         expect($product->name)->toBe($name)->not->toContain('[DEMO]');
         expect($product->product_code)->toBe('80520996');
         expect($product->inventory->quantity)->toBe(1);
-        expect($product->inventory->reorder_level)->toBe(1);
+        expect($product->inventory->reorder_level)->toBe(2);
         expect($product->image_path)->toBe('products/bundles-packages/80520996.webp');
     } finally {
         unlink($manifest);

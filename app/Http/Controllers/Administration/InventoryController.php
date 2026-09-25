@@ -37,7 +37,7 @@ class InventoryController extends Controller
                 'stock_status' => match (true) {
                     $product->inventory === null => 'not_initialized',
                     $product->inventory->quantity === 0 => 'out_of_stock',
-                    $product->is_low_stock => 'low',
+                    $product->is_low_stock => 'low_stock',
                     default => 'in_stock',
                 },
                 'category' => $product->category->name,
@@ -60,6 +60,7 @@ class InventoryController extends Controller
                 'categories' => $inventoryRepository->categories(),
             ],
             'low_stock_count' => $inventoryRepository->lowStockCount(),
+            'out_of_stock_count' => $inventoryRepository->outOfStockCount(),
         ]);
     }
 

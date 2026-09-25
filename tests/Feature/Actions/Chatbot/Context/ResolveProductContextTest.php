@@ -21,7 +21,7 @@ test('finds arbitrary catalog products through supported attributes', function (
         ['name' => 'Enterprise'],
     )->create();
     $product->tags()->attach($tags);
-    Inventory::factory()->for($product)->create(['quantity' => 7]);
+    Inventory::factory()->for($product)->create(['quantity' => 7, 'reorder_level' => 2]);
 
     $context = app(ResolveProductContext::class)->execute($message);
 
@@ -143,6 +143,18 @@ test('reports zero and missing Sagay inventory without hiding eligible products'
             'quantity' => 0,
             'status' => 'out_of_stock',
         ]);
+});
+
+test('reports positive inventory below the reorder level as low stock', function () {
+    $product = Product::factory()->create(['name' => 'Aurelius Low Stock Router']);
+    Inventory::factory()->for($product)->create(['quantity' => 1, 'reorder_level' => 2]);
+
+    $context = app(ResolveProductContext::class)->execute('Aurelius Low Stock Router');
+
+    expect($context['products'][0]['inventory'])->toBe([
+        'quantity' => 1,
+        'status' => 'low_stock',
+    ]);
 });
 
 test('excludes inactive products and products in inactive categories', function () {

@@ -5,6 +5,7 @@ import {
     Boxes,
     ChartNoAxesCombined,
     CircleAlert,
+    CircleX,
     Clock3,
     PackageSearch,
     ReceiptText,
@@ -111,7 +112,7 @@ defineOptions({
                     Operations summary
                 </h2>
                 <dl
-                    class="border-border bg-card grid border sm:grid-cols-2 lg:grid-cols-4"
+                    class="border-border bg-card grid border sm:grid-cols-2 lg:grid-cols-5"
                 >
                     <div
                         class="border-border border-b p-5 sm:border-r lg:border-b-0"
@@ -159,7 +160,9 @@ defineOptions({
                             Currently being fulfilled
                         </p>
                     </div>
-                    <div class="p-5">
+                    <div
+                        class="border-border border-b p-5 sm:border-r sm:border-b-0"
+                    >
                         <dt class="text-muted-foreground text-sm">
                             Low-stock products
                         </dt>
@@ -167,7 +170,22 @@ defineOptions({
                             {{ dashboard.kpis.low_stock_products }}
                         </dd>
                         <p class="text-muted-foreground mt-1 text-xs">
-                            Below their reorder level
+                            Stock remains below the reorder level
+                        </p>
+                    </div>
+                    <div
+                        class="border-destructive/50 bg-destructive/5 border-t p-5 sm:col-span-2 lg:col-span-1 lg:border-t-0 lg:border-l"
+                    >
+                        <dt class="text-destructive text-sm font-semibold">
+                            Out-of-stock products
+                        </dt>
+                        <dd
+                            class="text-destructive mt-2 text-2xl font-bold tabular-nums"
+                        >
+                            {{ dashboard.kpis.out_of_stock_products }}
+                        </dd>
+                        <p class="text-muted-foreground mt-1 text-xs">
+                            No units available
                         </p>
                     </div>
                 </dl>
@@ -275,6 +293,79 @@ defineOptions({
                             </div>
                         </div>
 
+                        <div
+                            class="border-destructive/40 bg-destructive/5 border-b p-5"
+                        >
+                            <div class="flex items-start justify-between gap-4">
+                                <div class="flex gap-3">
+                                    <span
+                                        class="bg-destructive/10 text-destructive flex size-10 shrink-0 items-center justify-center rounded-md"
+                                    >
+                                        <CircleX
+                                            class="size-5"
+                                            aria-hidden="true"
+                                        />
+                                    </span>
+                                    <div>
+                                        <h3
+                                            class="text-destructive font-semibold"
+                                        >
+                                            Out-of-stock inventory
+                                        </h3>
+                                        <p
+                                            class="text-muted-foreground mt-1 text-sm"
+                                        >
+                                            {{
+                                                dashboard.kpis
+                                                    .out_of_stock_products
+                                            }}
+                                            products have no units available.
+                                        </p>
+                                    </div>
+                                </div>
+                                <Button variant="ghost" size="sm" as-child>
+                                    <Link
+                                        :href="
+                                            InventoryController.index({
+                                                query: {
+                                                    stock: 'out_of_stock',
+                                                },
+                                            })
+                                        "
+                                    >
+                                        Inventory
+                                        <ArrowRight aria-hidden="true" />
+                                    </Link>
+                                </Button>
+                            </div>
+                            <p
+                                v-if="
+                                    dashboard.needs_attention
+                                        .out_of_stock_products.length === 0
+                                "
+                                class="text-muted-foreground mt-5 border-t pt-4 text-sm"
+                            >
+                                No products are out of stock.
+                            </p>
+                            <div v-else class="mt-5 divide-y">
+                                <div
+                                    v-for="product in dashboard.needs_attention
+                                        .out_of_stock_products"
+                                    :key="product.id"
+                                    class="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
+                                >
+                                    <p class="min-w-0 truncate font-semibold">
+                                        {{ product.name }}
+                                    </p>
+                                    <span
+                                        class="text-destructive shrink-0 text-xs font-semibold"
+                                    >
+                                        Out of stock
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="p-5">
                             <div class="flex items-start justify-between gap-4">
                                 <div class="flex gap-3">
@@ -302,7 +393,7 @@ defineOptions({
                                     <Link
                                         :href="
                                             InventoryController.index({
-                                                query: { stock: 'low' },
+                                                query: { stock: 'low_stock' },
                                             })
                                         "
                                     >
@@ -337,18 +428,25 @@ defineOptions({
                                             {{ product.name }}
                                         </p>
                                         <p
-                                            v-if="product.brand || !product.is_active"
+                                            v-if="
+                                                product.brand ||
+                                                !product.is_active
+                                            "
                                             class="text-muted-foreground mt-1 text-xs"
                                         >
                                             {{ product.brand }}
                                             <span v-if="!product.is_active">
-                                                {{ product.brand ? '· Inactive' : 'Inactive' }}
+                                                {{
+                                                    product.brand
+                                                        ? '· Inactive'
+                                                        : 'Inactive'
+                                                }}
                                             </span>
                                         </p>
                                     </div>
                                     <div class="shrink-0 text-right">
                                         <p
-                                            class="text-destructive font-bold tabular-nums"
+                                            class="text-primary font-bold tabular-nums"
                                         >
                                             {{ product.quantity }} in stock
                                         </p>

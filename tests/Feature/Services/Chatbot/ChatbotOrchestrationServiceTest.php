@@ -131,7 +131,7 @@ test('sends only matched catalog and Sagay inventory facts for a product inquiry
     ]);
     $tag = Tag::factory()->create(['name' => 'Field Ready']);
     $product->tags()->attach($tag);
-    Inventory::factory()->for($product)->create(['quantity' => 7]);
+    Inventory::factory()->for($product)->create(['quantity' => 7, 'reorder_level' => 2]);
     Product::factory()->create([
         'name' => 'Unrelated Device',
         'description' => 'Unrelated private product detail.',

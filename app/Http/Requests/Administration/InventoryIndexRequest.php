@@ -29,7 +29,7 @@ class InventoryIndexRequest extends FormRequest
             'stock' => [
                 'nullable',
                 'string',
-                Rule::in(['all', 'in_stock', 'low', 'out_of_stock', 'not_initialized']),
+                Rule::in(['all', 'in_stock', 'low_stock', 'out_of_stock', 'not_initialized']),
             ],
             'page' => ['nullable', 'integer', 'min:1'],
         ];

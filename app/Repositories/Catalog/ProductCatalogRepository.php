@@ -102,7 +102,7 @@ class ProductCatalogRepository
             ])
             ->with([
                 'category:id,name',
-                'inventory:id,product_id,quantity',
+                'inventory:id,product_id,quantity,reorder_level',
                 'tags:id,name',
             ]);
     }

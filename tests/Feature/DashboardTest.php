@@ -124,6 +124,11 @@ test('administrators receive authoritative operational dashboard data', function
         'quantity' => 10,
         'reorder_level' => 5,
     ]);
+    $outOfStockProduct = Product::factory()->create(['name' => 'Out of Stock Mouse']);
+    Inventory::factory()->for($outOfStockProduct)->create([
+        'quantity' => 0,
+        'reorder_level' => 5,
+    ]);
 
     $response = $this
         ->actingAs($administrator)
@@ -137,6 +142,7 @@ test('administrators receive authoritative operational dashboard data', function
         ->where('dashboard.kpis.pending_orders', 1)
         ->where('dashboard.kpis.processing_orders', 1)
         ->where('dashboard.kpis.low_stock_products', 1)
+        ->where('dashboard.kpis.out_of_stock_products', 1)
         ->where('dashboard.needs_attention.pending_payment_reviews', 1)
         ->has('dashboard.needs_attention.payment_orders', 1)
         ->where('dashboard.needs_attention.payment_orders.0.reference', $pendingOrder->reference)
@@ -144,6 +150,9 @@ test('administrators receive authoritative operational dashboard data', function
         ->has('dashboard.needs_attention.low_stock_products', 1)
         ->where('dashboard.needs_attention.low_stock_products.0.id', $lowStockProduct->id)
         ->where('dashboard.needs_attention.low_stock_products.0.quantity', 2)
+        ->has('dashboard.needs_attention.out_of_stock_products', 1)
+        ->where('dashboard.needs_attention.out_of_stock_products.0.id', $outOfStockProduct->id)
+        ->where('dashboard.needs_attention.out_of_stock_products.0.quantity', 0)
         ->has('dashboard.recent_orders', 5)
         ->where('dashboard.recent_orders.0.reference', $pendingOrder->reference)
         ->where('dashboard.recent_orders.0.item_count', 2)
@@ -185,9 +194,11 @@ test('administrators receive stable empty dashboard data', function () {
             'pending_orders' => 0,
             'processing_orders' => 0,
             'low_stock_products' => 0,
+            'out_of_stock_products' => 0,
         ])
         ->where('dashboard.needs_attention.pending_payment_reviews', 0)
         ->has('dashboard.needs_attention.payment_orders', 0)
         ->has('dashboard.needs_attention.low_stock_products', 0)
+        ->has('dashboard.needs_attention.out_of_stock_products', 0)
         ->has('dashboard.recent_orders', 0));
 });

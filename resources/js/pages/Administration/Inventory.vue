@@ -33,6 +33,7 @@ const props = defineProps({
     filters: { type: Object, required: true },
     filter_options: { type: Object, required: true },
     low_stock_count: { type: Number, required: true },
+    out_of_stock_count: { type: Number, required: true },
 });
 
 const categoryId = ref(String(props.filters.category_id ?? 'all'));
@@ -57,7 +58,7 @@ const stockFilterSummary = computed(
     () =>
         ({
             in_stock: 'in-stock',
-            low: 'low-stock',
+            low_stock: 'low-stock',
             out_of_stock: 'out-of-stock',
             not_initialized: 'not-initialized',
         })[props.filters.stock] ?? '',
@@ -182,7 +183,8 @@ defineOptions({
                     >
                         Review current product stock and maintain the quantity
                         and reorder level used by Battlefront operations. Stock
-                        is low when its quantity falls below its reorder level.
+                        is low when it has units remaining below its reorder
+                        level.
                     </p>
                 </div>
             </div>
@@ -206,17 +208,40 @@ defineOptions({
                     </h2>
                 </div>
 
-                <div
-                    class="border-border bg-card flex items-center gap-3 border px-4 py-3"
-                >
-                    <TriangleAlert class="text-primary size-4" />
-                    <div>
-                        <p class="text-sm font-semibold tabular-nums">
-                            {{ low_stock_count }} low-stock products
-                        </p>
-                        <p class="text-muted-foreground text-xs">
-                            Across the full inventory
-                        </p>
+                <div class="flex flex-wrap gap-3">
+                    <div
+                        class="border-border bg-card flex items-center gap-3 border px-4 py-3"
+                    >
+                        <TriangleAlert
+                            class="text-primary size-4"
+                            aria-hidden="true"
+                        />
+                        <div>
+                            <p class="text-sm font-semibold tabular-nums">
+                                {{ low_stock_count }} low-stock products
+                            </p>
+                            <p class="text-muted-foreground text-xs">
+                                Units remain below reorder level
+                            </p>
+                        </div>
+                    </div>
+                    <div
+                        class="border-destructive/50 bg-destructive/5 flex items-center gap-3 border px-4 py-3"
+                    >
+                        <CircleX
+                            class="text-destructive size-4"
+                            aria-hidden="true"
+                        />
+                        <div>
+                            <p
+                                class="text-destructive text-sm font-bold tabular-nums"
+                            >
+                                {{ out_of_stock_count }} out-of-stock products
+                            </p>
+                            <p class="text-muted-foreground text-xs">
+                                No units available
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -321,7 +346,9 @@ defineOptions({
                                 <SelectItem value="in_stock"
                                     >In stock</SelectItem
                                 >
-                                <SelectItem value="low">Low stock</SelectItem>
+                                <SelectItem value="low_stock"
+                                    >Low stock</SelectItem
+                                >
                                 <SelectItem value="out_of_stock"
                                     >Out of stock</SelectItem
                                 >
@@ -399,24 +426,26 @@ defineOptions({
                             <Badge
                                 v-if="product.stock_status === 'out_of_stock'"
                                 variant="outline"
-                                class="border-destructive/50 text-destructive"
+                                class="border-destructive/50 bg-destructive/10 text-destructive"
                             >
                                 <CircleX />
                                 Out of stock
                             </Badge>
                             <Badge
-                                v-else-if="product.stock_status === 'low'"
+                                v-else-if="product.stock_status === 'low_stock'"
                                 variant="outline"
-                                class="border-destructive/50 text-destructive"
+                                class="border-primary/40 text-primary"
                             >
                                 <TriangleAlert />
                                 Low stock
                             </Badge>
                         </div>
                         <p class="text-muted-foreground mt-1 text-sm">
-                            {{ product.product_code }}<span v-if="product.brand">
+                            {{ product.product_code
+                            }}<span v-if="product.brand">
                                 · {{ product.brand }}</span
-                            > ·
+                            >
+                            ·
                             {{ product.category }}
                         </p>
                         <p

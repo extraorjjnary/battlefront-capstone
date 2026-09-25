@@ -169,10 +169,13 @@ class RealCatalogImportService
                 $product->is_catalog_imported = true;
                 $product->save();
 
-                Inventory::query()->firstOrCreate(
+                $inventory = Inventory::query()->firstOrCreate(
                     ['product_id' => $product->id],
                     ['quantity' => $row['quantity'], 'reorder_level' => $row['reorder_level']],
                 );
+                if ($inventory->reorder_level !== $row['reorder_level']) {
+                    $inventory->update(['reorder_level' => $row['reorder_level']]);
+                }
 
                 $tagIds = [];
                 foreach ($row['tags'] as $tagName) {

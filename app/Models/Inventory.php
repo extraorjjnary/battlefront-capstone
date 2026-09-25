@@ -55,7 +55,19 @@ class Inventory extends Model
     #[Scope]
     protected function lowStock(Builder $query): void
     {
-        $query->whereColumn('quantity', '<', 'reorder_level');
+        $query->where('quantity', '>', 0)
+            ->whereColumn('quantity', '<', 'reorder_level');
+    }
+
+    /**
+     * Scope a query to inventory with no remaining stock.
+     *
+     * @param  Builder<Inventory>  $query
+     */
+    #[Scope]
+    protected function outOfStock(Builder $query): void
+    {
+        $query->where('quantity', 0);
     }
 
     /**

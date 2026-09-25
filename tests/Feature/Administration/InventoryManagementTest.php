@@ -42,6 +42,7 @@ test('administrators can view initialized and uninitialized product inventory', 
         ->component('Administration/Inventory')
         ->where('filters.stock', 'all')
         ->where('low_stock_count', 0)
+        ->where('out_of_stock_count', 0)
         ->has('products.data', 2)
         ->where('products.data.0.name', 'AMD Ryzen 7 9700X')
         ->where('products.data.0.is_low_stock', false)
@@ -81,16 +82,17 @@ test('administrators can filter products with low stock remaining', function () 
 
     $response = $this
         ->actingAs($administrator)
-        ->get(route('administration.inventory.index', ['stock' => 'low']));
+        ->get(route('administration.inventory.index', ['stock' => 'low_stock']));
 
     $response->assertInertia(fn (Assert $page) => $page
         ->component('Administration/Inventory')
-        ->where('filters.stock', 'low')
-        ->where('low_stock_count', 2)
+        ->where('filters.stock', 'low_stock')
+        ->where('low_stock_count', 1)
+        ->where('out_of_stock_count', 1)
         ->where('products.total', 1)
         ->where('products.data.0.name', 'Low Stock Product')
         ->where('products.data.0.is_low_stock', true)
-        ->where('products.data.0.stock_status', 'low'));
+        ->where('products.data.0.stock_status', 'low_stock'));
 });
 
 test('administrators can filter inventory by stock status', function (string $stock, string $expectedName) {
@@ -141,6 +143,20 @@ test('invalid inventory filters are rejected', function () {
         ->assertSessionHasErrors(['category_id', 'stock', 'page']);
 });
 
+test('zero quantity is out of stock even when the reorder level is zero', function () {
+    $administrator = User::factory()->administrator()->create();
+    $product = Product::factory()->create(['name' => 'Zero Threshold Product']);
+    Inventory::factory()->for($product)->create(['quantity' => 0, 'reorder_level' => 0]);
+
+    $this->actingAs($administrator)
+        ->get(route('administration.inventory.index', ['stock' => 'out_of_stock']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('out_of_stock_count', 1)
+            ->where('low_stock_count', 0)
+            ->where('products.total', 1)
+            ->where('products.data.0.stock_status', 'out_of_stock'));
+});
+
 test('administrators can search and filter inventory records', function () {
     $administrator = User::factory()->administrator()->create();
     $processors = Category::factory()->create(['name' => 'Processors']);
@@ -175,13 +191,13 @@ test('administrators can search and filter inventory records', function () {
         ->get(route('administration.inventory.index', [
             'q' => 'Ryzen',
             'category_id' => $processors->id,
-            'stock' => 'low',
+            'stock' => 'low_stock',
         ]));
 
     $response->assertInertia(fn (Assert $page) => $page
         ->where('filters.q', 'Ryzen')
         ->where('filters.category_id', $processors->id)
-        ->where('filters.stock', 'low')
+        ->where('filters.stock', 'low_stock')
         ->has('products.data', 1)
         ->where('products.data.0.id', $target->id)
         ->where('products.data.0.is_active', false)
@@ -226,7 +242,7 @@ test('inventory pagination preserves the active query', function () {
         ->get(route('administration.inventory.index', [
             'q' => 'Matching',
             'category_id' => $category->id,
-            'stock' => 'low',
+            'stock' => 'low_stock',
         ]));
 
     $nextPageUrl = $response->inertiaProps('products.next_page_url');
@@ -275,7 +291,7 @@ test('administrators can initialize missing inventory', function () {
         ->actingAs($administrator)
         ->from(route('administration.inventory.index', [
             'q' => 'Temporary product search',
-            'stock' => 'low',
+            'stock' => 'low_stock',
         ]))
         ->post(route('administration.products.inventory.store', $product), [
             'quantity' => 12,

@@ -40,11 +40,8 @@ class InventoryRepository
                 fn (Builder $query, int $categoryId): Builder => $query->where('category_id', $categoryId),
             )
             ->when(
-                $stockFilter === 'low',
-                fn (Builder $query): Builder => $query->whereHas(
-                    'lowStockInventory',
-                    fn (Builder $inventoryQuery): Builder => $inventoryQuery->where('quantity', '>', 0),
-                ),
+                $stockFilter === 'low_stock',
+                fn (Builder $query): Builder => $query->whereHas('lowStockInventory'),
             )
             ->when(
                 $stockFilter === 'in_stock',
@@ -85,5 +82,10 @@ class InventoryRepository
     public function lowStockCount(): int
     {
         return Inventory::query()->lowStock()->count();
+    }
+
+    public function outOfStockCount(): int
+    {
+        return Inventory::query()->outOfStock()->count();
     }
 }

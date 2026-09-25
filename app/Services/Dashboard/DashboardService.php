@@ -40,6 +40,7 @@ class DashboardService
             )
             ->first();
         $lowStockQuery = Inventory::query()->lowStock();
+        $outOfStockQuery = Inventory::query()->outOfStock();
 
         return [
             'kpis' => [
@@ -48,11 +49,13 @@ class DashboardService
                 'pending_orders' => (int) $orderSummary->pending_orders,
                 'processing_orders' => (int) $orderSummary->processing_orders,
                 'low_stock_products' => (clone $lowStockQuery)->count(),
+                'out_of_stock_products' => (clone $outOfStockQuery)->count(),
             ],
             'needs_attention' => [
                 'pending_payment_reviews' => (int) $orderSummary->pending_payment_reviews,
                 'payment_orders' => $this->paymentReviewOrders(),
-                'low_stock_products' => $this->lowStockProducts($lowStockQuery),
+                'out_of_stock_products' => $this->stockProducts($outOfStockQuery),
+                'low_stock_products' => $this->stockProducts($lowStockQuery),
             ],
             'recent_orders' => $this->recentOrders(),
         ];
@@ -129,12 +132,12 @@ class DashboardService
     }
 
     /**
-     * @param  Builder<Inventory>  $lowStockQuery
+     * @param  Builder<Inventory>  $stockQuery
      * @return list<array<string, mixed>>
      */
-    private function lowStockProducts(Builder $lowStockQuery): array
+    private function stockProducts(Builder $stockQuery): array
     {
-        return array_values($lowStockQuery
+        return array_values($stockQuery
             ->select(['id', 'product_id', 'quantity', 'reorder_level'])
             ->with('product:id,name,brand,is_active')
             ->orderBy('quantity')
