@@ -66,18 +66,19 @@ function returnToCatalog() {
             </Button>
 
             <article
-                class="border-border bg-card mt-6 grid overflow-hidden border lg:grid-cols-[minmax(0,1.05fr)_minmax(24rem,0.95fr)]"
+                class="border-border bg-card mt-6 grid overflow-hidden border lg:grid-cols-[minmax(0,1.3fr)_minmax(22rem,1fr)]"
             >
                 <div
-                    class="border-border aspect-square overflow-hidden border-b lg:aspect-auto lg:min-h-155 lg:border-r lg:border-b-0"
+                    class="border-border aspect-square overflow-hidden border-b sm:aspect-4/3 lg:aspect-auto lg:h-144 lg:max-h-[70vh] lg:border-r lg:border-b-0"
                 >
                     <ProductImage
                         :image-url="product.image_url"
                         :product-name="product.name"
+                        contain
                     />
                 </div>
 
-                <div class="flex flex-col p-6 sm:p-9 lg:p-12">
+                <div class="flex flex-col p-6 sm:p-9">
                     <div class="flex flex-wrap items-center gap-2">
                         <Badge variant="secondary">
                             {{ product.category.name }}
@@ -92,7 +93,7 @@ function returnToCatalog() {
                         {{ product.brand }}
                     </p>
                     <h1
-                        class="mt-2 text-3xl leading-tight font-bold tracking-tight sm:text-4xl"
+                        class="mt-2 text-2xl leading-tight font-bold tracking-tight break-words sm:text-3xl"
                     >
                         {{ product.name }}
                     </h1>
@@ -160,8 +161,12 @@ function returnToCatalog() {
                             </Link>
                         </Button>
                     </section>
+                </div>
 
-                    <section class="mt-7" aria-labelledby="description-heading">
+                <div
+                    class="border-border grid gap-8 border-t p-6 sm:p-9 lg:col-span-2 lg:grid-cols-[minmax(0,1.3fr)_minmax(22rem,1fr)]"
+                >
+                    <section aria-labelledby="description-heading">
                         <h2 id="description-heading" class="font-semibold">
                             Product description
                         </h2>
@@ -186,7 +191,7 @@ function returnToCatalog() {
                         </div>
                     </section>
 
-                    <section class="mt-8" aria-labelledby="tags-heading">
+                    <section aria-labelledby="tags-heading">
                         <h2
                             id="tags-heading"
                             class="flex items-center gap-2 font-semibold"

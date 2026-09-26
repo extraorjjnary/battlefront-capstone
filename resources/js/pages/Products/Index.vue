@@ -134,9 +134,9 @@ watch([categoryId, brand, tagId], updateFilters);
 
         <StorefrontHeader active-section="products" />
 
-        <main class="mx-auto max-w-7xl px-5 py-10 sm:px-8 sm:py-14">
+        <main class="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
             <section
-                class="border-border bg-card relative overflow-hidden border px-6 py-10 sm:px-10 lg:grid lg:grid-cols-[1.45fr_0.55fr] lg:items-end lg:gap-12 lg:px-14 lg:py-14"
+                class="border-border bg-card relative overflow-hidden border px-6 py-8 sm:px-10 lg:grid lg:grid-cols-[1.45fr_0.55fr] lg:items-end lg:gap-10"
                 aria-labelledby="catalog-heading"
             >
                 <div
@@ -145,7 +145,7 @@ watch([categoryId, brand, tagId], updateFilters);
                 />
                 <div>
                     <div
-                        class="border-primary/30 bg-primary/10 text-primary mb-5 flex size-11 items-center justify-center border"
+                        class="border-primary/30 bg-primary/10 text-primary mb-4 flex size-11 items-center justify-center border"
                     >
                         <PackageSearch class="size-5" aria-hidden="true" />
                     </div>
@@ -156,12 +156,12 @@ watch([categoryId, brand, tagId], updateFilters);
                     </p>
                     <h1
                         id="catalog-heading"
-                        class="mt-3 max-w-3xl text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl"
+                        class="mt-3 max-w-3xl text-3xl font-bold tracking-tight sm:text-4xl"
                     >
                         Computer hardware, clearly presented
                     </h1>
                     <p
-                        class="text-muted-foreground mt-5 max-w-2xl text-base leading-7 sm:text-lg"
+                        class="text-muted-foreground mt-4 max-w-2xl text-base leading-7"
                     >
                         Review current product details, pricing, and stock
                         availability before choosing the right hardware for your
@@ -187,7 +187,7 @@ watch([categoryId, brand, tagId], updateFilters);
             </section>
 
             <section
-                class="border-border bg-card mt-8 border p-5 sm:p-6"
+                class="border-border bg-card mt-6 border p-5 sm:p-6"
                 aria-labelledby="catalog-filters-heading"
             >
                 <div class="flex items-start gap-3">
@@ -208,7 +208,7 @@ watch([categoryId, brand, tagId], updateFilters);
                 </div>
 
                 <div
-                    class="mt-6 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
+                    class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
                 >
                     <div class="grid gap-2">
                         <Label for="catalog-search">Search products</Label>
@@ -250,7 +250,7 @@ watch([categoryId, brand, tagId], updateFilters);
                     </Button>
                 </div>
 
-                <div class="border-border mt-6 border-t pt-6">
+                <div class="border-border mt-4 border-t pt-4">
                     <div>
                         <h3 class="font-semibold">Filter products</h3>
                         <p class="text-muted-foreground mt-1 text-sm">
@@ -346,7 +346,7 @@ watch([categoryId, brand, tagId], updateFilters);
                 </div>
             </section>
 
-            <section class="mt-12" aria-labelledby="product-list-heading">
+            <section class="mt-8" aria-labelledby="product-list-heading">
                 <div class="mb-6 flex items-end justify-between gap-6">
                     <div>
                         <p
@@ -374,7 +374,7 @@ watch([categoryId, brand, tagId], updateFilters);
                     v-if="products.data.length"
                     data="products"
                     :buffer="300"
-                    class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
+                    class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
                 >
                     <Link
                         v-for="product in products.data"
@@ -386,7 +386,7 @@ watch([categoryId, brand, tagId], updateFilters);
                         "
                         class="border-border bg-card focus-visible:ring-ring group hover:border-primary/60 flex min-h-full flex-col overflow-hidden border transition-colors focus-visible:ring-2 focus-visible:outline-none"
                     >
-                        <div class="aspect-4/3 overflow-hidden">
+                        <div class="aspect-3/2 overflow-hidden">
                             <ProductImage
                                 :image-url="product.image_url"
                                 :product-name="product.name"
@@ -394,7 +394,7 @@ watch([categoryId, brand, tagId], updateFilters);
                             />
                         </div>
 
-                        <article class="flex flex-1 flex-col gap-4 p-5">
+                        <article class="flex flex-1 flex-col gap-3 p-4">
                             <div class="flex flex-wrap items-center gap-2">
                                 <Badge variant="secondary">
                                     {{ product.category.name }}
@@ -424,7 +424,7 @@ watch([categoryId, brand, tagId], updateFilters);
                                 </p>
                             </div>
 
-                            <div class="mt-auto flex flex-col gap-4">
+                            <div class="mt-auto flex flex-col gap-3">
                                 <ProductPrice
                                     :price="product.price"
                                     :discount-price="product.discount_price"
