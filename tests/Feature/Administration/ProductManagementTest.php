@@ -76,6 +76,76 @@ test('guests are redirected when viewing catalog products', function () {
         ->assertRedirect(route('login'));
 });
 
+test('administrators can view a product with its catalog details and low stock', function () {
+    $administrator = User::factory()->administrator()->create();
+    $category = Category::factory()->create(['name' => 'Processors']);
+    $tag = Tag::factory()->create(['name' => 'Gaming']);
+    $product = Product::factory()->for($category)->has(Inventory::factory()->state([
+        'quantity' => 1,
+        'reorder_level' => 2,
+    ]))->create([
+        'product_code' => '80520996',
+        'name' => 'Ryzen 7 Processor',
+        'description' => 'Eight cores',
+        'brand' => null,
+        'price' => '21999.00',
+        'discount_price' => '19999.00',
+        'image_path' => 'products/processors/80520996.webp',
+        'is_active' => false,
+    ]);
+    $product->tags()->attach($tag);
+
+    $this->actingAs($administrator)->get(route('administration.products.show', $product))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Administration/Products/Show')
+            ->where('product.id', $product->id)
+            ->where('product.product_code', '80520996')
+            ->where('product.name', 'Ryzen 7 Processor')
+            ->where('product.description', 'Eight cores')
+            ->where('product.brand', null)
+            ->where('product.price', '21999.00')
+            ->where('product.discount_price', '19999.00')
+            ->where('product.image_url', $product->image_url)
+            ->where('product.is_active', false)
+            ->where('product.category.name', 'Processors')
+            ->where('product.tags.0.name', 'Gaming')
+            ->where('product.inventory.quantity', 1)
+            ->where('product.inventory.reorder_level', 2)
+            ->where('product.stock_status', 'low_stock'));
+});
+
+test('product detail uses the inventory thresholds and handles missing inventory', function (?int $quantity, string $status) {
+    $administrator = User::factory()->administrator()->create();
+    $product = Product::factory()->create();
+
+    if ($quantity !== null) {
+        Inventory::factory()->for($product)->create(['quantity' => $quantity, 'reorder_level' => 2]);
+    }
+
+    $response = $this->actingAs($administrator)->get(route('administration.products.show', $product));
+
+    $response->assertInertia(fn (Assert $page) => $page->where('product.stock_status', $status));
+
+    if ($quantity === null) {
+        $response->assertInertia(fn (Assert $page) => $page->where('product.inventory', null));
+    } else {
+        $response->assertInertia(fn (Assert $page) => $page->where('product.inventory.quantity', $quantity));
+    }
+})->with([
+    'out of stock' => [0, 'out_of_stock'],
+    'at reorder level' => [2, 'in_stock'],
+    'above reorder level' => [3, 'in_stock'],
+    'not initialized' => [null, 'not_initialized'],
+]);
+
+test('only administrators can open product detail', function () {
+    $product = Product::factory()->create();
+
+    $this->get(route('administration.products.show', $product))->assertRedirect(route('login'));
+    $this->actingAs(User::factory()->customer()->create())
+        ->get(route('administration.products.show', $product))->assertForbidden();
+});
+
 test('customers are forbidden from catalog product actions', function () {
     $customer = User::factory()->customer()->create();
 

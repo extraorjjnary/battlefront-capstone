@@ -157,6 +157,39 @@ class ProductController extends Controller
     }
 
     /**
+     * Display the specified product and its current stock.
+     */
+    public function show(Product $product): Response
+    {
+        $product->load(['category:id,name,is_active', 'tags:id,name', 'inventory:id,product_id,quantity,reorder_level']);
+
+        return Inertia::render('Administration/Products/Show', [
+            'product' => [
+                ...$product->only([
+                    'id',
+                    'product_code',
+                    'name',
+                    'description',
+                    'brand',
+                    'price',
+                    'discount_price',
+                    'is_active',
+                ]),
+                'image_url' => $product->image_url,
+                'category' => $product->category->only(['name', 'is_active']),
+                'tags' => $product->tags->map(fn (Tag $tag): array => $tag->only(['id', 'name']))->values(),
+                'inventory' => $product->inventory?->only(['quantity', 'reorder_level']),
+                'stock_status' => match (true) {
+                    $product->inventory === null => 'not_initialized',
+                    $product->inventory->quantity === 0 => 'out_of_stock',
+                    $product->inventory->quantity < $product->inventory->reorder_level => 'low_stock',
+                    default => 'in_stock',
+                },
+            ],
+        ]);
+    }
+
+    /**
      * Show the form for editing the specified resource.
      */
     public function edit(Product $product): Response

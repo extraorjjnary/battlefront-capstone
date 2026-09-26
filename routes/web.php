@@ -89,7 +89,7 @@ Route::middleware(['auth', 'can:access-administration'])
     ->group(function () {
         // products
         Route::resource('products', ProductController::class)
-            ->except(['show', 'destroy']);
+            ->except(['destroy']);
         Route::patch('products/{product}/activation', ProductActivationController::class)
             ->name('products.activation.update');
 
