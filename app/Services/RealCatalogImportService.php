@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Actions\Product\ProductImagePaths;
-use App\Actions\Product\RetireDemoCatalog;
 use App\Models\Category;
 use App\Models\Inventory;
 use App\Models\Product;
@@ -13,10 +12,7 @@ use RuntimeException;
 
 class RealCatalogImportService
 {
-    public function __construct(
-        private readonly CatalogImagePipeline $images,
-        private readonly RetireDemoCatalog $retireDemoCatalog,
-    ) {}
+    public function __construct(private readonly CatalogImagePipeline $images) {}
 
     public function writeTemplate(string $outputPath, ?string $manifestPath = null): int
     {
@@ -140,7 +136,7 @@ class RealCatalogImportService
     }
 
     /**
-     * @return array{created: int, updated: int, demo_deleted: int, demo_retained: int}
+     * @return array{created: int, updated: int}
      */
     public function execute(string $mappingPath, ?string $manifestPath = null): array
     {
@@ -190,7 +186,7 @@ class RealCatalogImportService
                 }
             }
 
-            return ['created' => $created, 'updated' => $updated, ...$this->retireDemoCatalog->execute()];
+            return ['created' => $created, 'updated' => $updated];
         });
     }
 

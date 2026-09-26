@@ -5,7 +5,6 @@ use App\Models\Category;
 use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\Tag;
-use Database\Seeders\DevelopmentCatalogSeeder;
 
 test('finds arbitrary catalog products through supported attributes', function (string $message) {
     $category = Category::factory()->create(['name' => 'Field Networking']);
@@ -52,8 +51,14 @@ test('finds arbitrary catalog products through supported attributes', function (
     'case and punctuation' => ['  ARE HELIOS-LABS products available?!  '],
 ]);
 
-test('resolves natural brand and category questions against seeded demo catalog records', function (string $message) {
-    $this->seed(DevelopmentCatalogSeeder::class);
+test('resolves natural brand and category questions against a historical demo product', function (string $message) {
+    $category = Category::factory()->create(['name' => 'Storage']);
+    Product::factory()->for($category)->create([
+        'name' => '[DEMO] Samsung Sprint NVMe SSD',
+        'brand' => 'Samsung',
+        'price' => '4599.00',
+        'description' => null,
+    ]);
 
     $context = app(ResolveProductContext::class)->execute($message);
 

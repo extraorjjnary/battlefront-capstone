@@ -108,7 +108,6 @@ Artisan::command('catalog:import-real {mapping} {--manifest=} {--apply}', functi
 
     $result = $importer->execute($mapping, $manifest);
     $this->info("Imported {$result['created']} new products and updated {$result['updated']} existing products.");
-    $this->info("Removed {$result['demo_deleted']} unreferenced demos; retained {$result['demo_retained']} inactive historical products.");
 
     return 0;
 })->purpose('Validate or apply the real catalog using verified product details');

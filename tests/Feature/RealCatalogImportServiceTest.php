@@ -1,12 +1,13 @@
 <?php
 
 use App\Models\CartItem;
+use App\Models\Category;
+use App\Models\Inventory;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\CatalogImagePipeline;
 use App\Services\RealCatalogImportService;
-use Database\Seeders\DevelopmentCatalogSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
@@ -117,8 +118,8 @@ test('reimport updates the verified reorder level without resetting existing qua
         ]);
         $second = app(RealCatalogImportService::class)->execute($mapping, $manifest);
 
-        expect($first)->toBe(['created' => 1, 'updated' => 0, 'demo_deleted' => 0, 'demo_retained' => 0])
-            ->and($second)->toBe(['created' => 0, 'updated' => 1, 'demo_deleted' => 0, 'demo_retained' => 0])
+        expect($first)->toBe(['created' => 1, 'updated' => 0])
+            ->and($second)->toBe(['created' => 0, 'updated' => 1])
             ->and($product->refresh()->name)->toBe('Exact Product™')
             ->and($product->brand)->toBe('Biostar')
             ->and($product->image_path)->toBe('products/graphics-card/00123.webp')
@@ -250,47 +251,49 @@ test('an admin replacement preserves its manifest image and survives future impo
     }
 });
 
-test('import retires only known demos and preserves order and cart history', function () {
+test('import preserves existing products and their order and cart history', function () {
     Storage::fake('public');
-    $this->seed(DevelopmentCatalogSeeder::class);
-    $orderedProduct = Product::query()->where('name', '[DEMO] NVIDIA Atlas Graphics Card')->firstOrFail();
-    $cartProduct = Product::query()->where('name', '[DEMO] Intel Horizon Processor')->firstOrFail();
+    $category = Category::factory()->create(['name' => 'Storage']);
+    $orderedProduct = Product::factory()->for($category)->create([
+        'name' => 'Samsung Sprint NVMe SSD',
+        'is_featured' => true,
+    ]);
+    $cartProduct = Product::factory()->for($category)->create(['name' => 'Crucial Archive SATA SSD']);
+    foreach ([$orderedProduct, $cartProduct] as $existingProduct) {
+        Inventory::factory()->for($existingProduct)->create();
+    }
     $orderItem = OrderItem::factory()->for($orderedProduct)->create(['quantity' => 2, 'price_at_time' => '100.00']);
     $cartItem = CartItem::factory()->for($cartProduct)->create();
-    $inventory = $orderedProduct->inventory->getAttributes();
-    $unrelated = Product::factory()->create(['name' => '[DEMO] An unrelated admin product']);
+    $orderedProductAttributes = $orderedProduct->refresh()->getAttributes();
+    $cartProductAttributes = $cartProduct->refresh()->getAttributes();
+    $orderedInventoryAttributes = $orderedProduct->inventory->getAttributes();
     $manifest = realCatalogManifest();
     $mapping = realCatalogMapping();
 
     try {
         $result = app(RealCatalogImportService::class)->execute($mapping, $manifest);
 
-        expect($result)->toBe(['created' => 1, 'updated' => 0, 'demo_deleted' => 6, 'demo_retained' => 2]);
-        $this->assertDatabaseCount('products', 4);
+        expect($result)->toBe(['created' => 1, 'updated' => 0]);
+        $this->assertDatabaseCount('products', 3);
         $this->assertDatabaseCount('inventories', 3);
         $this->assertDatabaseHas('order_items', ['id' => $orderItem->id, 'product_id' => $orderedProduct->id, 'quantity' => 2, 'price_at_time' => '100.00']);
         $this->assertModelExists($cartItem);
-        $this->assertModelExists($unrelated);
-        expect($orderedProduct->refresh()->name)->toBe('NVIDIA Atlas Graphics Card');
-        expect($orderedProduct->is_active)->toBeFalse();
-        expect($orderedProduct->inventory->getAttributes())->toBe($inventory);
-        expect($cartProduct->refresh()->name)->toBe('Intel Horizon Processor');
-        expect($cartProduct->is_active)->toBeFalse();
-        expect($orderedProduct->category->name)->not->toContain('[DEMO]');
-        expect($orderedProduct->category->is_active)->toBeFalse();
+        expect($orderedProduct->refresh()->getAttributes())->toBe($orderedProductAttributes);
+        expect($cartProduct->refresh()->getAttributes())->toBe($cartProductAttributes);
+        expect($orderedProduct->inventory->getAttributes())->toBe($orderedInventoryAttributes);
 
         app(RealCatalogImportService::class)->execute($mapping, $manifest);
-        $this->seed(DevelopmentCatalogSeeder::class);
-        $this->assertDatabaseCount('products', 4);
+        $this->assertDatabaseCount('products', 3);
     } finally {
         unlink($manifest);
         unlink($mapping);
     }
 });
 
-test('incomplete reorder levels leave demo products and all catalog tables untouched', function () {
+test('incomplete reorder levels leave existing products and all catalog tables untouched', function () {
     Storage::fake('public');
-    $this->seed(DevelopmentCatalogSeeder::class);
+    $existingProduct = Product::factory()->create(['name' => 'Existing Admin Product']);
+    Inventory::factory()->for($existingProduct)->create();
     $manifest = realCatalogManifest();
     $mapping = realCatalogMapping([['00123', 'Exact Product™', 'Graphics Card', '', '', '']]);
     $before = Product::query()->orderBy('id')->get()->toArray();
@@ -300,8 +303,8 @@ test('incomplete reorder levels leave demo products and all catalog tables untou
             ->toThrow(RuntimeException::class, 'Invalid or duplicate verified product details for code 00123.');
 
         expect(Product::query()->orderBy('id')->get()->toArray())->toBe($before);
-        $this->assertDatabaseCount('categories', 4);
-        $this->assertDatabaseCount('inventories', 8);
+        $this->assertDatabaseCount('categories', 1);
+        $this->assertDatabaseCount('inventories', 1);
     } finally {
         unlink($manifest);
         unlink($mapping);
@@ -327,7 +330,7 @@ test('an import code cannot silently take over an administrator product', functi
     }
 });
 
-test('a database failure rolls back imported catalog changes before demo retirement', function () {
+test('a database failure rolls back imported catalog changes', function () {
     Storage::fake('public');
     $manifest = realCatalogManifest();
     $mapping = realCatalogMapping();

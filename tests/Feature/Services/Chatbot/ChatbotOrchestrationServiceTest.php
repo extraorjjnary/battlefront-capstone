@@ -21,7 +21,6 @@ use App\Models\Tag;
 use App\Models\User;
 use App\Services\Chatbot\ChatbotAiAdapter;
 use App\Services\Chatbot\ChatbotOrchestrationService;
-use Database\Seeders\DevelopmentCatalogSeeder;
 use Illuminate\Support\Facades\Http;
 use Laravel\Ai\Exceptions\AiException;
 use Laravel\Ai\Exceptions\ProviderConnectionException;
@@ -373,7 +372,12 @@ test('passes matched demo products to Gemini as unconfirmed samples instead of m
     ChatbotResponseAgent::fake([
         'This is a demo listing; Battlefront stock is unconfirmed.',
     ])->preventStrayPrompts();
-    $this->seed(DevelopmentCatalogSeeder::class);
+    Product::factory()->create([
+        'name' => '[DEMO] Samsung Sprint NVMe SSD',
+        'brand' => 'Samsung',
+        'price' => '4599.00',
+        'description' => null,
+    ]);
 
     $result = app(ChatbotOrchestrationService::class)->respond(
         'Do you have Samsung product available currently?',
