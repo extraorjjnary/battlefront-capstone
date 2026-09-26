@@ -18,7 +18,6 @@ use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
- * @property int|null $branch_id
  * @property string $name
  * @property string $email
  * @property Carbon|null $email_verified_at
@@ -32,7 +31,6 @@ use Illuminate\Support\Carbon;
  * @property string|null $remember_token
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
- * @property-read Branch|null $branch
  * @property-read Cart|null $cart
  * @property-read Collection<int, Order> $orders
  */
@@ -82,15 +80,6 @@ class User extends Authenticatable
         return $this->role === UserRole::Administrator;
     }
 
-    /**
-     * Get the branch associated with the user.
-     *
-     * @return BelongsTo<Branch, $this>
-     */
-    public function branch(): BelongsTo
-    {
-        return $this->belongsTo(Branch::class);
-    }
 
     /**
      * Get the customer's cart.

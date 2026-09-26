@@ -5,7 +5,7 @@ use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Schema;
 
-test('the branch schema follows the manuscript ERD', function () {
+test('the branch schema follows the current application design', function () {
     expect(Schema::getColumnListing('branches'))->toEqualCanonicalizing([
         'id',
         'name',
@@ -14,17 +14,9 @@ test('the branch schema follows the manuscript ERD', function () {
         'contact_number',
         'latitude',
         'longitude',
-    ])->and(Schema::hasColumn('users', 'branch_id'))->toBeTrue();
+    ])->and(Schema::hasColumn('users', 'branch_id'))->toBeFalse();
 });
 
-test('a user may belong to a branch', function () {
-    $branch = Branch::factory()->create();
-    $user = User::factory()->for($branch)->create();
-
-    expect($user->branch->is($branch))->toBeTrue()
-        ->and($branch->users->first()->is($user))->toBeTrue()
-        ->and(fn () => $branch->delete())->toThrow(QueryException::class);
-});
 
 test('branch reference data can be seeded repeatedly', function () {
     $this->seed();
