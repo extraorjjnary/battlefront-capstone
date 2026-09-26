@@ -56,16 +56,32 @@ class RealCatalogImportService
      */
     public function inspect(string $mappingPath, ?string $manifestPath = null): array
     {
+        $prepared = $this->inspectFiles($mappingPath, $manifestPath);
+
+        foreach ($prepared as $row) {
+            $code = $row['product_code'];
+            $existing = Product::query()->where('product_code', $code)->first();
+            if ($existing !== null && (! $existing->is_catalog_imported || $existing->product_code !== $code)) {
+                throw new RuntimeException("Product code $code conflicts with an existing product. No products were imported.");
+            }
+        }
+
+        return $prepared;
+    }
+
+    /**
+     * Validate the restore files without requiring an existing database schema.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function inspectFiles(string $mappingPath, ?string $manifestPath = null): array
+    {
         $entries = $this->images->importEntries($manifestPath);
         $mapping = $this->readMapping($mappingPath);
         $prepared = [];
 
         foreach ($entries as $entry) {
             $code = $entry['product_code'];
-            $existing = Product::query()->where('product_code', $code)->first();
-            if ($existing !== null && (! $existing->is_catalog_imported || $existing->product_code !== $code)) {
-                throw new RuntimeException("Product code $code conflicts with an existing product. No products were imported.");
-            }
             if (! isset($mapping[$code])) {
                 throw new RuntimeException("Verified product details are missing for code $code.");
             }
