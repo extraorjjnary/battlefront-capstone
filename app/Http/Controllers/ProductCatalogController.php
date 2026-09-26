@@ -24,9 +24,9 @@ class ProductCatalogController extends Controller
             ->through(fn (Product $product): array => $this->catalogData($product));
 
         return Inertia::render('Products/Index', [
-            'products' => $products,
+            'products' => Inertia::scroll($products),
             'filters' => $filters,
-            'filter_options' => $this->productCatalogRepository->filterOptions(),
+            'filter_options' => fn (): array => $this->productCatalogRepository->filterOptions(),
         ]);
     }
 

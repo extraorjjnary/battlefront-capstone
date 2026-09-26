@@ -21,13 +21,6 @@ class ProductCatalogRepository
     public function paginate(array $filters): LengthAwarePaginator
     {
         return $this->catalogQuery($filters)
-            ->orderByRaw(<<<'SQL'
-                CASE
-                    WHEN has_stock = 0 THEN 3
-                    WHEN is_low_stock = 1 THEN 2
-                    ELSE 1
-                END
-                SQL)
             ->orderByDesc('is_featured')
             ->orderBy('name')
             ->orderBy('id')
@@ -212,10 +205,7 @@ class ProductCatalogRepository
                 'inventory:id,product_id,quantity',
                 'tags:id,name',
             ])
-            ->withExists([
-                'inventory as has_stock' => fn (Builder $query): Builder => $query->where('quantity', '>', 0),
-                'lowStockInventory as is_low_stock',
-            ])
+            ->withExists('lowStockInventory as is_low_stock')
             ->when($filters['q'] ?? null, function (Builder $query, string $search): void {
                 $query->where(function (Builder $query) use ($search): void {
                     $query

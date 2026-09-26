@@ -9,6 +9,7 @@ import StockAvailability from '@/components/catalog/StockAvailability.vue';
 import StorefrontHeader from '@/components/StorefrontHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { consumeCatalogVisit } from '@/lib/catalogReturn';
 import { login } from '@/routes';
 import { index as productIndex } from '@/routes/products';
 
@@ -24,6 +25,11 @@ const canUseCustomerCart = computed(
 const hasAvailableStock = computed(
     () => Number(props.product.inventory.quantity) > 0,
 );
+const canReturnToCatalog = consumeCatalogVisit(props.product.id);
+
+function returnToCatalog() {
+    window.history.back();
+}
 </script>
 
 <template>
@@ -42,7 +48,17 @@ const hasAvailableStock = computed(
         <StorefrontHeader active-section="products" />
 
         <main class="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-12">
-            <Button as-child variant="ghost" class="-ml-3">
+            <Button
+                v-if="canReturnToCatalog"
+                type="button"
+                variant="ghost"
+                class="-ml-3"
+                @click="returnToCatalog"
+            >
+                <ArrowLeft aria-hidden="true" />
+                Back to products
+            </Button>
+            <Button v-else as-child variant="ghost" class="-ml-3">
                 <Link :href="productIndex()">
                     <ArrowLeft aria-hidden="true" />
                     Back to products

@@ -1,5 +1,5 @@
 <script setup>
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, InfiniteScroll, Link, router } from '@inertiajs/vue3';
 import {
     ArrowRight,
     Boxes,
@@ -9,12 +9,12 @@ import {
     X,
 } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
-import CatalogPagination from '@/components/CatalogPagination.vue';
 import ProductImage from '@/components/catalog/ProductImage.vue';
 import ProductPrice from '@/components/catalog/ProductPrice.vue';
 import StockAvailability from '@/components/catalog/StockAvailability.vue';
 import StorefrontHeader from '@/components/StorefrontHeader.vue';
 import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
+import { rememberCatalogVisit } from '@/lib/catalogReturn';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,6 +44,8 @@ const { search, isSearching, clearSearch, cancelPendingSearch } =
         currentSearch: () => props.filters.q,
         route: productIndex,
         query: selectedFilters,
+        reset: ['products'],
+        preserveScroll: false,
     });
 
 const hasSearch = computed(() => Boolean(props.filters.q));
@@ -59,15 +61,6 @@ const hasActiveQuery = computed(
 
 function selectedValue(value) {
     return value === 'all' ? undefined : value;
-}
-
-function catalogPage(options) {
-    return productIndex({
-        query: {
-            ...props.filters,
-            page: options.query.page,
-        },
-    });
 }
 
 function appliedFilters() {
@@ -111,9 +104,10 @@ function updateFilters() {
             },
         }),
         {
-            preserveScroll: true,
+            preserveScroll: false,
             preserveState: true,
             replace: true,
+            reset: ['products'],
         },
     );
 }
@@ -371,13 +365,15 @@ watch([categoryId, brand, tagId], updateFilters);
                         v-if="products.total"
                         class="text-muted-foreground hidden text-sm sm:block"
                     >
-                        Showing {{ products.from }} to {{ products.to }} of
+                        Showing {{ products.data.length }} of
                         {{ products.total }}
                     </p>
                 </div>
 
-                <div
+                <InfiniteScroll
                     v-if="products.data.length"
+                    data="products"
+                    :buffer="300"
                     class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3"
                 >
                     <Link
@@ -385,6 +381,9 @@ watch([categoryId, brand, tagId], updateFilters);
                         :key="product.id"
                         :href="productShow(product.id)"
                         prefetch
+                        @click.capture="
+                            rememberCatalogVisit($event, product.id)
+                        "
                         class="border-border bg-card focus-visible:ring-ring group hover:border-primary/60 flex min-h-full flex-col overflow-hidden border transition-colors focus-visible:ring-2 focus-visible:outline-none"
                     >
                         <div class="aspect-4/3 overflow-hidden">
@@ -444,7 +443,22 @@ watch([categoryId, brand, tagId], updateFilters);
                             </div>
                         </article>
                     </Link>
-                </div>
+                    <template #next="{ loading, hasMore }">
+                        <p
+                            v-if="loading"
+                            role="status"
+                            class="text-muted-foreground mt-6 text-center text-sm"
+                        >
+                            Loading more products...
+                        </p>
+                        <p
+                            v-else-if="!hasMore"
+                            class="text-muted-foreground mt-6 text-center text-sm"
+                        >
+                            You've reached the end of the catalog.
+                        </p>
+                    </template>
+                </InfiniteScroll>
 
                 <div
                     v-else
@@ -490,13 +504,6 @@ watch([categoryId, brand, tagId], updateFilters);
                         </Button>
                     </div>
                 </div>
-
-                <CatalogPagination
-                    :current-page="products.current_page"
-                    :last-page="products.last_page"
-                    :route="catalogPage"
-                    label="Product catalog pages"
-                />
             </section>
         </main>
     </div>

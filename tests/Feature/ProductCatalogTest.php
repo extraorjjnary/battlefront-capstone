@@ -40,7 +40,7 @@ test('guests can browse paginated customer eligible products in stable order', f
         ->not->toContain('Hidden category product');
 });
 
-test('catalog products are ordered by availability featured status name and id', function () {
+test('catalog products are ordered by featured status name and id regardless of availability', function () {
     $inStockZulu = Product::factory()->create([
         'name' => 'Zulu in-stock product',
         'is_featured' => true,
@@ -93,24 +93,24 @@ test('catalog products are ordered by availability featured status name and id',
     expect(collect($response->inertiaProps('products.data'))->pluck('id')->all())
         ->toBe([
             $inStockZulu->id,
+            $lowStockZulu->id,
+            $outOfStock->id,
             $inStockAlpha->id,
+            $lowStockAlpha->id,
+            $uninitialized->id,
             $inStockDuplicateFirst->id,
             $inStockDuplicateSecond->id,
-            $lowStockZulu->id,
-            $lowStockAlpha->id,
-            $outOfStock->id,
-            $uninitialized->id,
         ]);
     expect(collect($response->inertiaProps('products.data'))->pluck('inventory.status')->all())
         ->toBe([
             'in_stock',
-            'in_stock',
-            'in_stock',
-            'in_stock',
-            'low_stock',
             'low_stock',
             'out_of_stock',
+            'in_stock',
+            'low_stock',
             'unavailable',
+            'in_stock',
+            'in_stock',
         ]);
 });
 
@@ -333,6 +333,82 @@ test('catalog pagination preserves active filters and deterministic ordering', f
         ->toContain('category_id='.$category->id)
         ->toContain('brand=Battlefront%20Demo')
         ->toContain('tag_id='.$tag->id);
+});
+
+test('catalog scroll requests return one page with next and previous page metadata', function () {
+    Product::factory()->count(13)->create();
+
+    $firstPage = $this->get(route('products.index'));
+    $initialPage = $firstPage->viewData('page');
+
+    $firstPage->assertInertia(fn (Assert $page) => $page->has('products.data', 12));
+    expect($initialPage['scrollProps']['products'])->toBe([
+        'pageName' => 'page',
+        'previousPage' => null,
+        'nextPage' => 2,
+        'currentPage' => 1,
+        'reset' => false,
+    ]);
+
+    $lastPage = $this->withHeaders([
+        'X-Inertia' => 'true',
+        'X-Inertia-Version' => $initialPage['version'],
+        'X-Inertia-Partial-Component' => 'Products/Index',
+        'X-Inertia-Partial-Data' => 'products',
+    ])->get(route('products.index', ['page' => 2]));
+
+    $lastPage
+        ->assertJsonCount(1, 'props.products.data')
+        ->assertJsonPath('scrollProps.products.currentPage', 2)
+        ->assertJsonPath('scrollProps.products.nextPage', null)
+        ->assertJsonPath('scrollProps.products.previousPage', 1);
+
+    expect(array_keys($lastPage->json('props')))
+        ->toContain('products')
+        ->not->toContain('filter_options');
+});
+
+test('a filtered catalog scroll response resets previously accumulated products', function () {
+    Product::factory()->create(['name' => 'Graphics Card']);
+    Product::factory()->create(['name' => 'Keyboard']);
+    $version = $this->get(route('products.index'))->viewData('page')['version'];
+
+    $response = $this->withHeaders([
+        'X-Inertia' => 'true',
+        'X-Inertia-Version' => $version,
+        'X-Inertia-Partial-Component' => 'Products/Index',
+        'X-Inertia-Partial-Data' => 'products',
+        'X-Inertia-Reset' => 'products',
+    ])->get(route('products.index', ['q' => 'Graphics']));
+
+    $response
+        ->assertJsonCount(1, 'props.products.data')
+        ->assertJsonPath('props.products.data.0.name', 'Graphics Card')
+        ->assertJsonPath('scrollProps.products.reset', true);
+});
+
+test('stock changes between catalog pages do not duplicate or skip products', function () {
+    $products = Product::factory()
+        ->count(13)
+        ->sequence(fn ($sequence): array => [
+            'name' => sprintf('Product %02d', $sequence->index + 1),
+        ])
+        ->create();
+    $products->each(fn (Product $product) => Inventory::factory()->for($product)->create([
+        'quantity' => 5,
+        'reorder_level' => 2,
+    ]));
+
+    $firstPage = $this->get(route('products.index'));
+    $products->first()->inventory()->update(['quantity' => 0]);
+    $secondPage = $this->get(route('products.index', ['page' => 2]));
+
+    $loadedIds = [
+        ...collect($firstPage->inertiaProps('products.data'))->pluck('id')->all(),
+        ...collect($secondPage->inertiaProps('products.data'))->pluck('id')->all(),
+    ];
+
+    expect($loadedIds)->toBe($products->modelKeys());
 });
 
 test('catalog query parameters are validated', function (string $field, mixed $value, string $message) {

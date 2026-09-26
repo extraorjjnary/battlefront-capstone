@@ -7,6 +7,8 @@ export function useDebouncedSearch({
     route,
     query = () => ({}),
     debounceMs = 400,
+    reset = [],
+    preserveScroll = true,
 }) {
     const search = ref(initialSearch ?? '');
     const isSearching = ref(false);
@@ -37,9 +39,10 @@ export function useDebouncedSearch({
                 },
             }),
             {
-                preserveScroll: true,
+                preserveScroll,
                 preserveState: true,
                 replace: true,
+                reset,
                 onCancelToken: (token) => {
                     cancelToken = token;
                 },
