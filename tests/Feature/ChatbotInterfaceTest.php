@@ -63,7 +63,9 @@ test('customers receive only the chatbot response fields for a supported inquiry
     $this->actingAs($customer)
         ->postJson(route('chatbot.store'), ['message' => 'Where is the Sagay store?'])
         ->assertOk()
-        ->assertExactJson([
+        ->assertJsonCount(3)
+        ->assertJsonStructure(['message', 'source', 'context_token'])
+        ->assertJson([
             'message' => 'The Sagay store is at the confirmed address.',
             'source' => 'gemini',
         ]);
@@ -103,8 +105,10 @@ test('guests can ask about catalog products', function () {
 
     $this->postJson(route('chatbot.store'), ['message' => 'Is the Aurelius Link Station available?'])
         ->assertOk()
-        ->assertExactJson([
-            'message' => 'The Aurelius Link Station is available.',
+        ->assertJsonCount(3)
+        ->assertJsonStructure(['message', 'source', 'context_token'])
+        ->assertJson([
+            'message' => 'The Aurelius Link Station is available. Live inventory information covers the Sagay branch only.',
             'source' => 'gemini',
         ]);
 
@@ -122,7 +126,9 @@ test('guests can ask about store information', function () {
 
     $this->postJson(route('chatbot.store'), ['message' => 'Where is the Sagay store?'])
         ->assertOk()
-        ->assertExactJson([
+        ->assertJsonCount(3)
+        ->assertJsonStructure(['message', 'source', 'context_token'])
+        ->assertJson([
             'message' => 'The Sagay store is at the confirmed address.',
             'source' => 'gemini',
         ]);
@@ -142,7 +148,9 @@ test('guests can ask approved FAQ questions', function () {
 
     $this->postJson(route('chatbot.store'), ['message' => 'What payment methods are accepted?'])
         ->assertOk()
-        ->assertExactJson([
+        ->assertJsonCount(3)
+        ->assertJsonStructure(['message', 'source', 'context_token'])
+        ->assertJson([
             'message' => 'These are the approved payment methods.',
             'source' => 'gemini',
         ]);
@@ -159,7 +167,9 @@ test('guest order inquiries require sign-in without resolving an order or callin
 
     $this->postJson(route('chatbot.store'), ['message' => sprintf($messageFormat, $order->reference)])
         ->assertOk()
-        ->assertExactJson([
+        ->assertJsonCount(3)
+        ->assertJsonStructure(['message', 'source', 'context_token'])
+        ->assertJson([
             'message' => 'Please sign in with a customer account to check order status.',
             'source' => 'fallback',
         ]);
@@ -194,7 +204,9 @@ test('sensitive customer input returns a safe fallback before context or Gemini 
 
     $this->postJson(route('chatbot.store'), ['message' => $message])
         ->assertOk()
-        ->assertExactJson([
+        ->assertJsonCount(3)
+        ->assertJsonStructure(['message', 'source', 'context_token'])
+        ->assertJson([
             'message' => 'Please remove sensitive information from your question and try again.',
             'source' => 'fallback',
         ]);
@@ -222,7 +234,9 @@ test('customers can ask about their own order', function () {
     $this->actingAs($customer)
         ->postJson(route('chatbot.store'), ['message' => "Track my order {$order->reference}."])
         ->assertOk()
-        ->assertExactJson([
+        ->assertJsonCount(3)
+        ->assertJsonStructure(['message', 'source', 'context_token'])
+        ->assertJson([
             'message' => 'Your order is pending.',
             'source' => 'gemini',
         ]);
@@ -247,7 +261,9 @@ test('unsupported inquiries reach the customer as a safe fallback', function () 
     $this->actingAs($customer)
         ->postJson(route('chatbot.store'), ['message' => 'Recommend the best laptop.'])
         ->assertOk()
-        ->assertExactJson([
+        ->assertJsonCount(3)
+        ->assertJsonStructure(['message', 'source', 'context_token'])
+        ->assertJson([
             'message' => 'I can only help with Battlefront products, your orders, store information, payment methods, pickup, and delivery.',
             'source' => 'fallback',
         ]);
@@ -267,7 +283,9 @@ test('provider failures reach the customer as a safe fallback', function () {
     $this->actingAs($customer)
         ->postJson(route('chatbot.store'), ['message' => 'Where is the Sagay store?'])
         ->assertOk()
-        ->assertExactJson([
+        ->assertJsonCount(3)
+        ->assertJsonStructure(['message', 'source', 'context_token'])
+        ->assertJson([
             'message' => 'The chatbot is temporarily unavailable. Please try again later.',
             'source' => 'fallback',
         ]);
@@ -288,7 +306,9 @@ test('another customers order never reaches Gemini through the chatbot endpoint'
             'message' => "Track my order {$foreignOrder->reference}.",
         ])
         ->assertOk()
-        ->assertExactJson([
+        ->assertJsonCount(3)
+        ->assertJsonStructure(['message', 'source', 'context_token'])
+        ->assertJson([
             'message' => "I couldn't find a matching order in your account.",
             'source' => 'fallback',
         ]);

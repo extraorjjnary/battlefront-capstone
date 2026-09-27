@@ -1,12 +1,13 @@
 <script setup>
-import { useHttp } from '@inertiajs/vue3';
+import { useHttp, usePage } from '@inertiajs/vue3';
 import { LoaderCircle, MessageSquareText, Send, X } from '@lucide/vue';
-import { nextTick, ref } from 'vue';
+import { nextTick, ref, watch } from 'vue';
 import ChatbotController from '@/actions/App/Http/Controllers/ChatbotController';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 
-const inquiry = useHttp({ message: '' });
+const inquiry = useHttp({ message: '', context_token: null });
+const page = usePage();
 const messages = ref([]);
 const isOpen = ref(false);
 const pendingMessage = ref('');
@@ -16,6 +17,20 @@ const conversation = ref(null);
 const composer = ref(null);
 const launcher = ref(null);
 let nextMessageId = 1;
+let conversationVersion = 0;
+
+function startNewChat() {
+    conversationVersion++;
+    messages.value = [];
+    inquiry.message = '';
+    inquiry.context_token = null;
+    inquiry.clearErrors();
+    inputError.value = '';
+    requestError.value = '';
+    pendingMessage.value = '';
+}
+
+watch(() => page.props.auth?.user?.id ?? null, startNewChat);
 
 async function openPanel() {
     isOpen.value = true;
@@ -66,6 +81,7 @@ async function submitMessage() {
     }
 
     pendingMessage.value = message;
+    const submittedVersion = conversationVersion;
     void scrollToLatest();
 
     try {
@@ -77,7 +93,7 @@ async function submitMessage() {
             },
         });
 
-        if (!response) {
+        if (!response || submittedVersion !== conversationVersion) {
             return;
         }
 
@@ -91,6 +107,7 @@ async function submitMessage() {
             },
         );
         inquiry.message = '';
+        inquiry.context_token = response.context_token ?? null;
     } catch {
         requestError.value ||= 'Unable to send your question. Please try again.';
     } finally {
@@ -142,6 +159,15 @@ async function submitMessage() {
                             Customer support
                         </p>
                     </div>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        :disabled="inquiry.processing"
+                        @click="startNewChat"
+                    >
+                        New chat
+                    </Button>
                     <Button
                         type="button"
                         variant="ghost"

@@ -2,13 +2,14 @@
 
 namespace App\Services\Chatbot;
 
-use App\Actions\Chatbot\CategorizeChatbotQuery;
 use App\Actions\Chatbot\Context\ResolveFaqContext;
 use App\Actions\Chatbot\Context\ResolveOrderContext;
 use App\Actions\Chatbot\Context\ResolveProductContext;
 use App\Actions\Chatbot\Context\ResolveStoreContext;
+use App\Actions\Chatbot\RouteChatbotQuery;
 use App\Enums\ChatbotQueryCategory;
 use App\Models\User;
+use Closure;
 use Illuminate\Support\Str;
 
 class ChatbotOrchestrationService
@@ -44,7 +45,7 @@ class ChatbotOrchestrationService
     ];
 
     public function __construct(
-        private CategorizeChatbotQuery $categorizeChatbotQuery,
+        private RouteChatbotQuery $routeChatbotQuery,
         private ResolveProductContext $resolveProductContext,
         private ResolveOrderContext $resolveOrderContext,
         private ResolveStoreContext $resolveStoreContext,
@@ -57,20 +58,17 @@ class ChatbotOrchestrationService
      *
      * @return array{category: ChatbotQueryCategory, message: string, source: 'gemini'|'fallback'}
      */
-    public function respond(string $message, ?User $customer = null): array
+    public function respond(string $message, ?User $customer = null, ?Closure $remember = null, ?int $productId = null): array
     {
         $normalizedMessage = Str::of($message)->trim()->squish()->toString();
-        $category = $this->categorizeChatbotQuery->execute($normalizedMessage);
+        $routing = $this->routeChatbotQuery->execute($normalizedMessage);
+        $category = $routing['category'];
 
         if ($normalizedMessage === '') {
             return $this->fallback($category, self::EMPTY_MESSAGE);
         }
 
-        if ($category === ChatbotQueryCategory::Unsupported) {
-            return $this->fallback($category, self::UNSUPPORTED_INQUIRY);
-        }
-
-        if ($category === ChatbotQueryCategory::Order && $customer === null) {
+        if ($category === ChatbotQueryCategory::Order && $customer === null && $routing['choices'] === []) {
             return $this->fallback($category, self::UNAUTHENTICATED_ORDER);
         }
 
@@ -78,7 +76,28 @@ class ChatbotOrchestrationService
             return $this->fallback($category, self::SENSITIVE_INPUT);
         }
 
-        $context = $this->resolveContext($category, $normalizedMessage, $customer);
+        if ($routing['choices'] !== []) {
+            return $this->fallback($category, $this->routeChatbotQuery->clarification($routing['choices']));
+        }
+
+        if ($category === ChatbotQueryCategory::Unsupported) {
+            return $this->fallback($category, self::UNSUPPORTED_INQUIRY);
+        }
+
+        if ($category === ChatbotQueryCategory::Order && preg_match('/\bbf[\s\W_]*\d+\b/iu', $normalizedMessage) !== 1) {
+            return $this->fallback($category, 'Which order do you mean? Please provide its BF order reference from your order history.');
+        }
+
+        $scopeMessage = Str::of($normalizedMessage)->lower()->replaceMatches('/[^\p{L}\p{N}\s]+/u', ' ')->squish()->toString();
+        if ($category === ChatbotQueryCategory::Product
+            && preg_match('/\b(?:san carlos|escalante|guihulngan)\b/u', $scopeMessage) === 1
+            && preg_match('/\b(?:stock|stocks|available|availability|availble|avalable|stok)\b/u', $scopeMessage) === 1) {
+            return $this->fallback($category, 'Live inventory information covers the Sagay branch only. I cannot confirm stock at the other branches. Please ask about Sagay availability or contact the branch.');
+        }
+
+        $context = $productId !== null && $category === ChatbotQueryCategory::Product
+            ? $this->resolveProductContext->forProduct($productId)
+            : $this->resolveContext($category, $normalizedMessage, $customer);
 
         if ($this->hasNoContext($category, $context)) {
             return $this->fallback(
@@ -87,6 +106,7 @@ class ChatbotOrchestrationService
             );
         }
 
+        $remember?->__invoke($category, $context);
         $result = $this->chatbotAiAdapter->generate($normalizedMessage, $context);
 
         if ($result['successful']) {
@@ -151,7 +171,7 @@ class ChatbotOrchestrationService
         };
     }
 
-    private function containsSensitiveInput(string $message): bool
+    public function containsSensitiveInput(string $message): bool
     {
         foreach (self::SENSITIVE_INPUT_PATTERNS as $pattern) {
             if (preg_match($pattern, $message) === 1) {

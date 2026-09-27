@@ -1,10 +1,10 @@
 <?php
 
-use App\Actions\Chatbot\CategorizeChatbotQuery;
 use App\Actions\Chatbot\Context\ResolveFaqContext;
 use App\Actions\Chatbot\Context\ResolveOrderContext;
 use App\Actions\Chatbot\Context\ResolveProductContext;
 use App\Actions\Chatbot\Context\ResolveStoreContext;
+use App\Actions\Chatbot\RouteChatbotQuery;
 use App\Ai\Agents\ChatbotResponseAgent;
 use App\Enums\ChatbotCategory;
 use App\Enums\ChatbotQueryCategory;
@@ -36,7 +36,7 @@ test('categorizes before resolving context and resolves context before generatin
             'inventory' => ['quantity' => 7, 'status' => 'in_stock'],
         ]],
     ];
-    $categorizer = mock(CategorizeChatbotQuery::class);
+    $categorizer = mock(RouteChatbotQuery::class);
     $productResolver = mock(ResolveProductContext::class);
     $orderResolver = mock(ResolveOrderContext::class);
     $storeResolver = mock(ResolveStoreContext::class);
@@ -46,7 +46,7 @@ test('categorizes before resolving context and resolves context before generatin
         ->once()
         ->with('Is the Aurelius Link Station available?')
         ->globally()->ordered()
-        ->andReturn(ChatbotQueryCategory::Product);
+        ->andReturn(['category' => ChatbotQueryCategory::Product, 'choices' => []]);
     $productResolver->shouldReceive('execute')
         ->once()
         ->with('Is the Aurelius Link Station available?')

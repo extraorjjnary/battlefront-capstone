@@ -97,6 +97,27 @@ class ResolveProductContext
         ];
     }
 
+    /** @return array{products: list<array<string, mixed>>} */
+    public function forProduct(int $productId): array
+    {
+        $product = Product::query()->customerEligible()
+            ->with(['category', 'inventory', 'tags'])->find($productId);
+
+        return ['products' => $product === null ? [] : [$this->mapProduct($product)]];
+    }
+
+    public function namesProduct(string $message): bool
+    {
+        $normalized = Str::of($message)->lower()->replaceMatches('/[^\p{L}\p{N}\s]+/u', ' ')->squish()->toString();
+
+        return $this->products->contextMatches($this->meaningfulTerms($message))
+            ->contains(function (Product $product) use ($normalized): bool {
+                $name = Str::of($product->name)->lower()->replaceMatches('/[^\p{L}\p{N}\s]+/u', ' ')->squish()->toString();
+
+                return str_contains(" {$normalized} ", " {$name} ");
+            });
+    }
+
     /**
      * @return list<string>
      */
@@ -108,6 +129,8 @@ class ResolveProductContext
             ->replaceMatches('/[^\p{L}\p{N}\s]+/u', ' ')
             ->squish()
             ->toString();
+
+        $normalizedMessage = preg_replace('/\b(?:at|in) (?:the )?(?:sagay|san carlos|escalante|guihulngan)(?: city)?(?: branch| store)?\b/u', '', $normalizedMessage);
 
         if ($normalizedMessage === '') {
             return [];

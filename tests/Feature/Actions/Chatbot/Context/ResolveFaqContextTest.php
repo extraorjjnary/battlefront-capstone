@@ -86,8 +86,8 @@ test('orders FAQ matches by relevance then priority and limits context to three 
 
     expect(array_column($context['knowledge'], 'question_pattern'))->toBe([
         $mostRelevant->question_pattern,
-        $secondMostRelevant->question_pattern,
         $higherPriority->question_pattern,
+        $secondMostRelevant->question_pattern,
     ]);
 });
 

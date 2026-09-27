@@ -4,6 +4,7 @@ use App\Http\Controllers\Administration\CategoryActivationController;
 use App\Http\Controllers\Administration\CategoryController;
 use App\Http\Controllers\Administration\ChatbotKnowledgeActivationController;
 use App\Http\Controllers\Administration\ChatbotKnowledgeController;
+use App\Http\Controllers\Administration\ChatbotKnowledgePreviewController;
 use App\Http\Controllers\Administration\CustomerController;
 use App\Http\Controllers\Administration\InventoryController;
 use App\Http\Controllers\Administration\OrderController as AdministrationOrderController;
@@ -110,6 +111,8 @@ Route::middleware(['auth', 'can:access-administration'])
             ->name('inventory.update');
 
         // chatbots
+        Route::post('chatbot-knowledge/preview', ChatbotKnowledgePreviewController::class)
+            ->name('chatbot-knowledge.preview');
         Route::resource('chatbot-knowledge', ChatbotKnowledgeController::class)
             ->parameters(['chatbot-knowledge' => 'chatbotKnowledge'])
             ->except('destroy');

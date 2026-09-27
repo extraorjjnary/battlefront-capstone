@@ -178,16 +178,20 @@ class CategorizeChatbotQuery
     {
         $normalizedMessage = $this->normalize($message);
 
-        if (
-            $normalizedMessage === ''
-            || $this->containsAny($normalizedMessage, self::OPEN_DOMAIN_PHRASES)
-            || $this->containsAny($normalizedMessage, self::RECOMMENDATION_PHRASES)
-        ) {
+        if ($this->isBlocked($normalizedMessage)) {
             return ChatbotQueryCategory::Unsupported;
         }
 
         if (preg_match('/\bbf\s*\d+\b/u', $normalizedMessage) === 1) {
             return ChatbotQueryCategory::Order;
+        }
+
+        if (preg_match('/\b(?:my (?:payment|proof)|did (?:you receive|i pay)|have i paid)\b/u', $normalizedMessage) === 1) {
+            return ChatbotQueryCategory::Order;
+        }
+
+        if (preg_match('/\b(?:how (?:do|can|should) i pay|how to pay|payment (?:methods?|options?)|ways to pay|what does .+ mean)\b/u', $normalizedMessage) === 1) {
+            return ChatbotQueryCategory::Faq;
         }
 
         /** @var list<array{category: ChatbotQueryCategory, phrases: list<string>}> $rules */
@@ -206,6 +210,23 @@ class CategorizeChatbotQuery
         }
 
         return ChatbotQueryCategory::Unsupported;
+    }
+
+    public function isBlocked(string $message): bool
+    {
+        $message = $this->normalize($message);
+
+        return $message === ''
+            || $this->containsAny($message, self::OPEN_DOMAIN_PHRASES)
+            || $this->containsAny($message, self::RECOMMENDATION_PHRASES);
+    }
+
+    public function requiresLiveFacts(string $message): bool
+    {
+        $message = $this->normalize($message);
+
+        return $this->containsAny($message, self::STORE_OPERATIONAL_PHRASES)
+            || $this->containsAny($message, ['price', 'prices', 'pricing', 'cost', 'stock', 'stocks', 'available', 'availability', 'specs', 'specifications']);
     }
 
     private function normalize(string $message): string
