@@ -278,7 +278,7 @@ test('provider failures reach the customer as a safe fallback', function () {
         fn () => throw new AiException('private provider error'),
     )->preventStrayPrompts();
     $customer = User::factory()->customer()->create();
-    Branch::factory()->create(['city' => 'Sagay City']);
+    Branch::factory()->create(['city' => 'Sagay City', 'address' => 'Confirmed Sagay address']);
 
     $this->actingAs($customer)
         ->postJson(route('chatbot.store'), ['message' => 'Where is the Sagay store?'])
@@ -286,7 +286,7 @@ test('provider failures reach the customer as a safe fallback', function () {
         ->assertJsonCount(3)
         ->assertJsonStructure(['message', 'source', 'context_token'])
         ->assertJson([
-            'message' => 'The chatbot is temporarily unavailable. Please try again later.',
+            'message' => 'Sagay City: Address: Confirmed Sagay address.',
             'source' => 'fallback',
         ]);
 

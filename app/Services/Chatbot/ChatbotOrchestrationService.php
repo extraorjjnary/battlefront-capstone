@@ -6,6 +6,7 @@ use App\Actions\Chatbot\Context\ResolveFaqContext;
 use App\Actions\Chatbot\Context\ResolveOrderContext;
 use App\Actions\Chatbot\Context\ResolveProductContext;
 use App\Actions\Chatbot\Context\ResolveStoreContext;
+use App\Actions\Chatbot\RenderChatbotFallback;
 use App\Actions\Chatbot\RouteChatbotQuery;
 use App\Enums\ChatbotQueryCategory;
 use App\Models\User;
@@ -51,6 +52,7 @@ class ChatbotOrchestrationService
         private ResolveStoreContext $resolveStoreContext,
         private ResolveFaqContext $resolveFaqContext,
         private ChatbotAiAdapter $chatbotAiAdapter,
+        private RenderChatbotFallback $renderChatbotFallback,
     ) {}
 
     /**
@@ -119,9 +121,9 @@ class ChatbotOrchestrationService
 
         return $this->fallback(
             $category,
-            $result['failure'] === 'timeout'
+            $this->renderChatbotFallback->execute($category, $normalizedMessage, $context) ?? ($result['failure'] === 'timeout'
                 ? self::PROVIDER_TIMEOUT
-                : self::PROVIDER_UNAVAILABLE,
+                : self::PROVIDER_UNAVAILABLE),
         );
     }
 

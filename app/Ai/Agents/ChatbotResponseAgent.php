@@ -4,7 +4,6 @@ namespace App\Ai\Agents;
 
 use Laravel\Ai\Attributes\Model;
 use Laravel\Ai\Attributes\Provider;
-use Laravel\Ai\Attributes\Timeout;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Promptable;
@@ -12,10 +11,16 @@ use Stringable;
 
 #[Provider(Lab::Gemini)]
 #[Model('gemini-3.5-flash-lite')]
-#[Timeout(20)]
 class ChatbotResponseAgent implements Agent
 {
     use Promptable;
+
+    public function timeout(): int
+    {
+        $seconds = filter_var(config('battlefront.chatbot_timeout_seconds', 20), FILTER_VALIDATE_INT);
+
+        return $seconds !== false && $seconds >= 5 && $seconds <= 30 ? $seconds : 20;
+    }
 
     /**
      * Get the instructions that the agent should follow.

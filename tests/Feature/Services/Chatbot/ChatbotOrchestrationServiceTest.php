@@ -4,6 +4,7 @@ use App\Actions\Chatbot\Context\ResolveFaqContext;
 use App\Actions\Chatbot\Context\ResolveOrderContext;
 use App\Actions\Chatbot\Context\ResolveProductContext;
 use App\Actions\Chatbot\Context\ResolveStoreContext;
+use App\Actions\Chatbot\RenderChatbotFallback;
 use App\Actions\Chatbot\RouteChatbotQuery;
 use App\Ai\Agents\ChatbotResponseAgent;
 use App\Enums\ChatbotCategory;
@@ -72,6 +73,7 @@ test('categorizes before resolving context and resolves context before generatin
         $storeResolver,
         $faqResolver,
         $adapter,
+        new RenderChatbotFallback,
     ))->respond("  Is the Aurelius Link Station\navailable?  ");
 
     expect($result)->toBe([
@@ -419,7 +421,7 @@ test('cannot use another customers order as Gemini context', function () {
     Http::assertNothingSent();
 });
 
-test('returns a predefined timeout fallback after authoritative context is resolved', function () {
+test('returns the confirmed address after a provider connection failure', function () {
     Http::preventStrayRequests();
     ChatbotResponseAgent::fake(fn () => throw ProviderConnectionException::forProvider(
         'gemini',
@@ -434,14 +436,14 @@ test('returns a predefined timeout fallback after authoritative context is resol
 
     expect($result)->toBe([
         'category' => ChatbotQueryCategory::Store,
-        'message' => 'The chatbot took too long to respond. Please try again.',
+        'message' => 'Sagay City: Address: Approved Sagay address.',
         'source' => 'fallback',
     ])->not->toContain('sensitive timeout detail');
     ChatbotResponseAgent::assertPromptedTimes(1);
     Http::assertNothingSent();
 });
 
-test('returns a predefined unavailable fallback for provider errors', function () {
+test('returns the approved knowledge answer for provider errors', function () {
     Http::preventStrayRequests();
     ChatbotResponseAgent::fake(
         fn () => throw new AiException('provider response containing a secret'),
@@ -458,7 +460,7 @@ test('returns a predefined unavailable fallback for provider errors', function (
 
     expect($result)->toBe([
         'category' => ChatbotQueryCategory::Faq,
-        'message' => 'The chatbot is temporarily unavailable. Please try again later.',
+        'message' => 'Approved payment guidance.',
         'source' => 'fallback',
     ])->not->toContain('provider response containing a secret');
     ChatbotResponseAgent::assertPromptedTimes(1);

@@ -1,6 +1,8 @@
 <?php
 
 return [
+    'chatbot_timeout_seconds' => env('CHATBOT_TIMEOUT_SECONDS', 20),
+
     'operational_branch_city' => 'Sagay City',
 
     'operating_hours' => '8:00 AM–6:00 PM',
