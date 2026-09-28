@@ -13,6 +13,29 @@ use Illuminate\Support\Collection;
 class ProductCatalogRepository
 {
     /**
+     * Provide live catalog facts for deterministic recommendation rules.
+     *
+     * @return Builder<Product>
+     */
+    public function recommendationInputs(): Builder
+    {
+        return Product::query()
+            ->customerEligible()
+            ->select([
+                'id', 'product_code', 'name', 'category_id', 'brand',
+                'price', 'discount_price',
+            ])
+            ->with([
+                'category:id,name',
+                'tags:id,name',
+                'inventory:id,product_id,quantity',
+            ])
+            ->withExists([
+                'inventory as is_available' => fn (Builder $query): Builder => $query->where('quantity', '>', 0),
+            ]);
+    }
+
+    /**
      * Return customer-eligible products for the catalog directory.
      *
      * @param  array{q: string|null, category_id: int|null, brand: string|null, tag_id: int|null}  $filters
