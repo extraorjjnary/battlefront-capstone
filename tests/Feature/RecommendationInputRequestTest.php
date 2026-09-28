@@ -166,3 +166,29 @@ test('unknown intended use is rejected', function () {
         ->assertJsonValidationErrors('intended_use')
         ->assertJsonPath('errors.intended_use.0', 'Select a valid intended use.');
 });
+
+test('a whitespace-only preferred brand becomes an omitted preference', function () {
+    $this->postJson('/_test/recommendation-input', [
+        'budget' => '500.00',
+        'intended_use' => 'gaming',
+        'preferred_brand' => '   ',
+    ])->assertOk()->assertJsonPath('preferred_brand', null);
+});
+
+test('malformed optional preferences return field validation errors', function (array $preferences, string $field, string $message) {
+    $this->postJson('/_test/recommendation-input', [
+        'budget' => '500.00',
+        'intended_use' => 'gaming',
+        ...$preferences,
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors($field)
+        ->assertJsonFragment([$field => [$message]]);
+})->with([
+    'brand array' => [['preferred_brand' => ['AMD']], 'preferred_brand', 'Preferred brand must be text.'],
+    'oversized brand' => [['preferred_brand' => str_repeat('a', 256)], 'preferred_brand', 'Preferred brand may not be longer than 255 characters.'],
+    'category text' => [['category_id' => 'Networking'], 'category_id', 'Select a valid category.'],
+    'category array' => [['category_id' => [1]], 'category_id', 'Select a valid category.'],
+    'tags scalar' => [['tag_ids' => 'Gaming'], 'tag_ids', 'Select product tags as a list.'],
+    'tag text' => [['tag_ids' => ['Gaming']], 'tag_ids.0', 'Select valid product tags.'],
+    'nested tag' => [['tag_ids' => [[1]]], 'tag_ids.0', 'Select valid product tags.'],
+]);

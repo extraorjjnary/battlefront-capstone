@@ -1,5 +1,6 @@
 <?php
 
+use App\Ai\Agents\ChatbotResponseAgent;
 use App\Enums\RecommendationIntendedUse;
 use App\Models\Category;
 use App\Models\Inventory;
@@ -10,6 +11,8 @@ use App\Repositories\Catalog\ProductCatalogRepository;
 use App\Services\Recommendation\RecommendationEngine;
 use App\Services\Recommendation\RecommendedProduct;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Http;
+use Inertia\Inertia;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /**
@@ -61,6 +64,10 @@ test('guests and customers are authorized to use recommendations', function () {
 });
 
 test('customers can submit recommendation requirements', function () {
+    $category = Category::factory()->create(['name' => 'Graphics Cards']);
+    $gaming = Tag::factory()->create(['name' => 'Gaming']);
+    $product = createWorkflowProduct($category, [$gaming->id], 3, ['price' => '500.00', 'brand' => null]);
+
     $this->actingAs(User::factory()->customer()->create())
         ->get(route('recommendations.results', [
             'budget' => '500.00',
@@ -69,7 +76,9 @@ test('customers can submit recommendation requirements', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('Recommendations/Index')
             ->where('criteria.budget', '500.00')
-            ->where('criteria.intended_use', 'gaming'));
+            ->where('criteria.intended_use', 'gaming')
+            ->has('recommendations', 1)
+            ->where('recommendations.0.product.id', $product->id));
 });
 
 test('administrators cannot access the recommendation form or results', function (string $routeName, array $parameters) {
@@ -250,4 +259,55 @@ test('the results response presents the shared engine output without reranking i
         ->where('recommendations.0.reasons.0.value', 'Engine first')
         ->where('recommendations.1.product.id', $second->id)
         ->where('recommendations.1.reasons.0.value', 'Engine second'));
+});
+
+test('products without inventory produce an explicit empty result', function () {
+    $category = Category::factory()->create(['name' => 'Networking']);
+    Product::factory()->for($category)->create(['price' => '50.00', 'brand' => null]);
+
+    $this->get(route('recommendations.results', [
+        'budget' => '100.00',
+        'intended_use' => 'networking_piso_wifi',
+    ]))->assertInertia(fn (Assert $page) => $page
+        ->component('Recommendations/Index')
+        ->where('criteria.budget', '100.00')
+        ->where('recommendations', []));
+});
+
+test('an empty catalog returns an empty result and filter options', function () {
+    $this->get(route('recommendations.results', [
+        'budget' => '100.00',
+        'intended_use' => 'general_use',
+    ]))->assertInertia(fn (Assert $page) => $page
+        ->component('Recommendations/Index')
+        ->where('criteria.intended_use', 'general_use')
+        ->where('recommendations', [])
+        ->where('filter_options.categories', [])
+        ->where('filter_options.brands', [])
+        ->where('filter_options.tags', []));
+});
+
+test('successful and no-match recommendations do not prompt AI or send external requests', function () {
+    Inertia::disableSsr();
+    $category = Category::factory()->create(['name' => 'Networking']);
+    $product = createWorkflowProduct($category, [], 3, ['price' => '50.00', 'brand' => null]);
+    Http::preventStrayRequests();
+    ChatbotResponseAgent::fake()->preventStrayPrompts();
+
+    $this->get(route('recommendations.results', [
+        'budget' => '100.00',
+        'intended_use' => 'networking_piso_wifi',
+    ]))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->has('recommendations', 1)
+        ->where('recommendations.0.product.id', $product->id));
+
+    $this->get(route('recommendations.results', [
+        'budget' => '0.01',
+        'intended_use' => 'networking_piso_wifi',
+    ]))->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('recommendations', []));
+
+    ChatbotResponseAgent::assertNeverPrompted();
+    ChatbotResponseAgent::assertNeverQueued();
+    Http::assertNothingSent();
 });
