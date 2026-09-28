@@ -63,18 +63,24 @@ test('invalid restore inputs preserve the existing database', function (string $
     imagewebp($image, Storage::disk('public')->path($imagePath));
     $bytes = Storage::disk('public')->get($imagePath);
     file_put_contents($manifest, json_encode(['version' => 1, 'entries' => [[
-        'product_code' => '00123', 'name' => 'Test GPU', 'category' => 'Graphics Card',
-        'category_slug' => 'graphics-card', 'quantity' => '5', 'price' => '7500',
-        'image_path' => $imagePath, 'status' => 'complete',
-        'image_sha256' => hash('sha256', $bytes), 'image_bytes' => strlen($bytes),
+        'product_code' => '00123',
+        'name' => 'Test GPU',
+        'category' => 'Graphics Card',
+        'category_slug' => 'graphics-card',
+        'quantity' => '5',
+        'price' => '7500',
+        'image_path' => $imagePath,
+        'status' => 'complete',
+        'image_sha256' => hash('sha256', $bytes),
+        'image_bytes' => strlen($bytes),
     ]]], JSON_THROW_ON_ERROR));
     file_put_contents($mapping, "product_code,product_name,category,brand,quantity_override,reorder_level\n00123,Test GPU,Graphics Card,Biostar,,2\n");
     $options = ['--force' => true, '--manifest' => $manifest, '--mapping' => $mapping];
 
     try {
         match ($problem) {
-            'missing manifest' => $options['--manifest'] = $manifest.'.missing',
-            'missing mapping' => $options['--mapping'] = $mapping.'.missing',
+            'missing manifest' => $options['--manifest'] = $manifest . '.missing',
+            'missing mapping' => $options['--mapping'] = $mapping . '.missing',
             'invalid manifest' => file_put_contents($manifest, '{'),
             'invalid mapping' => file_put_contents($mapping, 'wrong,columns'),
             'missing image' => Storage::disk('public')->delete('products/graphics-card/00123.webp'),
@@ -138,7 +144,10 @@ test('reset restores the complete real catalog and removes transient records wit
 
     $originalConnection = DB::getDefaultConnection();
     config(['database.connections.reset_test' => [
-        'driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '', 'foreign_key_constraints' => true,
+        'driver' => 'sqlite',
+        'database' => ':memory:',
+        'prefix' => '',
+        'foreign_key_constraints' => true,
     ]]);
     DB::setDefaultConnection('reset_test');
 
@@ -153,7 +162,7 @@ test('reset restores the complete real catalog and removes transient records wit
         CartItem::factory()->for($transient)->create();
         Sale::factory()->create();
         $filesBefore = collect(Storage::disk('public')->allFiles('products'))
-            ->mapWithKeys(fn ($path) => [$path => hash_file('sha256', Storage::disk('public')->path($path))])->all();
+            ->mapWithKeys(fn($path) => [$path => hash_file('sha256', Storage::disk('public')->path($path))])->all();
 
         $this->artisan('battlefront:reset-dev', ['--force' => true])
             ->expectsOutput('Database recreated.')
@@ -177,7 +186,7 @@ test('reset restores the complete real catalog and removes transient records wit
             expect($product->image_path)->toBe($row['image_path']);
         }
         $filesAfter = collect(Storage::disk('public')->allFiles('products'))
-            ->mapWithKeys(fn ($path) => [$path => hash_file('sha256', Storage::disk('public')->path($path))])->all();
+            ->mapWithKeys(fn($path) => [$path => hash_file('sha256', Storage::disk('public')->path($path))])->all();
         expect($filesAfter)->toBe($filesBefore);
         foreach (['orders', 'order_items', 'sales', 'carts', 'cart_items'] as $table) {
             $this->assertDatabaseCount($table, 0);
@@ -186,7 +195,7 @@ test('reset restores the complete real catalog and removes transient records wit
         $this->assertDatabaseHas('users', ['email' => 'admin@example.com']);
         $this->assertDatabaseHas('users', ['email' => 'test@example.com']);
         $this->assertDatabaseHas('branches', ['city' => 'Sagay City']);
-        $this->assertDatabaseCount('chatbot_knowledge', 9);
+        $this->assertDatabaseCount('chatbot_knowledge', 11);
     } finally {
         DB::setDefaultConnection($originalConnection);
         DB::purge('reset_test');

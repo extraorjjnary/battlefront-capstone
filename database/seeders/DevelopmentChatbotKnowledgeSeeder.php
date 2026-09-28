@@ -23,6 +23,21 @@ class DevelopmentChatbotKnowledgeSeeder extends Seeder
         }
 
         $operationalBranch = Branch::query()->operational()->firstOrFail();
+        $paymentVerificationQuestion = 'How is payment proof verified for each method?';
+        $paymentVerificationAnswer = 'GCash and Maya require uploaded payment proof, which Battlefront staff review manually. Cash and Card at store are pickup payment methods and do not require an upload; staff confirm those payments manually. Check your order history for the latest payment status.';
+
+        if (! ChatbotKnowledge::query()->where('question_pattern', $paymentVerificationQuestion)->exists()) {
+            ChatbotKnowledge::query()
+                ->where('category', ChatbotCategory::Faq)
+                ->where('question_pattern', 'How is GCash payment verified?')
+                ->where('response_template', 'GCash payment proof is reviewed manually by Battlefront staff. Check your order history for the updated payment status.')
+                ->where('priority', 60)
+                ->where('is_active', true)
+                ->update([
+                    'question_pattern' => $paymentVerificationQuestion,
+                    'response_template' => $paymentVerificationAnswer,
+                ]);
+        }
 
         /** @var list<array{category: ChatbotCategory, question_pattern: string, response_template: string, priority: int}> $knowledgeEntries */
         $knowledgeEntries = [
@@ -80,10 +95,22 @@ class DevelopmentChatbotKnowledgeSeeder extends Seeder
                 'response_template' => 'Pickup orders support Cash, Card at store, GCash, and Maya. Delivery orders support GCash and Maya.',
                 'priority' => 70,
             ],
+            [
+                'category' => ChatbotCategory::Faq,
+                'question_pattern' => $paymentVerificationQuestion,
+                'response_template' => $paymentVerificationAnswer,
+                'priority' => 60,
+            ],
+            [
+                'category' => ChatbotCategory::Faq,
+                'question_pattern' => 'Do you offer real-time delivery tracking?',
+                'response_template' => 'Real-time delivery tracking is not available. Sign in and check your order history for the latest order status.',
+                'priority' => 60,
+            ],
         ];
 
         foreach ($knowledgeEntries as $knowledgeEntry) {
-            ChatbotKnowledge::query()->updateOrCreate(
+            ChatbotKnowledge::query()->firstOrCreate(
                 ['question_pattern' => $knowledgeEntry['question_pattern']],
                 [
                     'category' => $knowledgeEntry['category'],

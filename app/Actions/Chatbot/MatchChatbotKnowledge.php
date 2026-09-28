@@ -20,6 +20,7 @@ class MatchChatbotKnowledge
     {
         $normalized = $this->normalize($message);
         $terms = $this->terms($message);
+        $verificationIntent = $this->hasVerificationIntent($terms);
 
         if ($normalized === '' || $terms === []) {
             return [];
@@ -29,6 +30,7 @@ class MatchChatbotKnowledge
             ->whereIn('category', [ChatbotCategory::Faq->value, ChatbotCategory::Order->value])
             ->select(['id', 'question_pattern', 'response_template', 'priority'])
             ->get()
+            ->filter(fn (ChatbotKnowledge $knowledge): bool => $this->hasVerificationIntent($this->terms($knowledge->question_pattern)) === $verificationIntent)
             ->map(function (ChatbotKnowledge $knowledge) use ($normalized, $terms): array {
                 return [
                     'id' => $knowledge->id,
@@ -55,8 +57,16 @@ class MatchChatbotKnowledge
         $message = preg_replace('/\b(?:accept|accepted|accepts|supported|support|offer|offered)\b/u', '', $message);
         $message = preg_replace('/\b(?:pick up|collection)\b/u', 'pickup', $message);
         $message = preg_replace('/\b(?:deliver|delivry)\b/u', 'delivery', $message);
+        $message = preg_replace('/\b(?:verify|verifying|verification)\b/u', 'verified', $message);
+        $message = preg_replace('/\bproofs\b/u', 'proof', $message);
 
         return array_values(array_unique(array_filter(explode(' ', $message), fn (string $term): bool => Str::length($term) >= 2 && ! in_array($term, self::QUERY_WORDS, true))));
+    }
+
+    /** @param list<string> $terms */
+    private function hasVerificationIntent(array $terms): bool
+    {
+        return in_array('proof', $terms, true) || in_array('verified', $terms, true);
     }
 
     private function normalize(string $message): string
