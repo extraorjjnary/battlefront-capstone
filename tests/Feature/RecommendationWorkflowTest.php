@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Repositories\Catalog\ProductCatalogRepository;
 use App\Services\Recommendation\RecommendationEngine;
 use App\Services\Recommendation\RecommendedProduct;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /**
@@ -49,6 +50,39 @@ test('guests and customers can open the public recommendation form with current 
         ->component('Recommendations/Index')
         ->where('recommendations', null));
 });
+
+test('guests and customers are authorized to use recommendations', function () {
+    $customer = User::factory()->customer()->create();
+    $administrator = User::factory()->administrator()->create();
+
+    expect(Gate::forUser(null)->allows('use-recommendations'))->toBeTrue()
+        ->and(Gate::forUser($customer)->allows('use-recommendations'))->toBeTrue()
+        ->and(Gate::forUser($administrator)->allows('use-recommendations'))->toBeFalse();
+});
+
+test('customers can submit recommendation requirements', function () {
+    $this->actingAs(User::factory()->customer()->create())
+        ->get(route('recommendations.results', [
+            'budget' => '500.00',
+            'intended_use' => 'gaming',
+        ]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Recommendations/Index')
+            ->where('criteria.budget', '500.00')
+            ->where('criteria.intended_use', 'gaming'));
+});
+
+test('administrators cannot access the recommendation form or results', function (string $routeName, array $parameters) {
+    $this->actingAs(User::factory()->administrator()->create())
+        ->get(route($routeName, $parameters))
+        ->assertForbidden();
+})->with([
+    'form' => ['recommendations.index', []],
+    'results' => ['recommendations.results', [
+        'budget' => '500.00',
+        'intended_use' => 'gaming',
+    ]],
+]);
 
 test('valid requirements return ordered catalog products with prices stock and match evidence', function () {
     $category = Category::factory()->create(['name' => 'Graphics Cards']);

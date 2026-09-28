@@ -38,8 +38,10 @@ Route::resource('products', ProductCatalogController::class)
     ->where(['product' => '[0-9]+']);
 
 // public/customer recommendations
-Route::get('recommendations', [RecommendationController::class, 'index'])->name('recommendations.index');
-Route::get('recommendations/results', [RecommendationController::class, 'results'])->name('recommendations.results');
+Route::middleware('can:use-recommendations')->group(function () {
+    Route::get('recommendations', [RecommendationController::class, 'index'])->name('recommendations.index');
+    Route::get('recommendations/results', [RecommendationController::class, 'results'])->name('recommendations.results');
+});
 
 // dynamic dashboard for customer and admin
 Route::middleware('auth')->group(function () {
