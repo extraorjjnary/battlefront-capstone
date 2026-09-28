@@ -21,7 +21,7 @@ class ProductCatalogController extends Controller
      */
     public function index(ProductCatalogIndexRequest $request): Response
     {
-        $filters = $this->catalogFilters($request);
+        $filters = $request->filters();
 
         $products = $this->productCatalogRepository->paginate($filters)
             ->through(fn (Product $product): array => $this->catalogProductPresenter->present($product));
@@ -43,20 +43,5 @@ class ProductCatalogController extends Controller
         return Inertia::render('Products/Show', [
             'product' => $this->catalogProductPresenter->present($catalogProduct),
         ]);
-    }
-
-    /**
-     * Convert validated catalog input into stable Inertia filter values.
-     *
-     * @return array{q: string|null, category_id: int|null, brand: string|null, tag_id: int|null}
-     */
-    private function catalogFilters(ProductCatalogIndexRequest $request): array
-    {
-        return [
-            'q' => $request->filled('q') ? $request->string('q')->toString() : null,
-            'category_id' => $request->filled('category_id') ? $request->integer('category_id') : null,
-            'brand' => $request->filled('brand') ? $request->string('brand')->toString() : null,
-            'tag_id' => $request->filled('tag_id') ? $request->integer('tag_id') : null,
-        ];
     }
 }

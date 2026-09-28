@@ -18,6 +18,21 @@ class ProductCatalogIndexRequest extends FormRequest
     }
 
     /**
+     * Normalize validated catalog filters for web and API queries.
+     *
+     * @return array{q: string|null, category_id: int|null, brand: string|null, tag_id: int|null}
+     */
+    public function filters(): array
+    {
+        return [
+            'q' => $this->filled('q') ? $this->string('q')->toString() : null,
+            'category_id' => $this->filled('category_id') ? $this->integer('category_id') : null,
+            'brand' => $this->filled('brand') ? $this->string('brand')->toString() : null,
+            'tag_id' => $this->filled('tag_id') ? $this->integer('tag_id') : null,
+        ];
+    }
+
+    /**
      * Get the validation rules that apply to the request.
      *
      * @return array<string, ValidationRule|array<mixed>|string>
