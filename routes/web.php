@@ -23,15 +23,23 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderPaymentProofController as CustomerOrderPaymentProofController;
 use App\Http\Controllers\ProductCatalogController;
+use App\Http\Controllers\RecommendationController;
 use Illuminate\Support\Facades\Route;
 
 // guest landing page
 Route::inertia('/', 'Welcome')->name('home');
 
+// public/customer branches
 Route::get('branches', [BranchController::class, 'index'])->name('branches.index');
+
+// public/customer product catalog
 Route::resource('products', ProductCatalogController::class)
     ->only(['index', 'show'])
     ->where(['product' => '[0-9]+']);
+
+// public/customer recommendations
+Route::get('recommendations', [RecommendationController::class, 'index'])->name('recommendations.index');
+Route::get('recommendations/results', [RecommendationController::class, 'results'])->name('recommendations.results');
 
 // dynamic dashboard for customer and admin
 Route::middleware('auth')->group(function () {
@@ -141,4 +149,4 @@ Route::middleware(['auth', 'can:access-administration'])
     });
 
 // profile settings
-require __DIR__.'/settings.php';
+require __DIR__ . '/settings.php';

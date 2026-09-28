@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { dashboard, home, login, register } from "@/routes";
 import { index as branchIndex } from "@/routes/branches";
 import { index as productIndex } from "@/routes/products";
+import { index as recommendationIndex } from "@/routes/recommendations";
 
 const props = defineProps({
     activeSection: { type: String, default: null },
@@ -15,8 +16,9 @@ const props = defineProps({
 const page = usePage();
 const isAuthenticated = computed(() => Boolean(page.props.auth?.user));
 const storefrontLinks = [
-    { title: "Products", section: "products", href: productIndex() },
-    { title: "Branches", section: "branches", href: branchIndex() },
+    { title: "Products", mobileTitle: "Shop", section: "products", href: productIndex() },
+    { title: "Recommendations", mobileTitle: "Find", section: "recommendations", href: recommendationIndex() },
+    { title: "Branches", mobileTitle: "Stores", section: "branches", href: branchIndex() },
 ];
 </script>
 
@@ -50,13 +52,15 @@ const storefrontLinks = [
                 >
                     <Link
                         :href="item.href"
+                        :aria-label="item.title"
                         :aria-current="
                             props.activeSection === item.section
                                 ? 'page'
                                 : undefined
                         "
                     >
-                        {{ item.title }}
+                        <span class="sm:hidden">{{ item.mobileTitle }}</span>
+                        <span class="hidden sm:inline">{{ item.title }}</span>
                     </Link>
                 </Button>
 

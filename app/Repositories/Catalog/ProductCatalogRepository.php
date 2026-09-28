@@ -22,8 +22,8 @@ class ProductCatalogRepository
         return Product::query()
             ->customerEligible()
             ->select([
-                'id', 'product_code', 'name', 'category_id', 'brand',
-                'price', 'discount_price',
+                'id', 'product_code', 'name', 'description', 'category_id', 'brand',
+                'price', 'discount_price', 'image_path', 'is_featured',
             ])
             ->with([
                 'category:id,name',
@@ -32,7 +32,8 @@ class ProductCatalogRepository
             ])
             ->withExists([
                 'inventory as is_available' => fn (Builder $query): Builder => $query->where('quantity', '>', 0),
-            ]);
+            ])
+            ->withExists('lowStockInventory as is_low_stock');
     }
 
     /**

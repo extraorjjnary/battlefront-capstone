@@ -1,5 +1,5 @@
 <script setup>
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { ArrowLeft, LogIn, PackageOpen, Tag } from '@lucide/vue';
 import { computed } from 'vue';
 import AddToCartForm from '@/components/cart/AddToCartForm.vue';
@@ -10,8 +10,13 @@ import StorefrontHeader from '@/components/StorefrontHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { consumeCatalogVisit } from '@/lib/catalogReturn';
+import {
+    consumeRecommendationVisit,
+    recommendationReturnUrl,
+} from '@/lib/recommendationReturn';
 import { login } from '@/routes';
 import { index as productIndex } from '@/routes/products';
+import { results as recommendationResults } from '@/routes/recommendations';
 
 const props = defineProps({
     product: { type: Object, required: true },
@@ -25,7 +30,23 @@ const canUseCustomerCart = computed(
 const hasAvailableStock = computed(
     () => Number(props.product.inventory.quantity) > 0,
 );
+const recommendationReturnHref = computed(() =>
+    recommendationReturnUrl(page.url, recommendationResults.url()),
+);
+const canReturnToRecommendationHistory = consumeRecommendationVisit(
+    props.product.id,
+);
 const canReturnToCatalog = consumeCatalogVisit(props.product.id);
+
+function returnToRecommendations() {
+    if (canReturnToRecommendationHistory) {
+        window.history.back();
+
+        return;
+    }
+
+    router.visit(recommendationReturnHref.value);
+}
 
 function returnToCatalog() {
     window.history.back();
@@ -45,11 +66,25 @@ function returnToCatalog() {
             />
         </Head>
 
-        <StorefrontHeader active-section="products" />
+        <StorefrontHeader
+            :active-section="
+                recommendationReturnHref ? 'recommendations' : 'products'
+            "
+        />
 
         <main class="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-12">
             <Button
-                v-if="canReturnToCatalog"
+                v-if="recommendationReturnHref"
+                type="button"
+                variant="ghost"
+                class="-ml-3"
+                @click="returnToRecommendations"
+            >
+                <ArrowLeft aria-hidden="true" />
+                Back to recommendations
+            </Button>
+            <Button
+                v-else-if="canReturnToCatalog"
                 type="button"
                 variant="ghost"
                 class="-ml-3"

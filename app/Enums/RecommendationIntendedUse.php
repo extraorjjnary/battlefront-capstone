@@ -13,6 +13,20 @@ enum RecommendationIntendedUse: string
     case HomeSecurity = 'home_security';
     case BusinessEnterprise = 'business_enterprise';
 
+    public function label(): string
+    {
+        return match ($this) {
+            self::GeneralUse => 'General use',
+            self::OfficeWork => 'Office / work',
+            self::Gaming => 'Gaming',
+            self::NetworkingPisoWifi => 'Networking / Piso WiFi',
+            self::ContentCreation => 'Content creation',
+            self::Streaming => 'Streaming',
+            self::HomeSecurity => 'Home security',
+            self::BusinessEnterprise => 'Business / enterprise',
+        };
+    }
+
     /**
      * Names are resolved against current catalog records, never fixed database IDs.
      *
