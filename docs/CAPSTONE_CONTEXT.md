@@ -97,18 +97,18 @@ The primary development responsibility for this project includes:
 - Laravel backend;
 - Vue 3 + Inertia.js web application;
 - shared MySQL database;
-- RESTful JSON API endpoints and contracts required by the Flutter application;
+- RESTful JSON API endpoints and contracts required by the React Native application;
 - backend business logic shared by web and mobile clients.
 
-## Flutter Responsibility
+## React Native Responsibility
 
 Another group member is primarily responsible for:
 
-- Flutter UI;
-- Flutter application implementation;
+- React Native UI;
+- React Native application implementation;
 - mobile-side HTTP/API consumption.
 
-The Flutter application still depends on the shared Laravel backend and MySQL data.
+The React Native application still depends on the shared Laravel backend and MySQL data.
 
 **Laravel remains the shared source of backend business logic and persistent data for both web and mobile applications.**
 
@@ -164,20 +164,20 @@ Normal Inertia web functionality should therefore use:
 
 A separate REST endpoint or Axios-based frontend architecture should not be assumed for ordinary Inertia web features.
 
-REST APIs remain appropriate where there is an actual API consumer or architectural requirement, particularly the Flutter application.
+REST APIs remain appropriate where there is an actual API consumer or architectural requirement, particularly the React Native application.
 
 ## 4.2 Presentation Layer — Mobile Application
 
 Approved mobile technology:
 
-- Flutter
+- React Native
 
-Flutter communicates with Laravel through a dedicated **RESTful JSON API**.
+React Native communicates with Laravel through a dedicated **RESTful JSON API**.
 
 Normal mobile request flow:
 
 ```text
-Flutter Application
+React Native Application
     ↓ HTTP / JSON
 Laravel API Route
     ↓
@@ -197,7 +197,7 @@ Laravel
 MySQL
 
 Mobile
-Flutter
+React Native
    ↕ REST JSON API
 Laravel
    ↕
@@ -261,7 +261,7 @@ System/database data remains authoritative for those facts.
 - Shadcn Vue
 - Vite
 - MySQL
-- Flutter
+- React Native
 - Google Gemini 2.5 Flash API
 - Laravel AI SDK
 
@@ -276,7 +276,7 @@ System/database data remains authoritative for those facts.
 - Postman — manual REST API testing
 - Pest/PHPUnit — Laravel automated unit and feature testing
 
-Flutter remains part of the approved overall architecture even though its application implementation is primarily handled by another group member.
+React Native remains part of the approved overall architecture even though its application implementation is primarily handled by another group member.
 
 ---
 
@@ -360,7 +360,7 @@ Administrative workflows involving complex data entry, bulk inventory operations
 ## Integration
 
 - Inertia-based web application
-- Flutter REST API
+- React Native REST API
 - Gemini chatbot integration
 
 ---
@@ -728,7 +728,7 @@ Development is intended to be iterative and incremental rather than one large si
 ## 5. Mobile API and Integration
 
 - Laravel REST API contracts/endpoints
-- Flutter/backend integration
+- React Native/backend integration
 
 ## 6. System Integration and Testing
 
@@ -764,7 +764,7 @@ Relevant implementation areas include:
 - recommendation rules;
 - forecasting calculations;
 - deterministic chatbot categorization;
-- REST API behavior required by Flutter.
+- REST API behavior required by React Native.
 
 Postman is used for manual REST API endpoint testing where appropriate.
 

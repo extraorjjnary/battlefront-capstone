@@ -48,6 +48,9 @@ class AppServiceProvider extends ServiceProvider
             fn (?User $user): bool => $user === null || $user->role === UserRole::Customer,
         );
 
+        RateLimiter::for('api-v1', fn (Request $request): Limit => Limit::perMinute(60)
+            ->by('ip:'.$request->ip()));
+
         RateLimiter::for('chatbot', function (Request $request): Limit {
             $customer = $request->user();
 
