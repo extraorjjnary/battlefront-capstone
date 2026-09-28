@@ -4,6 +4,9 @@ use App\Services\CatalogImagePipeline;
 use App\Services\RealCatalogImportService;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('sanctum:prune-expired --hours=24')->daily();
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

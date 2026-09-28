@@ -6,6 +6,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | --- | --- |
 | app/Actions/{Inventory,Order}/**,app/Services/Order/**,app/Http/Controllers/Administration/Order*,resources/js/pages/Administration/Orders/** | .ai/rules/administration-orders.md |
 | app/Models/Product.php,app/Http/Controllers/Administration/ProductController.php,app/Http/Requests/Administration/SaveProductRequest.php | .ai/rules/administration.md |
+| routes/api.php,app/Http/Controllers/Api/**,config/sanctum.php | .ai/rules/api.md |
 | app/**,database/**,resources/js/** | .ai/rules/app-js.md |
 | app/Models/** | .ai/rules/app-models.md |
 | app/Http/Controllers/**,app/Actions/**,app/Services/**,app/Repositories/** | .ai/rules/application-architecture.md |
