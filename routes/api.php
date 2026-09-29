@@ -4,6 +4,9 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BranchController;
 use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Api\V1\CartItemController;
+use App\Http\Controllers\Api\V1\CheckoutController;
+use App\Http\Controllers\Api\V1\OrderController;
+use App\Http\Controllers\Api\V1\OrderPaymentProofController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -33,6 +36,13 @@ Route::prefix('v1')
             Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
 
             Route::get('cart', [CartController::class, 'show'])->name('cart.show');
+            Route::get('checkout', [CheckoutController::class, 'show'])->name('checkout.show');
+            Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
+            Route::post('orders', [OrderController::class, 'store'])->name('orders.store');
+            Route::get('orders/{order}', [OrderController::class, 'show'])
+                ->whereNumber('order')->name('orders.show');
+            Route::post('orders/{order}/payment-proof', OrderPaymentProofController::class)
+                ->whereNumber('order')->name('orders.payment-proof.store');
             Route::post('cart/items', [CartItemController::class, 'store'])->name('cart.items.store');
             Route::patch('cart/items/{cartItem}', [CartItemController::class, 'update'])
                 ->whereNumber('cartItem')->name('cart.items.update');

@@ -1,12 +1,13 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Order\SubmitReplacementPaymentProof;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreOrderPaymentProofRequest;
+use App\Http\Resources\Api\V1\OrderResource;
 use App\Models\User;
-use Illuminate\Http\RedirectResponse;
-use Inertia\Inertia;
+use App\Repositories\Order\CustomerOrderRepository;
 
 class OrderPaymentProofController extends Controller
 {
@@ -14,16 +15,12 @@ class OrderPaymentProofController extends Controller
         StoreOrderPaymentProofRequest $request,
         int $order,
         SubmitReplacementPaymentProof $submitReplacementPaymentProof,
-    ): RedirectResponse {
+        CustomerOrderRepository $orders,
+    ): OrderResource {
         /** @var User $customer */
         $customer = $request->user();
         $submitReplacementPaymentProof->execute($customer, $order, $request->file('payment_proof'));
 
-        Inertia::flash('toast', [
-            'type' => 'success',
-            'message' => 'Replacement payment proof submitted for review.',
-        ]);
-
-        return back();
+        return new OrderResource($orders->find($customer, $order));
     }
 }

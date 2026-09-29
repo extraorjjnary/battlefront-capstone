@@ -13,6 +13,24 @@ use Illuminate\Validation\Validator;
 class ValidateCheckoutRequest extends FormRequest
 {
     /**
+     * Return the validated checkout fields shared by web and API placement.
+     *
+     * @return array{recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address: string|null, payment_method: string}
+     */
+    public function checkoutData(): array
+    {
+        return [
+            'recipient_name' => $this->string('recipient_name')->toString(),
+            'contact_number' => $this->string('contact_number')->toString(),
+            'fulfillment_method' => $this->string('fulfillment_method')->toString(),
+            'delivery_address' => $this->filled('delivery_address')
+                ? $this->string('delivery_address')->toString()
+                : null,
+            'payment_method' => $this->string('payment_method')->toString(),
+        ];
+    }
+
+    /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
