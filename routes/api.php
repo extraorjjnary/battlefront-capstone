@@ -26,6 +26,10 @@ Route::prefix('v1')
             ->whereNumber('product')->name('products.show');
         Route::get('branches', [BranchController::class, 'index'])->name('branches.index');
 
+        Route::middleware(AuthorizeApiRecommendations::class)->group(function (): void {
+            Route::post('recommendations', [RecommendationController::class, 'results'])->name('recommendations.results');
+            Route::get('recommendations/options', [RecommendationController::class, 'options'])->name('recommendations.options');
+        });
         Route::post('auth/register', [AuthController::class, 'register'])
             ->middleware('throttle:5,1')->name('auth.register');
         Route::post('auth/login', [AuthController::class, 'login'])
