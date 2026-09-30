@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 
 class CartController extends Controller
 {
-    public function show(Request $request, BuildCartViewData $buildCartViewData): CartResource
+    public function index(Request $request, BuildCartViewData $buildCartViewData): CartResource
     {
         /** @var User $customer */
         $customer = $request->user();
