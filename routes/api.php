@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\BranchController;
 use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Api\V1\CartItemController;
+use App\Http\Controllers\Api\V1\ChatbotController;
 use App\Http\Controllers\Api\V1\CheckoutController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\OrderPaymentProofController;
@@ -36,6 +37,8 @@ Route::prefix('v1')
             Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
 
             Route::get('cart', [CartController::class, 'show'])->name('cart.show');
+            Route::post('chatbot', [ChatbotController::class, 'store'])
+                ->middleware(['can:use-chatbot', 'throttle:chatbot'])->name('chatbot.store');
             Route::get('checkout', [CheckoutController::class, 'show'])->name('checkout.show');
             Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
             Route::post('orders', [OrderController::class, 'store'])->name('orders.store');

@@ -2,19 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreChatbotMessageRequest;
 use App\Models\User;
 use App\Services\Chatbot\ChatbotConversation;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 class ChatbotController extends Controller
 {
-    public function store(Request $request, ChatbotConversation $chatbot): JsonResponse
+    public function store(StoreChatbotMessageRequest $request, ChatbotConversation $chatbot): JsonResponse
     {
-        $validated = $request->validate([
-            'message' => ['required', 'string', 'max:1000'],
-            'context_token' => ['nullable', 'string', 'max:16384'],
-        ]);
+        $validated = $request->validated();
 
         /** @var User|null $customer */
         $customer = $request->user();

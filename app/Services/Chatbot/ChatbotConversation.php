@@ -22,9 +22,9 @@ class ChatbotConversation
     ) {}
 
     /** @return array{message: string, source: string, context_token: string|null} */
-    public function respond(string $message, ?User $customer, ?string $token, string $sessionId): array
+    public function respond(string $message, ?User $customer, ?string $token, string $contextScope): array
     {
-        $subject = $sessionId.':'.($customer?->getKey() ?? 'guest');
+        $subject = $contextScope.':'.($customer?->getKey() ?? 'guest');
         $state = $this->tokens->decode($token, $subject);
         $message = Str::squish($message);
 
