@@ -1,6 +1,6 @@
 # React Native API handoff — EXT-62
 
-This document describes the implemented customer REST API, including guest chatbot access. Laravel owns all catalog, cart, checkout, order, recommendation, and chatbot business rules. React Native is a separate client. Administration remains on the web.
+This document describes the implemented customer REST API, including guest chatbot access. Laravel owns all catalog, cart, checkout, order, recommendation, and chatbot business rules. React Native + Expo is a separate client maintained and run by the mobile group member. Administration remains on the web.
 
 Companion files:
 
@@ -11,9 +11,13 @@ Examples below contain synthetic data, illustrative IDs and dates. They are shap
 
 ## 1. Connection and common contract
 
+For EXT-63, prefer the Expo app on a physical phone connected to the same Wi-Fi/LAN as the backend laptop. Record Expo Go versus a development/other Expo build, and physical device versus emulator. Actual consumer LAN validation is still pending; the completed Postman run does not replace it.
+
 Set Postman's `base_url` to the reachable backend root **including `/api/v1`**, without a trailing slash. Requests use `{{base_url}}/products`, etc. The checked local Herd health URL is `http://battlefront-capstone.test/api/v1/health`; that host may resolve only on the development computer.
 
-For a phone on the same LAN, bind the development server to an accessible interface, for example `php artisan serve --host=0.0.0.0 --port=8000`, allow the chosen development port through the host firewall, and use the development computer's reachable host/address in the Postman/mobile configuration. `0.0.0.0` is a listening address, not the client destination. A phone's localhost refers to the phone. Do not hard-code LAN addresses in application code. Confirm that returned image and pagination URLs are also reachable from the device. Native mobile HTTP does not use browser CORS; browser-based tooling may have different requirements. Use HTTPS for deployed credentials.
+Laravel Herd is the primary local server for LAN testing. Configure the mobile base URL with the laptop's reachable LAN IP/hostname, any required port, and `/api/v1`. Confirm that Herd accepts connections on that interface and routes the chosen hostname/address to this Laravel site; changing the client URL alone is insufficient. Allow the chosen development port through the laptop firewall for the test network. A phone's localhost refers to the phone, and Herd's local `.test` hostname may not resolve on it. Verify `/api/v1/health` from the actual device before exercising journeys.
+
+Only if Herd cannot be exposed over LAN for this setup, use `php artisan serve --host=0.0.0.0 --port=8000` as an optional fallback and point the client at the laptop's reachable address on that port. `0.0.0.0` is a listening address, not the client destination. Do not hard-code LAN addresses in application code. Confirm that returned image and pagination URLs are also reachable from the device. Native mobile HTTP does not use browser CORS; browser-based tooling may have different requirements. Use HTTPS for deployed credentials. Network/firewall/hostname/device transport failures must be distinguished from API-contract failures; see [EXT-63 integration validation](MOBILE_INTEGRATION_VALIDATION.md) for the observed Herd prerequisite and evidence checklist.
 
 Send `Accept: application/json`. JSON bodies use `Content-Type: application/json`; uploads use multipart with a client-generated boundary. API paths render JSON without needing the Accept header, but clients should send it.
 
@@ -804,7 +808,7 @@ Provider fallback and expiration scenarios are deterministically covered by exis
 
 Automated verification during this handoff: 275 existing API tests passed (1,732 assertions). Both JSON files parse; all 22 registered endpoints have collection coverage; all 33 environment references resolve; request scripts compile and JSON body scripts handle quotes/backslashes. Twelve local HTTP smoke checks passed, covering public reads, guest recommendations/chatbot, missing/invalid authentication, and catalog validation. No live customer/order data was mutated by these HTTP checks.
 
-A manual Postman import/run has **not** been performed by the coding agent; the developer must complete the sequence above in the Postman app. Postman/CLI were not found on PATH or in the checked standard installation locations. JSON/structural checks are not a Postman import or a full external-schema validation. No generator or validator dependency was installed.
+The developer subsequently reported completing manual tests in Postman Desktop with no API issues and approved EXT-62. The execution date, individual run results, and screenshots were not supplied to the coding agent. This is developer-reported manual verification, not an agent-executed Postman run. Keep the sequence above for repeat runs. JSON/structural checks are not full external-schema validation. No generator or validator dependency was installed. Actual React Native consumer validation is tracked separately in [EXT-63](MOBILE_INTEGRATION_VALIDATION.md).
 
 ## 10. Source mapping and known limitations
 
