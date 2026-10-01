@@ -12,16 +12,16 @@ class ChatbotController extends Controller
 {
     public function store(StoreChatbotMessageRequest $request, ChatbotConversation $chatbot): ChatbotResponseResource
     {
-        /** @var User $customer */
+        /** @var User|null $customer */
         $customer = $request->user();
-        $accessToken = $customer->currentAccessToken();
+        $accessToken = $customer?->currentAccessToken();
         $validated = $request->validated();
 
         return new ChatbotResponseResource($chatbot->respond(
             $validated['message'],
             $customer,
             $validated['context_token'] ?? null,
-            'api:token:'.$accessToken->getKey(),
+            $accessToken === null ? 'api:guest' : 'api:token:'.$accessToken->getKey(),
         ));
     }
 }

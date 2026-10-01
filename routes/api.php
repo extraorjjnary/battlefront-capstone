@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\OrderPaymentProofController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\RecommendationController;
+use App\Http\Middleware\AuthorizeApiChatbot;
 use App\Http\Middleware\AuthorizeApiRecommendations;
 use Illuminate\Support\Facades\Route;
 
@@ -19,9 +20,15 @@ Route::prefix('v1')
     ->name('api.v1.')
     ->middleware('throttle:api-v1')
     ->group(function (): void {
-        Route::get('health', fn() => response()->json([
+        Route::get('health', fn () => response()->json([
             'data' => ['status' => 'ok'],
         ]))->name('health');
+
+        // authentication
+        Route::post('auth/register', [AuthController::class, 'register'])
+            ->middleware('throttle:5,1')->name('auth.register');
+        Route::post('auth/login', [AuthController::class, 'login'])
+            ->middleware('throttle:login')->name('auth.login');
 
         // products
         Route::get('products', [ProductController::class, 'index'])->name('products.index');
@@ -34,15 +41,13 @@ Route::prefix('v1')
 
         // recommendations
         Route::middleware(AuthorizeApiRecommendations::class)->group(function (): void {
-            Route::post('recommendations', [RecommendationController::class, 'results'])->name('recommendations.results');
             Route::get('recommendations/options', [RecommendationController::class, 'options'])->name('recommendations.options');
+            Route::post('recommendations', [RecommendationController::class, 'results'])->name('recommendations.results');
         });
 
-        // authentication
-        Route::post('auth/register', [AuthController::class, 'register'])
-            ->middleware('throttle:5,1')->name('auth.register');
-        Route::post('auth/login', [AuthController::class, 'login'])
-            ->middleware('throttle:login')->name('auth.login');
+        // chatbot
+        Route::post('chatbot', [ChatbotController::class, 'store'])
+            ->middleware([AuthorizeApiChatbot::class, 'throttle:chatbot'])->name('chatbot.store');
 
         // auth customers endpoint
         Route::middleware(['auth:sanctum', 'can:use-customer-cart'])->group(function (): void {
@@ -62,10 +67,6 @@ Route::prefix('v1')
             Route::delete('cart/items/{cartItem}', [CartItemController::class, 'destroy'])
                 ->whereNumber('cartItem')->name('cart.items.destroy');
 
-            // chatbot
-            Route::post('chatbot', [ChatbotController::class, 'store'])
-                ->middleware(['can:use-chatbot', 'throttle:chatbot'])->name('chatbot.store');
-
             // checkout preview
             Route::get('checkout', [CheckoutController::class, 'show'])->name('checkout.show');
 
@@ -76,5 +77,6 @@ Route::prefix('v1')
                 ->whereNumber('order')->name('orders.show');
             Route::post('orders/{order}/payment-proof', OrderPaymentProofController::class)
                 ->whereNumber('order')->name('orders.payment-proof.store');
+
         });
     });
