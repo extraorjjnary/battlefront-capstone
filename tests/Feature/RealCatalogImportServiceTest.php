@@ -8,6 +8,8 @@ use App\Models\Product;
 use App\Models\User;
 use App\Services\CatalogImagePipeline;
 use App\Services\RealCatalogImportService;
+use Carbon\CarbonImmutable;
+use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
@@ -58,6 +60,35 @@ function realCatalogMapping(array $rows = [['00123', 'Exact Product™', 'Graphi
 
     return $path;
 }
+
+test('historical fixtures and verified catalog imports remain separate across reseeding and reimport', function () {
+    $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00'));
+    Storage::fake('public');
+    $manifest = realCatalogManifest();
+    $mapping = realCatalogMapping();
+
+    try {
+        $importer = app(RealCatalogImportService::class);
+        $importer->execute($mapping, $manifest);
+        $realProduct = Product::with(['inventory', 'category', 'tags'])->where('product_code', '00123')->sole();
+        $before = $realProduct->toArray();
+
+        $this->seed(DevelopmentHistoricalSalesSeeder::class);
+        expect($realProduct->fresh(['inventory', 'category', 'tags'])->toArray())->toBe($before);
+        $fixtureProducts = Product::with('inventory')->where('is_catalog_imported', false)->orderBy('id')->get()->toArray();
+        $second = $importer->execute($mapping, $manifest);
+
+        expect($second)->toBe(['created' => 0, 'updated' => 1]);
+        expect(Product::with('inventory')->where('is_catalog_imported', false)->orderBy('id')->get()->toArray())->toBe($fixtureProducts);
+        $this->assertDatabaseCount('products', 8);
+        $this->assertDatabaseCount('sales', 16);
+        $this->seed(DevelopmentHistoricalSalesSeeder::class);
+        expect($realProduct->fresh(['inventory', 'category', 'tags'])->toArray())->toBe($before);
+    } finally {
+        unlink($manifest);
+        unlink($mapping);
+    }
+});
 
 test('details template lists exact product codes without inventing missing fields or overwriting a review', function () {
     Storage::fake('public');

@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Services\RealCatalogImportService;
 use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -13,6 +14,7 @@ use Throwable;
 
 #[Signature('battlefront:reset-dev
     {--force : Skip confirmation in local/testing environments}
+    {--with-sales-history : Load synthetic historical sales for forecasting development}
     {--manifest= : Path to the audited catalog image manifest}
     {--mapping= : Path to the verified product details CSV}')]
 #[Description('Recreate the local development database and restore the verified 654-product catalog')]
@@ -68,6 +70,13 @@ class ResetDevCommand extends Command
                 throw new RuntimeException('Expected 654 newly imported products and no updates.');
             }
             $this->info("{$result['created']} products imported.");
+            if ($this->option('with-sales-history')) {
+                $stage = 'Synthetic historical sales seeding';
+                if ($this->call('db:seed', ['--class' => DevelopmentHistoricalSalesSeeder::class, '--force' => true, '--no-interaction' => true]) !== self::SUCCESS) {
+                    throw new RuntimeException('Historical sales seeding failed.');
+                }
+                $this->info('Synthetic development history seeded: 7 products, 16 completed orders and 16 sales across 8 completed quarters.');
+            }
             $this->info('Development reset completed.');
 
             return self::SUCCESS;

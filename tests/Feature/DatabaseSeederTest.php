@@ -30,3 +30,14 @@ test('the development users are verified with their expected roles when the defa
         ->and($administrator->refresh()->hasVerifiedEmail())->toBeTrue()
         ->and($administrator->role)->toBe(UserRole::Administrator);
 });
+
+test('default initialization does not load historical sales development fixtures', function (string $environment) {
+    $this->app->instance('env', $environment);
+
+    $this->artisan('db:seed', ['--force' => true, '--no-interaction' => true])->assertSuccessful();
+
+    $this->assertDatabaseMissing('users', ['email' => 'historical-sales@example.test']);
+    foreach (['products', 'categories', 'inventories', 'orders', 'order_items', 'sales'] as $table) {
+        $this->assertDatabaseCount($table, 0);
+    }
+})->with(['local', 'testing', 'production', 'staging']);

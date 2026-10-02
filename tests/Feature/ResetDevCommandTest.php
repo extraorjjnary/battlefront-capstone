@@ -7,6 +7,9 @@ use App\Models\Product;
 use App\Models\Sale;
 use App\Models\User;
 use App\Services\RealCatalogImportService;
+use Carbon\CarbonImmutable;
+use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -15,7 +18,7 @@ test('development reset rejects unsafe environments even with force', function (
     $sentinel = User::factory()->create();
     $this->app->instance('env', $environment);
 
-    $this->artisan('battlefront:reset-dev', ['--force' => $force])
+    $this->artisan('battlefront:reset-dev', ['--force' => $force, '--with-sales-history' => true])
         ->expectsOutputToContain('only allowed in local and testing')
         ->assertFailed();
 
@@ -79,8 +82,8 @@ test('invalid restore inputs preserve the existing database', function (string $
 
     try {
         match ($problem) {
-            'missing manifest' => $options['--manifest'] = $manifest . '.missing',
-            'missing mapping' => $options['--mapping'] = $mapping . '.missing',
+            'missing manifest' => $options['--manifest'] = $manifest.'.missing',
+            'missing mapping' => $options['--mapping'] = $mapping.'.missing',
             'invalid manifest' => file_put_contents($manifest, '{'),
             'invalid mapping' => file_put_contents($mapping, 'wrong,columns'),
             'missing image' => Storage::disk('public')->delete('products/graphics-card/00123.webp'),
@@ -129,7 +132,8 @@ test('reset stops when an orchestration stage fails', function (string $stage) {
     $this->assertModelExists($sentinel);
 })->with(['migration', 'seeding', 'import', 'count']);
 
-test('reset restores the complete real catalog and removes transient records without changing images', function () {
+test('reset restores the complete real catalog with historical sales only when requested', function (bool $withHistory) {
+    $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00'));
     $manifestPath = storage_path('app/private/product-catalog-images/manifest.json');
     $mappingPath = storage_path('app/imports/product_catalog/verified-product-details.csv');
     if (! is_file($manifestPath) || ! is_file($mappingPath)) {
@@ -162,18 +166,19 @@ test('reset restores the complete real catalog and removes transient records wit
         CartItem::factory()->for($transient)->create();
         Sale::factory()->create();
         $filesBefore = collect(Storage::disk('public')->allFiles('products'))
-            ->mapWithKeys(fn($path) => [$path => hash_file('sha256', Storage::disk('public')->path($path))])->all();
+            ->mapWithKeys(fn ($path) => [$path => hash_file('sha256', Storage::disk('public')->path($path))])->all();
 
-        $this->artisan('battlefront:reset-dev', ['--force' => true])
+        $this->artisan('battlefront:reset-dev', ['--force' => true, '--with-sales-history' => $withHistory])
             ->expectsOutput('Database recreated.')
             ->expectsOutput('Seeders completed.')
             ->expectsOutput('654 products imported.')
             ->expectsOutput('Development reset completed.')
             ->assertSuccessful();
 
-        $products = Product::with(['inventory', 'category', 'tags'])->get()->keyBy('product_code');
+        $products = Product::with(['inventory', 'category', 'tags'])->where('is_catalog_imported', true)->get()->keyBy('product_code');
         expect($products)->toHaveCount(654);
-        $this->assertDatabaseCount('inventories', 654);
+        $this->assertDatabaseCount('products', $withHistory ? 661 : 654);
+        $this->assertDatabaseCount('inventories', $withHistory ? 661 : 654);
         foreach ($expected as $row) {
             $product = $products->get($row['product_code']);
             expect($product)->not->toBeNull();
@@ -186,12 +191,19 @@ test('reset restores the complete real catalog and removes transient records wit
             expect($product->image_path)->toBe($row['image_path']);
         }
         $filesAfter = collect(Storage::disk('public')->allFiles('products'))
-            ->mapWithKeys(fn($path) => [$path => hash_file('sha256', Storage::disk('public')->path($path))])->all();
+            ->mapWithKeys(fn ($path) => [$path => hash_file('sha256', Storage::disk('public')->path($path))])->all();
         expect($filesAfter)->toBe($filesBefore);
-        foreach (['orders', 'order_items', 'sales', 'carts', 'cart_items'] as $table) {
-            $this->assertDatabaseCount($table, 0);
+        foreach (['orders' => 16, 'order_items' => 51, 'sales' => 16, 'carts' => 0, 'cart_items' => 0] as $table => $historicalCount) {
+            $this->assertDatabaseCount($table, $withHistory ? $historicalCount : 0);
         }
-        $this->assertDatabaseCount('users', 2);
+        if ($withHistory) {
+            $sales = Sale::query()->orderBy('sale_date')->get();
+            expect($sales->first()->sale_date->toDateString())->toBe('2024-10-01');
+            expect($sales->last()->sale_date->toDateString())->toBe('2026-09-30');
+        }
+        $this->assertDatabaseCount('users', $withHistory ? 3 : 2);
+        expect(User::query()->where('email', 'historical-sales@example.test')->exists())->toBe($withHistory);
+        expect(Product::query()->where('is_catalog_imported', false)->count())->toBe($withHistory ? 7 : 0);
         $this->assertDatabaseHas('users', ['email' => 'admin@example.com']);
         $this->assertDatabaseHas('users', ['email' => 'test@example.com']);
         $this->assertDatabaseHas('branches', ['city' => 'Sagay City']);
@@ -200,4 +212,25 @@ test('reset restores the complete real catalog and removes transient records wit
         DB::setDefaultConnection($originalConnection);
         DB::purge('reset_test');
     }
+})->with([false, true]);
+
+test('reset reports optional historical seeding failure after a successful catalog import', function () {
+    $this->mock(RealCatalogImportService::class, function ($mock) {
+        $mock->shouldReceive('inspectFiles')->once()->andReturn(array_fill(0, 654, []));
+        $mock->shouldReceive('execute')->once()->andReturn(['created' => 654, 'updated' => 0]);
+    });
+    $command = Mockery::mock(ResetDevCommand::class)->makePartial();
+    $command->setName('battlefront:reset-dev');
+    $command->setDefinition((new ResetDevCommand)->getDefinition());
+    $command->shouldReceive('call')->with('migrate:fresh', Mockery::any())->once()->andReturn(0);
+    $command->shouldReceive('call')->with('db:seed', ['--class' => DatabaseSeeder::class, '--force' => true, '--no-interaction' => true])->once()->andReturn(0);
+    $command->shouldReceive('call')->with('db:seed', ['--class' => DevelopmentHistoricalSalesSeeder::class, '--force' => true, '--no-interaction' => true])->once()->andReturn(1);
+    Artisan::registerCommand($command);
+
+    $this->artisan('battlefront:reset-dev', ['--force' => true, '--with-sales-history' => true])
+        ->expectsOutput('654 products imported.')
+        ->expectsOutputToContain('Synthetic historical sales seeding failed')
+        ->expectsOutputToContain('Reset incomplete')
+        ->doesntExpectOutput('Development reset completed.')
+        ->assertFailed();
 });
