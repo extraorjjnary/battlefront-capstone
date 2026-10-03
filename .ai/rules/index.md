@@ -20,6 +20,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/Chatbot/**,app/Services/Chatbot/**,resources/js/components/chatbot/** | .ai/rules/components-chatbot.md |
 | database/seeders/**,app/Http/Controllers/BranchController.php,resources/js/components/BranchMap.vue | .ai/rules/components.md |
 | routes/**,app/Http/Controllers/** | .ai/rules/controllers.md |
+| app/Actions/Forecasting/** | .ai/rules/forecasting.md |
 | ** | .ai/rules/general.md |
 | app/Http/Controllers/** | .ai/rules/http-controllers.md |
 | app/Http/Controllers/BranchController.php,resources/js/pages/Branches/**,resources/js/components/BranchMap.vue | .ai/rules/js-components.md |
