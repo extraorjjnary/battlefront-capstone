@@ -10,3 +10,6 @@ EXT-43 uses the latest four consecutive quarters as a full-year demand baseline,
 
 ## Linear trend fits all supplied quarters with a four-quarter minimum
 EXT-44 fits quantity_sold over all supplied consecutive completed quarters with x=1..n and targets x=n+1 at History.end_exclusive; require four observations, including zero demand. Use shared PrepareQuarterlyForecastHistory for both forecasting actions, without queries or rebuilding buckets. Absent/empty history is missing_history; one to three observations is insufficient_history. Keep exact BCMath integer fractions until output: slope, intercept and signed raw projection use six decimals, forecast_quantity uses two, ties round away from zero. Clamp exact negative projections to 0.00 before rounding and retain raw_forecast_quantity plus was_clamped; never project from rounded coefficients.
+
+## EXT-45 persists product forecasts only
+Forecast persistence follows the manuscript product-only Forecast ERD plus the approved method field. Accept only completed product results from moving_average or linear_trend; category calculations remain valid but cannot be persisted without a separate ERD amendment. Store finalized demand, target quarter, and generated_at only. Reruns replace the row keyed by product_id, method, and forecast_quarter.
