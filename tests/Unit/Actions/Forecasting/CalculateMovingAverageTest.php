@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Forecasting\CalculateLinearTrend;
 use App\Actions\Forecasting\CalculateMovingAverage;
 
 function movingAverageHistory(array $quantities, string $start = '2025-10-01', string $timezone = 'UTC'): array
@@ -117,11 +118,11 @@ test('does not change its input and ignores revenue', function () {
     expect($action->execute($history, 7))->toBe($before);
 });
 
-test('rejects malformed envelopes', function (string $field, mixed $value) {
+test('rejects malformed envelopes', function (string $field, mixed $value, string $actionClass) {
     $history = movingAverageHistory([1, 2, 3, 4]);
     $history[$field] = $value;
 
-    expect(fn () => (new CalculateMovingAverage)->execute($history, 7))->toThrow(InvalidArgumentException::class);
+    expect(fn () => (new $actionClass)->execute($history, 7))->toThrow(InvalidArgumentException::class);
 })->with([
     'dimension' => ['dimension', 'customer'],
     'timezone missing' => ['timezone', null],
@@ -137,17 +138,17 @@ test('rejects malformed envelopes', function (string $field, mixed $value) {
     'reversed boundaries' => ['end_exclusive', '2025-07-01'],
     'series missing' => ['series', null],
     'series not a list' => ['series', ['entity' => []]],
-]);
+])->with(['moving average' => CalculateMovingAverage::class, 'linear trend' => CalculateLinearTrend::class]);
 
-test('rejects an envelope with no metadata', function () {
-    expect(fn () => (new CalculateMovingAverage)->execute([], 7))->toThrow(InvalidArgumentException::class);
-});
+test('rejects an envelope with no metadata', function (string $actionClass) {
+    expect(fn () => (new $actionClass)->execute([], 7))->toThrow(InvalidArgumentException::class);
+})->with(['moving average' => CalculateMovingAverage::class, 'linear trend' => CalculateLinearTrend::class]);
 
-test('rejects malformed quarter values', function (string $field, mixed $value) {
+test('rejects malformed quarter values', function (string $field, mixed $value, string $actionClass) {
     $history = movingAverageHistory([1, 2, 3, 4]);
     $history['series'][0]['quarters'][1][$field] = $value;
 
-    expect(fn () => (new CalculateMovingAverage)->execute($history, 7))->toThrow(InvalidArgumentException::class);
+    expect(fn () => (new $actionClass)->execute($history, 7))->toThrow(InvalidArgumentException::class);
 })->with([
     'negative quantity' => ['quantity_sold', -1],
     'decimal quantity' => ['quantity_sold', 1.5],
@@ -156,9 +157,9 @@ test('rejects malformed quarter values', function (string $field, mixed $value) 
     'incorrect year' => ['year', 2025],
     'incorrect quarter' => ['quarter', 2],
     'incorrect end' => ['end_exclusive', '2026-07-01'],
-]);
+])->with(['moving average' => CalculateMovingAverage::class, 'linear trend' => CalculateLinearTrend::class]);
 
-test('rejects gaps duplicates and unordered or incomplete history instead of repairing it', function (string $case) {
+test('rejects gaps duplicates and unordered or incomplete history instead of repairing it', function (string $case, string $actionClass) {
     $history = movingAverageHistory([1, 2, 3, 4]);
     $quarters = &$history['series'][0]['quarters'];
     match ($case) {
@@ -170,14 +171,14 @@ test('rejects gaps duplicates and unordered or incomplete history instead of rep
         'nonarray observation' => $quarters[1] = null,
     };
 
-    expect(fn () => (new CalculateMovingAverage)->execute($history, 7))->toThrow(InvalidArgumentException::class);
-})->with(['gap', 'duplicate', 'unordered', 'missing first', 'missing last', 'nonarray observation']);
+    expect(fn () => (new $actionClass)->execute($history, 7))->toThrow(InvalidArgumentException::class);
+})->with(['gap', 'duplicate', 'unordered', 'missing first', 'missing last', 'nonarray observation'])->with(['moving average' => CalculateMovingAverage::class, 'linear trend' => CalculateLinearTrend::class]);
 
-test('rejects invalid requested entity IDs', function (int $id) {
-    expect(fn () => (new CalculateMovingAverage)->execute(movingAverageHistory([1, 2, 3, 4]), $id))->toThrow(InvalidArgumentException::class);
-})->with([0, -1]);
+test('rejects invalid requested entity IDs', function (int $id, string $actionClass) {
+    expect(fn () => (new $actionClass)->execute(movingAverageHistory([1, 2, 3, 4]), $id))->toThrow(InvalidArgumentException::class);
+})->with([0, -1])->with(['moving average' => CalculateMovingAverage::class, 'linear trend' => CalculateLinearTrend::class]);
 
-test('rejects malformed entity lists', function (string $case) {
+test('rejects malformed entity lists', function (string $case, string $actionClass) {
     $history = movingAverageHistory([1, 2, 3, 4]);
     match ($case) {
         'duplicate entity' => $history['series'][] = $history['series'][0],
@@ -188,5 +189,5 @@ test('rejects malformed entity lists', function (string $case) {
         'quarters not list' => $history['series'][0]['quarters'] = ['quarter' => []],
     };
 
-    expect(fn () => (new CalculateMovingAverage)->execute($history, 7))->toThrow(InvalidArgumentException::class);
-})->with(['duplicate entity', 'nonarray entity', 'noninteger ID', 'nonpositive ID', 'missing quarters', 'quarters not list']);
+    expect(fn () => (new $actionClass)->execute($history, 7))->toThrow(InvalidArgumentException::class);
+})->with(['duplicate entity', 'nonarray entity', 'noninteger ID', 'nonpositive ID', 'missing quarters', 'quarters not list'])->with(['moving average' => CalculateMovingAverage::class, 'linear trend' => CalculateLinearTrend::class]);
