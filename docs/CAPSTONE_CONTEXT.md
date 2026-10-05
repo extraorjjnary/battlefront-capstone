@@ -4,7 +4,7 @@
 
 **Integrated Web and Mobile Business Management System with Product Recommendation, Predictive Analytics, and Integrated Chatbot for Battlefront Computer Trading**
 
-This document records the current Battlefront Computer Trading repository implementation, completed work, pending work, and development boundaries. The general snapshot was verified on **2026-10-01**; forecasting architecture, implementation boundaries, and Linear migration status were reconciled on **2026-10-05** following the developer-authorized study revision. Unrelated areas retain their earlier snapshot.
+This document records the current Battlefront Computer Trading repository implementation, completed work, pending work, and development boundaries. The general snapshot was verified on **2026-10-01**; forecasting architecture, implementation boundaries, and Linear migration status were reconciled on **2026-10-05** following the latest developer-authorized monthly Holt–Winters revision. Unrelated areas retain their earlier snapshot.
 
 For current implementation facts, use the repository first, then Linear issue state and approved scope, existing handoff/context documents, and existing Postman/mobile API documentation. Planned capabilities are explicitly distinguished from implemented behavior.
 
@@ -38,7 +38,7 @@ The system supports:
 - sales monitoring;
 - business reports;
 - product recommendations;
-- predictive sales/demand analytics (calculation/aggregation/persistence foundations implemented; approved simplification pending);
+- predictive sales/demand analytics (moving-average workflow implemented; approved monthly Holt–Winters migration pending);
 - chatbot-assisted customer inquiries;
 - branch/store information.
 
@@ -220,7 +220,7 @@ Laravel is responsible for the system's main application and business logic, inc
 - sales;
 - reporting;
 - product recommendation;
-- predictive analytics (approved simplification pending; existing forecasting foundations described in Section 9);
+- predictive analytics (monthly additive Holt–Winters migration pending; implemented moving-average foundations described in Section 9);
 - chatbot orchestration;
 - REST API behavior required by the mobile application.
 
@@ -230,7 +230,7 @@ Business rules shared between web and mobile belong to the shared Laravel backen
 
 The approved relational database management system is **MySQL**.
 
-The implemented database stores users, products/categories/tags, inventory, customer carts and orders, sales, product forecasts, branch reference information, chatbot knowledge, and framework infrastructure including personal access tokens. Forecast migrations/model and persistence exist; new-write behavior is being simplified under EXT-45 without a planned schema change.
+The implemented database stores users, products/categories/tags, inventory, customer carts and orders, sales, product forecasts, branch reference information, chatbot knowledge, and framework infrastructure including personal access tokens. Forecast migrations/model and moving-average persistence exist; EXT-45 will migrate new writes to additive_holt_winters and extend database method constraints without adding columns.
 
 Current migrations and models establish the implemented schema. MySQL is the application backend; `phpunit.xml` uses SQLite in memory for automated tests. The starter `.env.example` still defaults to SQLite, so it does not describe the configured MySQL development backend.
 
@@ -321,7 +321,7 @@ Administrators can:
 - view branch reference information;
 - monitor sales, orders, and inventory through the administrative dashboard.
 
-The approved product-only forecasting generation/review workflow is pending under EXT-46; the current checkout has no forecasting controller/service/page. Current customer administration exposes index/detail viewing, not account editing. Branch reference data is maintained through seeders/configuration; there is no branch-management CRUD interface.
+The product-only moving-average forecasting controller/service/requests/page are implemented; EXT-46 will adapt that existing simple workflow to monthly additive Holt–Winters. Current customer administration exposes index/detail viewing, not account editing. Branch reference data is maintained through seeders/configuration; there is no branch-management CRUD interface.
 
 ## Authorization Boundaries
 
@@ -368,7 +368,7 @@ The approved product-only forecasting generation/review workflow is pending unde
 ## Intelligent Modules
 
 - Product Recommendation — complete
-- Predictive Analytics — approved simplification pending; existing foundations retained
+- Predictive Analytics — monthly Holt–Winters migration pending; existing moving-average workflow retained
 - Integrated Chatbot — complete
 
 ## Integration
@@ -446,78 +446,157 @@ The **Product Recommendation Module**, not the chatbot, owns recommendation logi
 
 # 9. Predictive Analytics Module
 
-**Approved architecture, 2026-10-05:** one product-level **trailing four-quarter simple moving average** is the production forecasting method. The developer-authorized study revision supersedes the previous requirement to provide two forecasting methods. It remains deterministic, lightweight, based solely on Battlefront's own sales, and non-machine-learning.
+**Approved architecture, latest 2026-10-05 revision:** production uses one product-level **additive Holt–Winters exponential-smoothing method over monthly recorded sales**. This developer-approved decision supersedes both the original moving-average/linear-trend scope and the later trailing four-quarter moving-average production decision. The calculation models level, undamped trend, and recurring annual monthly seasonality. It remains deterministic, lightweight, internal-sales-only, and implementable in the existing PHP/Laravel stack without Python or a heavyweight dependency.
 
-**Migration status:** EXT-36 and EXT-46 remain Backlog. EXT-40, EXT-42, EXT-44, and EXT-45 were reopened from Done to Backlog for required implementation/test changes. EXT-43 remains Done because its pure moving-average calculator already satisfies the approved calculation contract. This documentation/Linear pass does not implement or complete those revisions.
+**Current implementation:** the previous moving-average migration is implemented and accepted in EXT-40/42/43/45/46. The checkout contains synthetic historical fixtures, trusted coverage metadata, readiness-gated quarterly preparation, calculation, persistence, controller/requests/service, administrator UI, and focused tests. Those completed foundations require migration; do not describe Holt–Winters as implemented.
 
-## Current Implementation and Required Migration
+**New migration status:** EXT-36 and EXT-44 remain Backlog. EXT-40, EXT-42, EXT-43, EXT-45, and EXT-46 are reopened to Backlog for required code/test changes. This pass updates planning and forecasting documentation only; it implements no fixtures, aggregation, calculators, database migrations, or UI and creates no commit.
 
-- `DevelopmentHistoricalSalesSeeder` already creates eight completed quarters of distinguishable synthetic sales and known stable, increasing, declining, repeating, sparse, price-snapshot, and no-transaction scenarios. Trusted coverage metadata is not implemented.
-- `QuarterlySalesAggregationService` and `QuarterlySalesRepository` already aggregate quantities and purchase-time revenue by product/category, use sale dates and calendar-quarter boundaries, and preserve empty buckets. Explicitly selecting a product currently generates zeros without proving completeness; EXT-42 will add a forecasting preparation/readiness boundary before zero-filling.
-- `CalculateMovingAverage` uses the latest four supplied quarters, exact decimal arithmetic, and explicit missing/insufficient-series outcomes. Keep it pure; setup/import readiness belongs upstream.
-- `CalculateLinearTrend` and its regression tests exist as legacy implementation pending retirement under EXT-44; they are not approved production requirements.
-- `PersistForecast`, the Forecast model/factory, and product-focused migrations exist. EXT-45 will restrict new application writes to `moving_average` and remove obsolete regression validation while preserving existing rows/schema.
-- No forecasting controller/service/page is present in the current checkout. EXT-46 will deliver the approved administrator workflow using existing Chart.js/vue-chartjs.
+## Monthly History Contract and Fixed Window
 
-## Fixed Window and Calculation
+Let T be the current calendar-quarter start in the application timezone, config('app.timezone'). Use exactly the latest **36 completed calendar months** in [T − 36 months, T), and estimate the three months of the full target quarter [T, T + 3 months). For October 5, 2026, the source is October 2023–September 2026 and the target is October–December 2026. Mid-quarter reruns use the same cutoff; observations anywhere in the target quarter are excluded. This is a full-quarter estimate, not remaining-quarter demand.
 
-Let `T` be the current calendar-quarter start in the application timezone. Automatically use the four most recent completed quarters in `[T - 4 quarters, T)`, and estimate the full target quarter `[T, T + 1 quarter)`. Exclude every target-quarter sale from inputs. On October 5, 2026, the source is Q4 2025 through Q3 2026 and the target is Q4 2026. The estimate is not remaining-quarter demand or a forecast two quarters beyond completed history.
+Each observation uses a half-open first-day-midnight calendar-month interval and includes year, month, start, end_exclusive, and nonnegative integer quantity_sold. The prepared envelope identifies one product, timezone, source period, target quarter, and 36 ordered consecutive months. Quantities derive through Sale → Order → OrderItem using **Sale.sale_date** and **OrderItem.quantity**, not order creation dates. Revenue, current prices, customer identity, and inventory are not predictors.
 
-Sum the four product quantities and divide by four, preserving a two-decimal expected-unit result. Covered zero quarters count; all-zero covered history produces `0.00`. Do not average only sales-bearing quarters, shorten the divisor, select an older substitute window, or add method/window/target choices.
+The current repository application timezone is **UTC**. Follow the configured timezone consistently; this migration does not silently change global application time to Asia/Manila. Preserve tests for other configured timezones, month/quarter/year boundaries and leap months.
 
-The calculator may retain generic category/longer-input support for reuse, but the production workflow supplies exactly four quarters for one product, and persistence remains product-only.
+Preserve useful QuarterlySalesAggregationService/QuarterlySalesRepository and generic product/category reporting. Add the smallest monthly forecasting query/aggregation boundary; generic zero buckets never establish forecasting completeness.
 
-## Setup/Import Readiness Policy
+## Trusted Monthly Coverage and Eligibility
 
-Use a small configuration/import manifest keyed by product code, containing quarter-aligned `start`, `end_exclusive`, optional `unavailable_quarters`, and source kind/sales-scope identification. EXT-40 owns this metadata contract and deterministic development representation; EXT-42 consumes and validates it. No new coverage tables or administrator coverage-management interface are planned.
+Reuse the existing small configuration/import declaration and development manifest keyed by exact product code. Monthly declarations contain:
 
-Preparation declares the interval over which this product's records are complete, except any explicitly unavailable quarters. Operational metadata is unavailable by default. Source identity must distinguish synthetic local/testing fixtures from operational records and state whether coverage includes all Sagay sales or only captured system transactions. A label or existing sales does not prove completeness.
+- granularity=month;
+- month-aligned start and end_exclusive;
+- optional unavailable_months, represented by month-start dates;
+- timezone matching application timezone;
+- source_kind distinguishing operational_prepared from synthetic_development;
+- sales_scope distinguishing all_sagay_sales, captured_system_transactions, and development_fixture_transactions.
 
-| Coverage for the required recent window | Forecasting outcome |
+EXT-40 owns this contract; EXT-42 consumes it. The development manifest moves from version 1 to **version 2** and must be explicitly republished. Do not silently reinterpret earlier quarterly declarations as this new contract. No new coverage table or administrator coverage-management UI is approved. Operational declarations are unavailable by default.
+
+Coverage is a setup/import/data-preparation declaration that records are complete for the named product, interval, and sales scope. It does not prove full-store coverage if the declared scope is only captured system transactions. Never infer completeness from earliest Sale, Product.created_at, or generated zero buckets. Setup/import/quarter-close preparation explicitly advances coverage; the clock alone does not.
+
+| Condition for the required window | Outcome |
 | --- | --- |
-| Four complete covered quarters, with sales | Ready; calculate and save |
-| Four complete covered quarters, some empty | Ready; include zero observations |
-| Four complete covered quarters, all empty | Ready; valid `0.00` result |
-| Valid contiguous interval reaching `T`, but beginning too recently for four quarters | Insufficient history; save nothing |
-| Missing/malformed metadata, uncertain completeness, stale end before `T`, or a gap/incomplete quarter in the required window | History unavailable; save nothing |
+| Trusted complete 36-month history satisfying model eligibility | ready |
+| Valid complete gap-free declaration reaching T, with only 0–35 required months covered | insufficient_history; save nothing |
+| Missing/malformed/uncertain metadata, stale end before T, or an unavailable month in the covered portion of the required window | history_unavailable; save nothing |
+| Complete non-all-zero history failing the sparse-demand policy below | history_unsuitable; save nothing |
 
-Count only completed quarters in the required window. A gap outside that window does not invalidate an otherwise complete recent window. Do not automatically extend declared coverage with the clock: setup/import/quarter-close preparation establishes newly completed coverage. New or imported products require explicit metadata; never infer completeness solely from earliest Sale, `Product.created_at`, or four generated zero buckets. A short complete interval is different from unknown history. The pure calculator's `missing_history` status remains an input-contract outcome, while the production preparation boundary reports `history_unavailable` for coverage failures.
+Coverage failures take precedence over short-history/model eligibility checks. Ignore unavailable months outside the selected source window. For missing/unavailable/short coverage, do not construct a supposedly forecast-ready zero series. After coverage is established, empty covered months are valid zero observations.
 
-The academically honest assumption is that eligible records contain all completed sales within the declared product, period, and sales scope; absent transactions within that covered interval mean zero recorded sales. Zero recorded sales does not prove zero customer demand or uninterrupted stock availability. No verified real client history/import pipeline is established by this migration pass. Later real imports must be validated and must not silently mix synthetic history with operational data.
+**Minimum/window policy: 36 months.** Two annual cycles initialize components and a third supplies deterministic parameter-fitting observations. This is the approved project policy, not a universal statistical minimum or a guarantee of accuracy.
 
-## Sales Demand and Current Inventory
+**Sparse policy:** divide the 36-month source into three chronological 12-month blocks. An all-zero covered history is ready with a valid zero estimate. For every other history, each block must contain at least **six positive-sales months**; otherwise return history_unsuitable. Eligible mixed-zero histories retain every zero. This conservative project rule may exclude legitimate products selling only during a few seasonal months; it is not a universal statistical test or proof that annual seasonality exists. No Croston, fallback method, or hidden second production algorithm is introduced.
 
-Forecast input is historical **unit sales**, derived through Sale → Order → OrderItem and grouped by `sale_date`; quantity and purchase-time price are order-item snapshots. Product/category/revenue reporting can remain generic, but current price and stock do not alter the demand calculation.
+Synthetic records/declarations work only in development/testing and cannot establish operational readiness for a real product. Real client history remains unconfirmed. Later operational preparation must validate mapping and completeness without silently mixing synthetic and operational records.
 
-Inventory quantity/reorder level is current operational planning context, not a historical availability series. Display it separately if useful. The estimate does not measure lost sales, correct for stockouts, choose an optimal reorder quantity, or guarantee demand. It is a baseline for human inventory decisions and may lag growth/decline or miss seasonal differences.
+## Exact Additive Holt–Winters Calculation
 
-## Administrator Workflow and Persistence
+EXT-43 owns one pure PHP action consuming prepared monthly quantities without database queries, zero-filling, completeness inference, or runtime-clock decisions. Seasonal period is 12; trend is additive and undamped, with additive seasonal adjustments.
 
-```text
-Select product → Check setup/import readiness → Aggregate four completed quarters
-→ Calculate moving average → Persist result → Show observations and forecast
-→ Review saved result
-```
+Number observations y1 through y36. Define A=mean(y1..y12) and B=mean(y13..y24). Initialize at month 24:
 
-Administrators choose only a product and Generate forecast. No method selector, manual history-start selector, or recurring coverage-confirmation checkbox. Show target, four source quarters, actual unit quantities, estimated demand, generated time, and concise decision-support wording, with clear ready/insufficient/unavailable states. Customers cannot access forecasting administration.
+    b24 = (B − A) / 12
+    l24 = B + 5.5 × b24
 
-Keep the product-focused Forecast entity and existing `method` column. New generation stores product, `method=moving_average`, finalized two-decimal `predicted_demand`, target `forecast_quarter`, and `generated_at`. Reruns replace on `(product_id, method, forecast_quarter)`. Retain existing historical `linear_trend` rows for compatibility without allowing new trend generation/writes; historical labels may remain for review. No new forecast schema, snapshot/version tables, external inputs, ML, or heavyweight libraries are planned.
+For seasonal position j=1..12:
 
-Saved review reads stored demand. Moving-average source dates are derivable from the fixed rule, but original source quantities are not stored. Generation shows its actual observations; later historical views must not present current records as an original snapshot. Corrections can change a rerun; full historical reproducibility is not claimed. Legacy trend source dates were not retained and must not be invented.
+    s_j = [(y_j − A − (j − 6.5) × b24)
+           + (y_(12+j) − B − (j − 6.5) × b24)] / 2
 
-## Issue Ownership and Implementation Order
+Center these 12 adjustments by subtracting their mean, and assign them to s13..s24 by position. This fixed initialization detrends the two annual cycles rather than treating ordinary within-year growth entirely as seasonality. Independently worked examples must verify this convention.
 
-| Issue | Revised responsibility | Status |
+For each t=25..36, predict before updating with that observation:
+
+    p_t = l_(t−1) + b_(t−1) + s_(t−12)
+    l_t = alpha × (y_t − s_(t−12))
+          + (1 − alpha) × (l_(t−1) + b_(t−1))
+    b_t = beta × (l_t − l_(t−1))
+          + (1 − beta) × b_(t−1)
+    s_t = gamma × (y_t − l_t) + (1 − gamma) × s_(t−12)
+
+Gamma uses the updated-level formulation, often written gamma-star; do not mix it with the alternative unadjusted parameterization.
+
+### Deterministic Smoothing-Parameter Selection
+
+Use the fixed Cartesian grid:
+
+- alpha: 0.1, 0.2, …, 0.9;
+- beta: 0.0, 0.1, …, 0.9;
+- gamma: 0.0, 0.1, …, 0.9.
+
+Evaluate exactly **900 candidates**, each from identical initialization. Minimize the sum of squared raw one-step errors, sum((y_t − p_t)^2), over t=25..36. Predict before updating; break equal scores by the smallest numeric (alpha, beta, gamma) tuple in ascending lexicographic order. Use the winning candidate's month-36 states.
+
+This bounded coarse search is practical and reproducible; it does not claim a global optimum or best real-world accuracy. Unexplained fixed parameters were rejected because one arbitrary setting need not suit each product. No randomness, continuous optimizer, or administrator parameter input. The month-25..36 scores are fitting/tuning scores, not independent test accuracy.
+
+Use the existing **BCMath** dependency with explicit **scale 12** for intermediate operations, truncation and score comparisons. Do not rely on global decimal scale, floating-point arithmetic, or intermediate two-decimal rounding.
+
+### Three Monthly Outputs and Quarterly Rounding
+
+For h=1,2,3:
+
+    raw_h = l36 + h × b36 + s_(24+h)
+    usable_h = max(0, raw_h)
+
+Do not feed predicted values back as fabricated observations. Retain raw/clamp diagnostics in generation-time calculation context. Clamp each month separately, so negative projections cannot cancel another month's positive demand.
+
+Sum usable_1 + usable_2 + usable_3 at internal precision; round the quarterly total **once to two decimals, half-up**. Monthly values displayed to two decimals are presentation only and never feed the total. Explain: “Monthly estimates are rounded; the quarterly total is calculated before rounding.” Displayed monthly figures may therefore differ from the displayed total by a cent.
+
+Fully covered all-zero history initializes level/trend/seasonality to zero and uses the first tuple (0.1, 0.0, 0.0) without a parameter search. It produces three zero outputs and quarterly 0.00; it does not bypass coverage or the 36-month minimum. Invalid/oversized finalized output saves nothing and never overwrites a previous estimate.
+
+The pure successful output identifies method=additive_holt_winters, product, timezone, source/target periods, selected parameters, three ordered monthly forecasts and diagnostics, and finalized quarterly forecast_quantity. Production callers always supply the approved fixed contract.
+
+## Synthetic Development Strategy and Evaluation
+
+Revise DevelopmentHistoricalSalesSeeder to generate **48 completed months ending at T** for full-history scenarios. Production uses the latest 36; the extra year supports four rolling quarterly evaluation targets. Preserve environment guards, reserved identities, ownership checks, repeatability, publication-failure behavior, inactive synthetic products and unrelated operational records.
+
+Scenarios include stable non-seasonal demand, recurring annual monthly seasonality, seasonality with growth, decline, eligible mixed zeros, sparse/intermittent demand, covered all-zero history, fewer than 36 covered months, absent/stale coverage, and an internal unavailable month. Include irregular/abrupt-change behavior where Holt–Winters performs poorly or should be unsuitable. Calendar-month profiles must not shift with seed-loop position. Keep older fixtures only where genuinely useful for unrelated reporting/evaluation regression tests.
+
+For lightweight evaluation, compare production Holt–Winters with four-quarter moving average and monthly seasonal naïve summed to the same quarterly horizon. Using 48 complete months, evaluate four successive target quarters in the final 12 months. At every origin, fit/select parameters only from its preceding 36 months; do not use that target quarter. Earlier observed test quarters can enter later rolling training windows.
+
+Report **quarterly mean absolute error (MAE) in units per product**, using finalized quarterly predictions, and report excluded/unavailable/unsuitable cases. Evaluation is separate from normal administration and does not persist baselines as new production results.
+
+Synthetic data establishes implementation correctness and controlled behavior only. It does not establish accuracy for Battlefront, prove improvement over moving average, or validate claims based on seasonal social-media campaigns. Real operational accuracy requires held-out evaluation on real covered product history.
+
+Method references: [additive Holt–Winters equations](https://otexts.com/fpp3/holt-winters.html), [short-history limitations](https://otexts.com/fpp3/long-short-ts.html), and [rolling forecast evaluation](https://otexts.com/fpp3/tscv.html). The fixed window, sparse threshold, initialization, finite grid and precision rules above are explicit project implementation policies.
+
+## Sales Demand, Inventory, and Limitations
+
+The estimate forecasts **recorded completed sales quantities**. Zero recorded sales does not prove zero customer demand, uninterrupted stock availability, or absence of lost sales. Current inventory/reorder level may appear as separate planning context but never modifies Holt–Winters.
+
+The module supports human inventory decisions. It does not optimize reorder quantities, place purchases automatically, correct stockouts, know future discount schedules, or guarantee demand. Product turnover, irregular demand, changing promotion timing and limited history may reduce usefulness. ML, external economic/holiday datasets, Prophet, SARIMA, Python forecasting services and heavyweight libraries are outside this migration.
+
+## Administrator Workflow and Product-Focused Persistence
+
+    Select product → Generate forecast → Review estimated quarterly demand
+
+The server checks trusted coverage/eligibility, aggregates monthly history, selects parameters, calculates three estimates, sums the quarterly result and persists it. Administrators supply only product_id: no method, alpha/beta/gamma, history start, seasonal period, horizon, target/window input or coverage checkbox. Administrator-only authorization remains.
+
+Adapt existing ForecastingService/controller/requests/page, product search, independent pagination, loading/empty/error states and Chart.js/vue-chartjs. Show product, target quarter, three monthly estimates, quarterly demand, relevant historical monthly chart/table, generated time and concise decision-support wording. Identify synthetic data and declared sales scope. Clear ready/insufficient/unavailable/unsuitable messages must preserve prior saved results on failure.
+
+Keep the Forecast entity **product-focused** and retain its columns: product_id, method, predicted_demand, forecast_quarter and generated_at. New writes use **additive_holt_winters**; predicted_demand is the finalized quarterly sum and forecast_quarter remains YYYY-Qn. Reruns replace only on (product_id, method, forecast_quarter).
+
+The current MySQL forecasts_method_valid check and SQLite insert/update triggers accept only moving_average/linear_trend. EXT-45 must introduce a **new forward constraint migration** accepting all three identifiers for compatibility, while application writes accept only additive_holt_winters. Preserve original applied migrations, strict formats/case/year, nonnegative demand, DECIMAL(12,2) capacity, product foreign key, uniqueness and every legacy row. No new Forecast columns, snapshot tables or ERD relationship changes are approved. Define a rollback strategy that does not delete new-method records.
+
+**Monthly breakdown is generation-time context only.** Original monthly predictions, source observations, parameters and clamp diagnostics are not saved. Saved review reads the stored quarterly total and states that the original breakdown is not retained after the generation view is lost/refreshed. Do not recreate original monthly values using corrected current history. Fixed method source dates may be explicitly inferred, but original quantities/provenance are not reconstructed. Label existing moving_average and linear_trend rows as legacy without generation controls.
+
+## Issue Ownership, Current Status and Implementation Order
+
+| Issue | Approved responsibility | Live status after planning |
 | --- | --- | --- |
 | EXT-36 | Parent tracking and final acceptance | Backlog |
-| EXT-40 | Development history and trusted readiness metadata | Backlog (reopened) |
-| EXT-42 | Readiness-gated fixed-window preparation; preserve generic reporting | Backlog (reopened) |
-| EXT-43 | Retained four-quarter moving-average calculator | Done; revalidate with EXT-42 |
-| EXT-45 | Moving-average-only new persistence, existing schema/history retained | Backlog (reopened) |
-| EXT-46 | Simplified administrator generation/review | Backlog |
-| EXT-44 | Retire unused trend calculator and obsolete regression tests | Backlog (reopened) |
+| EXT-40 | 48-month development history and monthly trusted coverage | Backlog; reopened from Done |
+| EXT-42 | Trusted 36-month preparation, monthly aggregation and sparse eligibility | Backlog; reopened from Done |
+| EXT-43 | Additive Holt–Winters calculation, bounded parameter fitting and evaluation | Backlog; reopened from Done |
+| EXT-45 | New production output validation and compatible method-constraint migration | Backlog; reopened from Done |
+| EXT-46 | Existing simple workflow adapted to monthly history and three estimates | Backlog; reopened from Done |
+| EXT-44 | Final retirement of obsolete production paths; retain used evaluation baselines | Backlog; retained |
 
-Recommended order: EXT-40 → EXT-42 → EXT-45 → EXT-46 → EXT-44 cleanup. EXT-43's calculation acceptance remains valid; revalidate its integration during EXT-42. EXT-45 depends on EXT-42/43; EXT-46 depends on EXT-42/45; EXT-44 cleanup depends on EXT-45/46 and no longer blocks generation. Preserve relevant moving-average/shared-history tests; only solely obsolete trend coverage is retirement work. No revised issue returns to Done before implementation, focused tests, and human review.
+Recommended order: **EXT-40 → EXT-42 → EXT-43 → EXT-45 → EXT-46 → EXT-44**. Existing dependencies remain useful: EXT-26 → EXT-40; EXT-40 → EXT-42; EXT-42 → EXT-43/45/46; EXT-43 → EXT-45; EXT-45 → EXT-46/44; EXT-46 → EXT-44. EXT-44 blocks no calculation/generation issue. Existing parent external dependencies are preserved.
+
+Keep old calculators and relevant tests until replacement code is implemented/tested and human-accepted. EXT-44 then removes unused trend code/exclusive tests and moving-average production consumers, retaining moving average only as a used evaluation baseline and quarterly helpers where still needed. Do not delete historical forecasts. No revised issue returns to Done merely because descriptions or documentation changed.
 
 ---
 
@@ -601,7 +680,7 @@ Current migrations/models implement the following core entities:
 - Forecasts
 - Chatbot Knowledge
 
-Framework infrastructure includes sessions, password reset tokens, cache/jobs, and Sanctum personal access tokens. **Forecasts are implemented** with product, method, predicted demand, target quarter, generation time, and uniqueness on product/method/quarter. Their new-write policy is pending simplification under EXT-45.
+Framework infrastructure includes sessions, password reset tokens, cache/jobs, and Sanctum personal access tokens. **Forecasts are implemented** with product, method, predicted demand, target quarter, generation time, and uniqueness on product/method/quarter. Their new-write policy and method constraints require migration under EXT-45 for additive_holt_winters; existing columns remain suitable.
 
 ## Relationship Baseline
 
@@ -629,11 +708,11 @@ EXT-6 is Done. Its recorded baseline decisions remain useful historical context,
 
 - use Laravel-compatible unsigned big integer primary and foreign keys rather than interpreting the ERD's generic `int` labels as a required physical storage size;
 - retain Laravel authentication infrastructure fields and tables required by the installed authentication features, including `email_verified_at`, `remember_token`, conventional timestamps, password reset tokens, and sessions;
-- retain the implemented `forecasts.method` column for compatibility/history; the 2026-10-05 revision restricts new production generation to `moving_average` while preserving legacy records;
+- retain the implemented `forecasts.method` column for compatibility/history; the latest 2026-10-05 revision makes `additive_holt_winters` the production destination while preserving legacy records and requiring a forward method-constraint migration;
 - treat Sagay City as the sole operational branch for live sales and inventory, selected through application configuration; the current schema has no `branches.is_primary`;
 - retain the implemented `is_active` boolean with a default value of `true` on categories, products, and chatbot knowledge; use neither a lifecycle status enum nor Laravel soft deletes for these records;
 - use `DECIMAL(12,2)` for monetary values, matching unsigned integer types for quantities, and explicit foreign-key, uniqueness, and non-negative-value constraints where required by the approved relationships and business rules;
-- use `customer` and `administrator` roles; `pending`, `processing`, `completed`, and `cancelled` order states; `pending`, `verified`, and `rejected` payment states; and `product`, `order`, `store`, and `faq` knowledge categories. Chatbot routing also supports an unsupported outcome. `moving_average` is the sole approved production forecast method; existing schema compatibility for historical `linear_trend` rows is retained.
+- use `customer` and `administrator` roles; `pending`, `processing`, `completed`, and `cancelled` order states; `pending`, `verified`, and `rejected` payment states; and `product`, `order`, `store`, and `faq` knowledge categories. Chatbot routing also supports an unsupported outcome. `additive_holt_winters` is the sole approved production forecast method. Current constraints support legacy `moving_average`/`linear_trend`; EXT-45 must extend them to the new identifier while preserving historical compatibility.
 - expose **8:00 AM–6:00 PM** for the seeded reference branches through application configuration, without an `operating_hours` column.
 - seed confirmed branch addresses and contact numbers into the existing reference fields; keep unavailable values null and do not invent placeholders.
 - keep branch email reference data in application configuration; the current schema has no `branches.email` column.
@@ -717,7 +796,7 @@ Outside scope:
 
 ## Forecasting Data
 
-Forecasting uses covered historical Battlefront unit sales; current inventory remains separate planning context. Clearly identified synthetic history already supports development, with readiness metadata pending EXT-40; validated real client history should replace/import later if supplied. Synthetic development data is not an external market dataset and must not be presented as operational client history.
+Forecasting uses covered historical Battlefront unit sales; current inventory remains separate planning context. Clearly identified quarterly synthetic history and coverage metadata are implemented; EXT-40 will revise them to monthly fixtures/declarations. Validated real client history should be imported later if supplied; synthetic history cannot establish operational readiness. Synthetic development data is not an external market dataset and must not be presented as operational client history.
 
 Outside scope:
 
@@ -782,7 +861,7 @@ Documentation-only updates require source/diff review rather than invented featu
 
 # 14. Current Delivery Status and Remaining Work
 
-General status snapshot verified against Linear on **2026-10-01**; the forecasting row was reverified after the authorized migration edits on **2026-10-05**:
+General status snapshot verified against Linear on **2026-10-01**; the forecasting row was reverified after the authorized monthly Holt–Winters planning edits on **2026-10-05**:
 
 | Area | State | Evidence / remaining boundary |
 | --- | --- | --- |
@@ -793,7 +872,7 @@ General status snapshot verified against Linear on **2026-10-01**; the forecasti
 | Mobile API foundation/customer endpoints | Complete | EXT-56–61 and EXT-64 Done |
 | Mobile handoff and Postman collection | Complete | EXT-62 Done; developer-reported successful manual Postman Desktop verification |
 | Actual React Native + Expo integration | Pending | EXT-63 Backlog; preparation complete, real LAN consumer journeys not run |
-| Predictive analytics and historical development data | Approved simplification pending | EXT-36/46 Backlog; EXT-40/42/44/45 reopened to Backlog; EXT-43 remains Done; existing data/aggregation/calculation/persistence foundations retained |
+| Predictive analytics and historical development data | Monthly Holt–Winters migration pending | EXT-36/44 remain Backlog; EXT-40/42/43/45/46 reopened to Backlog. Accepted moving-average data/readiness/calculation/persistence/UI foundations remain in the checkout pending implementation |
 | Cross-module integration and release-quality checks | Pending | EXT-65–72 Backlog |
 | Deployment, pilot evaluation, and release candidate | Pending | EXT-73–79 Backlog |
 
@@ -847,7 +926,7 @@ Relevant implementation areas include:
 - order processing;
 - sales behavior;
 - recommendation rules;
-- forecasting calculations/aggregation/persistence (existing focused tests; readiness, simplification, and interface coverage pending migration);
+- forecasting calculations, monthly aggregation/readiness, persistence and administrator workflow (existing moving-average tests retained; Holt–Winters tests/evaluation and migration pending);
 - deterministic chatbot categorization;
 - REST API behavior required by React Native.
 
@@ -898,7 +977,7 @@ Only information required for the intended system function should be exposed to 
 
 ### Approved Scope
 
-Represented by the approved manuscript and explicit authorized study revisions. For forecasting, the 2026-10-05 developer-authorized revision supersedes the earlier two-method requirements.
+Represented by the approved manuscript and explicit authorized study revisions. For forecasting, the latest 2026-10-05 developer-authorized monthly additive Holt–Winters revision supersedes both the original two-method scope and the later four-quarter moving-average production decision.
 
 ### Necessary Implementation Detail
 
@@ -933,7 +1012,7 @@ Implementation establishes what currently exists; approved issue scope establish
 
 The approved Chapters 1–3 manuscript and authorized amendments remain academic scope references. For this forecasting migration, the developer explicitly approved the study revision and the following precedence:
 
-1. The newly approved 2026-10-05 forecasting decision.
+1. The latest approved 2026-10-05 monthly additive Holt–Winters forecasting decision.
 2. Revised Linear scope (EXT-36, EXT-40, EXT-42–46).
 3. Current implementation after each migration issue is completed.
 4. Revised CAPSTONE_CONTEXT.
@@ -941,12 +1020,12 @@ The approved Chapters 1–3 manuscript and authorized amendments remain academic
 
 Existing legacy code does not override the approved destination; Section 9 distinguishes implemented foundations from pending changes. The forecasting text in `docs/capstone_manuscript.docx` is narrowly synchronized under explicit authorization, preserving unrelated content, formatting, and the product-focused Forecast ERD. Other manuscript amendments remain developer-owned. Surface unresolved diagram/text or scope conflicts rather than silently revising unrelated material.
 
-The embedded Figure 8 architecture image still contains the older `Trend Analysis / Moving Average` label. Its explanatory paragraph explicitly supersedes that label with the approved four-quarter moving-average method. The image bytes are preserved; updating only that label in the original diagram artwork remains a developer follow-up. The DFD can retain inventory as separate planning context, and the product-focused Forecast ERD remains unchanged; its earlier omission of the separately approved compatibility `method` column is not a new schema requirement.
+The embedded Figure 8 architecture image still contains the older `Trend Analysis / Moving Average` label. Its revised explanatory paragraph explicitly supersedes that label with monthly additive Holt–Winters, three monthly estimates summed into quarterly demand. The raster itself remains an unresolved artwork follow-up rather than being silently treated as synchronized. The image bytes are preserved; updating only that label in the original diagram artwork remains a developer follow-up. The DFD can retain inventory as separate planning context, and the product-focused Forecast ERD remains unchanged; its earlier omission of the separately approved compatibility `method` column is not a new schema requirement.
 
 ## Evidence to Obtain Later
 
 - Real React Native + Expo LAN run evidence and resolution of Herd/device reachability prerequisites (EXT-63).
-- Implemented/tested readiness metadata and simplified forecasting workflow, accepted retirement cleanup, and validated real historical client data if later supplied (EXT-40/42/44–46; EXT-43 calculator retained).
+- Implemented/tested monthly fixtures/readiness/aggregation, additive Holt–Winters and held-out evaluation, compatible persistence, updated simple workflow, accepted retirement cleanup, and validated real historical client data if later supplied (EXT-40/42/43/45/46/44).
 - Integration, production readiness, pilot evaluation, and release acceptance evidence (EXT-65–79).
 
 This context update does not supply that evidence or close those pending issues.
