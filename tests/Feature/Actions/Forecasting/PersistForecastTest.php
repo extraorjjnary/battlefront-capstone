@@ -10,6 +10,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Tests\LegacyQuarterlySalesFixtures;
 
 beforeEach(function () {
     config(['app.timezone' => 'UTC']);
@@ -302,8 +303,9 @@ test('persists explicit zero demand from moving average', function () {
     $this->assertModelExists($forecast);
 });
 
-test('persists covered zero demand from ready product preparation and the moving average calculator', function () {
+test('persists covered zero demand from legacy quarterly preparation and the moving average calculator', function () {
     Storage::fake('local');
+    LegacyQuarterlySalesFixtures::bindCoverage();
     $product = Product::factory()->create();
     config(['forecasting.operational_coverage' => [$product->product_code => [
         'start' => '2026-01-01',

@@ -12,7 +12,8 @@ use InvalidArgumentException;
  * @phpstan-import-type Coverage from SalesHistoryCoverageRepository
  * @phpstan-import-type History from QuarterlySalesAggregationService
  *
- * @phpstan-type Preparation array{status: 'ready'|'insufficient_history'|'history_unavailable', product_id: int, product_code: string, timezone: string, source_period: array{start: string, end_exclusive: string}, target_quarter: array{year: int, quarter: int, start: string, end_exclusive: string}, covered_quarters: int|null, coverage: Coverage|null, history: History|null}
+ * @phpstan-type LegacyCoverage array{start: string, end_exclusive: string, unavailable_quarters: list<string>, timezone: string, source_kind: 'operational_prepared'|'synthetic_development', sales_scope: 'all_sagay_sales'|'captured_system_transactions'|'development_fixture_transactions'}
+ * @phpstan-type Preparation array{status: 'ready'|'insufficient_history'|'history_unavailable', product_id: int, product_code: string, timezone: string, source_period: array{start: string, end_exclusive: string}, target_quarter: array{year: int, quarter: int, start: string, end_exclusive: string}, covered_quarters: int|null, coverage: Coverage|LegacyCoverage|null, history: History|null}
  */
 class ProductForecastPreparationService
 {
@@ -38,6 +39,7 @@ class ProductForecastPreparationService
         $timezone = config('app.timezone');
         $targetStart = ($asOf ?? CarbonImmutable::now($timezone))->setTimezone($timezone)->startOfQuarter();
         $sourceStart = $targetStart->subQuarters(self::REQUIRED_QUARTERS);
+        /** @var Coverage|LegacyCoverage|null $coverage */
         $coverage = $this->coverageRepository->forProductCode($product->product_code);
         $result = [
             'status' => 'history_unavailable',
@@ -59,7 +61,9 @@ class ProductForecastPreparationService
             'history' => null,
         ];
 
-        if ($coverage === null || $coverage['end_exclusive'] < $targetStart->toDateString()) {
+        if ($coverage === null || ($coverage['granularity'] ?? null) === 'month'
+            || ! array_key_exists('unavailable_quarters', $coverage)
+            || $coverage['end_exclusive'] < $targetStart->toDateString()) {
             return $result;
         }
 

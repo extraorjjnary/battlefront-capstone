@@ -8,11 +8,12 @@ use App\Models\Sale;
 use App\Services\Forecasting\ProductForecastPreparationService;
 use App\Services\Reporting\QuarterlySalesAggregationService;
 use Carbon\CarbonImmutable;
-use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Tests\LegacyQuarterlySalesFixtures;
 
 beforeEach(function () {
+    LegacyQuarterlySalesFixtures::bindCoverage();
     config(['app.timezone' => 'UTC']);
     $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00', 'UTC'));
 });
@@ -42,7 +43,7 @@ function productForecastSale(Product $product, string $date, int $quantity): voi
 
 test('prepares exactly four trusted fixture quarters and integrates with the pure moving average', function (string $code, array $quantities, array $revenues, string $average) {
     Storage::fake('local');
-    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $this->seed(LegacyQuarterlySalesFixtures::class);
     $product = Product::where('product_code', 'DEVHIST40'.$code)->sole();
 
     $result = app(ProductForecastPreparationService::class)->prepare($product);
@@ -310,7 +311,7 @@ test('reference time is converted to the application timezone for the source and
 
 test('quarter rollover makes unchanged declarations stale until preparation republishes coverage', function () {
     $disk = Storage::fake('local');
-    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $this->seed(LegacyQuarterlySalesFixtures::class);
     $product = Product::where('product_code', 'DEVHIST40STABLE')->sole();
     $service = app(ProductForecastPreparationService::class);
     $manifest = $disk->get(config('forecasting.development_manifest'));
@@ -331,7 +332,7 @@ test('quarter rollover makes unchanged declarations stale until preparation repu
     }
     expect($disk->get(config('forecasting.development_manifest')))->toBe($manifest);
 
-    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $this->seed(LegacyQuarterlySalesFixtures::class);
     $ready = $service->prepare($product);
     expect($ready['status'])->toBe('ready');
     expect($ready['coverage']['end_exclusive'])->toBe('2027-01-01');
@@ -340,7 +341,7 @@ test('quarter rollover makes unchanged declarations stale until preparation repu
 
 test('synthetic metadata cannot establish production readiness', function () {
     Storage::fake('local');
-    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $this->seed(LegacyQuarterlySalesFixtures::class);
     $product = Product::where('product_code', 'DEVHIST40STABLE')->sole();
     $this->app->instance('env', 'production');
 
@@ -353,7 +354,7 @@ test('synthetic metadata cannot establish production readiness', function () {
 
 test('current inventory changes and missing stock do not alter prepared history', function () {
     Storage::fake('local');
-    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $this->seed(LegacyQuarterlySalesFixtures::class);
     $product = Product::where('product_code', 'DEVHIST40STABLE')->sole();
     $service = app(ProductForecastPreparationService::class);
     $before = $service->prepare($product);

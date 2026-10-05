@@ -9,9 +9,9 @@ use App\Models\Sale;
 use App\Models\User;
 use App\Services\Reporting\QuarterlySalesAggregationService;
 use Carbon\CarbonImmutable;
-use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Tests\LegacyQuarterlySalesFixtures;
 
 beforeEach(function () {
     Storage::fake('local');
@@ -37,7 +37,7 @@ function quarterlySale(Product $product, string $date, int $quantity = 1, string
 }
 
 test('product history preserves known quantities and exact purchase-time revenue', function (string $code, array $quantities, array $revenues) {
-    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $this->seed(LegacyQuarterlySalesFixtures::class);
     $product = Product::where('product_code', 'DEVHIST40'.$code)->sole();
 
     $result = quarterlySalesService()->completedProducts(8, [$product->id]);
@@ -65,7 +65,7 @@ test('product history preserves known quantities and exact purchase-time revenue
 ]);
 
 test('category history combines products without duplicating order revenue', function () {
-    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $this->seed(LegacyQuarterlySalesFixtures::class);
     $components = Category::where('name', 'Historical Sales Components')->sole();
     $peripherals = Category::where('name', 'Historical Sales Peripherals')->sole();
 
@@ -82,7 +82,7 @@ test('category history combines products without duplicating order revenue', fun
 });
 
 test('unfiltered history discovers only matching entities and explicit IDs retain zero series', function (string $method, string $model) {
-    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $this->seed(LegacyQuarterlySalesFixtures::class);
     $empty = $model === Product::class
         ? Product::where('product_code', 'DEVHIST40NOHISTORY')->sole()
         : Category::factory()->create();
@@ -165,7 +165,7 @@ test('money remains exact across fractional prices repeated lines and large tota
 });
 
 test('customer identity and current inventory do not affect historical demand', function () {
-    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $this->seed(LegacyQuarterlySalesFixtures::class);
     $before = quarterlySalesService()->completedProducts(8);
     $customer = User::factory()->customer()->create();
     Order::query()->update(['user_id' => $customer->id, 'recipient_name' => 'Changed customer']);
@@ -203,7 +203,7 @@ test('category history follows current product category membership', function ()
 });
 
 test('queries stay bounded for multiple entities and quarters and output is deterministic', function () {
-    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $this->seed(LegacyQuarterlySalesFixtures::class);
     $ids = Product::query()->orderByDesc('id')->pluck('id')->all();
     DB::enableQueryLog();
     DB::flushQueryLog();

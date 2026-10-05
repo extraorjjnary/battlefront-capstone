@@ -85,8 +85,8 @@ test('historical fixtures and verified catalog imports remain separate across re
         expect(Storage::disk('local')->get(config('forecasting.development_manifest')))->toBe($coverageBefore);
         expect(app(SalesHistoryCoverageRepository::class)->forProductCode('00123'))->toBeNull();
         expect(Product::with('inventory')->where('is_catalog_imported', false)->orderBy('id')->get()->toArray())->toBe($fixtureProducts);
-        $this->assertDatabaseCount('products', 8);
-        $this->assertDatabaseCount('sales', 16);
+        $this->assertDatabaseCount('products', 14);
+        $this->assertDatabaseCount('sales', 96);
         $this->seed(DevelopmentHistoricalSalesSeeder::class);
         expect($realProduct->fresh(['inventory', 'category', 'tags'])->toArray())->toBe($before);
     } finally {

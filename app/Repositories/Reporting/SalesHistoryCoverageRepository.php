@@ -11,7 +11,7 @@ use RuntimeException;
 use Throwable;
 
 /**
- * @phpstan-type Coverage array{start: string, end_exclusive: string, unavailable_quarters: list<string>, timezone: string, source_kind: 'operational_prepared'|'synthetic_development', sales_scope: 'all_sagay_sales'|'captured_system_transactions'|'development_fixture_transactions'}
+ * @phpstan-type Coverage array{granularity: 'month', start: string, end_exclusive: string, unavailable_months: list<string>, timezone: string, source_kind: 'operational_prepared'|'synthetic_development', sales_scope: 'all_sagay_sales'|'captured_system_transactions'|'development_fixture_transactions'}
  */
 class SalesHistoryCoverageRepository
 {
@@ -66,7 +66,7 @@ class SalesHistoryCoverageRepository
         $path = $disk->path($manifest);
         $temporary = $path.'.'.bin2hex(random_bytes(8)).'.tmp';
         try {
-            $json = json_encode(['version' => 1, 'products' => (object) $entries], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+            $json = json_encode(['version' => 2, 'products' => (object) $entries], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
             if (file_put_contents($temporary, $json) === false || ! rename($temporary, $path)) {
                 throw new RuntimeException('Development history coverage could not be published.');
             }
@@ -94,7 +94,7 @@ class SalesHistoryCoverageRepository
                 return [];
             }
             $manifest = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
-            if (! is_array($manifest) || ($manifest['version'] ?? null) !== 1 || ! is_array($manifest['products'] ?? null)) {
+            if (! is_array($manifest) || ($manifest['version'] ?? null) !== 2 || ! is_array($manifest['products'] ?? null)) {
                 return [];
             }
 
@@ -107,7 +107,9 @@ class SalesHistoryCoverageRepository
     /** @return Coverage|null */
     private function validate(mixed $entry, bool $synthetic): ?array
     {
-        if (! is_array($entry) || ($entry['timezone'] ?? null) !== config('app.timezone')) {
+        if (! is_array($entry) || ($entry['granularity'] ?? null) !== 'month'
+            || array_key_exists('unavailable_quarters', $entry)
+            || ($entry['timezone'] ?? null) !== config('app.timezone')) {
             return null;
         }
         $kind = $synthetic ? 'synthetic_development' : 'operational_prepared';
@@ -115,15 +117,15 @@ class SalesHistoryCoverageRepository
         if (($entry['source_kind'] ?? null) !== $kind || ! in_array($entry['sales_scope'] ?? null, $scopes, true)) {
             return null;
         }
-        $start = $this->quarterDate($entry['start'] ?? null);
-        $end = $this->quarterDate($entry['end_exclusive'] ?? null);
-        $gaps = array_key_exists('unavailable_quarters', $entry) ? $entry['unavailable_quarters'] : [];
+        $start = $this->monthDate($entry['start'] ?? null);
+        $end = $this->monthDate($entry['end_exclusive'] ?? null);
+        $gaps = array_key_exists('unavailable_months', $entry) ? $entry['unavailable_months'] : [];
         if ($start === null || $end === null || $start->gt($end) || ! is_array($gaps) || ! array_is_list($gaps)) {
             return null;
         }
         $validatedGaps = [];
         foreach ($gaps as $gap) {
-            $date = $this->quarterDate($gap);
+            $date = $this->monthDate($gap);
             if ($date === null || $date->lt($start) || $date->gte($end) || in_array($gap, $validatedGaps, true)) {
                 return null;
             }
@@ -132,16 +134,17 @@ class SalesHistoryCoverageRepository
         sort($validatedGaps, SORT_STRING);
 
         return [
+            'granularity' => 'month',
             'start' => $start->toDateString(),
             'end_exclusive' => $end->toDateString(),
-            'unavailable_quarters' => $validatedGaps,
+            'unavailable_months' => $validatedGaps,
             'timezone' => $entry['timezone'],
             'source_kind' => $kind,
             'sales_scope' => $entry['sales_scope'],
         ];
     }
 
-    private function quarterDate(mixed $value): ?CarbonImmutable
+    private function monthDate(mixed $value): ?CarbonImmutable
     {
         if (! is_string($value) || preg_match('/^\d{4}-\d{2}-\d{2}$/D', $value) !== 1) {
             return null;
@@ -149,7 +152,7 @@ class SalesHistoryCoverageRepository
         try {
             $date = CarbonImmutable::createFromFormat('!Y-m-d', $value, config('app.timezone'));
 
-            return $date !== null && $date->year >= 1 && $date->toDateString() === $value && $date->equalTo($date->startOfQuarter()) ? $date : null;
+            return $date !== null && $date->year >= 1 && $date->toDateString() === $value && $date->equalTo($date->startOfMonth()) ? $date : null;
         } catch (Throwable) {
             return null;
         }

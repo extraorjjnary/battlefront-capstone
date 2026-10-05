@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\Forecasting\CalculateMovingAverage;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Repositories\Reporting\SalesHistoryCoverageRepository;
@@ -22,8 +21,9 @@ afterEach(function () {
 function preparedSalesCoverage(array $overrides = []): array
 {
     return array_replace([
+        'granularity' => 'month',
         'start' => '2024-10-01', 'end_exclusive' => '2026-10-01',
-        'unavailable_quarters' => [], 'timezone' => 'UTC',
+        'unavailable_months' => [], 'timezone' => 'UTC',
         'source_kind' => 'operational_prepared', 'sales_scope' => 'captured_system_transactions',
     ], $overrides);
 }
@@ -77,66 +77,64 @@ test('malformed declarations return no trusted coverage', function (array $overr
     'missing scope' => [['sales_scope' => null]],
     'synthetic operational declaration' => [['source_kind' => 'synthetic_development']],
     'unknown scope' => [['sales_scope' => 'unknown']],
-    'null gaps' => [['unavailable_quarters' => null]],
-    'non list gaps' => [['unavailable_quarters' => ['gap' => '2026-01-01']]],
-    'unaligned gap' => [['unavailable_quarters' => ['2026-02-01']]],
-    'gap at exclusive end' => [['unavailable_quarters' => ['2026-10-01']]],
-    'gap before interval' => [['unavailable_quarters' => ['2024-07-01']]],
-    'duplicate gaps' => [['unavailable_quarters' => ['2026-01-01', '2026-01-01']]],
+    'null gaps' => [['unavailable_months' => null]],
+    'non list gaps' => [['unavailable_months' => ['gap' => '2026-01-01']]],
+    'unaligned gap' => [['unavailable_months' => ['2026-02-02']]],
+    'missing granularity' => [['granularity' => null]],
+    'quarter granularity' => [['granularity' => 'quarter']],
+    'legacy quarter gaps' => [['unavailable_quarters' => []]],
+    'gap at exclusive end' => [['unavailable_months' => ['2026-10-01']]],
+    'gap before interval' => [['unavailable_months' => ['2024-07-01']]],
+    'duplicate gaps' => [['unavailable_months' => ['2026-01-01', '2026-01-01']]],
 ]);
 
-test('short complete intervals preserve zero to three quarters for later insufficient history evaluation', function (string $start, int $completedQuarters) {
+test('short complete intervals preserve zero to thirty five months for later insufficient history evaluation', function (string $start, int $completedMonths) {
     Storage::fake('local');
     $entry = preparedSalesCoverage(['start' => $start]);
-    unset($entry['unavailable_quarters']);
+    unset($entry['unavailable_months']);
     config(['forecasting.operational_coverage' => ['00123' => $entry]]);
 
     $coverage = app(SalesHistoryCoverageRepository::class)->forProductCode('00123');
 
     expect($coverage['start'])->toBe($start);
     expect($coverage['end_exclusive'])->toBe('2026-10-01');
-    expect($coverage['unavailable_quarters'])->toBe([]);
-    expect((int) CarbonImmutable::parse($start)->diffInQuarters(CarbonImmutable::parse($coverage['end_exclusive'])))->toBe($completedQuarters);
-})->with([['2026-10-01', 0], ['2026-07-01', 1], ['2026-04-01', 2], ['2026-01-01', 3]]);
+    expect($coverage['unavailable_months'])->toBe([]);
+    expect((int) CarbonImmutable::parse($start)->diffInMonths(CarbonImmutable::parse($coverage['end_exclusive'])))->toBe($completedMonths);
+})->with(array_map(fn (int $months): array => [CarbonImmutable::parse('2026-10-01')->subMonths($months)->toDateString(), $months], range(0, 35)));
 
 test('stale ends and declared gaps remain explicit without clock based repairs', function () {
     Storage::fake('local');
     $stale = preparedSalesCoverage(['end_exclusive' => '2026-07-01']);
     config(['forecasting.operational_coverage' => [
         'STALE' => $stale,
-        'GAPPED' => preparedSalesCoverage(['unavailable_quarters' => ['2026-01-01', '2024-10-01']]),
+        'GAPPED' => preparedSalesCoverage(['unavailable_months' => ['2026-01-01', '2024-10-01']]),
     ]]);
     $repository = app(SalesHistoryCoverageRepository::class);
 
     expect($repository->forProductCode('STALE'))->toBe($stale);
-    expect($repository->forProductCode('GAPPED')['unavailable_quarters'])->toBe(['2024-10-01', '2026-01-01']);
+    expect($repository->forProductCode('GAPPED')['unavailable_months'])->toBe(['2024-10-01', '2026-01-01']);
     $this->travelTo(CarbonImmutable::parse('2027-01-15'));
     expect($repository->forProductCode('STALE'))->toBe($stale);
 });
 
-test('seeded coverage matches prepared history and known four quarter observations including zeros', function (string $code, array $quantities, string $average) {
+test('seeded monthly coverage matches exact full history quantities including mixed and all zeros', function (string $code, int $quantity) {
     Storage::fake('local');
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
     $product = Product::where('product_code', 'DEVHIST40'.$code)->sole();
     $repository = new SalesHistoryCoverageRepository;
 
     expect($repository->forProductCode($product->product_code))->toBe(preparedSalesCoverage([
+        'start' => '2022-10-01',
         'source_kind' => 'synthetic_development', 'sales_scope' => 'development_fixture_transactions',
     ]));
-    $history = app(QuarterlySalesAggregationService::class)->completedProducts(4, [$product->id]);
-    expect($history['start'])->toBe('2025-10-01');
-    expect($history['end_exclusive'])->toBe('2026-10-01');
-    expect(array_column($history['series'][0]['quarters'], 'quantity_sold'))->toBe($quantities);
-    expect((new CalculateMovingAverage)->execute($history, $product->id)['forecast_quantity'])->toBe($average);
-    Storage::disk('local')->assertExists(config('forecasting.development_manifest'));
+    expect($product->orderItems()->sum('quantity'))->toBe($quantity);
+    $manifest = json_decode(Storage::disk('local')->get(config('forecasting.development_manifest')), true, flags: JSON_THROW_ON_ERROR);
+    expect($manifest['version'])->toBe(2);
+    expect($manifest['products'])->toHaveCount(12);
 })->with([
-    ['STABLE', [10, 10, 10, 10], '10.00'],
-    ['INCREASING', [25, 30, 35, 40], '32.50'],
-    ['DECLINING', [20, 15, 10, 5], '12.50'],
-    ['REPEATING', [4, 8, 12, 20], '11.00'],
-    ['SPARSE', [0, 6, 0, 9], '3.75'],
-    ['PRICE', [4, 4, 4, 4], '4.00'],
-    ['NOHISTORY', [0, 0, 0, 0], '0.00'],
+    ['STABLE', 480], ['INCREASING', 3096], ['DECLINING', 3504],
+    ['REPEATING', 840], ['SPARSE', 48], ['PRICE', 192], ['NOHISTORY', 0],
+    ['MIXEDZERO', 360], ['ABRUPT', 1764],
 ]);
 
 test('only explicit reseeding advances the development coverage at quarter rollover', function () {
@@ -154,9 +152,9 @@ test('only explicit reseeding advances the development coverage at quarter rollo
     expect($disk->get($path))->toBe($before);
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
     $entry = $repository->forProductCode('DEVHIST40STABLE');
-    expect($entry['start'])->toBe('2025-01-01');
+    expect($entry['start'])->toBe('2023-01-01');
     expect($entry['end_exclusive'])->toBe('2027-01-01');
-    $this->assertDatabaseCount('sales', 16);
+    $this->assertDatabaseCount('sales', 96);
     expect(config('forecasting.operational_coverage'))->toBe([]);
 });
 
@@ -178,7 +176,7 @@ test('malformed development manifests cannot establish coverage', function (stri
     $disk->put(config('forecasting.development_manifest'), $contents);
 
     expect(app(SalesHistoryCoverageRepository::class)->forProductCode('DEVHIST40STABLE'))->toBeNull();
-})->with(['{', '{"version":2,"products":{}}', '{"version":1,"products":null}']);
+})->with(['{', '{"version":1,"products":{}}', '{"version":1,"products":null}', '{"version":2,"products":null}', '{"products":{}}']);
 
 test('synthetic coverage cannot be read published or cleared in unsafe environments', function (string $environment) {
     $disk = Storage::fake('local');
@@ -224,6 +222,31 @@ test('failed publication leaves prepared records without a trusted declaration',
 
     expect(fn () => $this->seed(DevelopmentHistoricalSalesSeeder::class))->toThrow(RuntimeException::class, 'Publication failed');
 
-    $this->assertDatabaseCount('sales', 16);
+    $this->assertDatabaseCount('sales', 96);
     $disk->assertMissing(config('forecasting.development_manifest'));
+});
+
+test('monthly fixture declarations retain short absent stale and gapped coverage despite recorded sales', function () {
+    Storage::fake('local');
+    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $repository = app(SalesHistoryCoverageRepository::class);
+
+    expect($repository->forProductCode('DEVHIST40SHORT')['start'])->toBe('2023-11-01');
+    expect($repository->forProductCode('DEVHIST40UNKNOWN'))->toBeNull();
+    expect($repository->forProductCode('DEVHIST40STALE')['end_exclusive'])->toBe('2026-09-01');
+    expect($repository->forProductCode('DEVHIST40GAPPED')['unavailable_months'])->toBe(['2026-04-01']);
+    foreach (['UNKNOWN', 'STALE', 'GAPPED'] as $code) {
+        expect(Product::where('product_code', 'DEVHIST40'.$code)->sole()->orderItems()->sum('quantity'))->toBe(480);
+    }
+});
+
+test('version one cannot establish coverage even with otherwise valid monthly entries', function () {
+    $disk = Storage::fake('local');
+    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $path = config('forecasting.development_manifest');
+    $manifest = json_decode($disk->get($path), true, flags: JSON_THROW_ON_ERROR);
+    $manifest['version'] = 1;
+    $disk->put($path, json_encode($manifest, JSON_THROW_ON_ERROR));
+
+    expect(app(SalesHistoryCoverageRepository::class)->forProductCode('DEVHIST40STABLE'))->toBeNull();
 });

@@ -9,11 +9,12 @@ use App\Models\Product;
 use App\Models\Sale;
 use App\Models\User;
 use Carbon\CarbonImmutable;
-use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\LegacyQuarterlySalesFixtures;
 
 beforeEach(function () {
+    LegacyQuarterlySalesFixtures::bindCoverage();
     config(['app.timezone' => 'UTC', 'forecasting.operational_coverage' => []]);
     Storage::fake('local');
     $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00', 'UTC'));
@@ -244,7 +245,7 @@ test('readiness is rechecked during generation without overwriting saved demand'
 });
 
 test('development fixtures generate a clearly identified synthetic forecast', function () {
-    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $this->seed(LegacyQuarterlySalesFixtures::class);
     $product = Product::where('product_code', 'DEVHIST40INCREASING')->sole();
 
     $this->actingAs(User::factory()->administrator()->create())

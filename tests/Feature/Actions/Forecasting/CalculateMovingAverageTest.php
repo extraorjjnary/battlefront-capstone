@@ -5,9 +5,9 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Services\Reporting\QuarterlySalesAggregationService;
 use Carbon\CarbonImmutable;
-use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Tests\LegacyQuarterlySalesFixtures;
 
 beforeEach(function () {
     Storage::fake('local');
@@ -20,7 +20,7 @@ afterEach(function () {
 });
 
 test('forecasts known historical products directly from shared aggregation without additional queries', function () {
-    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $this->seed(LegacyQuarterlySalesFixtures::class);
     $products = Product::query()->pluck('id', 'product_code');
     $history = app(QuarterlySalesAggregationService::class)->completedProducts(8, $products->values()->all());
     $original = $history;
@@ -46,7 +46,7 @@ test('forecasts known historical products directly from shared aggregation witho
 });
 
 test('accepts category history with the same calculation contract', function () {
-    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $this->seed(LegacyQuarterlySalesFixtures::class);
     $history = app(QuarterlySalesAggregationService::class)->completedCategories(8);
     $categories = Category::query()->pluck('id', 'name');
     $action = new CalculateMovingAverage;
@@ -60,7 +60,7 @@ test('accepts category history with the same calculation contract', function () 
 });
 
 test('distinguishes undiscovered history from explicitly aggregated zero demand', function () {
-    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $this->seed(LegacyQuarterlySalesFixtures::class);
     $product = Product::where('product_code', 'DEVHIST40NOHISTORY')->sole();
     $aggregation = app(QuarterlySalesAggregationService::class);
     $action = new CalculateMovingAverage;
@@ -75,7 +75,7 @@ test('distinguishes undiscovered history from explicitly aggregated zero demand'
 });
 
 test('uses supplied history even after the application clock and timezone change', function () {
-    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $this->seed(LegacyQuarterlySalesFixtures::class);
     $product = Product::where('product_code', 'DEVHIST40STABLE')->sole();
     $history = app(QuarterlySalesAggregationService::class)->completedProducts(4, [$product->id]);
     $action = new CalculateMovingAverage;
