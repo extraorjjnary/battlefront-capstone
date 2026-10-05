@@ -2,24 +2,27 @@
 
 namespace App\Services\Reporting;
 
-use App\Actions\Forecasting\CalculateMovingAverage;
+use App\Actions\Forecasting\CalculateAdditiveHoltWinters;
 use App\Actions\Forecasting\PersistForecast;
 use App\Models\Forecast;
 use App\Models\Product;
 use App\Services\Forecasting\ProductForecastPreparationService;
+use ArithmeticError;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 /**
- * @phpstan-import-type Preparation from ProductForecastPreparationService
+ * @phpstan-import-type MonthlyPreparation from ProductForecastPreparationService
  */
 class ForecastingService
 {
     public function __construct(
         private readonly ProductForecastPreparationService $preparation,
-        private readonly CalculateMovingAverage $movingAverage,
+        private readonly CalculateAdditiveHoltWinters $holtWinters,
         private readonly PersistForecast $persistForecast,
     ) {}
 
@@ -31,8 +34,8 @@ class ForecastingService
     {
         $productId = isset($filters['product_id']) ? (int) $filters['product_id'] : null;
         $search = trim($filters['q'] ?? '');
-        $selected = $productId === null ? null : Product::with('category')->findOrFail($productId);
-        $readiness = $selected === null ? null : $this->readinessData($this->preparation->prepare($selected));
+        $selected = $productId === null ? null : Product::with(['category', 'inventory'])->findOrFail($productId);
+        $readiness = $selected === null ? null : $this->readinessData($this->preparation->prepareMonthly($selected));
 
         return [
             'products' => Product::query()->with('category')
@@ -41,6 +44,7 @@ class ForecastingService
                 ->orderBy('name')->orderBy('id')->paginate(15)->withQueryString()
                 ->through($this->productData(...)),
             'selected_product' => $selected === null ? null : $this->productData($selected),
+            'current_inventory' => $selected === null ? null : $this->inventoryData($selected),
             'filters' => ['q' => $search, 'product_id' => $productId],
             'readiness' => $readiness,
             'timezone' => config('app.timezone'),
@@ -55,11 +59,18 @@ class ForecastingService
     /** @return array<string, mixed> */
     public function generate(Product $product): array
     {
-        $prepared = $this->preparation->prepare($product);
+        try {
+            $prepared = $this->preparation->prepareMonthly($product);
+        } catch (InvalidArgumentException|QueryException $exception) {
+            report($exception);
+            throw ValidationException::withMessages(['forecast' => 'Sales history could not be prepared. No forecast was saved.']);
+        }
         $base = [
             ...$this->readinessData($prepared),
-            'product' => $this->productData($product->loadMissing('category')),
+            'product' => $this->productData($product->loadMissing(['category', 'inventory'])),
+            'current_inventory' => $this->inventoryData($product),
             'observations' => [],
+            'monthly_forecasts' => [],
             'forecast_quantity' => null,
             'generated_at' => null,
         ];
@@ -70,62 +81,84 @@ class ForecastingService
         if ($prepared['history'] === null) {
             throw ValidationException::withMessages(['forecast' => 'Prepared history is unavailable. Please refresh and try again.']);
         }
-        $result = $this->movingAverage->execute($prepared['history'], $product->id);
+        try {
+            $result = $this->holtWinters->execute($prepared);
+        } catch (InvalidArgumentException|ArithmeticError $exception) {
+            report($exception);
+            throw ValidationException::withMessages(['forecast' => 'The forecast could not be calculated from the prepared monthly history. No forecast was saved.']);
+        }
         if ($result['status'] !== 'ok' || $result['forecast_quantity'] === null) {
-            throw ValidationException::withMessages(['forecast' => 'The forecast could not be calculated from the prepared history.']);
+            throw ValidationException::withMessages(['forecast' => 'The forecast could not be calculated from the prepared monthly history. No forecast was saved.']);
         }
         if (bccomp($result['forecast_quantity'], '9999999999.99', 2) > 0) {
             throw ValidationException::withMessages(['forecast' => 'This forecast exceeds the supported quantity and could not be saved.']);
         }
-        try {
-            $forecast = $this->persistForecast->execute($result);
-        } catch (InvalidArgumentException $exception) {
-            throw ValidationException::withMessages(['forecast' => 'This forecast could not be saved: '.$exception->getMessage()]);
-        }
         $observations = [];
-        foreach ($prepared['history']['series'][0]['quarters'] as $quarter) {
+        foreach ($prepared['history']['months'] as $month) {
             $observations[] = [
-                'label' => 'Q'.$quarter['quarter'].' '.$quarter['year'],
-                'start' => $quarter['start'],
-                'quantity_sold' => $quarter['quantity_sold'],
+                'label' => $this->monthLabel($month['start']),
+                'start' => $month['start'],
+                'end_exclusive' => $month['end_exclusive'],
+                'quantity_sold' => $month['quantity_sold'],
             ];
+        }
+        $monthlyForecasts = [];
+        foreach ($result['monthly_forecasts'] as $month) {
+            $monthlyForecasts[] = [
+                'label' => $this->monthLabel($month['start']),
+                'start' => $month['start'],
+                'end_exclusive' => $month['end_exclusive'],
+                'forecast_quantity' => bcdiv(bcadd($month['usable_quantity'], '0.005', 12), '1', 2),
+                'was_clamped' => $month['was_clamped'],
+            ];
+        }
+        try {
+            $forecast = DB::transaction(fn (): Forecast => $this->persistForecast->execute($result));
+        } catch (InvalidArgumentException|QueryException $exception) {
+            report($exception);
+            throw ValidationException::withMessages(['forecast' => 'This forecast could not be saved. Please refresh and try again.']);
         }
         $quantity = $forecast->predicted_demand;
 
         return [
             ...$base,
             'id' => $forecast->id,
-            'method' => 'moving_average',
+            'method' => 'additive_holt_winters',
             'observations' => $observations,
+            'monthly_forecasts' => $monthlyForecasts,
             'forecast_quantity' => $quantity,
             'generated_at' => $forecast->generated_at->toIso8601String(),
-            'message' => "Estimated quarterly demand: {$quantity} units for {$base['target_label']}, based on the average of four completed quarters.",
+            'message' => "Estimated quarterly demand: {$quantity} units for {$base['target_label']}, based on 36 completed months of recorded sales.",
+            'rounding_note' => 'Monthly estimates are rounded; the quarterly total is calculated before rounding.',
             'guidance' => 'Use this estimate alongside business judgment when planning stock. Actual demand may differ.',
         ];
     }
 
     /**
-     * @param  Preparation  $prepared
+     * @param  MonthlyPreparation  $prepared
      * @return array<string, mixed>
      */
     private function readinessData(array $prepared): array
     {
         $status = $prepared['status'];
         $message = match ($status) {
-            'ready' => 'Ready to forecast from four completed source quarters.',
-            'insufficient_history' => $prepared['covered_quarters'].' completed quarters covered; four are required. No forecast was saved.',
-            'history_unavailable' => 'Complete sales history is unavailable for the required four quarters. History preparation or import must establish coverage. No forecast was saved.',
+            'ready' => $prepared['message'],
+            'insufficient_history' => $prepared['message'].' No forecast was saved.',
+            'history_unavailable' => 'Complete monthly sales history is unavailable for the required 36 months. History preparation or import must establish coverage. No forecast was saved.',
+            'history_unsuitable' => 'This product’s monthly sales history is too sparse for this forecasting model. No forecast was saved.',
         };
 
         return [
             'status' => $status,
-            'covered_quarters' => $prepared['covered_quarters'],
+            'covered_months' => $prepared['covered_months'],
             'source_period' => $prepared['source_period'],
-            'source_label' => $this->periodLabel($prepared['source_period']['start'], $prepared['source_period']['end_exclusive']),
+            'source_label' => $this->monthlyPeriodLabel($prepared['source_period']['start'], $prepared['source_period']['end_exclusive']),
             'target_quarter' => $prepared['target_quarter'],
             'target_label' => 'Q'.$prepared['target_quarter']['quarter'].' '.$prepared['target_quarter']['year'],
             'timezone' => $prepared['timezone'],
             'is_synthetic' => ($prepared['coverage']['source_kind'] ?? null) === 'synthetic_development',
+            'source_kind' => $prepared['coverage']['source_kind'] ?? null,
+            'sales_scope' => $prepared['coverage']['sales_scope'] ?? null,
             'sales_scope_label' => match ($prepared['coverage']['sales_scope'] ?? null) {
                 'all_sagay_sales' => 'All Sagay sales',
                 'captured_system_transactions' => 'Captured system transactions',
@@ -149,6 +182,17 @@ class ForecastingService
         ];
     }
 
+    /** @return array{quantity: int, last_updated: string}|null */
+    private function inventoryData(Product $product): ?array
+    {
+        $inventory = $product->inventory;
+
+        return $inventory === null ? null : [
+            'quantity' => $inventory->quantity,
+            'last_updated' => $inventory->last_updated->toIso8601String(),
+        ];
+    }
+
     /** @return array<string, mixed> */
     private function savedData(Forecast $forecast): array
     {
@@ -158,15 +202,32 @@ class ForecastingService
             'id' => $forecast->id,
             'product' => $this->productData($forecast->product),
             'method' => $forecast->method,
-            'method_label' => $forecast->method === 'linear_trend' ? 'Linear trend — legacy' : 'Moving average',
-            'is_legacy' => $forecast->method === 'linear_trend',
+            'method_label' => match ($forecast->method) {
+                'additive_holt_winters' => 'Additive Holt–Winters',
+                'moving_average' => 'Moving average — legacy',
+                'linear_trend' => 'Linear trend — legacy',
+                default => $forecast->method.' — legacy',
+            },
+            'is_legacy' => $forecast->method !== 'additive_holt_winters',
             'forecast_quantity' => $forecast->predicted_demand,
             'target_label' => $this->quarterLabel($target),
-            'source_label' => $forecast->method === 'moving_average'
-                ? $this->periodLabel($target->subQuarters(4)->toDateString(), $target->toDateString()).' (inferred from four-quarter method)'
-                : 'Not retained with this saved forecast',
+            'source_label' => match ($forecast->method) {
+                'additive_holt_winters' => $this->monthlyPeriodLabel($target->subMonths(36)->toDateString(), $target->toDateString()).' (inferred from 36-month method)',
+                'moving_average' => $this->periodLabel($target->subQuarters(4)->toDateString(), $target->toDateString()).' (inferred from four-quarter method)',
+                default => 'Not retained with this saved forecast',
+            },
             'generated_at' => $forecast->generated_at->toIso8601String(),
         ];
+    }
+
+    private function monthLabel(string $start): string
+    {
+        return CarbonImmutable::parse($start, config('app.timezone'))->format('M Y');
+    }
+
+    private function monthlyPeriodLabel(string $start, string $endExclusive): string
+    {
+        return $this->monthLabel($start).' – '.$this->monthLabel(CarbonImmutable::parse($endExclusive, config('app.timezone'))->subMonth()->toDateString());
     }
 
     private function periodLabel(string $start, string $endExclusive): string

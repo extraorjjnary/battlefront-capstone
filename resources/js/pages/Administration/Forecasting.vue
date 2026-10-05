@@ -34,6 +34,7 @@ ChartJS.register(
 const props = defineProps({
     products: { type: Object, required: true },
     selected_product: { type: Object, default: null },
+    current_inventory: { type: Object, default: null },
     filters: { type: Object, required: true },
     readiness: { type: Object, default: null },
     timezone: { type: String, required: true },
@@ -122,15 +123,19 @@ function generatedTime(value) {
 
 const chartData = computed(() => {
     const observations = result.value?.observations ?? [];
+    const forecasts = result.value?.monthly_forecasts ?? [];
     return {
         labels: [
             ...observations.map((item) => item.label),
-            result.value?.target_label,
+            ...forecasts.map((item) => item.label),
         ],
         datasets: [
             {
                 label: 'Historical units sold',
-                data: [...observations.map((item) => item.quantity_sold), null],
+                data: [
+                    ...observations.map((item) => item.quantity_sold),
+                    ...forecasts.map(() => null),
+                ],
                 borderColor: '#9CA3AF',
                 backgroundColor: '#9CA3AF',
                 pointRadius: 4,
@@ -144,13 +149,16 @@ const chartData = computed(() => {
                             ? item.quantity_sold
                             : null,
                     ),
-                    Number(result.value?.forecast_quantity),
+                    ...forecasts.map((item) => Number(item.forecast_quantity)),
                 ],
                 borderColor: '#EF1B1B',
                 backgroundColor: '#EF1B1B',
                 borderDash: [6, 4],
                 pointStyle: 'rectRot',
-                pointRadius: observations.map(() => 0).concat(7),
+                pointRadius: [
+                    ...observations.map(() => 0),
+                    ...forecasts.map(() => 7),
+                ],
                 tension: 0,
             },
         ],
@@ -165,12 +173,12 @@ const chartOptions = {
         tooltip: {
             filter: (item) =>
                 item.datasetIndex === 0 ||
-                item.dataIndex === item.chart.data.labels.length - 1,
+                item.dataIndex >= item.chart.data.labels.length - 3,
         },
     },
     scales: {
         x: {
-            ticks: { color: '#9CA3AF' },
+            ticks: { color: '#9CA3AF', autoSkip: true, maxTicksLimit: 12 },
             grid: { color: 'rgba(42, 46, 54, 0.55)' },
         },
         y: {
@@ -194,8 +202,8 @@ const chartOptions = {
                 </h1>
             </div>
             <p class="text-muted-foreground mt-2 text-sm">
-                Estimate product demand from completed quarterly sales to
-                support stock planning.
+                Estimate quarterly product demand from completed monthly sales
+                to support stock planning.
             </p>
         </header>
 
@@ -332,14 +340,16 @@ const chartOptions = {
                                 ? 'Ready'
                                 : readiness.status === 'insufficient_history'
                                   ? 'Insufficient history'
-                                  : 'History unavailable'
+                                  : readiness.status === 'history_unsuitable'
+                                    ? 'History unsuitable'
+                                    : 'History unavailable'
                         }}
                     </Badge>
                     <p class="text-sm">{{ readiness.message }}</p>
                     <dl class="grid gap-3 text-sm sm:grid-cols-2">
                         <div>
                             <dt class="text-muted-foreground">
-                                Required source quarters
+                                Required source months
                             </dt>
                             <dd class="mt-1 font-medium">
                                 {{ readiness.source_label }}
@@ -361,10 +371,22 @@ const chartOptions = {
                         Sales basis: {{ readiness.sales_scope_label }}
                     </p>
                     <p class="text-muted-foreground text-xs">
-                        Four-quarter moving average. This estimates the full
-                        target quarter; current-quarter sales are excluded.
-                        Dates use {{ readiness.timezone }}.
+                        Additive Holt–Winters uses 36 completed months to
+                        estimate the full target quarter; current-quarter sales
+                        are excluded. Dates use {{ readiness.timezone }}.
                     </p>
+                </div>
+                <div
+                    v-if="selected_product"
+                    class="text-muted-foreground mt-4 text-xs"
+                >
+                    Current inventory — planning context:
+                    <template v-if="current_inventory">
+                        {{ current_inventory.quantity }} units · Updated
+                        {{ generatedTime(current_inventory.last_updated) }}
+                    </template>
+                    <template v-else>Unavailable</template>. Inventory does not
+                    affect this calculation.
                 </div>
                 <form class="mt-5 space-y-3" @submit.prevent="generate">
                     <InputError :message="form.errors.product_id" />
@@ -422,9 +444,7 @@ const chartOptions = {
                     </div>
                     <div>
                         <dt class="text-muted-foreground text-xs">Method</dt>
-                        <dd class="mt-1 font-medium">
-                            Four-quarter moving average
-                        </dd>
+                        <dd class="mt-1 font-medium">Additive Holt–Winters</dd>
                     </div>
                     <div>
                         <dt class="text-muted-foreground text-xs">
@@ -449,7 +469,7 @@ const chartOptions = {
                         </dt>
                         <dd class="mt-1 font-medium">
                             {{ result.source_label }} ·
-                            {{ result.observations.length }} quarters
+                            {{ result.observations.length }} months
                         </dd>
                     </div>
                     <div>
@@ -464,29 +484,50 @@ const chartOptions = {
                 <p class="text-muted-foreground mt-5 text-sm">
                     {{ result.guidance }}
                 </p>
+                <p class="text-muted-foreground mt-2 text-sm">
+                    Sales basis: {{ result.sales_scope_label }}
+                </p>
+                <dl
+                    class="mt-5 grid gap-4 sm:grid-cols-3"
+                    aria-label="Monthly demand estimates"
+                >
+                    <div
+                        v-for="month in result.monthly_forecasts"
+                        :key="month.start"
+                    >
+                        <dt class="text-muted-foreground text-sm">
+                            {{ month.label }}
+                        </dt>
+                        <dd class="mt-1 font-semibold tabular-nums">
+                            {{ month.forecast_quantity }} units
+                        </dd>
+                    </div>
+                </dl>
+                <p class="text-muted-foreground mt-3 text-xs">
+                    {{ result.rounding_note }}
+                </p>
                 <div class="mt-6 h-80 min-w-0">
                     <Line
                         :data="chartData"
                         :options="chartOptions"
                         role="img"
-                        aria-label="Completed-quarter units sold and next-quarter demand forecast. Exact values are in the table below."
+                        aria-label="Completed monthly sales and three target-quarter monthly demand estimates. Historical values are available in the table below."
                     />
                 </div>
-                <details open class="mt-4">
+                <details class="mt-4">
                     <summary
                         class="focus-visible:ring-ring cursor-pointer text-sm font-medium focus-visible:ring-2"
                     >
-                        View quarterly values
+                        View monthly history
                     </summary>
                     <div class="mt-3 overflow-x-auto">
                         <table class="w-full text-left text-sm">
                             <caption class="sr-only">
-                                Historical observations and forecast
+                                Completed monthly sales used for this generation
                             </caption>
                             <thead>
                                 <tr class="border-border border-b">
-                                    <th scope="col" class="p-2">Quarter</th>
-                                    <th scope="col" class="p-2">Type</th>
+                                    <th scope="col" class="p-2">Month</th>
                                     <th scope="col" class="p-2 text-right">
                                         Units
                                     </th>
@@ -501,20 +542,8 @@ const chartOptions = {
                                     <th scope="row" class="p-2 font-normal">
                                         {{ observation.label }}
                                     </th>
-                                    <td class="p-2">Historical sales</td>
                                     <td class="p-2 text-right tabular-nums">
                                         {{ observation.quantity_sold }}
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th scope="row" class="p-2">
-                                        {{ result.target_label }}
-                                    </th>
-                                    <td class="p-2">Forecast</td>
-                                    <td
-                                        class="p-2 text-right font-semibold tabular-nums"
-                                    >
-                                        {{ result.forecast_quantity }}
                                     </td>
                                 </tr>
                             </tbody>
@@ -522,8 +551,9 @@ const chartOptions = {
                     </div>
                 </details>
                 <p class="text-muted-foreground mt-4 text-xs">
-                    This chart shows the source used for this generation.
-                    Original observations are not retained with saved forecasts.
+                    Monthly estimates and history are generation-time context.
+                    They are not retained with saved forecasts after this view
+                    is refreshed or lost.
                 </p>
             </template>
         </section>
@@ -557,9 +587,11 @@ const chartOptions = {
                 </div>
             </div>
             <p class="text-muted-foreground mt-3 text-xs">
-                Saved results do not retain chart observations or the original
-                linear-trend source period. Moving-average source dates are
-                inferred from its fixed four-quarter method.
+                Saved quarterly totals are read as stored. Original monthly
+                estimates, observations, and model parameters are not retained.
+                Holt–Winters and moving-average source dates are inferred from
+                their fixed windows; legacy linear-trend source dates are
+                unavailable.
             </p>
             <div v-if="forecasts.data.length" class="mt-5 overflow-x-auto">
                 <table class="w-full text-left text-sm">
