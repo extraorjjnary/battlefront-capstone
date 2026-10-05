@@ -39,13 +39,21 @@ class ProductCatalogRepository
     /**
      * Return customer-eligible products for the catalog directory.
      *
-     * @param  array{q: string|null, category_id: int|null, brand: string|null, tag_id: int|null}  $filters
+     * @param  array{q: string|null, category_id: int|null, brand: string|null, tag_id: int|null, category_ids?: list<int>, min_price?: string, max_price?: string, sort?: string}  $filters
      * @return LengthAwarePaginator<int, Product>
      */
     public function paginate(array $filters): LengthAwarePaginator
     {
-        return $this->catalogQuery($filters)
-            ->orderByDesc('is_featured')
+        $query = $this->catalogQuery($filters);
+        $sort = $filters['sort'] ?? 'featured';
+
+        if ($sort === 'price_asc' || $sort === 'price_desc') {
+            $query->orderByRaw('COALESCE(discount_price, price) '.($sort === 'price_asc' ? 'asc' : 'desc'));
+        } else {
+            $query->orderByDesc('is_featured');
+        }
+
+        return $query
             ->orderBy('name')
             ->orderBy('id')
             ->paginate(12)
@@ -213,7 +221,7 @@ class ProductCatalogRepository
     }
 
     /**
-     * @param  array{q?: string|null, category_id?: int|null, brand?: string|null, tag_id?: int|null}  $filters
+     * @param  array{q?: string|null, category_id?: int|null, brand?: string|null, tag_id?: int|null, category_ids?: list<int>, min_price?: string, max_price?: string, sort?: string}  $filters
      * @return Builder<Product>
      */
     private function catalogQuery(array $filters = []): Builder
@@ -242,6 +250,18 @@ class ProductCatalogRepository
                 $filters['category_id'] ?? null,
                 fn (Builder $query, int $categoryId): Builder => $query->where('category_id', $categoryId),
             )
+            ->when(
+                $filters['category_ids'] ?? [],
+                fn (Builder $query, array $categoryIds): Builder => $query->whereIn('category_id', $categoryIds),
+            )
+            ->where(function (Builder $query) use ($filters): void {
+                if (isset($filters['min_price'])) {
+                    $query->whereRaw('COALESCE(discount_price, price) >= CAST(? AS DECIMAL(12, 2))', [$filters['min_price']]);
+                }
+                if (isset($filters['max_price'])) {
+                    $query->whereRaw('COALESCE(discount_price, price) <= CAST(? AS DECIMAL(12, 2))', [$filters['max_price']]);
+                }
+            })
             ->when(
                 $filters['brand'] ?? null,
                 fn (Builder $query, string $brand): Builder => $query->where('brand', $brand),
