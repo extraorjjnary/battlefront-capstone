@@ -10,6 +10,7 @@ use App\Services\Forecasting\ProductForecastPreparationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
+use InvalidArgumentException;
 
 /**
  * @phpstan-import-type Preparation from ProductForecastPreparationService
@@ -76,7 +77,11 @@ class ForecastingService
         if (bccomp($result['forecast_quantity'], '9999999999.99', 2) > 0) {
             throw ValidationException::withMessages(['forecast' => 'This forecast exceeds the supported quantity and could not be saved.']);
         }
-        $forecast = $this->persistForecast->execute($result);
+        try {
+            $forecast = $this->persistForecast->execute($result);
+        } catch (InvalidArgumentException $exception) {
+            throw ValidationException::withMessages(['forecast' => 'This forecast could not be saved: '.$exception->getMessage()]);
+        }
         $observations = [];
         foreach ($prepared['history']['series'][0]['quarters'] as $quarter) {
             $observations[] = [

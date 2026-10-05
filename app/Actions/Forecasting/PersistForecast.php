@@ -5,14 +5,14 @@ namespace App\Actions\Forecasting;
 use App\Models\Forecast;
 use App\Models\Product;
 use Carbon\CarbonImmutable;
-use DateTimeZone;
 use InvalidArgumentException;
-use Throwable;
 
 class PersistForecast
 {
+    public function __construct(private readonly MonthlyForecastInput $input = new MonthlyForecastInput) {}
+
     /**
-     * Persist a completed product moving average without repeating its calculation.
+     * Persist a completed product Holt-Winters forecast without fitting its model.
      *
      * @param  array<string, mixed>  $result
      */
@@ -21,19 +21,19 @@ class PersistForecast
         if (($result['dimension'] ?? null) === 'category') {
             throw new InvalidArgumentException('Category forecast results cannot be persisted by the product-only Forecast entity.');
         }
-        if (($result['dimension'] ?? null) !== 'product') {
+        if (array_key_exists('dimension', $result) && $result['dimension'] !== 'product') {
             throw new InvalidArgumentException('A product forecast result is required.');
         }
 
         $method = $result['method'] ?? null;
-        if ($method !== 'moving_average') {
-            throw new InvalidArgumentException('Only moving_average forecast results can be persisted.');
+        if ($method !== 'additive_holt_winters') {
+            throw new InvalidArgumentException('Only additive_holt_winters forecast results can be persisted.');
         }
         if (($result['status'] ?? null) !== 'ok') {
             throw new InvalidArgumentException('Only completed forecast results can be persisted.');
         }
 
-        $productId = $result['entity_id'] ?? null;
+        $productId = $result['product_id'] ?? null;
         if (! is_int($productId) || $productId < 1) {
             throw new InvalidArgumentException('A positive product ID is required.');
         }
@@ -44,15 +44,8 @@ class PersistForecast
             throw new InvalidArgumentException('Forecast demand must be a nonnegative two-decimal value within DECIMAL(12,2).');
         }
 
-        [$forecastQuarter, $sourceQuarters] = $this->validatePeriods($result);
-        $availableQuarters = $result['available_quarters'] ?? null;
-        if (! is_int($availableQuarters) || $availableQuarters < 4) {
-            throw new InvalidArgumentException('A completed forecast requires at least four available quarters.');
-        }
-
-        if (($result['window_size'] ?? null) !== 4 || $sourceQuarters !== 4) {
-            throw new InvalidArgumentException('Moving average requires a four-quarter source window.');
-        }
+        [$forecastQuarter, $targetStart] = $this->validatePeriods($result);
+        $this->validateMonthlyForecasts($result['monthly_forecasts'] ?? null, $targetStart, $demand);
 
         if (! Product::query()->whereKey($productId)->exists()) {
             throw new InvalidArgumentException('The forecast product does not exist.');
@@ -75,7 +68,7 @@ class PersistForecast
 
     /**
      * @param  array<string, mixed>  $result
-     * @return array{string, int}
+     * @return array{string, CarbonImmutable}
      */
     private function validatePeriods(array $result): array
     {
@@ -86,50 +79,58 @@ class PersistForecast
             throw new InvalidArgumentException('Complete forecast periods and timezone are required.');
         }
 
-        try {
-            $timezone = new DateTimeZone($timezoneName);
-        } catch (Throwable $exception) {
-            throw new InvalidArgumentException('Invalid forecast timezone.', previous: $exception);
-        }
-
-        $targetStart = $this->quarterBoundary($target['start'] ?? null, $timezone);
+        $targetStart = $this->input->boundary($target['start'] ?? null, $timezoneName);
         $targetEnd = $targetStart->addQuarter();
-        if (($target['year'] ?? null) !== $targetStart->year
+        if ($targetStart->month % 3 !== 1 || ($target['year'] ?? null) !== $targetStart->year
             || ($target['quarter'] ?? null) !== $targetStart->quarter
             || ($target['end_exclusive'] ?? null) !== $targetEnd->toDateString()
-            || $targetStart->greaterThan(CarbonImmutable::now($timezone)->startOfQuarter())) {
+            || $targetStart->greaterThan(CarbonImmutable::now($timezoneName)->startOfQuarter())) {
             throw new InvalidArgumentException('The target must be one complete quarter after completed history.');
         }
 
-        $sourceStart = $this->quarterBoundary($source['start'] ?? null, $timezone);
-        if (($source['end_exclusive'] ?? null) !== $targetStart->toDateString()) {
-            throw new InvalidArgumentException('The source period must end at the target quarter.');
+        $sourceStart = $this->input->boundary($source['start'] ?? null, $timezoneName);
+        if (($source['end_exclusive'] ?? null) !== $targetStart->toDateString()
+            || $sourceStart->addMonths(36)->toDateString() !== $targetStart->toDateString()) {
+            throw new InvalidArgumentException('The source period must span exactly 36 months ending at the target quarter.');
         }
 
-        $sourceQuarters = (($targetStart->year - $sourceStart->year) * 4)
-            + $targetStart->quarter - $sourceStart->quarter;
-        if ($sourceQuarters < 4) {
-            throw new InvalidArgumentException('The source period must contain at least four completed quarters.');
-        }
-
-        return [sprintf('%04d-Q%d', $targetStart->year, $targetStart->quarter), $sourceQuarters];
+        return [sprintf('%04d-Q%d', $targetStart->year, $targetStart->quarter), $targetStart];
     }
 
-    private function quarterBoundary(mixed $value, DateTimeZone $timezone): CarbonImmutable
+    private function validateMonthlyForecasts(mixed $months, CarbonImmutable $targetStart, string $demand): void
     {
-        if (! is_string($value) || ! preg_match('/^[0-9]{4}-(01|04|07|10)-01$/D', $value)) {
-            throw new InvalidArgumentException('Forecast periods require calendar-quarter date boundaries.');
+        if (! is_array($months) || ! array_is_list($months) || count($months) !== 3) {
+            throw new InvalidArgumentException('A forecast requires exactly three ordered target months.');
         }
 
-        try {
-            $date = CarbonImmutable::createFromFormat('!Y-m-d', $value, $timezone);
-        } catch (Throwable $exception) {
-            throw new InvalidArgumentException('Invalid forecast period date.', previous: $exception);
-        }
-        if ($date === null || $date->year < 1 || $date->toDateString() !== $value) {
-            throw new InvalidArgumentException('Invalid forecast period date.');
+        $next = $targetStart;
+        $total = '0.000000000000';
+        foreach ($months as $month) {
+            if (! is_array($month) || ($month['year'] ?? null) !== $next->year
+                || ($month['month'] ?? null) !== $next->month
+                || ($month['start'] ?? null) !== $next->toDateString()
+                || ($month['end_exclusive'] ?? null) !== $next->addMonth()->toDateString()) {
+                throw new InvalidArgumentException('Forecast months must consecutively cover the target calendar quarter.');
+            }
+
+            $raw = $month['raw_quantity'] ?? null;
+            $usable = $month['usable_quantity'] ?? null;
+            $clamped = $month['was_clamped'] ?? null;
+            if (! is_string($raw) || ! is_numeric($raw) || ! preg_match('/^-?(0|[1-9][0-9]*)\.[0-9]{12}$/D', $raw)
+                || ! is_string($usable) || ! is_numeric($usable) || ! preg_match('/^(0|[1-9][0-9]*)\.[0-9]{12}$/D', $usable)
+                || ! is_bool($clamped)) {
+                throw new InvalidArgumentException('Monthly forecasts require scale-12 quantities and boolean clamp flags.');
+            }
+            $negative = bccomp($raw, '0', 12) < 0;
+            if ($clamped !== $negative || bccomp($usable, $negative ? '0' : $raw, 12) !== 0) {
+                throw new InvalidArgumentException('Monthly usable quantities must match their clamped raw projections.');
+            }
+            $total = bcadd($total, $usable, 12);
+            $next = $next->addMonth();
         }
 
-        return $date;
+        if (bcdiv(bcadd($total, '0.005', 12), '1', 2) !== $demand) {
+            throw new InvalidArgumentException('Quarterly demand must equal the monthly usable sum rounded once half-up.');
+        }
     }
 }

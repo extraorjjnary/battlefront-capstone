@@ -8,6 +8,7 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\User;
+use App\Services\Forecasting\ProductForecastPreparationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -55,6 +56,19 @@ function forecastingCoverage(Product $product, array $overrides = []): void
     ]]);
 }
 
+/** @return array<string, mixed> */
+function forecastingPreparedLegacyResult(Product $product): array
+{
+    $prepared = app(ProductForecastPreparationService::class)->prepare($product);
+    expect($prepared['status'])->toBe('ready');
+    expect($prepared['history'])->not->toBeNull();
+
+    return [
+        'prepared' => $prepared,
+        'result' => app(CalculateMovingAverage::class)->execute($prepared['history'], $product->id),
+    ];
+}
+
 test('guests must log in and customers cannot read or generate forecasts', function (string $verb) {
     $this->$verb(route('administration.forecasting.'.($verb === 'get' ? 'index' : 'store')))
         ->assertRedirectToRoute('login');
@@ -81,7 +95,7 @@ test('administrators see the dedicated forecasting page and empty states', funct
             ->missing('filters.method'));
 });
 
-test('generates the latest four completed quarters through moving average and persistence', function () {
+test('rejects legacy moving average persistence after calculating the latest four completed quarters', function () {
     $product = Product::factory()->for(Category::factory()->state(['is_active' => false]))
         ->create(['is_active' => false]);
     forecastingCoverage($product, ['start' => '2025-04-01']);
@@ -90,61 +104,64 @@ test('generates the latest four completed quarters through moving average and pe
     }
     forecastingSale($product, '2026-10-01', 9999);
     $this->partialMock(PersistForecast::class)->shouldReceive('execute')->once()->passthru();
+    $calculated = forecastingPreparedLegacyResult($product);
+
+    expect($calculated['result'])->toMatchArray([
+        'status' => 'ok', 'method' => 'moving_average', 'dimension' => 'product',
+        'entity_id' => $product->id, 'forecast_quantity' => '22.50',
+        'source_period' => ['start' => '2025-10-01', 'end_exclusive' => '2026-10-01'],
+        'target_quarter' => ['year' => 2026, 'quarter' => 4, 'start' => '2026-10-01', 'end_exclusive' => '2027-01-01'],
+    ]);
+    expect(array_column($calculated['prepared']['history']['series'][0]['quarters'], 'quantity_sold'))
+        ->toBe([15, 20, 25, 30]);
 
     $response = $this->actingAs(User::factory()->administrator()->create())
+        ->from(route('administration.forecasting.index', ['product_id' => $product->id]))
         ->post(route('administration.forecasting.store'), forecastingInput($product));
 
     $response->assertRedirectToRoute('administration.forecasting.index', ['product_id' => $product->id])
-        ->assertInertiaFlash('forecast_result.status', 'ready')
-        ->assertInertiaFlash('forecast_result.method', 'moving_average')
-        ->assertInertiaFlash('forecast_result.forecast_quantity', '22.50')
-        ->assertInertiaFlash('forecast_result.product.id', $product->id)
-        ->assertInertiaFlash('forecast_result.source_period.start', '2025-10-01')
-        ->assertInertiaFlash('forecast_result.source_period.end_exclusive', '2026-10-01')
-        ->assertInertiaFlash('forecast_result.target_label', 'Q4 2026')
-        ->assertInertiaFlash('forecast_result.target_quarter.start', '2026-10-01')
-        ->assertInertiaFlash('forecast_result.target_quarter.end_exclusive', '2027-01-01')
-        ->assertInertiaFlash('forecast_result.generated_at', '2026-10-15T12:00:00+00:00')
-        ->assertInertiaFlash('forecast_result.observations', [
-            ['label' => 'Q4 2025', 'start' => '2025-10-01', 'quantity_sold' => 15],
-            ['label' => 'Q1 2026', 'start' => '2026-01-01', 'quantity_sold' => 20],
-            ['label' => 'Q2 2026', 'start' => '2026-04-01', 'quantity_sold' => 25],
-            ['label' => 'Q3 2026', 'start' => '2026-07-01', 'quantity_sold' => 30],
-        ])
-        ->assertInertiaFlash('forecast_result.guidance', 'Use this estimate alongside business judgment when planning stock. Actual demand may differ.');
-    $this->assertDatabaseCount('forecasts', 1);
-    $this->assertDatabaseHas('forecasts', [
-        'product_id' => $product->id, 'method' => 'moving_average',
-        'forecast_quarter' => '2026-Q4', 'predicted_demand' => '22.50',
-    ]);
+        ->assertSessionHasErrors(['forecast' => 'This forecast could not be saved: Only additive_holt_winters forecast results can be persisted.'])
+        ->assertInertiaFlashMissing('forecast_result');
+    $this->assertDatabaseEmpty('forecasts');
     $this->get($response->headers->get('Location'))
         ->assertInertia(fn (Assert $page) => $page
-            ->hasFlash('forecast_result.status', 'ready')
-            ->where('forecasts.data.0.forecast_quantity', '22.50')
+            ->missingFlash('forecast_result')
+            ->has('forecasts.data', 0)
             ->where('readiness.status', 'ready')
             ->where('readiness.covered_quarters', 4)
             ->where('readiness.source_label', 'Q4 2025 – Q3 2026')
             ->where('selected_product.is_active', false));
 });
 
-test('reruns replace the same row and refresh generation time without deleting other results', function () {
+test('rejected legacy reruns preserve all saved results and their generation times', function () {
     $product = Product::factory()->create();
     forecastingCoverage($product);
     $administrator = User::factory()->administrator()->create();
     $otherMethod = Forecast::factory()->for($product)->create(['method' => 'linear_trend']);
     $otherQuarter = Forecast::factory()->for($product)->create(['forecast_quarter' => '2026-Q3']);
-    $this->actingAs($administrator)->post(route('administration.forecasting.store'), forecastingInput($product));
-    $original = Forecast::where('method', 'moving_average')->where('forecast_quarter', '2026-Q4')->sole();
+    $original = Forecast::factory()->for($product)->create([
+        'method' => 'moving_average', 'forecast_quarter' => '2026-Q4',
+        'predicted_demand' => '14.00', 'generated_at' => '2026-10-14 12:00:00',
+    ]);
+    $saved = Forecast::orderBy('id')->get()->toArray();
+
+    $this->actingAs($administrator)
+        ->from(route('administration.forecasting.index', ['product_id' => $product->id]))
+        ->post(route('administration.forecasting.store'), forecastingInput($product))
+        ->assertRedirectToRoute('administration.forecasting.index', ['product_id' => $product->id])
+        ->assertSessionHasErrors(['forecast' => 'This forecast could not be saved: Only additive_holt_winters forecast results can be persisted.'])
+        ->assertInertiaFlashMissing('forecast_result');
+    expect(Forecast::orderBy('id')->get()->toArray())->toBe($saved);
     forecastingSale($product, '2026-09-30', 20);
     $this->travelTo(CarbonImmutable::parse('2026-10-16 12:00:00', 'UTC'));
 
     $this->post(route('administration.forecasting.store'), forecastingInput($product))
-        ->assertInertiaFlash('forecast_result.id', $original->id)
-        ->assertInertiaFlash('forecast_result.forecast_quantity', '5.00')
-        ->assertInertiaFlash('forecast_result.generated_at', '2026-10-16T12:00:00+00:00');
+        ->assertRedirectToRoute('administration.forecasting.index', ['product_id' => $product->id])
+        ->assertSessionHasErrors(['forecast' => 'This forecast could not be saved: Only additive_holt_winters forecast results can be persisted.'])
+        ->assertInertiaFlashMissing('forecast_result');
 
-    $this->assertDatabaseCount('forecasts', 3);
-    expect($original->fresh()->predicted_demand)->toBe('5.00');
+    expect(Forecast::orderBy('id')->get()->toArray())->toBe($saved);
+    $this->assertModelExists($original);
     $this->assertModelExists($otherMethod);
     $this->assertModelExists($otherQuarter);
 });
@@ -199,31 +216,43 @@ test('insufficient prepared history does not persist or overwrite a forecast', f
     ['2026-10-01', 0], ['2026-07-01', 1], ['2026-04-01', 2], ['2026-01-01', 3],
 ]);
 
-test('prepared coverage with zero sales is a valid forecast', function () {
+test('covered zero sales remain a valid legacy calculation but cannot create a legacy forecast', function () {
     $product = Product::factory()->create();
     forecastingCoverage($product);
-    $this->actingAs(User::factory()->administrator()->create())
-        ->post(route('administration.forecasting.store'), forecastingInput($product))
-        ->assertInertiaFlash('forecast_result.status', 'ready')
-        ->assertInertiaFlash('forecast_result.forecast_quantity', '0.00')
-        ->assertInertiaFlash('forecast_result.observations.0.quantity_sold', 0)
-        ->assertInertiaFlash('forecast_result.observations.3.quantity_sold', 0);
+    $calculated = forecastingPreparedLegacyResult($product);
 
-    $this->assertDatabaseHas('forecasts', ['product_id' => $product->id, 'predicted_demand' => '0.00', 'method' => 'moving_average']);
+    expect($calculated['result'])->toMatchArray(['status' => 'ok', 'forecast_quantity' => '0.00']);
+    expect(array_column($calculated['prepared']['history']['series'][0]['quarters'], 'quantity_sold'))
+        ->toBe([0, 0, 0, 0]);
+
+    $this->actingAs(User::factory()->administrator()->create())
+        ->from(route('administration.forecasting.index', ['product_id' => $product->id]))
+        ->post(route('administration.forecasting.store'), forecastingInput($product))
+        ->assertRedirectToRoute('administration.forecasting.index', ['product_id' => $product->id])
+        ->assertSessionHasErrors(['forecast' => 'This forecast could not be saved: Only additive_holt_winters forecast results can be persisted.'])
+        ->assertInertiaFlashMissing('forecast_result');
+
+    $this->assertDatabaseEmpty('forecasts');
 });
 
-test('sparse covered history preserves zero quantity quarters', function () {
+test('sparse legacy history preserves zero quantity quarters without permitting legacy persistence', function () {
     $product = Product::factory()->create();
     forecastingCoverage($product);
     forecastingSale($product, '2025-10-01', 3);
+    $calculated = forecastingPreparedLegacyResult($product);
+
+    expect($calculated['result'])->toMatchArray(['status' => 'ok', 'forecast_quantity' => '0.75']);
+    expect(array_column($calculated['prepared']['history']['series'][0]['quarters'], 'quantity_sold'))
+        ->toBe([3, 0, 0, 0]);
 
     $this->actingAs(User::factory()->administrator()->create())
+        ->from(route('administration.forecasting.index', ['product_id' => $product->id]))
         ->post(route('administration.forecasting.store'), forecastingInput($product))
-        ->assertInertiaFlash('forecast_result.forecast_quantity', '0.75')
-        ->assertInertiaFlash('forecast_result.observations.0.quantity_sold', 3)
-        ->assertInertiaFlash('forecast_result.observations.1.quantity_sold', 0);
+        ->assertRedirectToRoute('administration.forecasting.index', ['product_id' => $product->id])
+        ->assertSessionHasErrors(['forecast' => 'This forecast could not be saved: Only additive_holt_winters forecast results can be persisted.'])
+        ->assertInertiaFlashMissing('forecast_result');
 
-    $this->assertDatabaseHas('forecasts', ['product_id' => $product->id, 'predicted_demand' => '0.75']);
+    $this->assertDatabaseEmpty('forecasts');
 });
 
 test('readiness is rechecked during generation without overwriting saved demand', function () {
@@ -244,9 +273,15 @@ test('readiness is rechecked during generation without overwriting saved demand'
     $this->assertDatabaseCount('forecasts', 1);
 });
 
-test('development fixtures generate a clearly identified synthetic forecast', function () {
+test('legacy development calculations remain synthetic without creating legacy forecasts', function () {
     $this->seed(LegacyQuarterlySalesFixtures::class);
     $product = Product::where('product_code', 'DEVHIST40INCREASING')->sole();
+    $calculated = forecastingPreparedLegacyResult($product);
+
+    expect($calculated['result'])->toMatchArray(['status' => 'ok', 'forecast_quantity' => '32.50']);
+    expect($calculated['prepared']['coverage']['source_kind'])->toBe('synthetic_development');
+    expect(array_column($calculated['prepared']['history']['series'][0]['quarters'], 'quantity_sold'))
+        ->toBe([25, 30, 35, 40]);
 
     $this->actingAs(User::factory()->administrator()->create())
         ->get(route('administration.forecasting.index', ['product_id' => $product->id]))
@@ -254,13 +289,13 @@ test('development fixtures generate a clearly identified synthetic forecast', fu
             ->where('readiness.status', 'ready')
             ->where('readiness.is_synthetic', true)
             ->where('readiness.sales_scope_label', 'Synthetic development transactions'));
-    $this->post(route('administration.forecasting.store'), forecastingInput($product))
-        ->assertInertiaFlash('forecast_result.is_synthetic', true)
-        ->assertInertiaFlash('forecast_result.forecast_quantity', '32.50')
-        ->assertInertiaFlash('forecast_result.observations.0.quantity_sold', 25)
-        ->assertInertiaFlash('forecast_result.observations.3.quantity_sold', 40);
+    $this->from(route('administration.forecasting.index', ['product_id' => $product->id]))
+        ->post(route('administration.forecasting.store'), forecastingInput($product))
+        ->assertRedirectToRoute('administration.forecasting.index', ['product_id' => $product->id])
+        ->assertSessionHasErrors(['forecast' => 'This forecast could not be saved: Only additive_holt_winters forecast results can be persisted.'])
+        ->assertInertiaFlashMissing('forecast_result');
 
-    $this->assertDatabaseHas('forecasts', ['product_id' => $product->id, 'method' => 'moving_average', 'predicted_demand' => '32.50']);
+    $this->assertDatabaseEmpty('forecasts');
 });
 
 test('invalid generation inputs report field errors without persistence', function (string $field, mixed $value, string $message) {
@@ -292,19 +327,31 @@ test('generation rejects obsolete or extra configuration controls', function (st
     ['target_quarter', '2027-Q1'], ['year', 2025], ['quarter', 1],
 ]);
 
-test('application timezone controls the completed window and year rollover', function () {
+test('application timezone controls legacy calculation year rollover without allowing legacy writes', function () {
     config(['app.timezone' => 'Asia/Manila']);
     $this->travelTo(CarbonImmutable::parse('2026-12-31 16:30:00', 'UTC'));
     $product = Product::factory()->create();
     forecastingCoverage($product, ['start' => '2026-01-01', 'end_exclusive' => '2027-01-01']);
     forecastingSale($product, '2026-12-31', 8);
     forecastingSale($product, '2027-01-01', 900);
+    $calculated = forecastingPreparedLegacyResult($product);
+
+    expect($calculated['result'])->toMatchArray([
+        'status' => 'ok', 'forecast_quantity' => '2.00', 'timezone' => 'Asia/Manila',
+        'source_period' => ['start' => '2026-01-01', 'end_exclusive' => '2027-01-01'],
+        'target_quarter' => ['year' => 2027, 'quarter' => 1, 'start' => '2027-01-01', 'end_exclusive' => '2027-04-01'],
+    ]);
+    expect(array_column($calculated['prepared']['history']['series'][0]['quarters'], 'quantity_sold'))
+        ->toBe([0, 0, 0, 8]);
 
     $this->actingAs(User::factory()->administrator()->create())
+        ->from(route('administration.forecasting.index', ['product_id' => $product->id]))
         ->post(route('administration.forecasting.store'), forecastingInput($product))
-        ->assertInertiaFlash('forecast_result.target_label', 'Q1 2027')
-        ->assertInertiaFlash('forecast_result.forecast_quantity', '2.00')
-        ->assertInertiaFlash('forecast_result.source_label', 'Q1 2026 – Q4 2026');
+        ->assertRedirectToRoute('administration.forecasting.index', ['product_id' => $product->id])
+        ->assertSessionHasErrors(['forecast' => 'This forecast could not be saved: Only additive_holt_winters forecast results can be persisted.'])
+        ->assertInertiaFlashMissing('forecast_result');
+
+    $this->assertDatabaseEmpty('forecasts');
 });
 
 test('saved review reads stored and legacy results without recalculation or invented quantities', function () {
