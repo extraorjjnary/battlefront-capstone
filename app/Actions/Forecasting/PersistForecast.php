@@ -12,7 +12,7 @@ use Throwable;
 class PersistForecast
 {
     /**
-     * Persist a completed product forecast without repeating its calculation.
+     * Persist a completed product moving average without repeating its calculation.
      *
      * @param  array<string, mixed>  $result
      */
@@ -26,8 +26,8 @@ class PersistForecast
         }
 
         $method = $result['method'] ?? null;
-        if (! in_array($method, ['moving_average', 'linear_trend'], true)) {
-            throw new InvalidArgumentException('Unsupported forecast method.');
+        if ($method !== 'moving_average') {
+            throw new InvalidArgumentException('Only moving_average forecast results can be persisted.');
         }
         if (($result['status'] ?? null) !== 'ok') {
             throw new InvalidArgumentException('Only completed forecast results can be persisted.');
@@ -50,14 +50,8 @@ class PersistForecast
             throw new InvalidArgumentException('A completed forecast requires at least four available quarters.');
         }
 
-        if ($method === 'moving_average') {
-            if (($result['window_size'] ?? null) !== 4 || $sourceQuarters !== 4) {
-                throw new InvalidArgumentException('Moving average requires a four-quarter source window.');
-            }
-        } elseif (($result['minimum_quarters'] ?? null) !== 4 || $sourceQuarters !== $availableQuarters) {
-            throw new InvalidArgumentException('Linear trend requires all available completed source quarters.');
-        } else {
-            $this->validateLinearMetadata($result, $demand);
+        if (($result['window_size'] ?? null) !== 4 || $sourceQuarters !== 4) {
+            throw new InvalidArgumentException('Moving average requires a four-quarter source window.');
         }
 
         if (! Product::query()->whereKey($productId)->exists()) {
@@ -137,38 +131,5 @@ class PersistForecast
         }
 
         return $date;
-    }
-
-    /**
-     * @param  array<string, mixed>  $result
-     * @param  numeric-string  $demand
-     */
-    private function validateLinearMetadata(array $result, string $demand): void
-    {
-        foreach (['slope', 'intercept', 'raw_forecast_quantity'] as $field) {
-            $value = $result[$field] ?? null;
-            if (! is_string($value) || ! preg_match('/^-?(0|[1-9][0-9]*)\.[0-9]{6}$/D', $value)) {
-                throw new InvalidArgumentException('Linear trend metadata is incomplete or malformed.');
-            }
-        }
-
-        $clamped = $result['was_clamped'] ?? null;
-        $raw = $result['raw_forecast_quantity'];
-        if (! is_bool($clamped)
-            || ($clamped && ($demand !== '0.00' || bccomp($raw, '0', 6) > 0))
-            || (! $clamped && bccomp($raw, '0', 6) < 0)) {
-            throw new InvalidArgumentException('Linear trend clamp metadata is inconsistent.');
-        }
-
-        /**
-         * Both outputs round independently from the exact projection. Their rounding
-         * intervals must overlap: half a cent plus half a millionth. Checking this
-         * bound preserves valid double-rounding cases without recalculating demand.
-         */
-        $difference = bcsub($demand, $raw, 7);
-        if (! $clamped && (bccomp($difference, '0.0050005', 7) >= 0
-            || bccomp($difference, '-0.0050005', 7) <= 0)) {
-            throw new InvalidArgumentException('Linear trend demand is inconsistent with its raw projection.');
-        }
     }
 }

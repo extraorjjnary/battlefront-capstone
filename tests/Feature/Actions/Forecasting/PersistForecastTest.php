@@ -1,14 +1,15 @@
 <?php
 
-use App\Actions\Forecasting\CalculateLinearTrend;
 use App\Actions\Forecasting\CalculateMovingAverage;
 use App\Actions\Forecasting\PersistForecast;
 use App\Models\Category;
 use App\Models\Forecast;
 use App\Models\Product;
+use App\Services\Forecasting\ProductForecastPreparationService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     config(['app.timezone' => 'UTC']);
@@ -57,21 +58,35 @@ test('persists moving average output against its product and quarter', function 
     expect($forecast->generated_at->toDateTimeString())->toBe('2027-01-15 12:00:00');
     expect($forecast->product->is($product))->toBeTrue();
     expect($product->forecasts()->sole()->is($forecast))->toBeTrue();
+    expect(array_keys($forecast->getAttributes()))->toEqualCanonicalizing(['id', 'product_id', 'method', 'predicted_demand', 'forecast_quarter', 'generated_at']);
     $this->assertModelExists($forecast);
     $this->assertDatabaseCount('forecasts', 1);
 });
 
-test('persists finalized linear trend output and leaves diagnostics out of the schema', function () {
+test('preserves historical linear trend rows during moving average inserts reruns and rejected trend writes', function () {
     $product = Product::factory()->create();
-    $result = (new CalculateLinearTrend)->execute(persistForecastHistory($product->id, [5, 10, 15, 20]), $product->id);
+    $legacy = Forecast::factory()->for($product)->create([
+        'method' => 'linear_trend',
+        'predicted_demand' => '25.00',
+        'forecast_quarter' => '2026-Q4',
+        'generated_at' => '2026-10-15 12:00:00',
+    ]);
+    $original = $legacy->refresh()->getAttributes();
+    $action = app(PersistForecast::class);
+    $result = (new CalculateMovingAverage)->execute(persistForecastHistory($product->id, [5, 10, 15, 20]), $product->id);
 
-    $forecast = app(PersistForecast::class)->execute($result);
+    $forecast = $action->execute($result);
+    $this->travelTo(CarbonImmutable::parse('2027-01-16 12:00:00', 'UTC'));
+    $replacement = $action->execute((new CalculateMovingAverage)->execute(persistForecastHistory($product->id, [8, 8, 8, 8]), $product->id));
 
-    expect($forecast->method)->toBe('linear_trend');
-    expect($forecast->predicted_demand)->toBe('25.00');
-    expect($forecast->forecast_quarter)->toBe('2026-Q4');
-    expect(array_keys($forecast->getAttributes()))->toEqualCanonicalizing(['id', 'product_id', 'method', 'predicted_demand', 'forecast_quarter', 'generated_at']);
-    $this->assertDatabaseHas('forecasts', ['product_id' => $product->id, 'method' => 'linear_trend', 'predicted_demand' => '25.00']);
+    expect(fn () => $action->execute(array_replace($result, ['method' => 'linear_trend'])))->toThrow(InvalidArgumentException::class, 'Only moving_average');
+
+    expect($replacement->id)->toBe($forecast->id);
+    expect($replacement->predicted_demand)->toBe('8.00');
+    expect($replacement->generated_at->toDateTimeString())->toBe('2027-01-16 12:00:00');
+    expect($legacy->refresh()->getAttributes())->toBe($original);
+    expect($legacy->product->is($product))->toBeTrue();
+    $this->assertDatabaseCount('forecasts', 2);
 });
 
 test('rerunning a product method and quarter replaces the result and generation time', function () {
@@ -90,42 +105,58 @@ test('rerunning a product method and quarter replaces the result and generation 
     $this->assertDatabaseCount('forecasts', 1);
 });
 
-test('keeps distinct methods and target quarters for the same product', function () {
+test('keeps distinct target quarters for the same product', function () {
     $product = Product::factory()->create();
     $history = persistForecastHistory($product->id, [5, 10, 15, 20]);
     $action = app(PersistForecast::class);
 
     $action->execute((new CalculateMovingAverage)->execute($history, $product->id));
-    $action->execute((new CalculateLinearTrend)->execute($history, $product->id));
     $action->execute((new CalculateMovingAverage)->execute(persistForecastHistory($product->id, [5, 10, 15, 20, 25]), $product->id));
+    $action->execute((new CalculateMovingAverage)->execute(persistForecastHistory($product->id, [8, 8, 8, 8]), $product->id));
 
-    $this->assertDatabaseCount('forecasts', 3);
+    $this->assertDatabaseCount('forecasts', 2);
     expect($product->forecasts()->pluck('forecast_quarter')->all())->toContain('2026-Q4', '2027-Q1');
+    $this->assertDatabaseHas('forecasts', ['product_id' => $product->id, 'forecast_quarter' => '2026-Q4', 'predicted_demand' => '8.00']);
+    $this->assertDatabaseHas('forecasts', ['product_id' => $product->id, 'forecast_quarter' => '2027-Q1', 'predicted_demand' => '17.50']);
 });
 
-test('rejects a valid category calculation at the product-only persistence boundary', function (string $calculator) {
+test('rejects a valid category calculation at the product-only persistence boundary', function () {
     $category = Category::factory()->create();
-    $result = (new $calculator)->execute(persistForecastHistory($category->id, [5, 10, 15, 20], dimension: 'category'), $category->id);
+    $result = (new CalculateMovingAverage)->execute(persistForecastHistory($category->id, [5, 10, 15, 20], dimension: 'category'), $category->id);
 
+    expect($result['status'])->toBe('ok');
     expect(fn () => app(PersistForecast::class)->execute($result))->toThrow(InvalidArgumentException::class, 'Category forecast results cannot be persisted');
     $this->assertDatabaseCount('forecasts', 0);
-})->with([CalculateMovingAverage::class, CalculateLinearTrend::class]);
+});
 
-test('rejects unsupported methods and non-persistable calculator outcomes', function (string $calculator) {
+test('rejects new linear trend writes and every method other than moving average', function (mixed $method) {
+    $product = Product::factory()->create();
+    $result = (new CalculateMovingAverage)->execute(persistForecastHistory($product->id, [5, 10, 15, 20]), $product->id);
+    $result['method'] = $method;
+
+    expect(fn () => app(PersistForecast::class)->execute($result))->toThrow(InvalidArgumentException::class, 'Only moving_average');
+    $this->assertDatabaseCount('forecasts', 0);
+})->with([
+    'legacy linear trend' => ['linear_trend'],
+    'unsupported method' => ['seasonal'],
+    'missing method' => [null],
+    'noncanonical method' => ['MOVING_AVERAGE'],
+    'malformed method' => [[]],
+]);
+
+test('rejects non-persistable moving average calculator outcomes', function () {
     $product = Product::factory()->create();
     $action = app(PersistForecast::class);
-    $valid = (new $calculator)->execute(persistForecastHistory($product->id, [5, 10, 15, 20]), $product->id);
-    $unsupported = array_replace($valid, ['method' => 'seasonal']);
-    $insufficient = (new $calculator)->execute(persistForecastHistory($product->id, [5, 10, 15]), $product->id);
+    $insufficient = (new CalculateMovingAverage)->execute(persistForecastHistory($product->id, [5, 10, 15]), $product->id);
     $missingHistory = persistForecastHistory($product->id, [5, 10, 15, 20]);
     $missingHistory['series'] = [];
-    $missing = (new $calculator)->execute($missingHistory, $product->id);
+    $missing = (new CalculateMovingAverage)->execute($missingHistory, $product->id);
 
-    foreach ([$unsupported, $insufficient, $missing] as $result) {
+    foreach ([$insufficient, $missing] as $result) {
         expect(fn () => $action->execute($result))->toThrow(InvalidArgumentException::class);
     }
     $this->assertDatabaseCount('forecasts', 0);
-})->with([CalculateMovingAverage::class, CalculateLinearTrend::class]);
+});
 
 test('rejects malformed output and incomplete or inconsistent periods', function (string $field, mixed $value) {
     $product = Product::factory()->create();
@@ -147,19 +178,41 @@ test('rejects malformed output and incomplete or inconsistent periods', function
 })->with([
     'missing target' => ['target_quarter', null],
     'missing source' => ['source_period', null],
+    'missing dimension' => ['dimension', null],
+    'unknown dimension' => ['dimension', 'branch'],
+    'unavailable history' => ['status', 'history_unavailable'],
+    'unavailable result' => ['status', 'unavailable'],
+    'preparation is not a calculation' => ['status', 'ready'],
+    'missing status' => ['status', null],
     'incorrect target year' => ['target_quarter', ['year' => 2025, 'quarter' => 4, 'start' => '2026-10-01', 'end_exclusive' => '2027-01-01']],
+    'incorrect target quarter' => ['target_quarter', ['year' => 2026, 'quarter' => 3, 'start' => '2026-10-01', 'end_exclusive' => '2027-01-01']],
     'target not quarter aligned' => ['target_start', '2026-11-01'],
     'target incomplete' => ['target_end', null],
+    'target end is not the next boundary' => ['target_end', '2026-12-31'],
+    'invalid target year zero' => ['target_start', '0000-10-01'],
     'source gap' => ['source_end', '2026-07-01'],
+    'source incomplete' => ['source_start', null],
     'source not quarter aligned' => ['source_start', '2025-11-01'],
     'source too short' => ['source_start', '2026-01-01'],
+    'source too long' => ['source_start', '2025-07-01'],
+    'source reversed' => ['source_start', '2027-01-01'],
     'missing demand' => ['forecast_quantity', null],
     'float demand' => ['forecast_quantity', 1.25],
     'negative demand' => ['forecast_quantity', '-1.00'],
     'excessive decimal precision' => ['forecast_quantity', '1.234'],
+    'insufficient decimal precision' => ['forecast_quantity', '1.2'],
+    'scientific notation demand' => ['forecast_quantity', '1e2'],
+    'noncanonical demand' => ['forecast_quantity', '01.00'],
+    'trailing whitespace demand' => ['forecast_quantity', "1.00\n"],
     'out of range demand' => ['forecast_quantity', '10000000000.00'],
     'invalid timezone' => ['timezone', 'Invalid/Zone'],
+    'missing timezone' => ['timezone', null],
     'wrong moving window' => ['window_size', 3],
+    'missing moving window' => ['window_size', null],
+    'string moving window' => ['window_size', '4'],
+    'missing available quarters' => ['available_quarters', null],
+    'insufficient available quarters' => ['available_quarters', 3],
+    'string available quarters' => ['available_quarters', '4'],
 ]);
 
 test('rejects a complete calculation whose source includes the current incomplete quarter', function () {
@@ -170,55 +223,20 @@ test('rejects a complete calculation whose source includes the current incomplet
     $this->assertDatabaseCount('forecasts', 0);
 });
 
-test('rejects incomplete or inconsistent linear calculation metadata', function (string $field, mixed $value) {
+test('preserves exact decimal values from moving average calculations', function (array $quantities, string $expected) {
     $product = Product::factory()->create();
-    $result = (new CalculateLinearTrend)->execute(persistForecastHistory($product->id, [5, 10, 15, 20]), $product->id);
-    $result[$field] = $value;
-
-    expect(fn () => app(PersistForecast::class)->execute($result))->toThrow(InvalidArgumentException::class);
-    $this->assertDatabaseCount('forecasts', 0);
-})->with([
-    'missing raw projection' => ['raw_forecast_quantity', null],
-    'malformed slope' => ['slope', '1.25'],
-    'missing clamp flag' => ['was_clamped', null],
-    'incorrect available quarters' => ['available_quarters', 5],
-    'inconsistent positive clamp' => ['was_clamped', true],
-]);
-
-test('preserves exact small decimal values from a linear calculation', function () {
-    $product = Product::factory()->create();
-    $quantities = array_fill(0, 16, 0);
-    $quantities[6] = 1;
-    $result = (new CalculateLinearTrend)->execute(persistForecastHistory($product->id, $quantities, '2022-10-01'), $product->id);
+    $result = (new CalculateMovingAverage)->execute(persistForecastHistory($product->id, $quantities), $product->id);
 
     $forecast = app(PersistForecast::class)->execute($result);
 
-    expect($result['forecast_quantity'])->toBe('0.03');
-    expect($forecast->predicted_demand)->toBe('0.03');
-    $this->assertDatabaseHas('forecasts', ['id' => $forecast->id, 'predicted_demand' => '0.03']);
-});
-
-test('persists zero after linear projection is clamped and rejects inconsistent clamp metadata', function () {
-    $product = Product::factory()->create();
-    $result = (new CalculateLinearTrend)->execute(persistForecastHistory($product->id, [9, 6, 3, 0]), $product->id);
-    $action = app(PersistForecast::class);
-
-    $forecast = $action->execute($result);
-
-    expect($result['raw_forecast_quantity'])->toBe('-3.000000');
-    expect($result['was_clamped'])->toBeTrue();
-    expect($forecast->predicted_demand)->toBe('0.00');
-    $this->assertDatabaseHas('forecasts', ['id' => $forecast->id, 'predicted_demand' => '0.00']);
-
-    $original = $forecast->getAttributes();
-    $this->travelTo(CarbonImmutable::parse('2027-01-16 12:00:00', 'UTC'));
-
-    foreach ([array_replace($result, ['was_clamped' => false]), array_replace($result, ['raw_forecast_quantity' => null]), array_replace($result, ['forecast_quantity' => '1.00'])] as $invalid) {
-        expect(fn () => $action->execute($invalid))->toThrow(InvalidArgumentException::class);
-    }
-    $this->assertDatabaseCount('forecasts', 1);
-    expect($forecast->refresh()->getAttributes())->toBe($original);
-});
+    expect($forecast->predicted_demand)->toBe($expected);
+    $this->assertDatabaseHas('forecasts', ['id' => $forecast->id, 'predicted_demand' => $expected]);
+})->with([
+    'quarter unit' => [[0, 0, 0, 1], '0.25'],
+    'half unit' => [[0, 0, 1, 1], '0.50'],
+    'three quarter unit' => [[0, 1, 1, 1], '0.75'],
+    'large exact decimal' => [[9999999999, 10000000000, 10000000000, 10000000000], '9999999999.75'],
+]);
 
 test('database rejects duplicate keys, missing products, invalid methods, negative demand, and malformed quarters', function (array $attributes) {
     $product = Product::factory()->create();
@@ -274,70 +292,78 @@ test('database rejects noncanonical values when updating an existing forecast', 
     'year zero' => [['forecast_quarter' => '0000-Q1']],
 ]);
 
-test('persists explicit zero demand from either calculator', function (string $calculator) {
+test('persists explicit zero demand from moving average', function () {
     $product = Product::factory()->create();
-    $result = (new $calculator)->execute(persistForecastHistory($product->id, [0, 0, 0, 0]), $product->id);
+    $result = (new CalculateMovingAverage)->execute(persistForecastHistory($product->id, [0, 0, 0, 0]), $product->id);
 
     $forecast = app(PersistForecast::class)->execute($result);
 
     expect($forecast->predicted_demand)->toBe('0.00');
     $this->assertModelExists($forecast);
-})->with([CalculateMovingAverage::class, CalculateLinearTrend::class]);
-
-test('preserves a clamp decision when the raw projection has rounded to zero', function () {
-    $product = Product::factory()->create();
-    $quantities = array_fill(0, 4000, 0);
-    $quantities[1332] = 1;
-    $result = (new CalculateLinearTrend)->execute(persistForecastHistory($product->id, $quantities, '1026-10-01'), $product->id);
-
-    $forecast = app(PersistForecast::class)->execute($result);
-
-    expect($result['raw_forecast_quantity'])->toBe('0.000000');
-    expect($result['was_clamped'])->toBeTrue();
-    expect($forecast->predicted_demand)->toBe('0.00');
 });
 
-test('accepts independently rounded raw and finalized projections at rounding boundaries', function (string $raw, string $finalized) {
+test('persists covered zero demand from ready product preparation and the moving average calculator', function () {
+    Storage::fake('local');
     $product = Product::factory()->create();
-    $result = (new CalculateLinearTrend)->execute(persistForecastHistory($product->id, [0, 0, 0, 0]), $product->id);
-    $result['raw_forecast_quantity'] = $raw;
-    $result['forecast_quantity'] = $finalized;
+    config(['forecasting.operational_coverage' => [$product->product_code => [
+        'start' => '2026-01-01',
+        'end_exclusive' => '2027-01-01',
+        'unavailable_quarters' => [],
+        'timezone' => 'UTC',
+        'source_kind' => 'operational_prepared',
+        'sales_scope' => 'captured_system_transactions',
+    ]]]);
+    $preparation = app(ProductForecastPreparationService::class)->prepare($product);
+    expect($preparation['status'])->toBe('ready');
+    $result = (new CalculateMovingAverage)->execute($preparation['history'], $product->id);
 
     $forecast = app(PersistForecast::class)->execute($result);
 
-    expect($forecast->predicted_demand)->toBe($finalized);
-})->with([
-    'raw rounds up across half cent' => ['0.005000', '0.00'],
-    'exact half cent' => ['0.005000', '0.01'],
-    'maximum stored demand' => ['9999999999.990000', '9999999999.99'],
-]);
+    expect($forecast->predicted_demand)->toBe('0.00');
+    expect($forecast->forecast_quarter)->toBe('2027-Q1');
+    $this->assertDatabaseHas('forecasts', ['product_id' => $product->id, 'method' => 'moving_average', 'forecast_quarter' => '2027-Q1', 'predicted_demand' => '0.00']);
+    $this->assertDatabaseCount('forecasts', 1);
+});
 
-test('rejects inconsistent raw and finalized projections without changing an existing forecast', function (string $raw, string $finalized) {
+test('persists the maximum finalized demand without recalculating it', function () {
     $product = Product::factory()->create();
-    $result = (new CalculateLinearTrend)->execute(persistForecastHistory($product->id, [5, 10, 15, 20]), $product->id);
+    $result = (new CalculateMovingAverage)->execute(persistForecastHistory($product->id, [0, 0, 0, 0]), $product->id);
+    $result['forecast_quantity'] = '9999999999.99';
+
+    $forecast = app(PersistForecast::class)->execute($result);
+
+    expect($forecast->predicted_demand)->toBe('9999999999.99');
+    $this->assertDatabaseHas('forecasts', ['id' => $forecast->id, 'predicted_demand' => '9999999999.99']);
+});
+
+test('rejects invalid reruns without changing an existing forecast', function (array $attributes) {
+    $product = Product::factory()->create();
+    $result = (new CalculateMovingAverage)->execute(persistForecastHistory($product->id, [5, 10, 15, 20]), $product->id);
     $action = app(PersistForecast::class);
     $forecast = $action->execute($result);
     $original = $forecast->getAttributes();
     $this->travelTo(CarbonImmutable::parse('2027-01-16 12:00:00', 'UTC'));
-    $result['raw_forecast_quantity'] = $raw;
-    $result['forecast_quantity'] = $finalized;
 
-    expect(fn () => $action->execute($result))->toThrow(InvalidArgumentException::class);
+    expect(fn () => $action->execute(array_replace($result, $attributes)))->toThrow(InvalidArgumentException::class);
 
     expect($forecast->refresh()->getAttributes())->toBe($original);
+    $this->assertDatabaseCount('forecasts', 1);
 })->with([
-    'clearly inconsistent' => ['25.000000', '999.00'],
-    'below rounding interval' => ['0.004999', '0.01'],
-    'above rounding interval' => ['0.005001', '0.00'],
+    'linear trend' => [['method' => 'linear_trend']],
+    'category' => [['dimension' => 'category']],
+    'unavailable' => [['status' => 'history_unavailable']],
+    'insufficient' => [['status' => 'insufficient_history']],
+    'bad period' => [['source_period' => null]],
+    'bad quantity' => [['forecast_quantity' => '-1.00']],
 ]);
 
-test('rejects real calculator results exceeding decimal storage capacity', function (string $calculator) {
+test('rejects real moving average results exceeding decimal storage capacity', function () {
     $product = Product::factory()->create();
-    $result = (new $calculator)->execute(persistForecastHistory($product->id, array_fill(0, 4, 10000000000)), $product->id);
+    $result = (new CalculateMovingAverage)->execute(persistForecastHistory($product->id, array_fill(0, 4, 10000000000)), $product->id);
 
     expect(fn () => app(PersistForecast::class)->execute($result))->toThrow(InvalidArgumentException::class);
     $this->assertDatabaseCount('forecasts', 0);
-})->with([CalculateMovingAverage::class, CalculateLinearTrend::class]);
+});
 
 test('keeps separate forecasts for different products sharing a method and quarter', function () {
     $first = Product::factory()->create();
@@ -346,8 +372,9 @@ test('keeps separate forecasts for different products sharing a method and quart
 
     $action->execute((new CalculateMovingAverage)->execute(persistForecastHistory($first->id, [4, 4, 4, 4]), $first->id));
     $action->execute((new CalculateMovingAverage)->execute(persistForecastHistory($second->id, [8, 8, 8, 8]), $second->id));
+    $action->execute((new CalculateMovingAverage)->execute(persistForecastHistory($first->id, [12, 12, 12, 12]), $first->id));
 
-    expect($first->forecasts()->sole()->predicted_demand)->toBe('4.00');
+    expect($first->forecasts()->sole()->predicted_demand)->toBe('12.00');
     expect($second->forecasts()->sole()->predicted_demand)->toBe('8.00');
     $this->assertDatabaseCount('forecasts', 2);
 });
