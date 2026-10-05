@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Repositories\Reporting\SalesHistoryCoverageRepository;
 use App\Services\RealCatalogImportService;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DevelopmentHistoricalSalesSeeder;
@@ -23,7 +24,7 @@ class ResetDevCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle(RealCatalogImportService $importer): int
+    public function handle(RealCatalogImportService $importer, SalesHistoryCoverageRepository $coverage): int
     {
         if (! $this->laravel->environment(['local', 'testing'])) {
             $this->error('Development reset is only allowed in local and testing environments.');
@@ -51,6 +52,8 @@ class ResetDevCommand extends Command
                 return self::FAILURE;
             }
 
+            $stage = 'Development coverage invalidation';
+            $coverage->clearDevelopment();
             $stage = 'Database recreation';
             $resetStarted = true;
             if ($this->call('migrate:fresh', ['--force' => true, '--no-interaction' => true]) !== self::SUCCESS) {

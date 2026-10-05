@@ -22,9 +22,11 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
+    Storage::fake('local');
     config(['app.timezone' => 'UTC']);
     $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00', 'UTC'));
 });

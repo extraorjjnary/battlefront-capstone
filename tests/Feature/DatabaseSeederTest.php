@@ -2,6 +2,7 @@
 
 use App\Enums\UserRole;
 use App\Models\User;
+use Illuminate\Support\Facades\Storage;
 
 test('the development users are verified with their expected roles when the default seeder is rerun', function () {
     $this->seed();
@@ -32,6 +33,7 @@ test('the development users are verified with their expected roles when the defa
 });
 
 test('default initialization does not load historical sales development fixtures', function (string $environment) {
+    $disk = Storage::fake('local');
     $this->app->instance('env', $environment);
 
     $this->artisan('db:seed', ['--force' => true, '--no-interaction' => true])->assertSuccessful();
@@ -40,4 +42,6 @@ test('default initialization does not load historical sales development fixtures
     foreach (['products', 'categories', 'inventories', 'orders', 'order_items', 'sales'] as $table) {
         $this->assertDatabaseCount($table, 0);
     }
+    expect(config('forecasting.operational_coverage'))->toBe([]);
+    $disk->assertMissing(config('forecasting.development_manifest'));
 })->with(['local', 'testing', 'production', 'staging']);

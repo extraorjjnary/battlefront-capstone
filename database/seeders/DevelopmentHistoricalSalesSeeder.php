@@ -12,6 +12,7 @@ use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
+use App\Repositories\Reporting\SalesHistoryCoverageRepository;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\App;
@@ -26,7 +27,7 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
      * Seed synthetic sales history. Customer ownership satisfies Order persistence
      * only; customer identity is not a forecasting input.
      */
-    public function run(): void
+    public function run(SalesHistoryCoverageRepository $coverage): void
     {
         if (! App::environment(['local', 'testing'])) {
             throw new RuntimeException('Historical sales development data is only allowed in local and testing environments.');
@@ -35,7 +36,8 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
         $historyEnd = CarbonImmutable::instance(now(config('app.timezone')))->startOfQuarter();
         $firstQuarter = $historyEnd->subQuarters(8);
 
-        DB::transaction(function () use ($firstQuarter, $historyEnd): void {
+        $coverage->clearDevelopment();
+        $productCodes = DB::transaction(function () use ($firstQuarter, $historyEnd): array {
             $customer = $this->seedCustomer($firstQuarter->subDay());
             $products = $this->seedProducts($firstQuarter->subDay());
             $this->removeObsoleteHistory($customer, $products, $firstQuarter, $historyEnd);
@@ -62,7 +64,22 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
 
                 $this->seedOrder($customer, $label, $start->endOfQuarter(), $closingItems);
             }
+
+            return array_map(fn (Product $product): string => $product->product_code, $products);
         });
+
+        $entries = [];
+        foreach ($productCodes as $code) {
+            $entries[$code] = [
+                'start' => $firstQuarter->toDateString(),
+                'end_exclusive' => $historyEnd->toDateString(),
+                'unavailable_quarters' => [],
+                'timezone' => config('app.timezone'),
+                'source_kind' => 'synthetic_development',
+                'sales_scope' => 'development_fixture_transactions',
+            ];
+        }
+        $coverage->writeDevelopment($entries);
 
         $lastQuarter = $historyEnd->subQuarter();
         $this->command->info("Synthetic development sales history: Q{$firstQuarter->quarter} {$firstQuarter->year}–Q{$lastQuarter->quarter} {$lastQuarter->year} (8 completed quarters).");

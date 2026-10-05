@@ -14,6 +14,10 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
+beforeEach(function () {
+    Storage::fake('local');
+});
+
 test('development reset rejects unsafe environments even with force', function (string $environment, bool $force) {
     $sentinel = User::factory()->create();
     $this->app->instance('env', $environment);
@@ -26,6 +30,8 @@ test('development reset rejects unsafe environments even with force', function (
 })->with(['production', 'staging'])->with([false, true]);
 
 test('development reset requires confirmation', function (string $environment) {
+    $coveragePath = config('forecasting.development_manifest');
+    Storage::disk('local')->put($coveragePath, 'existing declaration');
     $this->app->instance('env', $environment);
     $sentinel = User::factory()->create();
     $this->mock(RealCatalogImportService::class, function ($mock) {
@@ -39,6 +45,7 @@ test('development reset requires confirmation', function (string $environment) {
         ->assertFailed();
 
     $this->assertModelExists($sentinel);
+    expect(Storage::disk('local')->get($coveragePath))->toBe('existing declaration');
 })->with(['local', 'testing']);
 
 test('noninteractive reset requires force', function () {
@@ -168,6 +175,8 @@ test('reset restores the complete real catalog with historical sales only when r
         $filesBefore = collect(Storage::disk('public')->allFiles('products'))
             ->mapWithKeys(fn ($path) => [$path => hash_file('sha256', Storage::disk('public')->path($path))])->all();
 
+        $coveragePath = config('forecasting.development_manifest');
+        Storage::disk('local')->put($coveragePath, 'old declaration');
         $this->artisan('battlefront:reset-dev', ['--force' => true, '--with-sales-history' => $withHistory])
             ->expectsOutput('Database recreated.')
             ->expectsOutput('Seeders completed.')
@@ -200,6 +209,11 @@ test('reset restores the complete real catalog with historical sales only when r
             $sales = Sale::query()->orderBy('sale_date')->get();
             expect($sales->first()->sale_date->toDateString())->toBe('2024-10-01');
             expect($sales->last()->sale_date->toDateString())->toBe('2026-09-30');
+            $manifest = json_decode(Storage::disk('local')->get($coveragePath), true, flags: JSON_THROW_ON_ERROR);
+            expect($manifest['products'])->toHaveCount(7);
+            expect($manifest['products']['DEVHIST40NOHISTORY']['end_exclusive'])->toBe('2026-10-01');
+        } else {
+            Storage::disk('local')->assertMissing($coveragePath);
         }
         $this->assertDatabaseCount('users', $withHistory ? 3 : 2);
         expect(User::query()->where('email', 'historical-sales@example.test')->exists())->toBe($withHistory);
