@@ -11,6 +11,8 @@ use ArithmeticError;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
@@ -20,6 +22,10 @@ use InvalidArgumentException;
  */
 class ForecastingService
 {
+    private const PRODUCT_BATCH_SIZE = 200;
+
+    private const PRODUCTS_PER_PAGE = 15;
+
     public function __construct(
         private readonly ProductForecastPreparationService $preparation,
         private readonly CalculateAdditiveHoltWinters $holtWinters,
@@ -34,15 +40,12 @@ class ForecastingService
     {
         $productId = isset($filters['product_id']) ? (int) $filters['product_id'] : null;
         $search = trim($filters['q'] ?? '');
+        $asOf = CarbonImmutable::now(config('app.timezone'));
         $selected = $productId === null ? null : Product::with(['category', 'inventory'])->findOrFail($productId);
-        $readiness = $selected === null ? null : $this->readinessData($this->preparation->prepareMonthly($selected));
+        $readiness = $selected === null ? null : $this->readinessData($this->preparation->prepareMonthly($selected, $asOf));
 
         return [
-            'products' => Product::query()->with('category')
-                ->when($search !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query
-                    ->where('name', 'like', '%'.$search.'%')->orWhere('product_code', 'like', '%'.$search.'%')))
-                ->orderBy('name')->orderBy('id')->paginate(15)->withQueryString()
-                ->through($this->productData(...)),
+            'products' => $this->forecastReadyProducts($search, (int) ($filters['page'] ?? 1), $asOf),
             'selected_product' => $selected === null ? null : $this->productData($selected),
             'current_inventory' => $selected === null ? null : $this->inventoryData($selected),
             'filters' => ['q' => $search, 'product_id' => $productId],
@@ -54,6 +57,36 @@ class ForecastingService
                 ->paginate(15, ['*'], 'forecast_page')->withQueryString()
                 ->through($this->savedData(...)),
         ];
+    }
+
+    /** @return LengthAwarePaginator<int, array{id: int, name: string, product_code: string, category: string, is_active: bool, is_synthetic: bool}> */
+    private function forecastReadyProducts(string $search, int $page, CarbonImmutable $asOf): LengthAwarePaginator
+    {
+        $total = 0;
+        $pageIds = [];
+        $offset = ($page - 1) * self::PRODUCTS_PER_PAGE;
+        Product::query()->select(['id', 'name', 'product_code'])
+            ->when($search !== '', fn (Builder $query) => $query->where(fn (Builder $query) => $query
+                ->where('name', 'like', '%'.$search.'%')->orWhere('product_code', 'like', '%'.$search.'%')))
+            ->orderBy('name')->orderBy('id')
+            ->chunk(self::PRODUCT_BATCH_SIZE, function (Collection $products) use ($asOf, $offset, &$total, &$pageIds): void {
+                $prepared = $this->preparation->prepareMonthlyBatch(array_values($products->all()), $asOf);
+                foreach ($products as $product) {
+                    if ($prepared[$product->id]['status'] !== 'ready') {
+                        continue;
+                    }
+                    if ($total >= $offset && count($pageIds) < self::PRODUCTS_PER_PAGE) {
+                        $pageIds[] = $product->id;
+                    }
+                    $total++;
+                }
+            });
+        $products = Product::query()->with('category')->whereIn('id', $pageIds)
+            ->orderBy('name')->orderBy('id')->get()->map($this->productData(...));
+
+        return (new LengthAwarePaginator($products, $total, self::PRODUCTS_PER_PAGE, $page, [
+            'path' => LengthAwarePaginator::resolveCurrentPath(),
+        ]))->withQueryString();
     }
 
     /** @return array<string, mixed> */

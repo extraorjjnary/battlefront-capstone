@@ -216,8 +216,8 @@ const chartOptions = {
                     1. Select a product
                 </h2>
                 <p class="text-muted-foreground mt-1 text-sm">
-                    Inactive products remain available for historical
-                    forecasting.
+                    Only forecast-ready products are listed, including inactive
+                    products with eligible history.
                 </p>
                 <Label for="product-search" class="mt-4 mb-2 block"
                     >Product name or code</Label
@@ -231,7 +231,7 @@ const chartOptions = {
                         v-model="search"
                         :disabled="form.processing || isCheckingHistory"
                         class="pl-9"
-                        placeholder="Search products"
+                        placeholder="Search forecast-ready products"
                     />
                 </div>
                 <p
@@ -279,11 +279,7 @@ const chartOptions = {
                     v-if="products.data.length === 0"
                     class="text-muted-foreground py-6 text-sm"
                 >
-                    {{
-                        filters.q
-                            ? 'No products match this search.'
-                            : 'No products are available.'
-                    }}
+                    No forecast-ready products found.
                 </p>
                 <CatalogPagination
                     :current-page="products.current_page"
@@ -375,18 +371,6 @@ const chartOptions = {
                         estimate the full target quarter; current-quarter sales
                         are excluded. Dates use {{ readiness.timezone }}.
                     </p>
-                </div>
-                <div
-                    v-if="selected_product"
-                    class="text-muted-foreground mt-4 text-xs"
-                >
-                    Current inventory — planning context:
-                    <template v-if="current_inventory">
-                        {{ current_inventory.quantity }} units · Updated
-                        {{ generatedTime(current_inventory.last_updated) }}
-                    </template>
-                    <template v-else>Unavailable</template>. Inventory does not
-                    affect this calculation.
                 </div>
                 <form class="mt-5 space-y-3" @submit.prevent="generate">
                     <InputError :message="form.errors.product_id" />
@@ -586,13 +570,6 @@ const chartOptions = {
                     >
                 </div>
             </div>
-            <p class="text-muted-foreground mt-3 text-xs">
-                Saved quarterly totals are read as stored. Original monthly
-                estimates, observations, and model parameters are not retained.
-                Holt–Winters and moving-average source dates are inferred from
-                their fixed windows; legacy linear-trend source dates are
-                unavailable.
-            </p>
             <div v-if="forecasts.data.length" class="mt-5 overflow-x-auto">
                 <table class="w-full text-left text-sm">
                     <caption class="sr-only">

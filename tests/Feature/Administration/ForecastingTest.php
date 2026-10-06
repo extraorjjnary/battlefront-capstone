@@ -12,6 +12,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\MonthlyForecastFixtures;
@@ -105,6 +106,35 @@ test('administrators see the dedicated forecasting page and empty states', funct
             ->missing('history_end')
             ->missing('filters.method'));
 });
+
+test('the selector includes only currently forecast ready products', function (?array $coverage, array $quantities, bool $active, string $status) {
+    $product = Product::factory()->create(['is_active' => $active]);
+    if ($coverage !== null) {
+        forecastingCoverage($product, $coverage);
+    }
+    forecastingMonthlySales($product, $quantities);
+
+    $this->actingAs(User::factory()->administrator()->create())
+        ->get(route('administration.forecasting.index', ['product_id' => $product->id]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('readiness.status', $status)
+            ->where('products.total', $status === 'ready' ? 1 : 0)
+            ->where('products.data', $status === 'ready' ? [[
+                'id' => $product->id, 'name' => $product->name, 'product_code' => $product->product_code,
+                'category' => $product->category->name, 'is_active' => $active, 'is_synthetic' => false,
+            ]] : []));
+})->with([
+    'positive history' => [[], array_fill(0, 36, 10), true, 'ready'],
+    'mixed zeros at threshold' => [[], array_merge(...array_fill(0, 3, [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0])), true, 'ready'],
+    'covered all zero' => [[], [], true, 'ready'],
+    'inactive ready' => [[], [], false, 'ready'],
+    'short' => [['start' => '2023-11-01'], [], true, 'insufficient_history'],
+    'absent coverage despite recorded sales' => [null, array_fill(0, 36, 10), true, 'history_unavailable'],
+    'stale coverage' => [['end_exclusive' => '2026-09-01'], [], true, 'history_unavailable'],
+    'coverage gap' => [['unavailable_months' => ['2026-04-01']], [], true, 'history_unavailable'],
+    'sparse' => [[], [1], true, 'history_unsuitable'],
+    'inactive unsuitable' => [[], [1], false, 'history_unsuitable'],
+]);
 
 test('generates three monthly estimates from exactly thirty six completed months through EXT45', function () {
     $product = Product::factory()->for(Category::factory()->state(['is_active' => false]))
@@ -299,23 +329,37 @@ test('fully covered sparse history is unsuitable and preserves saved demand', fu
     $this->assertDatabaseCount('forecasts', 1);
 });
 
-test('readiness is rechecked during generation without overwriting saved demand', function () {
+test('readiness is rechecked during generation without overwriting saved demand', function (array $coverage, array $quantities, string $status) {
     $product = Product::factory()->create();
     forecastingCoverage($product);
     $saved = Forecast::factory()->for($product)->create(['method' => 'additive_holt_winters', 'predicted_demand' => '14.00']);
+    $snapshot = $saved->fresh()->toArray();
     $this->actingAs(User::factory()->administrator()->create())
         ->get(route('administration.forecasting.index', ['product_id' => $product->id]))
-        ->assertInertia(fn (Assert $page) => $page->where('readiness.status', 'ready'));
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('readiness.status', 'ready')
+            ->where('products.data.0.id', $product->id));
 
-    forecastingCoverage($product, ['end_exclusive' => '2026-09-01']);
+    forecastingCoverage($product, $coverage);
+    forecastingMonthlySales($product, $quantities);
     $this->mock(CalculateAdditiveHoltWinters::class)->shouldNotReceive('execute');
     $this->mock(PersistForecast::class)->shouldNotReceive('execute');
     $this->post(route('administration.forecasting.store'), forecastingInput($product))
-        ->assertInertiaFlash('forecast_result.status', 'history_unavailable');
+        ->assertInertiaFlash('forecast_result.status', $status);
 
-    expect($saved->fresh()->predicted_demand)->toBe('14.00');
+    expect($saved->fresh()->toArray())->toBe($snapshot);
     $this->assertDatabaseCount('forecasts', 1);
-});
+    $this->get(route('administration.forecasting.index', ['product_id' => $product->id]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('products.data', 0)
+            ->where('selected_product.id', $product->id)
+            ->where('readiness.status', $status)
+            ->where('forecasts.data.0.forecast_quantity', '14.00'));
+})->with([
+    'coverage becomes stale' => [['end_exclusive' => '2026-09-01'], [], 'history_unavailable'],
+    'coverage becomes short' => [['start' => '2023-11-01'], [], 'insufficient_history'],
+    'history becomes unsuitable' => [[], [1], 'history_unsuitable'],
+]);
 
 test('monthly development fixtures show synthetic scope and seasonal target estimates', function () {
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
@@ -490,7 +534,17 @@ test('refreshing saved review does not recover generation time monthly context',
 test('product search and saved review retain inactive selections across pages', function () {
     $product = Product::factory()->for(Category::factory()->state(['is_active' => false]))
         ->create(['name' => 'ZZ Selected', 'product_code' => 'DEVHIST40STABLE', 'is_active' => false]);
-    Product::factory()->count(16)->create(['name' => 'Searchable']);
+    forecastingCoverage($product);
+    $searchable = Product::factory()->count(16)->create(['name' => 'Searchable']);
+    foreach ($searchable as $ready) {
+        forecastingCoverage($ready);
+    }
+    $short = Product::factory()->create(['name' => 'Searchable']);
+    forecastingCoverage($short, ['start' => '2023-11-01']);
+    Product::factory()->create(['name' => 'Searchable']);
+    $sparse = Product::factory()->create(['name' => 'Searchable']);
+    forecastingCoverage($sparse);
+    forecastingSale($sparse, '2023-10-01', 1);
     Forecast::factory()->for($product)->create(['method' => 'linear_trend']);
     Forecast::factory()->for($product)->create(['method' => 'moving_average']);
     Forecast::factory()->create(['method' => 'linear_trend']);
@@ -501,6 +555,8 @@ test('product search and saved review retain inactive selections across pages', 
     ]))->assertInertia(fn (Assert $page) => $page
         ->has('products.data', 1)
         ->where('products.total', 16)
+        ->where('products.last_page', 2)
+        ->where('products.data.0.id', $searchable->last()->id)
         ->where('selected_product.id', $product->id)
         ->where('selected_product.is_active', false)
         ->where('selected_product.is_synthetic', true)
@@ -513,6 +569,41 @@ test('product search and saved review retain inactive selections across pages', 
         ->assertInertia(fn (Assert $page) => $page->has('products.data', 1)->where('products.data.0.id', $product->id));
     $this->get(route('administration.forecasting.index', ['q' => "' OR 1=1 --"]))
         ->assertInertia(fn (Assert $page) => $page->has('products.data', 0));
+    $this->get(route('administration.forecasting.index', ['q' => $short->product_code]))
+        ->assertInertia(fn (Assert $page) => $page->has('products.data', 0)->where('products.total', 0));
+});
+
+test('eligible pagination crosses batches with bounded sales queries and deterministic ordering', function () {
+    $products = Product::factory()->count(201)->for(Category::factory())
+        ->sequence(fn ($sequence) => ['name' => sprintf('Ready %03d', $sequence->index)])
+        ->create();
+    foreach ($products as $product) {
+        forecastingCoverage($product);
+    }
+    $excluded = Product::factory()->count(16)->create(['name' => 'Ready 000']);
+    $administrator = User::factory()->administrator()->create();
+    $this->actingAs($administrator);
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+    try {
+        $response = $this->get(route('administration.forecasting.index', ['q' => 'Ready', 'page' => 14]));
+        $salesQueries = array_filter(DB::getQueryLog(), fn (array $query): bool => str_contains($query['query'], 'SUM(order_items.quantity)'));
+        expect($salesQueries)->toHaveCount(2);
+    } finally {
+        DB::disableQueryLog();
+    }
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->where('products.total', 201)
+        ->where('products.current_page', 14)
+        ->where('products.last_page', 14)
+        ->has('products.data', 6)
+        ->where('products.data.0.id', $products[195]->id)
+        ->where('products.data.5.id', $products[200]->id)
+        ->where('filters.q', 'Ready'));
+    expect(array_intersect(array_column($response->inertiaProps('products.data'), 'id'), $excluded->modelKeys()))->toBe([]);
+    $this->get(route('administration.forecasting.index', ['q' => 'Ready', 'page' => 15]))
+        ->assertInertia(fn (Assert $page) => $page->has('products.data', 0)->where('products.total', 201));
 });
 
 test('invalid review filters report validation errors', function (string $field, mixed $value) {

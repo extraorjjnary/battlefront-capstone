@@ -23,23 +23,32 @@ class SalesHistoryCoverageRepository
      */
     public function forProductCode(string $productCode): ?array
     {
-        if (preg_match(Product::CODE_PATTERN, $productCode) !== 1) {
-            return null;
-        }
+        return $this->forProductCodes([$productCode])[$productCode];
+    }
+
+    /**
+     * Read a fresh declaration snapshot once for this batch, never cache eligibility.
+     *
+     * @param  list<string>  $productCodes
+     * @return array<string, Coverage|null>
+     */
+    public function forProductCodes(array $productCodes): array
+    {
         $operational = config('forecasting.operational_coverage');
-        if (! is_array($operational)) {
-            return null;
-        }
-        $development = App::environment(['local', 'testing']) ? $this->readDevelopment() : [];
-        if (array_key_exists($productCode, $operational)) {
-            if (array_key_exists($productCode, $development)) {
-                return null;
+        $development = is_array($operational) && App::environment(['local', 'testing']) ? $this->readDevelopment() : [];
+        $results = [];
+        foreach ($productCodes as $productCode) {
+            if (preg_match(Product::CODE_PATTERN, $productCode) !== 1 || ! is_array($operational)) {
+                $results[$productCode] = null;
+            } elseif (array_key_exists($productCode, $operational)) {
+                $results[$productCode] = array_key_exists($productCode, $development)
+                    ? null : $this->validate($operational[$productCode], false);
+            } else {
+                $results[$productCode] = $this->validate($development[$productCode] ?? null, true);
             }
-
-            return $this->validate($operational[$productCode], false);
         }
 
-        return $this->validate($development[$productCode] ?? null, true);
+        return $results;
     }
 
     /** @param array<string, Coverage> $entries */

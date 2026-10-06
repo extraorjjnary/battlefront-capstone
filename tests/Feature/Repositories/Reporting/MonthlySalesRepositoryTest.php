@@ -71,3 +71,36 @@ test('rejects missing product identifiers or month intervals before querying', f
     'missing product' => [0, [['start' => '2024-01-01', 'end_exclusive' => '2024-02-01']]],
     'empty window' => [1, []],
 ]);
+
+test('batch aggregation isolates products and months in one query without fabricating zero groups', function () {
+    $products = Product::factory()->count(3)->create();
+    foreach ([['2024-01-01', 2, 10], ['2024-02-29', 3, 20], ['2024-02-01', 4, 30], ['2024-03-01', 900, 900]] as [$date, $first, $second]) {
+        $sale = Sale::factory()->create(['sale_date' => $date]);
+        OrderItem::factory()->for($sale->order)->for($products[0])->create(['quantity' => $first]);
+        OrderItem::factory()->for($sale->order)->for($products[1])->create(['quantity' => $second]);
+        OrderItem::factory()->for($sale->order)->create(['quantity' => 999]);
+    }
+    $months = [
+        ['start' => '2024-01-01', 'end_exclusive' => '2024-02-01'],
+        ['start' => '2024-02-01', 'end_exclusive' => '2024-03-01'],
+    ];
+    $this->expectsDatabaseQueryCount(1);
+
+    $rows = app(MonthlySalesRepository::class)->aggregateProducts($products->modelKeys(), $months);
+
+    expect($rows)->toBe([
+        $products[0]->id => [['start' => '2024-01-01', 'quantity_sold' => 2], ['start' => '2024-02-01', 'quantity_sold' => 7]],
+        $products[1]->id => [['start' => '2024-01-01', 'quantity_sold' => 10], ['start' => '2024-02-01', 'quantity_sold' => 50]],
+    ]);
+});
+
+test('batch aggregation rejects invalid product lists before querying', function (array $ids) {
+    $this->expectsDatabaseQueryCount(0);
+
+    expect(fn () => app(MonthlySalesRepository::class)->aggregateProducts($ids, [
+        ['start' => '2024-01-01', 'end_exclusive' => '2024-02-01'],
+    ]))->toThrow(InvalidArgumentException::class);
+})->with([
+    'empty' => [[]],
+    'invalid identifier among valid identifiers' => [[1, 0]],
+]);

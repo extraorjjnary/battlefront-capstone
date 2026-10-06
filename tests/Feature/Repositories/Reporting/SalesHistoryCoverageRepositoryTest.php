@@ -28,6 +28,33 @@ function preparedSalesCoverage(array $overrides = []): array
     ], $overrides);
 }
 
+test('bulk coverage preserves validation exact codes conflicts and environment restrictions', function (string $environment) {
+    $disk = Storage::fake('local');
+    $operational = preparedSalesCoverage();
+    $synthetic = preparedSalesCoverage(['source_kind' => 'synthetic_development', 'sales_scope' => 'development_fixture_transactions']);
+    config(['forecasting.operational_coverage' => [
+        '00123' => $operational, '123' => $operational,
+        'INVALID' => preparedSalesCoverage(['timezone' => 'Asia/Manila']), 'CONFLICT' => $operational,
+    ]]);
+    $disk->put(config('forecasting.development_manifest'), json_encode([
+        'version' => 2, 'products' => ['SYNTHETIC' => $synthetic, 'CONFLICT' => $synthetic],
+    ], JSON_THROW_ON_ERROR));
+    $this->app->instance('env', $environment);
+    $this->expectsDatabaseQueryCount(0);
+
+    $repository = app(SalesHistoryCoverageRepository::class);
+    $results = $repository->forProductCodes(['00123', '123', 'UNKNOWN', 'INVALID', 'CONFLICT', 'SYNTHETIC', 'invalid-code']);
+
+    expect($results)->toBe([
+        '00123' => $operational, '123' => $operational, 'UNKNOWN' => null, 'INVALID' => null,
+        'CONFLICT' => $environment === 'production' ? $operational : null,
+        'SYNTHETIC' => $environment === 'production' ? null : $synthetic, 'invalid-code' => null,
+    ]);
+    config(['forecasting.operational_coverage' => []]);
+    $disk->delete(config('forecasting.development_manifest'));
+    expect($repository->forProductCodes(['00123', 'SYNTHETIC']))->toBe(['00123' => null, 'SYNTHETIC' => null]);
+})->with(['testing', 'production']);
+
 test('operational coverage stays unavailable despite existing records and generated zero buckets', function () {
     Storage::fake('local');
     $product = Product::factory()->create(['product_code' => '00123', 'created_at' => '2020-01-01']);

@@ -293,3 +293,40 @@ test('rejects a product which has not been persisted', function () {
 
     expect(fn () => app(ProductForecastPreparationService::class)->prepareMonthly($product))->toThrow(InvalidArgumentException::class, 'persisted product');
 });
+
+test('batch preparation matches every single product fixture using one sales query', function () {
+    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $products = Product::where('product_code', 'like', 'DEVHIST40%')->orderBy('id')->get();
+    $preparation = app(ProductForecastPreparationService::class);
+    $expected = [];
+    foreach ($products as $product) {
+        $expected[$product->id] = $preparation->prepareMonthly($product);
+    }
+    $this->expectsDatabaseQueryCount(1);
+
+    $result = $preparation->prepareMonthlyBatch($products->all());
+
+    expect($result)->toBe($expected);
+});
+
+test('batch preparation does not query sales when every declaration fails coverage', function () {
+    $products = Product::factory()->count(3)->create();
+    config(['forecasting.operational_coverage' => [
+        $products[1]->product_code => monthlyForecastCoverage(['start' => '2023-11-01']),
+        $products[2]->product_code => monthlyForecastCoverage(['unavailable_months' => ['2026-04-01']]),
+    ]]);
+    $this->expectsDatabaseQueryCount(0);
+
+    $result = app(ProductForecastPreparationService::class)->prepareMonthlyBatch($products->all());
+
+    expect(array_column($result, 'status'))->toBe(['history_unavailable', 'insufficient_history', 'history_unavailable']);
+    expect(array_column($result, 'history'))->toBe([null, null, null]);
+});
+
+test('batch preparation accepts empty input and rejects unpersisted products before querying', function () {
+    $preparation = app(ProductForecastPreparationService::class);
+    $this->expectsDatabaseQueryCount(0);
+
+    expect($preparation->prepareMonthlyBatch([]))->toBe([]);
+    expect(fn () => $preparation->prepareMonthlyBatch([new Product]))->toThrow(InvalidArgumentException::class, 'persisted product');
+});

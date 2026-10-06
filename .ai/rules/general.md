@@ -12,3 +12,6 @@ Do not change status or otherwise modify an issue (including comments, labels, r
 
 ## Forecasting scope and manuscript boundary
 The latest developer-approved forecasting revision and completed EXT-40/42/43/45/46 implementation supersede the earlier two-method and four-quarter production decisions. Production is product-level monthly additive Holt–Winters using 36 completed months and three monthly estimates summed to quarterly demand; administrators do not select models, parameters, history or coverage. EXT-44 retires obsolete paths while preserving legacy Forecast records. Preserve unrelated manuscript content/formatting; Figure 8's old raster label remains an explicit artwork follow-up.
+
+## Forecasting selector readiness is convenience only
+EXT-84 lists only products currently ready under the shared EXT-42 monthly preparation rules, including covered all-zero and eligible inactive products. Search and pagination count only ready products; evaluate candidates in bounded batches before forming visible pages. Generation must independently prepare fresh history and recheck readiness before calculating or persisting; never trust selector results or weaken coverage/sparse eligibility. Preserve saved review for stale selections and legacy records.

@@ -31,14 +31,70 @@ class ProductForecastPreparationService
      */
     public function prepareMonthly(Product $product, ?CarbonImmutable $asOf = null): array
     {
+        $this->validateProduct($product);
+        $result = $this->prepareCoverage($product, $this->coverageRepository->forProductCode($product->product_code), $asOf);
+        if ($result['covered_months'] !== self::REQUIRED_MONTHS) {
+            return $result;
+        }
+        $months = $this->sourceMonths($result);
+
+        return $this->prepareObservations($result, $months, $this->monthlySales->aggregateProduct($product->id, $months));
+    }
+
+    /**
+     * @param  list<Product>  $products
+     * @return array<int, MonthlyPreparation>
+     */
+    public function prepareMonthlyBatch(array $products, ?CarbonImmutable $asOf = null): array
+    {
+        if ($products === []) {
+            return [];
+        }
+        foreach ($products as $product) {
+            $this->validateProduct($product);
+        }
+        $asOf ??= CarbonImmutable::now(config('app.timezone'));
+        $coverage = $this->coverageRepository->forProductCodes(array_map(fn (Product $product): string => $product->product_code, $products));
+        $results = [];
+        $coveredIds = [];
+        $months = [];
+        foreach ($products as $product) {
+            $result = $this->prepareCoverage($product, $coverage[$product->product_code], $asOf);
+            $results[$product->id] = $result;
+            if ($result['covered_months'] === self::REQUIRED_MONTHS) {
+                $coveredIds[] = $product->id;
+                if ($months === []) {
+                    $months = $this->sourceMonths($result);
+                }
+            }
+        }
+        if ($coveredIds === []) {
+            return $results;
+        }
+        $recorded = $this->monthlySales->aggregateProducts($coveredIds, $months);
+        foreach ($coveredIds as $id) {
+            $results[$id] = $this->prepareObservations($results[$id], $months, $recorded[$id] ?? []);
+        }
+
+        return $results;
+    }
+
+    private function validateProduct(Product $product): void
+    {
         if (! $product->exists || $product->id < 1) {
             throw new InvalidArgumentException('Forecast preparation requires a persisted product.');
         }
+    }
 
+    /**
+     * @param  Coverage|null  $coverage
+     * @return MonthlyPreparation
+     */
+    private function prepareCoverage(Product $product, ?array $coverage, ?CarbonImmutable $asOf): array
+    {
         $timezone = config('app.timezone');
         $targetStart = ($asOf ?? CarbonImmutable::now($timezone))->setTimezone($timezone)->startOfQuarter();
         $sourceStart = $targetStart->subMonths(self::REQUIRED_MONTHS);
-        $coverage = $this->coverageRepository->forProductCode($product->product_code);
         $result = [
             'status' => 'history_unavailable',
             'message' => 'Trusted monthly sales history is unavailable for the required source period.',
@@ -78,6 +134,17 @@ class ProductForecastPreparationService
             return $result;
         }
 
+        return $result;
+    }
+
+    /**
+     * @param  MonthlyPreparation  $result
+     * @return list<Month>
+     */
+    private function sourceMonths(array $result): array
+    {
+        $sourceStart = CarbonImmutable::parse($result['source_period']['start'], $result['timezone']);
+        $targetStart = CarbonImmutable::parse($result['source_period']['end_exclusive'], $result['timezone']);
         $months = [];
         for ($month = $sourceStart; $month->lessThan($targetStart); $month = $month->addMonth()) {
             $months[] = [
@@ -86,7 +153,18 @@ class ProductForecastPreparationService
                 'quantity_sold' => 0,
             ];
         }
-        $recorded = $this->monthlySales->aggregateProduct($product->id, $months);
+
+        return $months;
+    }
+
+    /**
+     * @param  MonthlyPreparation  $result
+     * @param  list<Month>  $months
+     * @param  list<array{start: string, quantity_sold: int}>  $recorded
+     * @return MonthlyPreparation
+     */
+    private function prepareObservations(array $result, array $months, array $recorded): array
+    {
         $quantities = $this->recordedQuantities(array_column($months, 'start'), $recorded);
         foreach ($months as $index => $month) {
             $months[$index]['quantity_sold'] = $quantities[$month['start']] ?? 0;
@@ -96,8 +174,8 @@ class ProductForecastPreparationService
             $positiveMonths[] = count(array_filter($block, fn (array $month): bool => $month['quantity_sold'] > 0));
         }
         $result['history'] = [
-            'product_id' => $product->id, 'timezone' => $timezone,
-            'start' => $sourceStart->toDateString(), 'end_exclusive' => $targetStart->toDateString(),
+            'product_id' => $result['product_id'], 'timezone' => $result['timezone'],
+            'start' => $result['source_period']['start'], 'end_exclusive' => $result['source_period']['end_exclusive'],
             'months' => $months,
         ];
         $result['positive_sales_months'] = $positiveMonths;
