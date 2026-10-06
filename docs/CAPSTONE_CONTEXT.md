@@ -882,6 +882,8 @@ General status snapshot verified against Linear on **2026-10-01**; the forecasti
 
 `routes/api.php` defines 22 `/api/v1` endpoints covering health, customer registration/login/logout, profile read/update, catalog search/filter/detail, branch information, cart operations, checkout preview, order placement/history/detail, rejected-proof replacement, chatbot, and recommendation options/results.
 
+The mobile product list additionally supports multiple active categories (`category_ids`), inclusive effective-price bounds (`min_price`, `max_price`), and `featured`/`price_asc`/`price_desc` sorting. These parameters are enabled only for the named API product-list route; the existing Inertia web catalog keeps its singular category/brand/tag filters, search, default ordering, and scroll behavior. Both clients retain shared catalog eligibility and presentation. This extension adds no endpoints or schema changes; see the handoff for validation and pagination details. React Native consumer validation of the additions remains pending.
+
 Controllers reuse shared business logic and safe resource presenters. Responses use the documented JSON envelopes, pagination, validation/access errors, and rate limits. The global API limit is 60 requests per minute per IP, with additional authentication/chatbot limits. No mobile administrator operations, token refresh, password-reset/change, customer cancellation, payment gateway, or courier endpoints are present.
 
 Supporting artifacts:

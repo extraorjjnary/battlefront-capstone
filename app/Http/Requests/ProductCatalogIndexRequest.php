@@ -20,16 +20,38 @@ class ProductCatalogIndexRequest extends FormRequest
     /**
      * Normalize validated catalog filters for web and API queries.
      *
-     * @return array{q: string|null, category_id: int|null, brand: string|null, tag_id: int|null}
+     * @return array{q: string|null, category_id: int|null, brand: string|null, tag_id: int|null, category_ids?: list<int>, min_price?: string, max_price?: string, sort?: string}
      */
     public function filters(): array
     {
-        return [
+        $filters = [
             'q' => $this->filled('q') ? $this->string('q')->toString() : null,
             'category_id' => $this->filled('category_id') ? $this->integer('category_id') : null,
             'brand' => $this->filled('brand') ? $this->string('brand')->toString() : null,
             'tag_id' => $this->filled('tag_id') ? $this->integer('tag_id') : null,
         ];
+
+        if (! $this->routeIs('api.v1.products.index')) {
+            return $filters;
+        }
+
+        $validated = $this->validated();
+        $categoryIds = $validated['category_ids'] ?? [];
+
+        if (is_array($categoryIds) && $categoryIds !== []) {
+            $filters['category_ids'] = array_values(array_map(
+                static fn (mixed $categoryId): int => (int) $categoryId,
+                $categoryIds,
+            ));
+        }
+
+        foreach (['min_price', 'max_price', 'sort'] as $filter) {
+            if (isset($validated[$filter])) {
+                $filters[$filter] = (string) $validated[$filter];
+            }
+        }
+
+        return $filters;
     }
 
     /**
@@ -39,7 +61,7 @@ class ProductCatalogIndexRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        $rules = [
             'q' => ['nullable', 'string', 'max:255'],
             'category_id' => [
                 'nullable',
@@ -50,6 +72,29 @@ class ProductCatalogIndexRequest extends FormRequest
             'tag_id' => ['nullable', 'integer', 'exists:tags,id'],
             'page' => ['nullable', 'integer', 'min:1'],
         ];
+
+        if (! $this->routeIs('api.v1.products.index')) {
+            return $rules;
+        }
+
+        $rules['category_ids'] = ['bail', 'nullable', 'array', 'max:50', 'prohibits:category_id'];
+        $categoryIds = $this->input('category_ids');
+
+        if (is_array($categoryIds) && count($categoryIds) <= 50) {
+            $rules['category_ids.*'] = [
+                'bail', 'required', 'integer', 'distinct',
+                Rule::exists(Category::class, 'id')->where('is_active', true),
+            ];
+        }
+
+        $rules['min_price'] = ['bail', 'nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'];
+        $rules['max_price'] = [
+            'bail', 'nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99',
+            Rule::when($this->filled('min_price'), 'gte:min_price'),
+        ];
+        $rules['sort'] = ['nullable', Rule::in(['featured', 'price_asc', 'price_desc'])];
+
+        return $rules;
     }
 
     /**
