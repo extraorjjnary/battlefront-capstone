@@ -20,7 +20,7 @@ class ForecastFactory extends Factory
     {
         return [
             'product_id' => Product::factory(),
-            'method' => 'moving_average',
+            'method' => 'additive_holt_winters',
             'predicted_demand' => '0.00',
             'forecast_quarter' => '2026-Q4',
             'generated_at' => now(),

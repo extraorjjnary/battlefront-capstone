@@ -15,7 +15,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Storage;
 
-/** Retain the old calculator/reporting observations without a production legacy contract. */
+/** Retain quarterly sales observations for reporting regression tests. */
 class LegacyQuarterlySalesFixtures extends Seeder
 {
     public function run(): void

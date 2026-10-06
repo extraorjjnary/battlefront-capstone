@@ -338,7 +338,7 @@ test('database rejects duplicate keys, missing products, invalid methods, negati
 
     expect(fn () => DB::table('forecasts')->insert(array_replace([
         'product_id' => $product->id,
-        'method' => 'linear_trend',
+        'method' => 'additive_holt_winters',
         'predicted_demand' => '1.00',
         'forecast_quarter' => '2026-Q4',
         'generated_at' => now(),
@@ -347,7 +347,7 @@ test('database rejects duplicate keys, missing products, invalid methods, negati
     $this->assertModelExists($forecast);
     $this->assertDatabaseCount('forecasts', 1);
 })->with([
-    'unique key' => [['method' => 'moving_average']],
+    'unique key' => [[]],
     'foreign key' => [['product_id' => 999999]],
     'unsupported method' => [['method' => 'unsupported']],
     'uppercase method' => [['method' => 'LINEAR_TREND']],

@@ -38,7 +38,7 @@ The system supports:
 - sales monitoring;
 - business reports;
 - product recommendations;
-- predictive sales/demand analytics (moving-average workflow implemented; approved monthly Holt–Winters migration pending);
+- predictive sales/demand analytics (monthly additive Holt–Winters implemented);
 - chatbot-assisted customer inquiries;
 - branch/store information.
 
@@ -220,7 +220,7 @@ Laravel is responsible for the system's main application and business logic, inc
 - sales;
 - reporting;
 - product recommendation;
-- predictive analytics (monthly additive Holt–Winters migration pending; implemented moving-average foundations described in Section 9);
+- predictive analytics (monthly additive Holt–Winters; see Section 9);
 - chatbot orchestration;
 - REST API behavior required by the mobile application.
 
@@ -230,7 +230,7 @@ Business rules shared between web and mobile belong to the shared Laravel backen
 
 The approved relational database management system is **MySQL**.
 
-The implemented database stores users, products/categories/tags, inventory, customer carts and orders, sales, product forecasts, branch reference information, chatbot knowledge, and framework infrastructure including personal access tokens. Forecast migrations/model and moving-average persistence exist; EXT-45 will migrate new writes to additive_holt_winters and extend database method constraints without adding columns.
+The implemented database stores users, products/categories/tags, inventory, customer carts and orders, sales, product forecasts, branch reference information, chatbot knowledge, and framework infrastructure including personal access tokens. Forecast persistence writes additive_holt_winters results; database constraints also accept historical moving_average and linear_trend rows without adding columns.
 
 Current migrations and models establish the implemented schema. MySQL is the application backend; `phpunit.xml` uses SQLite in memory for automated tests. The starter `.env.example` still defaults to SQLite, so it does not describe the configured MySQL development backend.
 
@@ -321,7 +321,7 @@ Administrators can:
 - view branch reference information;
 - monitor sales, orders, and inventory through the administrative dashboard.
 
-The product-only moving-average forecasting controller/service/requests/page are implemented; EXT-46 will adapt that existing simple workflow to monthly additive Holt–Winters. Current customer administration exposes index/detail viewing, not account editing. Branch reference data is maintained through seeders/configuration; there is no branch-management CRUD interface.
+The product-only monthly Holt–Winters forecasting controller/service/requests/page are implemented. Administrators select a product, not a forecasting method or parameters. Current customer administration exposes index/detail viewing, not account editing. Branch reference data is maintained through seeders/configuration; there is no branch-management CRUD interface.
 
 ## Authorization Boundaries
 
@@ -368,7 +368,7 @@ The product-only moving-average forecasting controller/service/requests/page are
 ## Intelligent Modules
 
 - Product Recommendation — complete
-- Predictive Analytics — monthly Holt–Winters migration pending; existing moving-average workflow retained
+- Predictive Analytics — monthly additive Holt–Winters production workflow implemented; evaluation uses Moving Average and Seasonal Naive baselines
 - Integrated Chatbot — complete
 
 ## Integration
@@ -448,9 +448,9 @@ The **Product Recommendation Module**, not the chatbot, owns recommendation logi
 
 **Approved architecture, latest 2026-10-05 revision:** production uses one product-level **additive Holt–Winters exponential-smoothing method over monthly recorded sales**. This developer-approved decision supersedes both the original moving-average/linear-trend scope and the later trailing four-quarter moving-average production decision. The calculation models level, undamped trend, and recurring annual monthly seasonality. It remains deterministic, lightweight, internal-sales-only, and implementable in the existing PHP/Laravel stack without Python or a heavyweight dependency.
 
-**Current implementation:** the previous moving-average migration is implemented and accepted in EXT-40/42/43/45/46. The checkout contains synthetic historical fixtures, trusted coverage metadata, readiness-gated quarterly preparation, calculation, persistence, controller/requests/service, administrator UI, and focused tests. Those completed foundations require migration; do not describe Holt–Winters as implemented.
+**Current implementation:** EXT-40/42/43/45/46 are complete. The checkout contains 48-month synthetic development fixtures, trusted monthly coverage metadata, readiness-gated 36-month preparation, additive Holt–Winters calculation and paired evaluation, compatible persistence, the product-only administrator workflow, and focused tests. New production forecasts use additive_holt_winters only. Four-quarter Moving Average and monthly Seasonal Naive are evaluation baselines only; Linear Trend/Regression is retired.
 
-**New migration status:** EXT-36 and EXT-44 remain Backlog. EXT-40, EXT-42, EXT-43, EXT-45, and EXT-46 are reopened to Backlog for required code/test changes. This pass updates planning and forecasting documentation only; it implements no fixtures, aggregation, calculators, database migrations, or UI and creates no commit.
+**Retirement status:** EXT-44 removes obsolete production paths after the completed Holt–Winters migration. EXT-36 remains the parent acceptance issue. Historical moving_average and linear_trend Forecast rows remain readable and preserved.
 
 ## Monthly History Contract and Fixed Window
 
@@ -460,7 +460,7 @@ Each observation uses a half-open first-day-midnight calendar-month interval and
 
 The current repository application timezone is **UTC**. Follow the configured timezone consistently; this migration does not silently change global application time to Asia/Manila. Preserve tests for other configured timezones, month/quarter/year boundaries and leap months.
 
-Preserve useful QuarterlySalesAggregationService/QuarterlySalesRepository and generic product/category reporting. Add the smallest monthly forecasting query/aggregation boundary; generic zero buckets never establish forecasting completeness.
+QuarterlySalesAggregationService/QuarterlySalesRepository remain useful for generic product/category reporting and the evaluation baseline. Monthly forecasting uses its own query boundary; generic zero buckets never establish forecasting completeness.
 
 ## Trusted Monthly Coverage and Eligibility
 
@@ -550,7 +550,7 @@ The pure successful output identifies method=additive_holt_winters, product, tim
 
 ## Synthetic Development Strategy and Evaluation
 
-Revise DevelopmentHistoricalSalesSeeder to generate **48 completed months ending at T** for full-history scenarios. Production uses the latest 36; the extra year supports four rolling quarterly evaluation targets. Preserve environment guards, reserved identities, ownership checks, repeatability, publication-failure behavior, inactive synthetic products and unrelated operational records.
+DevelopmentHistoricalSalesSeeder generates **48 completed months ending at T** for full-history scenarios. Production uses the latest 36; the extra year supports four rolling quarterly evaluation targets. Environment guards, reserved identities, ownership checks, repeatability, publication-failure behavior, inactive synthetic products and unrelated operational records remain protected.
 
 Scenarios include stable non-seasonal demand, recurring annual monthly seasonality, seasonality with growth, decline, eligible mixed zeros, sparse/intermittent demand, covered all-zero history, fewer than 36 covered months, absent/stale coverage, and an internal unavailable month. Include irregular/abrupt-change behavior where Holt–Winters performs poorly or should be unsuitable. Calendar-month profiles must not shift with seed-loop position. Keep older fixtures only where genuinely useful for unrelated reporting/evaluation regression tests.
 
@@ -574,29 +574,29 @@ The module supports human inventory decisions. It does not optimize reorder quan
 
 The server checks trusted coverage/eligibility, aggregates monthly history, selects parameters, calculates three estimates, sums the quarterly result and persists it. Administrators supply only product_id: no method, alpha/beta/gamma, history start, seasonal period, horizon, target/window input or coverage checkbox. Administrator-only authorization remains.
 
-Adapt existing ForecastingService/controller/requests/page, product search, independent pagination, loading/empty/error states and Chart.js/vue-chartjs. Show product, target quarter, three monthly estimates, quarterly demand, relevant historical monthly chart/table, generated time and concise decision-support wording. Identify synthetic data and declared sales scope. Clear ready/insufficient/unavailable/unsuitable messages must preserve prior saved results on failure.
+The ForecastingService/controller/requests/page retain product search, independent pagination, loading/empty/error states and Chart.js/vue-chartjs. The generation view shows product, target quarter, three monthly estimates, quarterly demand, relevant historical monthly chart/table, generated time and concise decision-support wording. Synthetic data and declared sales scope remain identified. Ready/insufficient/unavailable/unsuitable messages preserve prior saved results on failure.
 
 Keep the Forecast entity **product-focused** and retain its columns: product_id, method, predicted_demand, forecast_quarter and generated_at. New writes use **additive_holt_winters**; predicted_demand is the finalized quarterly sum and forecast_quarter remains YYYY-Qn. Reruns replace only on (product_id, method, forecast_quarter).
 
-The current MySQL forecasts_method_valid check and SQLite insert/update triggers accept only moving_average/linear_trend. EXT-45 must introduce a **new forward constraint migration** accepting all three identifiers for compatibility, while application writes accept only additive_holt_winters. Preserve original applied migrations, strict formats/case/year, nonnegative demand, DECIMAL(12,2) capacity, product foreign key, uniqueness and every legacy row. No new Forecast columns, snapshot tables or ERD relationship changes are approved. Define a rollback strategy that does not delete new-method records.
+The completed forward migration extends the MySQL forecasts_method_valid check and SQLite insert/update triggers to accept additive_holt_winters alongside moving_average and linear_trend for compatibility. Application forecast writes accept only additive_holt_winters. Preserve original applied migrations, strict formats/case/year, nonnegative demand, DECIMAL(12,2) capacity, product foreign key, uniqueness and every legacy row. No new Forecast columns, snapshot tables or ERD relationship changes are approved; rollback must not delete new-method records.
 
 **Monthly breakdown is generation-time context only.** Original monthly predictions, source observations, parameters and clamp diagnostics are not saved. Saved review reads the stored quarterly total and states that the original breakdown is not retained after the generation view is lost/refreshed. Do not recreate original monthly values using corrected current history. Fixed method source dates may be explicitly inferred, but original quantities/provenance are not reconstructed. Label existing moving_average and linear_trend rows as legacy without generation controls.
 
-## Issue Ownership, Current Status and Implementation Order
+## Issue Ownership and Current Implementation
 
-| Issue | Approved responsibility | Live status after planning |
+| Issue | Approved responsibility | Implementation |
 | --- | --- | --- |
-| EXT-36 | Parent tracking and final acceptance | Backlog |
-| EXT-40 | 48-month development history and monthly trusted coverage | Backlog; reopened from Done |
-| EXT-42 | Trusted 36-month preparation, monthly aggregation and sparse eligibility | Backlog; reopened from Done |
-| EXT-43 | Additive Holt–Winters calculation, bounded parameter fitting and evaluation | Backlog; reopened from Done |
-| EXT-45 | New production output validation and compatible method-constraint migration | Backlog; reopened from Done |
-| EXT-46 | Existing simple workflow adapted to monthly history and three estimates | Backlog; reopened from Done |
-| EXT-44 | Final retirement of obsolete production paths; retain used evaluation baselines | Backlog; retained |
+| EXT-36 | Parent tracking and final acceptance | Pending human acceptance |
+| EXT-40 | 48-month development history and monthly trusted coverage | Implemented |
+| EXT-42 | Trusted 36-month preparation, monthly aggregation and sparse eligibility | Implemented |
+| EXT-43 | Additive Holt–Winters calculation, bounded parameter fitting and evaluation | Implemented |
+| EXT-45 | New production output validation and compatible method-constraint migration | Implemented |
+| EXT-46 | Existing simple workflow adapted to monthly history and three estimates | Implemented |
+| EXT-44 | Final retirement of obsolete production paths; retain used evaluation baselines | Cleanup in review |
 
-Recommended order: **EXT-40 → EXT-42 → EXT-43 → EXT-45 → EXT-46 → EXT-44**. Existing dependencies remain useful: EXT-26 → EXT-40; EXT-40 → EXT-42; EXT-42 → EXT-43/45/46; EXT-43 → EXT-45; EXT-45 → EXT-46/44; EXT-46 → EXT-44. EXT-44 blocks no calculation/generation issue. Existing parent external dependencies are preserved.
+The implementation order was **EXT-40 → EXT-42 → EXT-43 → EXT-45 → EXT-46 → EXT-44**. EXT-44 removes unused trend calculation and quarterly production preparation while retaining the Moving Average evaluation baseline. Existing parent external dependencies are preserved.
 
-Keep old calculators and relevant tests until replacement code is implemented/tested and human-accepted. EXT-44 then removes unused trend code/exclusive tests and moving-average production consumers, retaining moving average only as a used evaluation baseline and quarterly helpers where still needed. Do not delete historical forecasts. No revised issue returns to Done merely because descriptions or documentation changed.
+Do not delete historical forecasts. The database retains both legacy method identifiers; saved-review behavior continues to label legacy rows without offering those methods for new generation. Human review remains required before closing EXT-44 or EXT-36.
 
 ---
 
@@ -680,7 +680,7 @@ Current migrations/models implement the following core entities:
 - Forecasts
 - Chatbot Knowledge
 
-Framework infrastructure includes sessions, password reset tokens, cache/jobs, and Sanctum personal access tokens. **Forecasts are implemented** with product, method, predicted demand, target quarter, generation time, and uniqueness on product/method/quarter. Their new-write policy and method constraints require migration under EXT-45 for additive_holt_winters; existing columns remain suitable.
+Framework infrastructure includes sessions, password reset tokens, cache/jobs, and Sanctum personal access tokens. **Forecasts are implemented** with product, method, predicted demand, target quarter, generation time, and uniqueness on product/method/quarter. New application writes require additive_holt_winters; method constraints retain both legacy identifiers.
 
 ## Relationship Baseline
 
@@ -708,11 +708,11 @@ EXT-6 is Done. Its recorded baseline decisions remain useful historical context,
 
 - use Laravel-compatible unsigned big integer primary and foreign keys rather than interpreting the ERD's generic `int` labels as a required physical storage size;
 - retain Laravel authentication infrastructure fields and tables required by the installed authentication features, including `email_verified_at`, `remember_token`, conventional timestamps, password reset tokens, and sessions;
-- retain the implemented `forecasts.method` column for compatibility/history; the latest 2026-10-05 revision makes `additive_holt_winters` the production destination while preserving legacy records and requiring a forward method-constraint migration;
+- retain the implemented `forecasts.method` column for compatibility/history; `additive_holt_winters` is the production method, while the completed forward constraint migration preserves legacy records;
 - treat Sagay City as the sole operational branch for live sales and inventory, selected through application configuration; the current schema has no `branches.is_primary`;
 - retain the implemented `is_active` boolean with a default value of `true` on categories, products, and chatbot knowledge; use neither a lifecycle status enum nor Laravel soft deletes for these records;
 - use `DECIMAL(12,2)` for monetary values, matching unsigned integer types for quantities, and explicit foreign-key, uniqueness, and non-negative-value constraints where required by the approved relationships and business rules;
-- use `customer` and `administrator` roles; `pending`, `processing`, `completed`, and `cancelled` order states; `pending`, `verified`, and `rejected` payment states; and `product`, `order`, `store`, and `faq` knowledge categories. Chatbot routing also supports an unsupported outcome. `additive_holt_winters` is the sole approved production forecast method. Current constraints support legacy `moving_average`/`linear_trend`; EXT-45 must extend them to the new identifier while preserving historical compatibility.
+- use `customer` and `administrator` roles; `pending`, `processing`, `completed`, and `cancelled` order states; `pending`, `verified`, and `rejected` payment states; and `product`, `order`, `store`, and `faq` knowledge categories. Chatbot routing also supports an unsupported outcome. `additive_holt_winters` is the sole production forecast method. Current constraints also support legacy `moving_average`/`linear_trend` for historical compatibility.
 - expose **8:00 AM–6:00 PM** for the seeded reference branches through application configuration, without an `operating_hours` column.
 - seed confirmed branch addresses and contact numbers into the existing reference fields; keep unavailable values null and do not invent placeholders.
 - keep branch email reference data in application configuration; the current schema has no `branches.email` column.
@@ -861,7 +861,7 @@ Documentation-only updates require source/diff review rather than invented featu
 
 # 14. Current Delivery Status and Remaining Work
 
-General status snapshot verified against Linear on **2026-10-01**; the forecasting row was reverified after the authorized monthly Holt–Winters planning edits on **2026-10-05**:
+General status snapshot verified against Linear on **2026-10-01**; the forecasting row reflects the implemented EXT-40/42/43/45/46 migration and EXT-44 cleanup:
 
 | Area | State | Evidence / remaining boundary |
 | --- | --- | --- |
@@ -872,7 +872,7 @@ General status snapshot verified against Linear on **2026-10-01**; the forecasti
 | Mobile API foundation/customer endpoints | Complete | EXT-56–61 and EXT-64 Done |
 | Mobile handoff and Postman collection | Complete | EXT-62 Done; developer-reported successful manual Postman Desktop verification |
 | Actual React Native + Expo integration | Pending | EXT-63 Backlog; preparation complete, real LAN consumer journeys not run |
-| Predictive analytics and historical development data | Monthly Holt–Winters migration pending | EXT-36/44 remain Backlog; EXT-40/42/43/45/46 reopened to Backlog. Accepted moving-average data/readiness/calculation/persistence/UI foundations remain in the checkout pending implementation |
+| Predictive analytics and historical development data | Monthly Holt–Winters production implemented; final acceptance pending | EXT-40/42/43/45/46 are implemented; EXT-44 retires obsolete production paths, and EXT-36 awaits human acceptance |
 | Cross-module integration and release-quality checks | Pending | EXT-65–72 Backlog |
 | Deployment, pilot evaluation, and release candidate | Pending | EXT-73–79 Backlog |
 
@@ -926,7 +926,7 @@ Relevant implementation areas include:
 - order processing;
 - sales behavior;
 - recommendation rules;
-- forecasting calculations, monthly aggregation/readiness, persistence and administrator workflow (existing moving-average tests retained; Holt–Winters tests/evaluation and migration pending);
+- forecasting calculations, monthly aggregation/readiness, persistence and administrator workflow (Holt–Winters production tests, paired Moving Average and Seasonal Naive evaluation tests, and legacy compatibility tests);
 - deterministic chatbot categorization;
 - REST API behavior required by React Native.
 

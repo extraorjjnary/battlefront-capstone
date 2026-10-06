@@ -172,7 +172,7 @@ test('reruns replace only the Holt Winters product quarter and exclude all targe
     $product = Product::factory()->create();
     forecastingCoverage($product);
     forecastingMonthlySales($product, array_fill(0, 36, 10));
-    $legacyAverage = Forecast::factory()->for($product)->create(['predicted_demand' => '12.00']);
+    $legacyAverage = Forecast::factory()->for($product)->create(['method' => 'moving_average', 'predicted_demand' => '12.00']);
     $legacyTrend = Forecast::factory()->for($product)->create(['method' => 'linear_trend']);
     $otherQuarter = Forecast::factory()->for($product)->create(['method' => 'additive_holt_winters', 'forecast_quarter' => '2026-Q3']);
     $otherProduct = Forecast::factory()->create(['method' => 'additive_holt_winters']);

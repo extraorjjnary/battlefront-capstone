@@ -3,10 +3,8 @@
 use App\Models\Forecast;
 use App\Models\Product;
 use App\Models\User;
-use App\Services\Forecasting\ProductForecastPreparationService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DevelopmentHistoricalSalesSeeder;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -20,24 +18,11 @@ afterEach(function () {
     $this->travelBack();
 });
 
-test('monthly generation preserves quarterly preparation isolation and legacy forecast records', function () {
+test('monthly generation preserves legacy forecasts without changing their saved values', function () {
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
     $product = Product::where('product_code', 'DEVHIST40STABLE')->sole();
     $legacy = Forecast::factory()->for($product)->create(['method' => 'moving_average', 'predicted_demand' => '12.00']);
     $snapshot = $legacy->fresh()->toArray();
-    DB::enableQueryLog();
-    DB::flushQueryLog();
-    try {
-        $result = app(ProductForecastPreparationService::class)->prepare($product);
-        expect($result['coverage']['granularity'])->toBe('month');
-        expect($result['status'])->toBe('history_unavailable');
-        expect($result['covered_quarters'])->toBeNull();
-        expect($result['history'])->toBeNull();
-        expect(DB::getQueryLog())->toBe([]);
-    } finally {
-        DB::disableQueryLog();
-    }
-
     $this->actingAs(User::factory()->administrator()->create())
         ->get(route('administration.forecasting.index', ['product_id' => $product->id]))
         ->assertInertia(fn (Assert $page) => $page
