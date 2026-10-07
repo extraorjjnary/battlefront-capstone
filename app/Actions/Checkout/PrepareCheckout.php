@@ -6,11 +6,19 @@ use App\Actions\Cart\ReviewCheckoutCart;
 use App\Enums\FulfillmentMethod;
 use App\Enums\PaymentMethod;
 use App\Models\Branch;
+use App\Models\Product;
 use App\Models\User;
+use App\Services\DeliveryQuotePresenter;
+use App\Services\Order\DeliveryRules;
+use Carbon\CarbonImmutable;
 
 class PrepareCheckout
 {
-    public function __construct(private readonly ReviewCheckoutCart $reviewCheckoutCart) {}
+    public function __construct(
+        private readonly ReviewCheckoutCart $reviewCheckoutCart,
+        private readonly DeliveryRules $deliveryRules,
+        private readonly DeliveryQuotePresenter $deliveryQuotePresenter,
+    ) {}
 
     /**
      * Build the complete checkout-page payload.
@@ -20,6 +28,17 @@ class PrepareCheckout
     public function execute(User $customer): array
     {
         $cart = $this->reviewCheckoutCart->execute($customer);
+        $products = Product::query()
+            ->select(['id', 'shipping_profile'])
+            ->whereKey(array_column(array_column($cart['items'], 'product'), 'id'))
+            ->get();
+        $anchor = CarbonImmutable::now(config('app.timezone'))->startOfDay();
+        $deliveryQuotes = [];
+
+        foreach (array_keys($this->deliveryRules->destinations()) as $destination) {
+            $quote = $this->deliveryRules->quote(FulfillmentMethod::Delivery, $destination, $products);
+            $deliveryQuotes[] = $this->deliveryQuotePresenter->checkout($quote, $cart['total'], $anchor);
+        }
         $pickupBranch = Branch::query()
             ->select(['name', 'address', 'city', 'contact_number'])
             ->operational()
@@ -27,6 +46,12 @@ class PrepareCheckout
 
         return [
             'cart' => $cart,
+            'deliveryQuotes' => $deliveryQuotes,
+            'pickupQuote' => [
+                'product_subtotal' => $cart['total'],
+                'delivery_fee' => '0.00',
+                'total' => $cart['total'],
+            ],
             'customer' => [
                 'name' => $customer->name,
                 'default_delivery_address' => $customer->default_delivery_address,

@@ -332,7 +332,7 @@ defineOptions({
                 </section>
 
                 <section aria-labelledby="order-items-heading">
-                    <div class="mb-4 flex items-end justify-between gap-4">
+                    <div class="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                         <div>
                             <p class="text-muted-foreground text-sm">
                                 {{ order.total_quantity }} units across
@@ -345,9 +345,26 @@ defineOptions({
                                 Purchase-time item ledger
                             </h2>
                         </div>
-                        <p class="font-semibold tabular-nums">
-                            {{ formatCurrency(order.total) }}
-                        </p>
+                        <dl class="grid grid-cols-3 gap-4 text-sm sm:text-right">
+                            <div>
+                                <dt class="text-muted-foreground">Product subtotal</dt>
+                                <dd class="mt-1 font-semibold tabular-nums">
+                                    {{ order.product_subtotal === null ? 'Not recorded' : formatCurrency(order.product_subtotal) }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-muted-foreground">Delivery fee</dt>
+                                <dd class="mt-1 font-semibold tabular-nums">
+                                    {{ formatCurrency(order.delivery_fee) }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-muted-foreground">Final total</dt>
+                                <dd class="mt-1 font-semibold tabular-nums">
+                                    {{ formatCurrency(order.total) }}
+                                </dd>
+                            </div>
+                        </dl>
                     </div>
 
                     <div

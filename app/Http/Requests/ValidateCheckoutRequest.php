@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use App\Enums\FulfillmentMethod;
 use App\Enums\PaymentMethod;
+use App\Services\Order\DeliveryRules;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -15,7 +16,7 @@ class ValidateCheckoutRequest extends FormRequest
     /**
      * Return the validated checkout fields shared by web and API placement.
      *
-     * @return array{recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address: string|null, payment_method: string}
+     * @return array{recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address: string|null, delivery_destination: string|null, payment_method: string}
      */
     public function checkoutData(): array
     {
@@ -25,6 +26,9 @@ class ValidateCheckoutRequest extends FormRequest
             'fulfillment_method' => $this->string('fulfillment_method')->toString(),
             'delivery_address' => $this->filled('delivery_address')
                 ? $this->string('delivery_address')->toString()
+                : null,
+            'delivery_destination' => $this->filled('delivery_destination')
+                ? $this->string('delivery_destination')->toString()
                 : null,
             'payment_method' => $this->string('payment_method')->toString(),
         ];
@@ -55,6 +59,14 @@ class ValidateCheckoutRequest extends FormRequest
             'recipient_name' => ['bail', 'required', 'string', 'max:255'],
             'contact_number' => ['bail', 'required', 'string', 'max:20'],
             'fulfillment_method' => ['bail', 'required', new Enum(FulfillmentMethod::class)],
+            'delivery_destination' => [
+                'bail',
+                Rule::requiredIf($this->input('fulfillment_method') === FulfillmentMethod::Delivery->value),
+                Rule::prohibitedIf($this->input('fulfillment_method') === FulfillmentMethod::Pickup->value),
+                'nullable',
+                'string',
+                Rule::in(array_keys(app(DeliveryRules::class)->destinations())),
+            ],
             'delivery_address' => [
                 'bail',
                 Rule::requiredIf($this->input('fulfillment_method') === FulfillmentMethod::Delivery->value),
@@ -117,6 +129,10 @@ class ValidateCheckoutRequest extends FormRequest
             'contact_number.max' => 'The contact number may not exceed 20 characters.',
             'fulfillment_method.required' => 'Select pickup or delivery.',
             'fulfillment_method.*' => 'Select a valid fulfillment method.',
+            'delivery_destination.required' => 'Select a supported delivery destination.',
+            'delivery_destination.prohibited' => 'A delivery destination is not used for pickup orders.',
+            'delivery_destination.string' => 'Select one supported delivery destination.',
+            'delivery_destination.in' => 'Select a supported delivery destination.',
             'delivery_address.required' => 'Enter a delivery address.',
             'delivery_address.prohibited' => 'A delivery address is not used for pickup orders.',
             'delivery_address.max' => 'The delivery address may not exceed 255 characters.',

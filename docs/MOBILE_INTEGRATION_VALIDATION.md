@@ -66,12 +66,12 @@ All rows start **not run**. Record each variant independently; a partial run doe
 | RN-06 | Public branches | Unpaginated static data; unconfirmed values remain null | Not run |
 | RN-07 | Cart add/re-add/update/remove | 200 refreshed cart; add accumulates, update replaces; correct decimal totals | Not run |
 | RN-08 | Quantity zero/excess stock/unavailable product | 422 field errors; no incorrect mutation/reservation | Not run |
-| RN-09 | Checkout preview with valid/empty/conflicting cart | 200 options/snapshot or 422 errors.cart | Not run |
+| RN-09 | Checkout preview with valid/empty/conflicting cart | 200 options, 12 delivery quotes/pickup quote; subtotal/fee/total, profile/packing, LBC/demo notice and anchored provisional dates; otherwise 422 errors.cart | Not run |
 | RN-10 | Cash pickup and card-at-store pickup | Each 201; pending order/payment, cart cleared, stock deducted once | Not run |
-| RN-11 | GCash pickup and delivery | Each 201 with proof; delivery address required, no nonempty pickup address | Not run |
+| RN-11 | GCash pickup and delivery | Each 201 with proof; delivery requires canonical destination and separate address; pickup prohibits both, zero fee/no Shipment; delivery snapshots recalculated quote | Not run |
 | RN-12 | Maya pickup and delivery | Same shared wallet rules and state consistency | Not run |
-| RN-13 | Wallet proof type/size/missing file; cash proof/delivery cash invalid | Appropriate 422; no order/deduction on failed validation | Not run |
-| RN-14 | Own order history/detail, second page | 200; 10/page newest first; persisted price; safe payment status/rejection | Not run |
+| RN-13 | Wallet proof failures, delivery cash/card, missing/unsupported/array destinations, pickup destination/address, forged quote values | Appropriate 422 or ignored forged pricing/ETA; no order/deduction on failed validation; forged quote cannot alter saved amounts/relative ETA | Not run |
+| RN-14 | Own order history/detail, second page | 200; 10/page newest first; saved subtotal/fee/final total and relative delivery quote in detail; unchanged history shape; safe payment status/rejection | Not run |
 | RN-15 | Replace rejected GCash and Maya proof | 200 pending payment, rejection cleared, stock/order status unchanged; retry ineligible ->422 | Not run |
 | RN-16 | Guest chatbot product/store/FAQ, follow-up, order question | 200 gemini/fallback; guest order asks for sign-in without private facts | Not run |
 | RN-17 | Customer chatbot public topics, own/foreign order, follow-up | Owned facts only; foreign/missing order same safe fallback; context reset on identity change | Not run |

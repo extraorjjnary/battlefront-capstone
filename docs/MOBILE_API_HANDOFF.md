@@ -361,7 +361,7 @@ Empty cart:
 
 ### GET /checkout
 
-Requires a nonempty conflict-free cart, otherwise 422 `errors.cart`. Returns a current snapshot and payment/fulfillment options:
+Requires a nonempty conflict-free cart, otherwise 422 `errors.cart`. Returns a current snapshot, payment/fulfillment options, `pickup_quote`, and 12 `delivery_quotes`. No destination query parameter is needed: choose exactly one canonical `destination` from the returned quotes. Existing cart/payment fields are shown below; the new quote fields follow separately:
 
 ```json
 {
@@ -459,6 +459,39 @@ Requires a nonempty conflict-free cart, otherwise 422 `errors.cart`. Returns a c
 
 Checkout cart lines omit the ordinary cart's availability and category/price fields; use the shown snapshot shape. `payment_account` is null for cash/card, or an object with account_name/account_number/is_demo for wallets. Display configured values from the response and honor demo labeling; the example account above is synthetic. No transfer is initiated by this API.
 
+`pickup_quote` is `{"product_subtotal":"200.00","delivery_fee":"0.00","total":"200.00"}` for the example cart. Each `delivery_quotes` entry contains the complete server-derived quote for that cart and one destination. Example entry for standard-profile Sagay delivery:
+
+```json
+{
+  "origin_city": "Sagay City",
+  "destination": "Sagay City",
+  "is_demo": true,
+  "assumption_label": "Battlefront-configured demo delivery assumptions; not official LBC rates.",
+  "shipping_profile": "standard",
+  "base_fee": "80.00",
+  "handling_surcharge": "0.00",
+  "delivery_fee": "80.00",
+  "preparation_days": 1,
+  "transit_min_days": 1,
+  "transit_max_days": 1,
+  "eta_min_days": 2,
+  "eta_max_days": 2,
+  "carrier": "lbc",
+  "packing_expectation": "Standard packing",
+  "product_subtotal": "200.00",
+  "total": "280.00",
+  "eta_anchor_date": "2026-10-08",
+  "eta_timezone": "UTC",
+  "estimated_delivery_start": "2026-10-10",
+  "estimated_delivery_end": "2026-10-10",
+  "notice": "Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification."
+}
+```
+
+Display the selected entry's monetary values; `total` is product subtotal plus delivery fee. Mixed carts use their highest persisted shipping profile (`standard < fragile < bulky`) once, regardless of quantities/line count. Fees and dates are Battlefront-configured demo estimates, not live LBC quotations or tracking. Display carrier `lbc` as **LBC**, the packing expectation, estimate notice and demo assumption label.
+
+Calendar dates are checkout-only presentation. One server quote-generation date in `config('app.timezone')` (currently UTC) anchors all 12 windows in a response. Minimum/maximum total days are added as calendar days, without weekend/holiday adjustment. Treat date strings as civil dates in the returned timezone; do not shift them through the device timezone. Arrival is provisional and subject to payment verification. Refresh checkout after cart changes and before paying; placement independently recalculates current prices, profiles and configured fees/relative ETA. Neither preview quotes nor calendar windows are trusted placement inputs.
+
 ### POST /orders
 
 Required fields:
@@ -470,6 +503,7 @@ Required fields:
 | fulfillment_method | pickup or delivery |
 | payment_method | cash, card_at_store, gcash, maya |
 | delivery_address | String <=255, required for delivery; prohibited when nonempty for pickup |
+| delivery_destination | Exactly one canonical destination from `delivery_quotes`, required for delivery; prohibited when nonempty for pickup |
 | payment_proof | Required for gcash/maya; prohibited for cash/card_at_store |
 
 Pickup accepts all four payment methods. Delivery accepts only gcash/maya. Submit JSON for cash/card pickup:
@@ -485,9 +519,13 @@ Pickup accepts all four payment methods. Delivery accepts only gcash/maya. Submi
 
 For wallet orders submit the fields above using multipart form data, including an actual file part named `payment_proof`. JPEG/JPG, PNG, WebP only; contents must be an image, filename extension must match allowed extensions; max **5120 KB (5 MB)**. Do not send a filesystem path or base64 string as the proof, and do not manually specify a multipart boundary/Content-Type in Postman or React Native FormData.
 
+For delivery, include `delivery_destination` (for example `Sagay City`) and a separate detailed `delivery_address`. For pickup, omit both fields. Supported canonical names are Sagay City, Escalante City, Cadiz City, Toboso, Manapla, Calatrava, Victorias City, E.B. Magalona, San Carlos City, Silay City, Talisay City, and Bacolod City. Do not infer a destination from the address. Missing, unsupported, wrong-case and array destination values receive 422 `errors.delivery_destination`.
+
 The server places the entire current cart through shared transactional order placement, locks/rechecks stock, snapshots prices/recipient/fulfillment, deducts inventory and clears the cart atomically. Order and payment initially remain pending; payment verification is manual. Failed stock validation uses 422 `errors.cart` and rolls back the operation.
 
 Do not send client totals, item prices, inventory adjustments or a user ID. There is no idempotency-key contract: a repeated request after successful cart consumption fails on the empty cart. On an uncertain network outcome, inspect history before attempting a new placement; do not assume retries return the original order.
+
+Client fee/base fee/surcharge/profile/preparation/transit/ETA/subtotal/total values are ignored, including nested quotes. Delivery uses the same strict internal placement transaction as web checkout: the accepted quote is recalculated and saved with exactly one `awaiting_preparation` Shipment. That initial record does not imply packing or dispatch. Pickup saves zero delivery fee and creates no Shipment.
 
 201 response, also the shape for GET /orders/{order} and successful proof replacement:
 
@@ -540,12 +578,17 @@ Do not send client totals, item prices, inventory adjustments or a user ID. Ther
     ],
     "item_count": 1,
     "total_quantity": 2,
+    "product_subtotal": "200.00",
+    "delivery_fee": "0.00",
+    "delivery_quote": null,
     "total": "200.00"
   }
 }
 ```
 
 Order item prices/quantities are persisted snapshots; displayed product names/brand/image come from current related product records. `payment.rejection` is null or `{"reason":"customer-facing explanation","note":null}` (note may be string). Use returned `can_resubmit_proof`; no proof path or download URL is exposed.
+
+Detail responses add saved `product_subtotal`, `delivery_fee` and `delivery_quote`; existing `total` remains the final total. Quoted delivery `delivery_quote` contains the quote-entry fields above **except** `eta_anchor_date`, `eta_timezone`, `estimated_delivery_start`, and `estimated_delivery_end`. Its fees, destination, profile, carrier, assumptions and relative ETA come from saved Order/Shipment snapshots, never current configuration. Pickup/legacy unquoted delivery has `delivery_quote: null`; unknown legacy `product_subtotal` stays null and original totals remain unchanged. History summaries retain their existing shape. Shipment lifecycle/tracking and notifications belong to EXT-89/90.
 
 Order status values: pending, processing, completed, cancelled. Labels reflect fulfillment (e.g. Preparing for pickup / Preparing for delivery). Payment statuses: pending, verified, rejected. They are separate state machines; proof submission is not payment verification.
 
@@ -784,6 +827,7 @@ The collection uses the [Postman v2.1 JSON format](https://schema.postman.com/) 
 | rejected_order_id | Owned wallet order prepared with rejected payment in web administration |
 | quantity, page, budget, intended_use, search | Representative nonsecret defaults where useful; optional catalog filters initially disabled |
 | recipient_name, contact_number, delivery_address | Locally supplied test checkout/profile values |
+| delivery_destination | Canonical configured destination; defaults to Sagay City for disposable delivery tests |
 | chatbot_message, follow_up_message | Representative public questions provided |
 | context_token, guest_context_token | Separate customer/guest continuation values captured by chatbot scripts |
 | other_cart_item_id, other_order_id, other_order_reference | Another disposable customer's resources, for ownership checks |
@@ -804,7 +848,7 @@ Use a disposable development database/account with an active product, live Sagay
 2. **Access:** Profile without token (401). Guest recommendations/options (200). Guest chatbot public question/follow-up (200). Guest order question returns sign-in fallback. Pace calls under guest limits.
 3. **Authentication/profile:** Register a unique customer (201) OR log in (200); confirm token capture. Read/update profile (200), verify only approved fields. Invalid login gives 401; duplicate/invalid registration gives 422.
 4. **Cart:** Add stock-eligible product (200), verify captured cart_item_id; update quantity and totals; remove (200). Add again before checkout. Try quantity zero, quantity above stock, and an unavailable product (422); failed operations must not corrupt the cart.
-5. **Checkout/orders:** Preview checkout (200). Submit cash/card pickup (201), inspect order/history (200), and verify cart is empty. Refill before each alternative wallet placement. Select an image; test gcash/maya and delivery address rules. Verify order/payment initially pending and inventory deduction through existing web inventory.
+5. **Checkout/orders:** Preview checkout (200), verify all 12 server quotes and select a destination. Check standard/fragile/bulky and mixed carts, subtotal/fee/final total, LBC/demo wording and provisional calendar windows. Submit cash/card pickup (201, zero fee/no Shipment); omit address and destination. Refill before each wallet placement, select an image, and include canonical destination plus detailed address for delivery. Try missing/unsupported/wrong-case/array destinations, pickup destination/address, and forged quote fields. Verify recalculated saved fees/relative ETA, pending order/payment, cart consumption and inventory deduction through existing web administration.
 6. **Replacement proof:** Reject the test wallet payment through existing web administration. Set rejected_order_id, select a replacement image, submit (200). Verify pending payment, cleared rejection, unchanged order status/stock. Retry while payment is pending (422). Test unsupported file type and >5 MB (422 when Laravel handles it).
 7. **Customer chatbot/recommendations:** Ask about the captured own order reference. Check customer follow-up. Exercise recommendation preferences, omitted/null brand, a budget with no matches, ranking/reasons, and available stock. Compare with web using the same current data.
 8. **Ownership/roles:** Prepare a second customer's cart/order and use their IDs under the first token: 404. Foreign order chatbot: safe 200 fallback. With an out-of-band valid administrator test token: profile/chatbot/recommendations 403. Invalid/expired/revoked credentials: 401. Web session alone is insufficient for personal API data.

@@ -221,6 +221,7 @@ test('delivery requires an address', function () {
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'delivery',
+            'delivery_destination' => 'Sagay City',
             'payment_method' => 'gcash',
             'payment_proof' => UploadedFile::fake()->image('proof.png'),
         ])
@@ -261,6 +262,7 @@ test('delivery rejects payment methods that require paying at the store', functi
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'delivery',
+            'delivery_destination' => 'Sagay City',
             'delivery_address' => 'Sagay City, Negros Occidental',
             'payment_method' => $paymentMethod,
         ])
@@ -354,6 +356,7 @@ test('all eligible fulfillment and payment combinations place an order', functio
 
     if ($fulfillmentMethod === 'delivery') {
         $payload['delivery_address'] = 'Sagay City, Negros Occidental';
+        $payload['delivery_destination'] = 'Sagay City';
     }
 
     if ($requiresProof) {
@@ -430,6 +433,7 @@ test('a checkout override is snapshotted without changing the profile default', 
             'contact_number' => '09171234567',
             'fulfillment_method' => 'delivery',
             'delivery_address' => '99 Lopez Jaena Street, Sagay City',
+            'delivery_destination' => 'Sagay City',
             'payment_method' => 'gcash',
             'payment_proof' => UploadedFile::fake()->image('proof.png'),
         ])

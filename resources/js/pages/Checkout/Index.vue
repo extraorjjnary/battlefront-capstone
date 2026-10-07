@@ -20,6 +20,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency } from "@/lib/currency";
@@ -32,11 +39,26 @@ const props = defineProps({
     pickupLocation: { type: Object, required: true },
     fulfillmentMethods: { type: Array, required: true },
     paymentMethods: { type: Array, required: true },
+    deliveryQuotes: { type: Array, required: true },
+    pickupQuote: { type: Object, required: true },
 });
 
 const fulfillmentMethod = ref("pickup");
 const paymentMethod = ref("cash");
 const paymentProofKey = ref(0);
+const deliveryDestination = ref("");
+const selectedQuote = computed(() =>
+    fulfillmentMethod.value === "pickup"
+        ? props.pickupQuote
+        : props.deliveryQuotes.find(
+              (quote) => quote.destination === deliveryDestination.value,
+          ),
+);
+const dateFormatter = new Intl.DateTimeFormat("en-PH", { dateStyle: "medium" });
+
+function formatDeliveryDate(value) {
+    return dateFormatter.format(new Date(`${value}T00:00:00`));
+}
 
 const availablePaymentMethods = computed(() =>
     props.paymentMethods.filter((method) =>
@@ -55,6 +77,10 @@ const selectedPaymentAccount = computed(
 
 function chooseFulfillment(value) {
     fulfillmentMethod.value = value;
+
+    if (value === "pickup") {
+        deliveryDestination.value = "";
+    }
 
     if (
         !availablePaymentMethods.value.some(
@@ -81,6 +107,7 @@ defineOptions({
 </script>
 
 <template>
+    <div class="contents">
     <Head title="Checkout" />
 
     <main
@@ -327,29 +354,61 @@ defineOptions({
 
                     <div
                         v-if="fulfillmentMethod === 'delivery'"
-                        class="grid gap-2"
+                        class="grid gap-5"
                     >
-                        <Label for="delivery-address">Delivery address</Label>
-                        <Textarea
-                            id="delivery-address"
-                            name="delivery_address"
-                            maxlength="255"
-                            autocomplete="street-address"
-                            :default-value="
-                                customer.default_delivery_address ?? ''
-                            "
-                            placeholder="House or building, street, barangay, city, and province"
-                            :aria-invalid="Boolean(errors.delivery_address)"
-                            required
-                        />
-                        <p
-                            v-if="customer.default_delivery_address"
-                            class="text-muted-foreground text-xs leading-5"
-                        >
-                            Pre-filled from your profile. Changes here apply only
-                            to this order.
-                        </p>
-                        <InputError :message="errors.delivery_address" />
+                        <div class="grid gap-2">
+                            <Label for="delivery-destination">Delivery city or municipality</Label>
+                            <Select v-model="deliveryDestination">
+                                <SelectTrigger
+                                    id="delivery-destination"
+                                    class="w-full"
+                                    aria-required="true"
+                                    :aria-invalid="Boolean(errors.delivery_destination)"
+                                >
+                                    <SelectValue placeholder="Select a supported destination" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem v-for="quote in deliveryQuotes" :key="quote.destination" :value="quote.destination">
+                                        {{ quote.destination }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <input type="hidden" name="delivery_destination" :value="deliveryDestination" />
+                            <InputError :message="errors.delivery_destination" />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="delivery-address">Delivery address</Label>
+                            <Textarea
+                                id="delivery-address"
+                                name="delivery_address"
+                                maxlength="255"
+                                autocomplete="street-address"
+                                :default-value="
+                                    customer.default_delivery_address ?? ''
+                                "
+                                placeholder="House or building, street, barangay, city, and province"
+                                :aria-invalid="Boolean(errors.delivery_address)"
+                                required
+                            />
+                            <p
+                                v-if="customer.default_delivery_address"
+                                class="text-muted-foreground text-xs leading-5"
+                            >
+                                Pre-filled from your profile. Changes here apply only
+                                to this order.
+                            </p>
+                            <InputError :message="errors.delivery_address" />
+                        </div>
+                        <div v-if="selectedQuote" class="border-border bg-secondary/40 grid gap-2 border p-4 text-sm" aria-live="polite">
+                            <p class="font-semibold">{{ selectedQuote.carrier.toUpperCase() }} delivery estimate · {{ selectedQuote.destination }}</p>
+                            <p>{{ selectedQuote.packing_expectation }} · {{ selectedQuote.preparation_days }} preparation {{ selectedQuote.preparation_days === 1 ? 'day' : 'days' }}</p>
+                            <p class="text-muted-foreground">Base fee {{ formatCurrency(selectedQuote.base_fee) }} + handling {{ formatCurrency(selectedQuote.handling_surcharge) }}</p>
+                            <p class="font-semibold">
+                                Estimated delivery: {{ formatDeliveryDate(selectedQuote.estimated_delivery_start) }}<template v-if="selectedQuote.estimated_delivery_start !== selectedQuote.estimated_delivery_end">–{{ formatDeliveryDate(selectedQuote.estimated_delivery_end) }}</template>
+                            </p>
+                            <p class="text-muted-foreground text-xs leading-5">{{ selectedQuote.notice }}</p>
+                            <p v-if="selectedQuote.is_demo" class="text-muted-foreground text-xs leading-5">{{ selectedQuote.assumption_label }}</p>
+                        </div>
                     </div>
                 </section>
 
@@ -573,11 +632,21 @@ defineOptions({
                         </dd>
                     </div>
                     <div
+                        class="flex justify-between gap-4 text-sm"
+                    >
+                        <dt class="text-muted-foreground">Product subtotal</dt>
+                        <dd class="font-semibold tabular-nums">{{ formatCurrency(pickupQuote.product_subtotal) }}</dd>
+                    </div>
+                    <div class="flex justify-between gap-4 text-sm" aria-live="polite">
+                        <dt class="text-muted-foreground">Delivery fee</dt>
+                        <dd class="font-semibold tabular-nums">{{ selectedQuote ? formatCurrency(selectedQuote.delivery_fee) : 'Select destination' }}</dd>
+                    </div>
+                    <div
                         class="border-border flex items-end justify-between gap-4 border-t pt-4"
                     >
-                        <dt class="font-semibold">Cart total</dt>
+                        <dt class="font-semibold">Final total</dt>
                         <dd class="text-2xl font-bold tabular-nums">
-                            {{ formatCurrency(cart.total) }}
+                            {{ selectedQuote ? formatCurrency(selectedQuote.total) : '—' }}
                         </dd>
                     </div>
                 </dl>
@@ -594,7 +663,7 @@ defineOptions({
                     />
                 </div>
 
-                <Button type="submit" class="w-full" :disabled="processing">
+                <Button type="submit" class="w-full" :disabled="processing || !selectedQuote">
                     <Spinner v-if="processing" />
                     <BadgeCheck v-else aria-hidden="true" />
                     {{ processing ? "Placing order..." : "Place order" }}
@@ -616,4 +685,5 @@ defineOptions({
             </aside>
         </Form>
     </main>
+    </div>
 </template>

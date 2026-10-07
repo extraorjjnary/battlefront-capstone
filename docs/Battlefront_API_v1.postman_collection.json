@@ -1398,7 +1398,7 @@
                 "checkout"
               ]
             },
-            "description": "Requires a nonempty conflict-free cart. 422 errors.cart otherwise. Use returned payment methods, available_for and payment account/demo flags."
+            "description": "Returns the ready cart, pickup_quote and 12 delivery_quotes. Select one canonical destination from the server quotes; show subtotal, fee, total, packing, LBC/demo notice and provisional calendar dates. No destination query parameter is needed. Refresh before payment. 422 errors.cart for an empty/conflicting cart."
           },
           "event": [
             {
@@ -1411,6 +1411,16 @@
                   "if (pm.response.code === 200) {",
                   "  const body = pm.response.json();",
                   "  pm.test(\"Response contract\", () => pm.expect(body).to.have.property(\"data\"));",
+                  "}",
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json().data;",
+                  "  pm.test(\"12 canonical server quotes\", () => pm.expect(data.delivery_quotes).to.have.lengthOf(12));",
+                  "  pm.test(\"Pickup fee is zero\", () => pm.expect(data.pickup_quote.delivery_fee).to.eql(\"0.00\"));",
+                  "  pm.test(\"Provisional quote contract\", () => data.delivery_quotes.forEach(q => {",
+                  "    pm.expect(q).to.include.all.keys(\"destination\", \"product_subtotal\", \"delivery_fee\", \"total\", \"shipping_profile\", \"packing_expectation\", \"eta_anchor_date\", \"eta_timezone\", \"estimated_delivery_start\", \"estimated_delivery_end\", \"notice\");",
+                  "    pm.expect(q.carrier).to.eql(\"lbc\");",
+                  "    pm.expect(q.notice).to.include(\"subject to payment verification\");",
+                  "  }));",
                   "}"
                 ]
               }
@@ -1436,7 +1446,7 @@
                     "checkout"
                   ]
                 },
-                "description": "Requires a nonempty conflict-free cart. 422 errors.cart otherwise. Use returned payment methods, available_for and payment account/demo flags."
+                "description": "Returns the ready cart, pickup_quote and 12 delivery_quotes. Select one canonical destination from the server quotes; show subtotal, fee, total, packing, LBC/demo notice and provisional calendar dates. No destination query parameter is needed. Refresh before payment. 422 errors.cart for an empty/conflicting cart."
               },
               "status": "OK",
               "code": 200,
@@ -1446,7 +1456,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"data\": {\n    \"cart\": {\n      \"items\": [\n        {\n          \"id\": 1,\n          \"quantity\": 2,\n          \"product\": {\n            \"id\": 1,\n            \"name\": \"Example Mouse\",\n            \"brand\": null,\n            \"image_url\": null\n          },\n          \"unit_price\": \"100.00\",\n          \"line_total\": \"200.00\"\n        }\n      ],\n      \"item_count\": 1,\n      \"total_quantity\": 2,\n      \"total\": \"200.00\"\n    },\n    \"customer\": {\n      \"name\": \"Example Customer\",\n      \"default_delivery_address\": null\n    },\n    \"pickup_location\": {\n      \"name\": \"Example Store — Sagay City\",\n      \"address\": null,\n      \"contact_number\": null,\n      \"operating_hours\": \"8:00 AM–6:00 PM\"\n    },\n    \"fulfillment_methods\": [\n      {\n        \"value\": \"pickup\",\n        \"label\": \"Pickup\"\n      },\n      {\n        \"value\": \"delivery\",\n        \"label\": \"Delivery\"\n      }\n    ],\n    \"payment_methods\": [\n      {\n        \"value\": \"cash\",\n        \"label\": \"Cash\",\n        \"requires_proof\": false,\n        \"payment_account\": null,\n        \"available_for\": [\n          \"pickup\"\n        ]\n      },\n      {\n        \"value\": \"card_at_store\",\n        \"label\": \"Card at store\",\n        \"requires_proof\": false,\n        \"payment_account\": null,\n        \"available_for\": [\n          \"pickup\"\n        ]\n      },\n      {\n        \"value\": \"gcash\",\n        \"label\": \"GCash\",\n        \"requires_proof\": true,\n        \"payment_account\": {\n          \"account_name\": \"Example demo account\",\n          \"account_number\": \"EXAMPLE\",\n          \"is_demo\": true\n        },\n        \"available_for\": [\n          \"pickup\",\n          \"delivery\"\n        ]\n      },\n      {\n        \"value\": \"maya\",\n        \"label\": \"Maya\",\n        \"requires_proof\": true,\n        \"payment_account\": {\n          \"account_name\": \"Example demo account\",\n          \"account_number\": \"EXAMPLE\",\n          \"is_demo\": true\n        },\n        \"available_for\": [\n          \"pickup\",\n          \"delivery\"\n        ]\n      }\n    ]\n  }\n}"
+              "body": "{\n  \"data\": {\n    \"cart\": {\n      \"items\": [\n        {\n          \"id\": 1,\n          \"quantity\": 2,\n          \"product\": {\n            \"id\": 1,\n            \"name\": \"Example Mouse\",\n            \"brand\": null,\n            \"image_url\": null\n          },\n          \"unit_price\": \"100.00\",\n          \"line_total\": \"200.00\"\n        }\n      ],\n      \"item_count\": 1,\n      \"total_quantity\": 2,\n      \"total\": \"200.00\"\n    },\n    \"customer\": {\n      \"name\": \"Example Customer\",\n      \"default_delivery_address\": null\n    },\n    \"pickup_location\": {\n      \"name\": \"Example Store — Sagay City\",\n      \"address\": null,\n      \"contact_number\": null,\n      \"operating_hours\": \"8:00 AM–6:00 PM\"\n    },\n    \"fulfillment_methods\": [\n      {\n        \"value\": \"pickup\",\n        \"label\": \"Pickup\"\n      },\n      {\n        \"value\": \"delivery\",\n        \"label\": \"Delivery\"\n      }\n    ],\n    \"payment_methods\": [\n      {\n        \"value\": \"cash\",\n        \"label\": \"Cash\",\n        \"requires_proof\": false,\n        \"payment_account\": null,\n        \"available_for\": [\n          \"pickup\"\n        ]\n      },\n      {\n        \"value\": \"card_at_store\",\n        \"label\": \"Card at store\",\n        \"requires_proof\": false,\n        \"payment_account\": null,\n        \"available_for\": [\n          \"pickup\"\n        ]\n      },\n      {\n        \"value\": \"gcash\",\n        \"label\": \"GCash\",\n        \"requires_proof\": true,\n        \"payment_account\": {\n          \"account_name\": \"Example demo account\",\n          \"account_number\": \"EXAMPLE\",\n          \"is_demo\": true\n        },\n        \"available_for\": [\n          \"pickup\",\n          \"delivery\"\n        ]\n      },\n      {\n        \"value\": \"maya\",\n        \"label\": \"Maya\",\n        \"requires_proof\": true,\n        \"payment_account\": {\n          \"account_name\": \"Example demo account\",\n          \"account_number\": \"EXAMPLE\",\n          \"is_demo\": true\n        },\n        \"available_for\": [\n          \"pickup\",\n          \"delivery\"\n        ]\n      }\n    ],\n    \"delivery_quotes\": [\n      {\n        \"origin_city\": \"Sagay City\",\n        \"destination\": \"Sagay City\",\n        \"is_demo\": true,\n        \"assumption_label\": \"Battlefront-configured demo delivery assumptions; not official LBC rates.\",\n        \"shipping_profile\": \"standard\",\n        \"base_fee\": \"80.00\",\n        \"handling_surcharge\": \"0.00\",\n        \"delivery_fee\": \"80.00\",\n        \"preparation_days\": 1,\n        \"transit_min_days\": 1,\n        \"transit_max_days\": 1,\n        \"eta_min_days\": 2,\n        \"eta_max_days\": 2,\n        \"carrier\": \"lbc\",\n        \"packing_expectation\": \"Standard packing\",\n        \"product_subtotal\": \"200.00\",\n        \"total\": \"280.00\",\n        \"eta_anchor_date\": \"2026-10-08\",\n        \"eta_timezone\": \"UTC\",\n        \"estimated_delivery_start\": \"2026-10-10\",\n        \"estimated_delivery_end\": \"2026-10-10\",\n        \"notice\": \"Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification.\"\n      },\n      {\n        \"origin_city\": \"Sagay City\",\n        \"destination\": \"Escalante City\",\n        \"is_demo\": true,\n        \"assumption_label\": \"Battlefront-configured demo delivery assumptions; not official LBC rates.\",\n        \"shipping_profile\": \"standard\",\n        \"base_fee\": \"100.00\",\n        \"handling_surcharge\": \"0.00\",\n        \"delivery_fee\": \"100.00\",\n        \"preparation_days\": 1,\n        \"transit_min_days\": 1,\n        \"transit_max_days\": 2,\n        \"eta_min_days\": 2,\n        \"eta_max_days\": 3,\n        \"carrier\": \"lbc\",\n        \"packing_expectation\": \"Standard packing\",\n        \"product_subtotal\": \"200.00\",\n        \"total\": \"300.00\",\n        \"eta_anchor_date\": \"2026-10-08\",\n        \"eta_timezone\": \"UTC\",\n        \"estimated_delivery_start\": \"2026-10-10\",\n        \"estimated_delivery_end\": \"2026-10-11\",\n        \"notice\": \"Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification.\"\n      },\n      {\n        \"origin_city\": \"Sagay City\",\n        \"destination\": \"Cadiz City\",\n        \"is_demo\": true,\n        \"assumption_label\": \"Battlefront-configured demo delivery assumptions; not official LBC rates.\",\n        \"shipping_profile\": \"standard\",\n        \"base_fee\": \"120.00\",\n        \"handling_surcharge\": \"0.00\",\n        \"delivery_fee\": \"120.00\",\n        \"preparation_days\": 1,\n        \"transit_min_days\": 1,\n        \"transit_max_days\": 2,\n        \"eta_min_days\": 2,\n        \"eta_max_days\": 3,\n        \"carrier\": \"lbc\",\n        \"packing_expectation\": \"Standard packing\",\n        \"product_subtotal\": \"200.00\",\n        \"total\": \"320.00\",\n        \"eta_anchor_date\": \"2026-10-08\",\n        \"eta_timezone\": \"UTC\",\n        \"estimated_delivery_start\": \"2026-10-10\",\n        \"estimated_delivery_end\": \"2026-10-11\",\n        \"notice\": \"Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification.\"\n      },\n      {\n        \"origin_city\": \"Sagay City\",\n        \"destination\": \"Toboso\",\n        \"is_demo\": true,\n        \"assumption_label\": \"Battlefront-configured demo delivery assumptions; not official LBC rates.\",\n        \"shipping_profile\": \"standard\",\n        \"base_fee\": \"140.00\",\n        \"handling_surcharge\": \"0.00\",\n        \"delivery_fee\": \"140.00\",\n        \"preparation_days\": 1,\n        \"transit_min_days\": 2,\n        \"transit_max_days\": 3,\n        \"eta_min_days\": 3,\n        \"eta_max_days\": 4,\n        \"carrier\": \"lbc\",\n        \"packing_expectation\": \"Standard packing\",\n        \"product_subtotal\": \"200.00\",\n        \"total\": \"340.00\",\n        \"eta_anchor_date\": \"2026-10-08\",\n        \"eta_timezone\": \"UTC\",\n        \"estimated_delivery_start\": \"2026-10-11\",\n        \"estimated_delivery_end\": \"2026-10-12\",\n        \"notice\": \"Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification.\"\n      },\n      {\n        \"origin_city\": \"Sagay City\",\n        \"destination\": \"Manapla\",\n        \"is_demo\": true,\n        \"assumption_label\": \"Battlefront-configured demo delivery assumptions; not official LBC rates.\",\n        \"shipping_profile\": \"standard\",\n        \"base_fee\": \"160.00\",\n        \"handling_surcharge\": \"0.00\",\n        \"delivery_fee\": \"160.00\",\n        \"preparation_days\": 1,\n        \"transit_min_days\": 2,\n        \"transit_max_days\": 3,\n        \"eta_min_days\": 3,\n        \"eta_max_days\": 4,\n        \"carrier\": \"lbc\",\n        \"packing_expectation\": \"Standard packing\",\n        \"product_subtotal\": \"200.00\",\n        \"total\": \"360.00\",\n        \"eta_anchor_date\": \"2026-10-08\",\n        \"eta_timezone\": \"UTC\",\n        \"estimated_delivery_start\": \"2026-10-11\",\n        \"estimated_delivery_end\": \"2026-10-12\",\n        \"notice\": \"Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification.\"\n      },\n      {\n        \"origin_city\": \"Sagay City\",\n        \"destination\": \"Calatrava\",\n        \"is_demo\": true,\n        \"assumption_label\": \"Battlefront-configured demo delivery assumptions; not official LBC rates.\",\n        \"shipping_profile\": \"standard\",\n        \"base_fee\": \"180.00\",\n        \"handling_surcharge\": \"0.00\",\n        \"delivery_fee\": \"180.00\",\n        \"preparation_days\": 1,\n        \"transit_min_days\": 2,\n        \"transit_max_days\": 3,\n        \"eta_min_days\": 3,\n        \"eta_max_days\": 4,\n        \"carrier\": \"lbc\",\n        \"packing_expectation\": \"Standard packing\",\n        \"product_subtotal\": \"200.00\",\n        \"total\": \"380.00\",\n        \"eta_anchor_date\": \"2026-10-08\",\n        \"eta_timezone\": \"UTC\",\n        \"estimated_delivery_start\": \"2026-10-11\",\n        \"estimated_delivery_end\": \"2026-10-12\",\n        \"notice\": \"Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification.\"\n      },\n      {\n        \"origin_city\": \"Sagay City\",\n        \"destination\": \"Victorias City\",\n        \"is_demo\": true,\n        \"assumption_label\": \"Battlefront-configured demo delivery assumptions; not official LBC rates.\",\n        \"shipping_profile\": \"standard\",\n        \"base_fee\": \"180.00\",\n        \"handling_surcharge\": \"0.00\",\n        \"delivery_fee\": \"180.00\",\n        \"preparation_days\": 1,\n        \"transit_min_days\": 2,\n        \"transit_max_days\": 3,\n        \"eta_min_days\": 3,\n        \"eta_max_days\": 4,\n        \"carrier\": \"lbc\",\n        \"packing_expectation\": \"Standard packing\",\n        \"product_subtotal\": \"200.00\",\n        \"total\": \"380.00\",\n        \"eta_anchor_date\": \"2026-10-08\",\n        \"eta_timezone\": \"UTC\",\n        \"estimated_delivery_start\": \"2026-10-11\",\n        \"estimated_delivery_end\": \"2026-10-12\",\n        \"notice\": \"Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification.\"\n      },\n      {\n        \"origin_city\": \"Sagay City\",\n        \"destination\": \"E.B. Magalona\",\n        \"is_demo\": true,\n        \"assumption_label\": \"Battlefront-configured demo delivery assumptions; not official LBC rates.\",\n        \"shipping_profile\": \"standard\",\n        \"base_fee\": \"200.00\",\n        \"handling_surcharge\": \"0.00\",\n        \"delivery_fee\": \"200.00\",\n        \"preparation_days\": 1,\n        \"transit_min_days\": 2,\n        \"transit_max_days\": 4,\n        \"eta_min_days\": 3,\n        \"eta_max_days\": 5,\n        \"carrier\": \"lbc\",\n        \"packing_expectation\": \"Standard packing\",\n        \"product_subtotal\": \"200.00\",\n        \"total\": \"400.00\",\n        \"eta_anchor_date\": \"2026-10-08\",\n        \"eta_timezone\": \"UTC\",\n        \"estimated_delivery_start\": \"2026-10-11\",\n        \"estimated_delivery_end\": \"2026-10-13\",\n        \"notice\": \"Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification.\"\n      },\n      {\n        \"origin_city\": \"Sagay City\",\n        \"destination\": \"San Carlos City\",\n        \"is_demo\": true,\n        \"assumption_label\": \"Battlefront-configured demo delivery assumptions; not official LBC rates.\",\n        \"shipping_profile\": \"standard\",\n        \"base_fee\": \"220.00\",\n        \"handling_surcharge\": \"0.00\",\n        \"delivery_fee\": \"220.00\",\n        \"preparation_days\": 1,\n        \"transit_min_days\": 2,\n        \"transit_max_days\": 4,\n        \"eta_min_days\": 3,\n        \"eta_max_days\": 5,\n        \"carrier\": \"lbc\",\n        \"packing_expectation\": \"Standard packing\",\n        \"product_subtotal\": \"200.00\",\n        \"total\": \"420.00\",\n        \"eta_anchor_date\": \"2026-10-08\",\n        \"eta_timezone\": \"UTC\",\n        \"estimated_delivery_start\": \"2026-10-11\",\n        \"estimated_delivery_end\": \"2026-10-13\",\n        \"notice\": \"Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification.\"\n      },\n      {\n        \"origin_city\": \"Sagay City\",\n        \"destination\": \"Silay City\",\n        \"is_demo\": true,\n        \"assumption_label\": \"Battlefront-configured demo delivery assumptions; not official LBC rates.\",\n        \"shipping_profile\": \"standard\",\n        \"base_fee\": \"220.00\",\n        \"handling_surcharge\": \"0.00\",\n        \"delivery_fee\": \"220.00\",\n        \"preparation_days\": 1,\n        \"transit_min_days\": 2,\n        \"transit_max_days\": 4,\n        \"eta_min_days\": 3,\n        \"eta_max_days\": 5,\n        \"carrier\": \"lbc\",\n        \"packing_expectation\": \"Standard packing\",\n        \"product_subtotal\": \"200.00\",\n        \"total\": \"420.00\",\n        \"eta_anchor_date\": \"2026-10-08\",\n        \"eta_timezone\": \"UTC\",\n        \"estimated_delivery_start\": \"2026-10-11\",\n        \"estimated_delivery_end\": \"2026-10-13\",\n        \"notice\": \"Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification.\"\n      },\n      {\n        \"origin_city\": \"Sagay City\",\n        \"destination\": \"Talisay City\",\n        \"is_demo\": true,\n        \"assumption_label\": \"Battlefront-configured demo delivery assumptions; not official LBC rates.\",\n        \"shipping_profile\": \"standard\",\n        \"base_fee\": \"240.00\",\n        \"handling_surcharge\": \"0.00\",\n        \"delivery_fee\": \"240.00\",\n        \"preparation_days\": 1,\n        \"transit_min_days\": 2,\n        \"transit_max_days\": 4,\n        \"eta_min_days\": 3,\n        \"eta_max_days\": 5,\n        \"carrier\": \"lbc\",\n        \"packing_expectation\": \"Standard packing\",\n        \"product_subtotal\": \"200.00\",\n        \"total\": \"440.00\",\n        \"eta_anchor_date\": \"2026-10-08\",\n        \"eta_timezone\": \"UTC\",\n        \"estimated_delivery_start\": \"2026-10-11\",\n        \"estimated_delivery_end\": \"2026-10-13\",\n        \"notice\": \"Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification.\"\n      },\n      {\n        \"origin_city\": \"Sagay City\",\n        \"destination\": \"Bacolod City\",\n        \"is_demo\": true,\n        \"assumption_label\": \"Battlefront-configured demo delivery assumptions; not official LBC rates.\",\n        \"shipping_profile\": \"standard\",\n        \"base_fee\": \"250.00\",\n        \"handling_surcharge\": \"0.00\",\n        \"delivery_fee\": \"250.00\",\n        \"preparation_days\": 1,\n        \"transit_min_days\": 2,\n        \"transit_max_days\": 4,\n        \"eta_min_days\": 3,\n        \"eta_max_days\": 5,\n        \"carrier\": \"lbc\",\n        \"packing_expectation\": \"Standard packing\",\n        \"product_subtotal\": \"200.00\",\n        \"total\": \"450.00\",\n        \"eta_anchor_date\": \"2026-10-08\",\n        \"eta_timezone\": \"UTC\",\n        \"estimated_delivery_start\": \"2026-10-11\",\n        \"estimated_delivery_end\": \"2026-10-13\",\n        \"notice\": \"Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification.\"\n      }\n    ],\n    \"pickup_quote\": {\n      \"product_subtotal\": \"200.00\",\n      \"delivery_fee\": \"0.00\",\n      \"total\": \"200.00\"\n    }\n  }\n}"
             }
           ]
         },
@@ -1473,7 +1483,7 @@
                 "orders"
               ]
             },
-            "description": "Set payment_method to cash or card_at_store. Omit delivery_address and payment_proof. Server uses current cart and prices. 422 on empty/conflicting cart.",
+            "description": "Use cash or card_at_store. Omit delivery_destination, delivery_address and payment_proof. Server snapshots current subtotal with zero delivery fee and no Shipment. 422 on empty/conflicting cart.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"recipient_name\": \"{{recipient_name}}\",\n  \"contact_number\": \"{{contact_number}}\",\n  \"fulfillment_method\": \"pickup\",\n  \"payment_method\": \"cash\"\n}",
@@ -1541,7 +1551,7 @@
                     "orders"
                   ]
                 },
-                "description": "Set payment_method to cash or card_at_store. Omit delivery_address and payment_proof. Server uses current cart and prices. 422 on empty/conflicting cart.",
+                "description": "Use cash or card_at_store. Omit delivery_destination, delivery_address and payment_proof. Server snapshots current subtotal with zero delivery fee and no Shipment. 422 on empty/conflicting cart.",
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"recipient_name\": \"{{recipient_name}}\",\n  \"contact_number\": \"{{contact_number}}\",\n  \"fulfillment_method\": \"pickup\",\n  \"payment_method\": \"cash\"\n}",
@@ -1560,7 +1570,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"data\": {\n    \"id\": 1,\n    \"reference\": \"BF-000001\",\n    \"created_at\": \"2026-10-01T08:00:00+00:00\",\n    \"status\": {\n      \"value\": \"pending\",\n      \"label\": \"Pending\"\n    },\n    \"recipient\": {\n      \"name\": \"Example Customer\",\n      \"contact_number\": \"EXAMPLE\"\n    },\n    \"fulfillment\": {\n      \"value\": \"pickup\",\n      \"label\": \"Pickup\",\n      \"delivery_address\": null\n    },\n    \"payment\": {\n      \"method\": {\n        \"value\": \"cash\",\n        \"label\": \"Cash\"\n      },\n      \"status\": {\n        \"value\": \"pending\",\n        \"label\": \"Pending\"\n      },\n      \"proof_submitted\": false,\n      \"notice\": \"Payment will be handled when you collect your order.\",\n      \"rejection\": null,\n      \"can_resubmit_proof\": false\n    },\n    \"items\": [\n      {\n        \"id\": 1,\n        \"product\": {\n          \"id\": 1,\n          \"name\": \"Example Mouse\",\n          \"brand\": null,\n          \"image_url\": null\n        },\n        \"quantity\": 2,\n        \"unit_price\": \"100.00\",\n        \"line_total\": \"200.00\"\n      }\n    ],\n    \"item_count\": 1,\n    \"total_quantity\": 2,\n    \"total\": \"200.00\"\n  }\n}"
+              "body": "{\n  \"data\": {\n    \"id\": 1,\n    \"reference\": \"BF-000001\",\n    \"created_at\": \"2026-10-01T08:00:00+00:00\",\n    \"status\": {\n      \"value\": \"pending\",\n      \"label\": \"Pending\"\n    },\n    \"recipient\": {\n      \"name\": \"Example Customer\",\n      \"contact_number\": \"EXAMPLE\"\n    },\n    \"fulfillment\": {\n      \"value\": \"pickup\",\n      \"label\": \"Pickup\",\n      \"delivery_address\": null\n    },\n    \"payment\": {\n      \"method\": {\n        \"value\": \"cash\",\n        \"label\": \"Cash\"\n      },\n      \"status\": {\n        \"value\": \"pending\",\n        \"label\": \"Pending\"\n      },\n      \"proof_submitted\": false,\n      \"notice\": \"Payment will be handled when you collect your order.\",\n      \"rejection\": null,\n      \"can_resubmit_proof\": false\n    },\n    \"items\": [\n      {\n        \"id\": 1,\n        \"product\": {\n          \"id\": 1,\n          \"name\": \"Example Mouse\",\n          \"brand\": null,\n          \"image_url\": null\n        },\n        \"quantity\": 2,\n        \"unit_price\": \"100.00\",\n        \"line_total\": \"200.00\"\n      }\n    ],\n    \"item_count\": 1,\n    \"total_quantity\": 2,\n    \"total\": \"200.00\",\n    \"product_subtotal\": \"200.00\",\n    \"delivery_fee\": \"0.00\",\n    \"delivery_quote\": null\n  }\n}"
             }
           ]
         },
@@ -1583,7 +1593,7 @@
                 "orders"
               ]
             },
-            "description": "Select a local JPEG/PNG/WebP file <=5 MB. gcash or maya. Delivery requires address; for pickup change fulfillment_method and disable delivery_address. Do not manually set Content-Type. Payment remains pending manual verification.",
+            "description": "Select a local JPEG/PNG/WebP image <=5 MB for GCash/Maya. Delivery requires one canonical delivery_destination from checkout quotes plus a separate detailed delivery_address. For pickup, disable BOTH destination and address fields. Never submit quote/pricing/ETA fields. Server recalculates and snapshots delivery fees/relative ETA; payment remains pending manual verification. Do not manually set Content-Type.",
             "body": {
               "mode": "formdata",
               "formdata": [
@@ -1600,6 +1610,11 @@
                 {
                   "key": "fulfillment_method",
                   "value": "delivery",
+                  "type": "text"
+                },
+                {
+                  "key": "delivery_destination",
+                  "value": "{{delivery_destination}}",
                   "type": "text"
                 },
                 {
@@ -1637,7 +1652,79 @@
               }
             }
           ],
-          "response": []
+          "response": [
+            {
+              "name": "Illustrative response (synthetic data)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/orders",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "orders"
+                  ]
+                },
+                "description": "Select a local JPEG/PNG/WebP image <=5 MB for GCash/Maya. Delivery requires one canonical delivery_destination from checkout quotes plus a separate detailed delivery_address. For pickup, disable BOTH destination and address fields. Never submit quote/pricing/ETA fields. Server recalculates and snapshots delivery fees/relative ETA; payment remains pending manual verification. Do not manually set Content-Type.",
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "recipient_name",
+                      "value": "{{recipient_name}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "contact_number",
+                      "value": "{{contact_number}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "fulfillment_method",
+                      "value": "delivery",
+                      "type": "text"
+                    },
+                    {
+                      "key": "delivery_destination",
+                      "value": "{{delivery_destination}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "delivery_address",
+                      "value": "{{delivery_address}}",
+                      "type": "text"
+                    },
+                    {
+                      "key": "payment_method",
+                      "value": "gcash",
+                      "type": "text"
+                    },
+                    {
+                      "key": "payment_proof",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"data\": {\n    \"id\": 1,\n    \"reference\": \"BF-000001\",\n    \"created_at\": \"2026-10-01T08:00:00+00:00\",\n    \"status\": {\n      \"value\": \"pending\",\n      \"label\": \"Pending\"\n    },\n    \"recipient\": {\n      \"name\": \"Example Customer\",\n      \"contact_number\": \"EXAMPLE\"\n    },\n    \"fulfillment\": {\n      \"value\": \"delivery\",\n      \"label\": \"Delivery\",\n      \"delivery_address\": \"Example street and barangay, Sagay City\"\n    },\n    \"payment\": {\n      \"method\": {\n        \"value\": \"gcash\",\n        \"label\": \"GCash\"\n      },\n      \"status\": {\n        \"value\": \"pending\",\n        \"label\": \"Pending\"\n      },\n      \"proof_submitted\": true,\n      \"notice\": \"Your uploaded proof is awaiting manual verification by Battlefront.\",\n      \"rejection\": null,\n      \"can_resubmit_proof\": false\n    },\n    \"items\": [\n      {\n        \"id\": 1,\n        \"product\": {\n          \"id\": 1,\n          \"name\": \"Example Mouse\",\n          \"brand\": null,\n          \"image_url\": null\n        },\n        \"quantity\": 2,\n        \"unit_price\": \"100.00\",\n        \"line_total\": \"200.00\"\n      }\n    ],\n    \"item_count\": 1,\n    \"total_quantity\": 2,\n    \"total\": \"280.00\",\n    \"product_subtotal\": \"200.00\",\n    \"delivery_fee\": \"80.00\",\n    \"delivery_quote\": {\n      \"origin_city\": \"Sagay City\",\n      \"destination\": \"Sagay City\",\n      \"is_demo\": true,\n      \"assumption_label\": \"Battlefront-configured demo delivery assumptions; not official LBC rates.\",\n      \"shipping_profile\": \"standard\",\n      \"base_fee\": \"80.00\",\n      \"handling_surcharge\": \"0.00\",\n      \"delivery_fee\": \"80.00\",\n      \"preparation_days\": 1,\n      \"transit_min_days\": 1,\n      \"transit_max_days\": 1,\n      \"eta_min_days\": 2,\n      \"eta_max_days\": 2,\n      \"carrier\": \"lbc\",\n      \"packing_expectation\": \"Standard packing\",\n      \"product_subtotal\": \"200.00\",\n      \"total\": \"280.00\",\n      \"notice\": \"Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification.\"\n    }\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Own order history",
@@ -1743,7 +1830,7 @@
                 "{{order_id}}"
               ]
             },
-            "description": "Foreign/missing order: 404. Payment proof is represented by metadata, not a file URL."
+            "description": "Foreign/missing order: 404. Payment proof is represented by metadata, not a file URL. Saved product_subtotal, delivery_fee and delivery_quote use Order/Shipment snapshots. Unknown legacy subtotal/quote stays null; checkout calendar windows are omitted. History summaries are unchanged."
           },
           "event": [
             {
@@ -1756,6 +1843,17 @@
                   "if (pm.response.code === 200) {",
                   "  const body = pm.response.json();",
                   "  pm.test(\"Response contract\", () => pm.expect(body).to.have.property(\"data\"));",
+                  "}",
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "  const data = pm.response.json().data;",
+                  "  pm.test(\"Saved price breakdown contract\", () => pm.expect(data).to.include.all.keys(\"product_subtotal\", \"delivery_fee\", \"delivery_quote\", \"total\"));",
+                  "  pm.test(\"Private proof path is absent\", () => pm.expect(data).not.to.have.property(\"payment_proof_path\"));",
+                  "  if (data.delivery_quote) {",
+                  "    pm.test(\"Saved relative delivery quote\", () => {",
+                  "      pm.expect(data.delivery_quote).to.include.all.keys(\"destination\", \"carrier\", \"eta_min_days\", \"eta_max_days\", \"packing_expectation\");",
+                  "      pm.expect(data.delivery_quote).not.to.have.property(\"estimated_delivery_start\");",
+                  "    });",
+                  "  }",
                   "}"
                 ]
               }
@@ -1782,7 +1880,7 @@
                     "{{order_id}}"
                   ]
                 },
-                "description": "Foreign/missing order: 404. Payment proof is represented by metadata, not a file URL."
+                "description": "Foreign/missing order: 404. Payment proof is represented by metadata, not a file URL. Saved product_subtotal, delivery_fee and delivery_quote use Order/Shipment snapshots. Unknown legacy subtotal/quote stays null; checkout calendar windows are omitted. History summaries are unchanged."
               },
               "status": "OK",
               "code": 200,
@@ -1792,7 +1890,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"data\": {\n    \"id\": 1,\n    \"reference\": \"BF-000001\",\n    \"created_at\": \"2026-10-01T08:00:00+00:00\",\n    \"status\": {\n      \"value\": \"pending\",\n      \"label\": \"Pending\"\n    },\n    \"recipient\": {\n      \"name\": \"Example Customer\",\n      \"contact_number\": \"EXAMPLE\"\n    },\n    \"fulfillment\": {\n      \"value\": \"pickup\",\n      \"label\": \"Pickup\",\n      \"delivery_address\": null\n    },\n    \"payment\": {\n      \"method\": {\n        \"value\": \"cash\",\n        \"label\": \"Cash\"\n      },\n      \"status\": {\n        \"value\": \"pending\",\n        \"label\": \"Pending\"\n      },\n      \"proof_submitted\": false,\n      \"notice\": \"Payment will be handled when you collect your order.\",\n      \"rejection\": null,\n      \"can_resubmit_proof\": false\n    },\n    \"items\": [\n      {\n        \"id\": 1,\n        \"product\": {\n          \"id\": 1,\n          \"name\": \"Example Mouse\",\n          \"brand\": null,\n          \"image_url\": null\n        },\n        \"quantity\": 2,\n        \"unit_price\": \"100.00\",\n        \"line_total\": \"200.00\"\n      }\n    ],\n    \"item_count\": 1,\n    \"total_quantity\": 2,\n    \"total\": \"200.00\"\n  }\n}"
+              "body": "{\n  \"data\": {\n    \"id\": 1,\n    \"reference\": \"BF-000001\",\n    \"created_at\": \"2026-10-01T08:00:00+00:00\",\n    \"status\": {\n      \"value\": \"pending\",\n      \"label\": \"Pending\"\n    },\n    \"recipient\": {\n      \"name\": \"Example Customer\",\n      \"contact_number\": \"EXAMPLE\"\n    },\n    \"fulfillment\": {\n      \"value\": \"pickup\",\n      \"label\": \"Pickup\",\n      \"delivery_address\": null\n    },\n    \"payment\": {\n      \"method\": {\n        \"value\": \"cash\",\n        \"label\": \"Cash\"\n      },\n      \"status\": {\n        \"value\": \"pending\",\n        \"label\": \"Pending\"\n      },\n      \"proof_submitted\": false,\n      \"notice\": \"Payment will be handled when you collect your order.\",\n      \"rejection\": null,\n      \"can_resubmit_proof\": false\n    },\n    \"items\": [\n      {\n        \"id\": 1,\n        \"product\": {\n          \"id\": 1,\n          \"name\": \"Example Mouse\",\n          \"brand\": null,\n          \"image_url\": null\n        },\n        \"quantity\": 2,\n        \"unit_price\": \"100.00\",\n        \"line_total\": \"200.00\"\n      }\n    ],\n    \"item_count\": 1,\n    \"total_quantity\": 2,\n    \"total\": \"200.00\",\n    \"product_subtotal\": \"200.00\",\n    \"delivery_fee\": \"0.00\",\n    \"delivery_quote\": null\n  }\n}"
             }
           ]
         }

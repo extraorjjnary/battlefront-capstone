@@ -192,6 +192,8 @@ class OrderController extends Controller
                 })->values()->all(),
                 'item_count' => $order->items->count(),
                 'total_quantity' => $order->items->sum('quantity'),
+                'product_subtotal' => $order->product_subtotal,
+                'delivery_fee' => $order->delivery_fee,
                 'total' => $order->total_amount,
             ],
         ]);
