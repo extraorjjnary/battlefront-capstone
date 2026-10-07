@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ShippingProfile;
 use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
@@ -21,6 +22,7 @@ use Illuminate\Support\Facades\Storage;
  * @property int $id
  * @property string $product_code
  * @property bool $is_catalog_imported
+ * @property ShippingProfile $shipping_profile
  * @property string $name
  * @property string|null $description
  * @property int $category_id
@@ -43,6 +45,7 @@ use Illuminate\Support\Facades\Storage;
  */
 #[Fillable([
     'product_code',
+    'shipping_profile',
     'name',
     'description',
     'category_id',
@@ -74,6 +77,7 @@ class Product extends Model
      */
     protected $attributes = [
         'is_catalog_imported' => false,
+        'shipping_profile' => 'standard',
         'is_featured' => false,
         'is_active' => true,
     ];
@@ -223,6 +227,7 @@ class Product extends Model
     {
         return [
             'is_catalog_imported' => 'boolean',
+            'shipping_profile' => ShippingProfile::class,
             'price' => 'decimal:2',
             'is_featured' => 'boolean',
             'discount_price' => 'decimal:2',

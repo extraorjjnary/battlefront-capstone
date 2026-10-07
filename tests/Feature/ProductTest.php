@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ShippingProfile;
 use App\Models\Category;
 use App\Models\Product;
 use Illuminate\Database\QueryException;
@@ -10,6 +11,7 @@ test('the product schema follows the approved ERD decisions', function () {
         'id',
         'product_code',
         'is_catalog_imported',
+        'shipping_profile',
         'name',
         'description',
         'category_id',
@@ -53,7 +55,30 @@ test('a product persists with its approved defaults and casts', function () {
         ->and($product->is_featured)->toBeBool()
         ->and($product->is_active)->toBeTrue()
         ->and($product->is_active)->toBeBool()
+        ->and($product->shipping_profile)->toBe(ShippingProfile::Standard)
         ->and($product->created_at)->not->toBeNull();
+});
+
+test('shipping profile factory states persist explicit product assignments', function (string $state, ShippingProfile $expected) {
+    $product = Product::factory()->{$state}()->create();
+
+    expect($product->refresh()->shipping_profile)->toBe($expected);
+    $this->assertDatabaseHas('products', ['id' => $product->id, 'shipping_profile' => $expected->value]);
+})->with([
+    'standard' => ['standard', ShippingProfile::Standard],
+    'fragile' => ['fragile', ShippingProfile::Fragile],
+    'bulky' => ['bulky', ShippingProfile::Bulky],
+]);
+
+test('shipping profile assignments can change without category inference', function () {
+    $product = Product::factory()->standard()->create();
+    $newCategory = Category::factory()->create(['name' => 'Monitor']);
+
+    $product->update(['category_id' => $newCategory->id]);
+    expect($product->refresh()->shipping_profile)->toBe(ShippingProfile::Standard);
+
+    $product->update(['shipping_profile' => ShippingProfile::Fragile]);
+    expect($product->refresh()->shipping_profile)->toBe(ShippingProfile::Fragile);
 });
 
 test('a product belongs to a required category', function () {

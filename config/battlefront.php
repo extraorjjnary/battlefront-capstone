@@ -7,6 +7,35 @@ return [
 
     'operating_hours' => '8:00 AM–6:00 PM',
 
+    /**
+     * Battlefront-configured capstone/demo assumptions, not official LBC rates.
+     * Sagay is the fixed origin for this table; no runtime distance lookup is used.
+     */
+    'delivery' => [
+        'origin_city' => 'Sagay City',
+        'is_demo' => true,
+        'assumption_label' => 'Battlefront-configured demo delivery assumptions; not official LBC rates.',
+        'destinations' => [
+            'Sagay City' => ['base_fee' => '80.00', 'transit_min_days' => 1, 'transit_max_days' => 1],
+            'Escalante City' => ['base_fee' => '100.00', 'transit_min_days' => 1, 'transit_max_days' => 2],
+            'Cadiz City' => ['base_fee' => '120.00', 'transit_min_days' => 1, 'transit_max_days' => 2],
+            'Toboso' => ['base_fee' => '140.00', 'transit_min_days' => 2, 'transit_max_days' => 3],
+            'Manapla' => ['base_fee' => '160.00', 'transit_min_days' => 2, 'transit_max_days' => 3],
+            'Calatrava' => ['base_fee' => '180.00', 'transit_min_days' => 2, 'transit_max_days' => 3],
+            'Victorias City' => ['base_fee' => '180.00', 'transit_min_days' => 2, 'transit_max_days' => 3],
+            'E.B. Magalona' => ['base_fee' => '200.00', 'transit_min_days' => 2, 'transit_max_days' => 4],
+            'San Carlos City' => ['base_fee' => '220.00', 'transit_min_days' => 2, 'transit_max_days' => 4],
+            'Silay City' => ['base_fee' => '220.00', 'transit_min_days' => 2, 'transit_max_days' => 4],
+            'Talisay City' => ['base_fee' => '240.00', 'transit_min_days' => 2, 'transit_max_days' => 4],
+            'Bacolod City' => ['base_fee' => '250.00', 'transit_min_days' => 2, 'transit_max_days' => 4],
+        ],
+        'profiles' => [
+            'standard' => ['surcharge' => '0.00', 'preparation_days' => 1],
+            'fragile' => ['surcharge' => '50.00', 'preparation_days' => 2],
+            'bulky' => ['surcharge' => '100.00', 'preparation_days' => 3],
+        ],
+    ],
+
     'branch_emails' => [
         'Sagay City' => 'battlefrontcomputertrading@gmail.com',
         'Guihulngan City' => 'battlefrontcomputertrading@gmail.com',

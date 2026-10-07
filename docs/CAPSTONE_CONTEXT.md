@@ -730,6 +730,7 @@ Subsequent implemented schema/commerce decisions include:
 - the proof column is nullable for non-wallet orders, while checkout requires private proof for GCash/Maya and prohibits it for cash/card-at-store;
 - rejected wallet payments carry customer-facing rejection feedback and allow eligible proof replacement;
 - users have profile delivery-address and appearance fields; products have unique product codes, nullable brands, import tracking, and `image_path` rather than the former image URL field;
+- EXT-86 adds the enum-cast `products.shipping_profile` string field (`standard`, `fragile`, `bulky`), defaulting existing and new products to `standard`. This persisted field is the sole assignment source; category changes do not infer handling. Server-side catalog preparation must explicitly assign fragile/bulky products. Current import and admin forms preserve assignments but do not offer profile editing. Rolling back the profile migration removes those assignments;
 - checkout validation, transactional placement, manual payment decisions, initial stock deduction, explicit cancellation restoration, and completed-order sales recording are implemented, as described in Section 7.
 
 ---
@@ -775,6 +776,37 @@ The system supports:
 - pickup and delivery fulfillment, with recipient and contact snapshots on the order.
 
 Actual delivery continues through Battlefront's existing business processes.
+
+### Configured Delivery Rules — EXT-86
+
+The reusable Laravel `DeliveryRules` service reads `battlefront.delivery` configuration. These are **Battlefront-configured capstone/demo assumptions, not official LBC rates**. Sagay City is the fixed operational origin for the approved table; runtime does not calculate distance or use coordinates, Google Maps, geocoding, routing, or courier APIs.
+
+| Destination | Base fee (PHP) | Transit days |
+| --- | --- | --- |
+| Sagay City | 80.00 | 1 |
+| Escalante City | 100.00 | 1–2 |
+| Cadiz City | 120.00 | 1–2 |
+| Toboso | 140.00 | 2–3 |
+| Manapla | 160.00 | 2–3 |
+| Calatrava | 180.00 | 2–3 |
+| Victorias City | 180.00 | 2–3 |
+| E.B. Magalona | 200.00 | 2–4 |
+| San Carlos City | 220.00 | 2–4 |
+| Silay City | 220.00 | 2–4 |
+| Talisay City | 240.00 | 2–4 |
+| Bacolod City | 250.00 | 2–4 |
+
+| Shipping profile | Handling surcharge (PHP) | Preparation days |
+| --- | --- | --- |
+| standard | 0.00 | 1 |
+| fragile | 50.00 | 2 |
+| bulky | 100.00 | 3 |
+
+Priority is explicitly `standard < fragile < bulky`. Delivery fee is the destination base fee plus the highest applicable surcharge **once**, regardless of cart line count or quantity. Money remains two-decimal strings, added with BCMath at scale 2. Relative ETA minimum/maximum is the selected profile's preparation days plus the destination transit minimum/maximum; no date anchor, holiday policy, or guaranteed courier arrival is implied.
+
+`DeliveryRules::destinations()` lists canonical names and rules; `destination()` rejects unsupported names with `DomainException`. `handling()` accepts a `ShippingProfile`, and `highestProfile()` reads an iterable of server-loaded Products. `quote()` accepts a `FulfillmentMethod`, optional canonical destination name, and those Products; callers cannot supply fee, preparation, surcharge, or ETA values. Quotes include origin, demo identification, selected profile, fee components, and day ranges. Destination lookup is exact and never parses a free-text address. Empty delivery product lists or products lacking a loaded profile raise `InvalidArgumentException`. Pickup returns no delivery quote before destination or product evaluation.
+
+EXT-86 implements the rule layer and product assignment field only. Current checkout/order totals and web/mobile contracts do not yet apply these delivery quotes. EXT-87 owns quote snapshot/shipment persistence; EXT-88 owns shared checkout integration. Shipment workflow, notifications, and live tracking are not implemented by EXT-86.
 
 Outside scope:
 
