@@ -12,6 +12,7 @@ return [
      * Sagay is the fixed origin for this table; no runtime distance lookup is used.
      */
     'delivery' => [
+        'carrier' => 'lbc',
         'origin_city' => 'Sagay City',
         'is_demo' => true,
         'assumption_label' => 'Battlefront-configured demo delivery assumptions; not official LBC rates.',

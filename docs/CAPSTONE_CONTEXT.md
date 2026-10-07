@@ -678,6 +678,7 @@ Current migrations/models implement the following core entities:
 - Cart Items
 - Orders
 - Order Items
+- Shipments (EXT-87 persistence; shipment workflow is deferred)
 - Sales
 - Forecasts
 - Chatbot Knowledge
@@ -697,6 +698,7 @@ Implemented relationships include:
 - Cart Items and Products;
 - Orders and Order Items;
 - Order Items and Products;
+- Orders and Shipments through one unique `shipments.order_id` for quoted delivery orders;
 - Orders and Sales;
 - Products and Forecasts.
 
@@ -732,6 +734,7 @@ Subsequent implemented schema/commerce decisions include:
 - users have profile delivery-address and appearance fields; products have unique product codes, nullable brands, import tracking, and `image_path` rather than the former image URL field;
 - EXT-86 adds the enum-cast `products.shipping_profile` string field (`standard`, `fragile`, `bulky`), defaulting existing and new products to `standard`. This persisted field is the sole assignment source; category changes do not infer handling. Server-side catalog preparation must explicitly assign fragile/bulky products. Current import and admin forms preserve assignments but do not offer profile editing. Rolling back the profile migration removes those assignments;
 - checkout validation, transactional placement, manual payment decisions, initial stock deduction, explicit cancellation restoration, and completed-order sales recording are implemented, as described in Section 7.
+- EXT-87 adds immutable commercial snapshots on Order and a separate Shipment fulfillment snapshot. Historical order totals remain unchanged; historical subtotal/quote fields stay nullable and delivery fee defaults to zero. No historical shipment or quote is reconstructed. See the delivery persistence contract below.
 
 ---
 
@@ -807,6 +810,24 @@ Priority is explicitly `standard < fragile < bulky`. Delivery fee is the destina
 `DeliveryRules::destinations()` lists canonical names and rules; `destination()` rejects unsupported names with `DomainException`. `handling()` accepts a `ShippingProfile`, and `highestProfile()` reads an iterable of server-loaded Products. `quote()` accepts a `FulfillmentMethod`, optional canonical destination name, and those Products; callers cannot supply fee, preparation, surcharge, or ETA values. Quotes include origin, demo identification, selected profile, fee components, and day ranges. Destination lookup is exact and never parses a free-text address. Empty delivery product lists or products lacking a loaded profile raise `InvalidArgumentException`. Pickup returns no delivery quote before destination or product evaluation.
 
 EXT-86 implements the rule layer and product assignment field only. Current checkout/order totals and web/mobile contracts do not yet apply these delivery quotes. EXT-87 owns quote snapshot/shipment persistence; EXT-88 owns shared checkout integration. Shipment workflow, notifications, and live tracking are not implemented by EXT-86.
+
+### Delivery Snapshot and Shipment Persistence — EXT-87
+
+`OrderPlacementService::executeWithDeliveryQuote()` accepts validated checkout data plus a supported canonical destination, and requires delivery fulfillment. It generates one authoritative EXT-86 quote from the locked current products and persists the order, items, shipment, initial stock deduction, and cart consumption in the existing retried transaction. Shipment creation failure rolls back all of those database changes. No caller-supplied fees or estimates are accepted, and no external mapping/courier API is called.
+
+Order owns `delivery_destination`, `delivery_base_fee`, `shipping_profile`, `handling_surcharge`, `delivery_fee`, and `product_subtotal`; existing `total_amount` is the final total, calculated as subtotal plus delivery fee using BCMath at scale 2. All money columns use DECIMAL(12,2) and decimal-string casts. Order also stores `delivery_origin_city`, `delivery_is_demo`, and `delivery_assumption_label` so historical demo assumptions retain their original context. Snapshot values are not re-read from current configuration or product profiles.
+
+Shipment owns the configured manual carrier (`battlefront.delivery.carrier`, initially `lbc`), its separate enum-cast status, and `preparation_days`, `transit_min_days`, `transit_max_days`, `eta_min_days`, and `eta_max_days`. It reads the immutable handling profile through its Order relationship rather than copying that profile into a second column. The unique order foreign key permits one Shipment per quoted delivery order and restricts deletion of its owning order. Shipment model persistence rejects pickup and unquoted legacy orders and protects ownership, carrier, and relative ETA context from subsequent edits.
+
+Initial status is **`awaiting_preparation`** while order/payment are pending. It means only that the shipment record exists; it does not imply packing or dispatch. Order payment/status updates, proof resubmission, cancellation restoration, and completed-order sales recording retain their existing behavior and do not change Shipment status. Sales continue using the persisted final `Order.total_amount`. EXT-89 must extend the allowed shipment statuses and implement the payment/order-processing conditions for `awaiting_preparation → preparing` and later transitions.
+
+`tracking_reference`, `handed_to_carrier_at`, and `delivered_at` remain nullable until actual manually supplied data is recorded by later workflow. No reference is fabricated, no calendar estimate is computed or persisted, and no GPS/location, status-note, timeline, or notification feature is introduced. Shipment has ordinary creation/update timestamps; those do not establish an ETA date anchor.
+
+Pickup placement saves its product subtotal and zero delivery fee and creates no Shipment. As explicitly approved for the EXT-87 persistence boundary, existing web/mobile callers continue using `OrderPlacementService::execute()` until EXT-88 supplies a canonical destination and connects the strict entrypoint. Current delivery submissions therefore retain their pre-revision total and no Shipment; a free-text address is never parsed or treated as a configured zone. Those placements save the known subtotal and zero fee, while quote-specific fields remain null. Existing pre-revision orders remain readable with their original totals and nullable unknown snapshot fields.
+
+Eloquent update guards protect placed commercial snapshots; database constraints validate quote completeness, non-negative amounts, monetary consistency, allowed profile/status values, and relative ETA consistency. Snapshot mutation must not bypass model guards through query-builder updates. Migration rollback refuses to discard saved delivery quotes or shipments; preserve historical data and use a forward migration instead. Opt-in order snapshot and shipment factories use DeliveryRules without changing existing fixture defaults or seeding operational shipments.
+
+EXT-88 owns shared checkout/API quoting and wiring; EXT-89 owns shipment controls, transitions, date anchoring, and customer tracking views; EXT-90 owns notifications. None of those later behaviors is implemented by EXT-87.
 
 Outside scope:
 
