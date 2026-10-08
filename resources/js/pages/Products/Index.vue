@@ -382,13 +382,15 @@ watch([categoryId, brand, tagId], updateFilters);
                         v-for="product in products.data"
                         :key="product.id"
                         :href="productShow(product.id)"
-                        @pointerenter="prefetchProduct($event, productShow(product.id))"
+                        @pointerenter="
+                            prefetchProduct($event, productShow(product.id))
+                        "
                         @pointerleave="cancelProductPrefetch"
                         @pointercancel="cancelProductPrefetch"
                         @pointerdown="cancelProductPrefetch"
                         @click.capture="
                             cancelProductPrefetch();
-                            rememberCatalogVisit($event, product.id)
+                            rememberCatalogVisit($event, product.id);
                         "
                         class="border-border bg-card focus-visible:ring-ring group hover:border-primary/60 flex min-h-full flex-col overflow-hidden border transition-colors focus-visible:ring-2 focus-visible:outline-none"
                     >

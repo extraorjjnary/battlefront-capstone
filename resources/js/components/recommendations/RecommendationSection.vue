@@ -1,7 +1,14 @@
 <script setup>
 import { Link, usePage } from '@inertiajs/vue3';
 import { ArrowRight } from '@lucide/vue';
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import {
+    computed,
+    nextTick,
+    onBeforeUnmount,
+    onMounted,
+    ref,
+    watch,
+} from 'vue';
 import ProductImage from '@/components/catalog/ProductImage.vue';
 import ProductPrice from '@/components/catalog/ProductPrice.vue';
 import StockAvailability from '@/components/catalog/StockAvailability.vue';
@@ -21,9 +28,12 @@ const props = defineProps({
 const page = usePage();
 const recommendationCards = ref([]);
 const dismissedProductIds = ref(new Set());
-const visibleRecommendations = computed(() => props.recommendations.filter(
-    (recommendation) => !dismissedProductIds.value.has(recommendation.product.id),
-));
+const visibleRecommendations = computed(() =>
+    props.recommendations.filter(
+        (recommendation) =>
+            !dismissedProductIds.value.has(recommendation.product.id),
+    ),
+);
 const visibleCards = new Set();
 const impressionTimers = new Map();
 let observer;
@@ -84,11 +94,19 @@ function recordInteraction(recommendation, eventType, position) {
 }
 
 function recommendationPosition(recommendation) {
-    return visibleRecommendations.value.findIndex((item) => item.product.id === recommendation.product.id) + 1;
+    return (
+        visibleRecommendations.value.findIndex(
+            (item) => item.product.id === recommendation.product.id,
+        ) + 1
+    );
 }
 
 function dismissRecommendation(recommendation, eventType) {
-    recordInteraction(recommendation, eventType, recommendationPosition(recommendation));
+    recordInteraction(
+        recommendation,
+        eventType,
+        recommendationPosition(recommendation),
+    );
 
     const nextDismissedIds = new Set(dismissedProductIds.value);
     nextDismissedIds.add(recommendation.product.id);
@@ -99,7 +117,10 @@ function dismissRecommendation(recommendation, eventType) {
         const saved = readDismissals();
         saved[recommendation.product.id] = Date.now();
         const entries = Object.entries(saved).slice(-100);
-        storage.setItem(dismissalStorageKey.value, JSON.stringify(Object.fromEntries(entries)));
+        storage.setItem(
+            dismissalStorageKey.value,
+            JSON.stringify(Object.fromEntries(entries)),
+        );
     } catch {
         // Recommendation feedback should never interrupt shopping.
     }
@@ -115,17 +136,27 @@ const dismissalStorageKey = computed(() => {
 
 function readDismissals() {
     const storage = page.props.auth?.user ? localStorage : sessionStorage;
-    const saved = JSON.parse(storage.getItem(dismissalStorageKey.value) ?? '{}');
+    const saved = JSON.parse(
+        storage.getItem(dismissalStorageKey.value) ?? '{}',
+    );
     if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return {};
-    return Object.fromEntries(Object.entries(saved).filter(([id, time]) =>
-        Number.isInteger(Number(id)) && Number(id) > 0 && Number.isFinite(time)
-        && time > Date.now() - 90 * 24 * 60 * 60 * 1000 && time <= Date.now(),
-    ));
+    return Object.fromEntries(
+        Object.entries(saved).filter(
+            ([id, time]) =>
+                Number.isInteger(Number(id)) &&
+                Number(id) > 0 &&
+                Number.isFinite(time) &&
+                time > Date.now() - 90 * 24 * 60 * 60 * 1000 &&
+                time <= Date.now(),
+        ),
+    );
 }
 
 function loadDismissedRecommendations() {
     try {
-        localStorage.removeItem('battlefront:dismissed-recommendations:v1:guest');
+        localStorage.removeItem(
+            'battlefront:dismissed-recommendations:v1:guest',
+        );
         const storage = page.props.auth?.user ? localStorage : sessionStorage;
         const saved = readDismissals();
         storage.setItem(dismissalStorageKey.value, JSON.stringify(saved));
@@ -145,7 +176,10 @@ function clearImpressionObservation() {
 }
 
 function observeRecommendationCards() {
-    if (document.visibilityState !== 'visible' || !('IntersectionObserver' in window)) {
+    if (
+        document.visibilityState !== 'visible' ||
+        !('IntersectionObserver' in window)
+    ) {
         return;
     }
 
@@ -159,15 +193,29 @@ function observeRecommendationCards() {
 
                     if (!impressionTimers.has(card)) {
                         const timer = window.setTimeout(() => {
-                            const index = Number(card.dataset.recommendationPosition);
-                            const productId = Number(card.dataset.recommendationProductId);
-                            const recommendation = visibleRecommendations.value.find(
-                                (item) => item.product.id === productId,
+                            const index = Number(
+                                card.dataset.recommendationPosition,
                             );
+                            const productId = Number(
+                                card.dataset.recommendationProductId,
+                            );
+                            const recommendation =
+                                visibleRecommendations.value.find(
+                                    (item) => item.product.id === productId,
+                                );
 
-                            if (document.visibilityState === 'visible' && visibleCards.has(card) && recommendation && card.dataset.impressionTracked !== 'true') {
+                            if (
+                                document.visibilityState === 'visible' &&
+                                visibleCards.has(card) &&
+                                recommendation &&
+                                card.dataset.impressionTracked !== 'true'
+                            ) {
                                 card.dataset.impressionTracked = 'true';
-                                recordInteraction(recommendation, 'impression', index);
+                                recordInteraction(
+                                    recommendation,
+                                    'impression',
+                                    index,
+                                );
                             }
 
                             impressionTimers.delete(card);
@@ -202,7 +250,8 @@ async function refreshObservation() {
     clearImpressionObservation();
     const version = observationVersion;
     await nextTick();
-    if (isMounted && version === observationVersion) observeRecommendationCards();
+    if (isMounted && version === observationVersion)
+        observeRecommendationCards();
 }
 
 onMounted(() => {
@@ -230,7 +279,9 @@ onBeforeUnmount(() => {
     >
         <div class="flex flex-wrap items-end justify-between gap-4">
             <div class="max-w-2xl">
-                <p class="text-primary text-xs font-bold tracking-[0.18em] uppercase">
+                <p
+                    class="text-primary text-xs font-bold tracking-[0.18em] uppercase"
+                >
                     Product recommendations
                 </p>
                 <h2
@@ -252,8 +303,13 @@ onBeforeUnmount(() => {
             </Button>
         </div>
 
-        <p v-if="visibleRecommendations.length === 0" class="text-muted-foreground mt-5 text-sm" role="status">
-            You have hidden these suggestions. Browse the catalog for more products.
+        <p
+            v-if="visibleRecommendations.length === 0"
+            class="text-muted-foreground mt-5 text-sm"
+            role="status"
+        >
+            You have hidden these suggestions. Browse the catalog for more
+            products.
         </p>
         <div v-else class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <article
@@ -266,7 +322,9 @@ onBeforeUnmount(() => {
             >
                 <Link
                     :href="productShow(recommendation.product.id)"
-                    @click="recordInteraction(recommendation, 'click', index + 1)"
+                    @click="
+                        recordInteraction(recommendation, 'click', index + 1)
+                    "
                     class="focus-visible:ring-ring block focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                     :aria-label="`View ${recommendation.product.name}`"
                 >
@@ -280,37 +338,57 @@ onBeforeUnmount(() => {
 
                 <div class="flex flex-1 flex-col gap-3 p-4">
                     <div class="min-w-0">
-                        <p class="text-muted-foreground text-xs font-semibold tracking-wide uppercase">
+                        <p
+                            class="text-muted-foreground text-xs font-semibold tracking-wide uppercase"
+                        >
                             {{ recommendation.product.category.name }}
                         </p>
                         <Link
                             :href="productShow(recommendation.product.id)"
-                            @click="recordInteraction(recommendation, 'click', index + 1)"
+                            @click="
+                                recordInteraction(
+                                    recommendation,
+                                    'click',
+                                    index + 1,
+                                )
+                            "
                             class="focus-visible:ring-ring mt-1 block rounded-sm text-base leading-snug font-bold focus-visible:ring-2 focus-visible:outline-none"
                         >
                             {{ recommendation.product.name }}
                         </Link>
                     </div>
 
-                    <p class="text-muted-foreground line-clamp-2 text-xs leading-5">
+                    <p
+                        class="text-muted-foreground line-clamp-2 text-xs leading-5"
+                    >
                         {{ recommendation.reasons[0]?.value }}
                     </p>
 
-                    <div class="mt-auto flex flex-wrap items-end justify-between gap-3">
+                    <div
+                        class="mt-auto flex flex-wrap items-end justify-between gap-3"
+                    >
                         <ProductPrice
                             :price="recommendation.product.price"
-                            :discount-price="recommendation.product.discount_price"
+                            :discount-price="
+                                recommendation.product.discount_price
+                            "
                         />
-                        <StockAvailability :inventory="recommendation.product.inventory" />
+                        <StockAvailability
+                            :inventory="recommendation.product.inventory"
+                        />
                     </div>
 
-                    <div class="border-border flex flex-wrap gap-2 border-t pt-3">
+                    <div
+                        class="border-border flex flex-wrap gap-2 border-t pt-3"
+                    >
                         <Button
                             type="button"
                             variant="ghost"
                             size="sm"
                             class="min-h-10 px-2 text-xs"
-                            @click="dismissRecommendation(recommendation, 'dismiss')"
+                            @click="
+                                dismissRecommendation(recommendation, 'dismiss')
+                            "
                         >
                             Hide
                         </Button>
@@ -319,7 +397,12 @@ onBeforeUnmount(() => {
                             variant="ghost"
                             size="sm"
                             class="min-h-10 px-2 text-xs"
-                            @click="dismissRecommendation(recommendation, 'report_wrong')"
+                            @click="
+                                dismissRecommendation(
+                                    recommendation,
+                                    'report_wrong',
+                                )
+                            "
                         >
                             Report a problem
                         </Button>

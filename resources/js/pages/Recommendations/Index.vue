@@ -42,21 +42,31 @@ const isAuthenticated = computed(() => Boolean(page.props.auth?.user));
                     aria-hidden="true"
                 />
                 <div class="max-w-3xl">
-                    <p class="text-primary text-xs font-bold tracking-[0.2em] uppercase">
+                    <p
+                        class="text-primary text-xs font-bold tracking-[0.2em] uppercase"
+                    >
                         Product recommendations
                     </p>
                     <h1
                         id="recommendation-heading"
                         class="mt-3 text-3xl font-bold tracking-tight sm:text-4xl"
                     >
-                        {{ is_personalized ? 'Recommended for you' : has_featured_fallback ? 'Popular and featured products' : 'Popular products' }}
+                        {{
+                            is_personalized
+                                ? 'Recommended for you'
+                                : has_featured_fallback
+                                  ? 'Popular and featured products'
+                                  : 'Popular products'
+                        }}
                     </h1>
                     <p class="text-muted-foreground mt-4 max-w-2xl leading-7">
-                        {{ is_personalized
-                            ? 'Suggestions reflect recent searches, products you viewed, items in your cart, completed orders, and products bought by customers with overlapping purchase histories.'
-                            : has_featured_fallback
-                              ? 'Browse popular products and currently available featured picks from Battlefront.'
-                              : 'These products appear often in completed Battlefront orders and are currently available in Sagay.' }}
+                        {{
+                            is_personalized
+                                ? 'Suggestions reflect recent searches, products you viewed, items in your cart, completed orders, and products bought by customers with overlapping purchase histories.'
+                                : has_featured_fallback
+                                  ? 'Browse popular products and currently available featured picks from Battlefront.'
+                                  : 'These products appear often in completed Battlefront orders and are currently available in Sagay.'
+                        }}
                     </p>
                 </div>
             </section>
@@ -67,9 +77,16 @@ const isAuthenticated = computed(() => Boolean(page.props.auth?.user));
                 role="status"
             >
                 <div>
-                    <h2 class="font-semibold">Personalized recommendations are off</h2>
-                    <p class="text-muted-foreground mt-1 max-w-2xl text-sm leading-6">
-                        These suggestions use popular and featured products. Turn personalization on to use your eligible browsing and shopping activity. You can also change this in Profile settings.
+                    <h2 class="font-semibold">
+                        Personalized recommendations are off
+                    </h2>
+                    <p
+                        class="text-muted-foreground mt-1 max-w-2xl text-sm leading-6"
+                    >
+                        These suggestions use popular and featured products.
+                        Turn personalization on to use your eligible browsing
+                        and shopping activity. You can also change this in
+                        Profile settings.
                     </p>
                 </div>
                 <Button as-child class="shrink-0">
@@ -83,13 +100,26 @@ const isAuthenticated = computed(() => Boolean(page.props.auth?.user));
                 </Button>
             </section>
 
-            <section v-if="recommendations.length === 0" class="border-border bg-card mt-8 border p-8 text-center sm:p-12" aria-live="polite">
-                <PackageSearch class="text-primary mx-auto size-8" aria-hidden="true" />
-                <h2 class="mt-4 text-lg font-bold">No recommendations are available yet</h2>
-                <p class="text-muted-foreground mx-auto mt-2 max-w-md text-sm leading-6">
-                    {{ is_personalized
-                        ? 'Try searching the catalog, viewing products, or adding an item to your cart to shape future suggestions.'
-                        : 'Popular products will appear as completed orders build up. You can browse the current catalog in the meantime.' }}
+            <section
+                v-if="recommendations.length === 0"
+                class="border-border bg-card mt-8 border p-8 text-center sm:p-12"
+                aria-live="polite"
+            >
+                <PackageSearch
+                    class="text-primary mx-auto size-8"
+                    aria-hidden="true"
+                />
+                <h2 class="mt-4 text-lg font-bold">
+                    No recommendations are available yet
+                </h2>
+                <p
+                    class="text-muted-foreground mx-auto mt-2 max-w-md text-sm leading-6"
+                >
+                    {{
+                        is_personalized
+                            ? 'Try searching the catalog, viewing products, or adding an item to your cart to shape future suggestions.'
+                            : 'Popular products will appear as completed orders build up. You can browse the current catalog in the meantime.'
+                    }}
                 </p>
                 <div class="mt-5 flex flex-wrap justify-center gap-3">
                     <Button as-child variant="outline">

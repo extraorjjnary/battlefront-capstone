@@ -8,7 +8,10 @@ import { useProductPrefetch } from '../../composables/useProductPrefetch.js';
 
 function prefetchHarness(t, { hover = true } = {}) {
     t.mock.timers.enable({ apis: ['setTimeout'] });
-    const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+    const originalWindow = Object.getOwnPropertyDescriptor(
+        globalThis,
+        'window',
+    );
     Object.defineProperty(globalThis, 'window', {
         configurable: true,
         value: { matchMedia: () => ({ matches: hover }) },
@@ -79,7 +82,9 @@ test('a new hovered product replaces the previous pending request', (t) => {
     t.mock.timers.tick(200);
 
     assert.equal(harness.request.mock.callCount(), 1);
-    assert.deepEqual(harness.request.mock.calls[0].arguments, [productRoute(2)]);
+    assert.deepEqual(harness.request.mock.calls[0].arguments, [
+        productRoute(2),
+    ]);
 });
 
 test('repeat hovers reuse cached data and can prefetch again after eviction', (t) => {
@@ -142,33 +147,62 @@ test('disposing the catalog cancels its pending hover request', (t) => {
 
 function loadCatalog(rememberVisit) {
     const primitive = {};
-    const modules = new Proxy({
-        vue: Vue,
-        '@inertiajs/vue3': { Head: primitive, InfiniteScroll: primitive, Link, router },
-        '@/routes/products': { index: () => productRoute(''), show: productRoute },
-        '@/composables/useProductPrefetch': { useProductPrefetch },
-        '@/composables/useDebouncedSearch': {
-            useDebouncedSearch: () => ({ search: Vue.ref(''), isSearching: Vue.ref(false) }),
+    const modules = new Proxy(
+        {
+            vue: Vue,
+            '@inertiajs/vue3': {
+                Head: primitive,
+                InfiniteScroll: primitive,
+                Link,
+                router,
+            },
+            '@/routes/products': {
+                index: () => productRoute(''),
+                show: productRoute,
+            },
+            '@/composables/useProductPrefetch': { useProductPrefetch },
+            '@/composables/useDebouncedSearch': {
+                useDebouncedSearch: () => ({
+                    search: Vue.ref(''),
+                    isSearching: Vue.ref(false),
+                }),
+            },
+            '@/lib/catalogReturn': { rememberCatalogVisit: rememberVisit },
         },
-        '@/lib/catalogReturn': { rememberCatalogVisit: rememberVisit },
-    }, { get: (target, name) => target[name] ?? new Proxy({}, { get: () => primitive }) });
-    const { descriptor } = parse(readFileSync(new URL('./Index.vue', import.meta.url), 'utf8'));
-    const script = compileScript(descriptor, { id: 'catalog-prefetch-test', inlineTemplate: true });
+        {
+            get: (target, name) =>
+                target[name] ?? new Proxy({}, { get: () => primitive }),
+        },
+    );
+    const { descriptor } = parse(
+        readFileSync(new URL('./Index.vue', import.meta.url), 'utf8'),
+    );
+    const script = compileScript(descriptor, {
+        id: 'catalog-prefetch-test',
+        inlineTemplate: true,
+    });
     const code = script.content
-        .replace(/import\s*\{([^}]+)\}\s*from\s*['"]([^'"]+)['"];?/g, (_, names, name) =>
-            `const { ${names.replace(/\s+as\s+/g, ': ')} } = modules[${JSON.stringify(name)}];`)
-        .replace(/import\s+(\w+)\s+from\s*['"]([^'"]+)['"];?/g, (_, name, moduleName) =>
-            `const ${name} = modules[${JSON.stringify(moduleName)}].default;`)
+        .replace(
+            /import\s*\{([^}]+)\}\s*from\s*['"]([^'"]+)['"];?/g,
+            (_, names, name) =>
+                `const { ${names.replace(/\s+as\s+/g, ': ')} } = modules[${JSON.stringify(name)}];`,
+        )
+        .replace(
+            /import\s+(\w+)\s+from\s*['"]([^'"]+)['"];?/g,
+            (_, name, moduleName) =>
+                `const ${name} = modules[${JSON.stringify(moduleName)}].default;`,
+        )
         .replace('export default', 'return');
 
     return new Function('modules', code)(modules);
 }
 
 function productCard(node) {
-    if (node?.type === Link && node.props?.href?.url === '/products/1') return node;
+    if (node?.type === Link && node.props?.href?.url === '/products/1')
+        return node;
     const children = Array.isArray(node?.children)
         ? node.children
-        : node?.children?.default?.() ?? [];
+        : (node?.children?.default?.() ?? []);
     for (const child of children) {
         const found = productCard(child);
         if (found) return found;
@@ -178,16 +212,41 @@ function productCard(node) {
 test('catalog cards wire hover cancellation while retaining their Inertia links and click history', (t) => {
     const harness = prefetchHarness(t);
     const rememberVisit = t.mock.fn();
-    const render = harness.scope.run(() => loadCatalog(rememberVisit).setup({
-        products: { data: [{ id: 1, name: 'Graphics card', category: {}, inventory: {}, tags: [] }], total: 1 },
-        filters: { q: null, category_id: null, brand: null, tag_id: null },
-        filter_options: { categories: [], brands: [], tags: [] },
-    }, { expose() {} }));
+    const render = harness.scope.run(() =>
+        loadCatalog(rememberVisit).setup(
+            {
+                products: {
+                    data: [
+                        {
+                            id: 1,
+                            name: 'Graphics card',
+                            category: {},
+                            inventory: {},
+                            tags: [],
+                        },
+                    ],
+                    total: 1,
+                },
+                filters: {
+                    q: null,
+                    category_id: null,
+                    brand: null,
+                    tag_id: null,
+                },
+                filter_options: { categories: [], brands: [], tags: [] },
+            },
+            { expose() {} },
+        ),
+    );
     const card = productCard(render({}, []));
     assert.deepEqual(card.props.href, productRoute(1));
     assert.equal(card.props.prefetch, undefined);
 
-    for (const cancelEvent of ['onPointerleave', 'onPointercancel', 'onPointerdown']) {
+    for (const cancelEvent of [
+        'onPointerleave',
+        'onPointercancel',
+        'onPointerdown',
+    ]) {
         card.props.onPointerenter(mouse);
         t.mock.timers.tick(100);
         card.props[cancelEvent]();
@@ -204,5 +263,7 @@ test('catalog cards wire hover cancellation while retaining their Inertia links 
 
     card.props.onPointerenter(mouse);
     t.mock.timers.tick(200);
-    assert.deepEqual(harness.request.mock.calls[0].arguments, [card.props.href]);
+    assert.deepEqual(harness.request.mock.calls[0].arguments, [
+        card.props.href,
+    ]);
 });

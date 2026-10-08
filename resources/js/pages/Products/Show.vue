@@ -40,7 +40,10 @@ let viewRequest = null;
 
 function postActivity(route, payload = {}) {
     const xsrfToken = decodeURIComponent(
-        document.cookie.split('; ').find((cookie) => cookie.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? '',
+        document.cookie
+            .split('; ')
+            .find((cookie) => cookie.startsWith('XSRF-TOKEN='))
+            ?.split('=')[1] ?? '',
     );
     return fetch(route.url, {
         method: route.method.toUpperCase(),
@@ -53,11 +56,17 @@ function postActivity(route, payload = {}) {
             'X-XSRF-TOKEN': xsrfToken,
         },
         body: JSON.stringify(payload),
-    }).then((response) => response.ok).catch(() => false);
+    })
+        .then((response) => response.ok)
+        .catch(() => false);
 }
 
 function startViewing() {
-    if (!props.can_record_product_dwell || document.visibilityState !== 'visible') return;
+    if (
+        !props.can_record_product_dwell ||
+        document.visibilityState !== 'visible'
+    )
+        return;
     viewRequest ??= postActivity(storeProductView.post(trackedProductId));
     visibleSince ??= performance.now();
 }
@@ -67,8 +76,9 @@ function recordVisibleTime() {
         return;
     }
 
-    const visibleMilliseconds = accumulatedVisibleMilliseconds
-        + (visibleSince === null ? 0 : performance.now() - visibleSince);
+    const visibleMilliseconds =
+        accumulatedVisibleMilliseconds +
+        (visibleSince === null ? 0 : performance.now() - visibleSince);
     const seconds = Math.min(3600, Math.floor(visibleMilliseconds / 1000));
 
     if (seconds < 5) {
@@ -81,18 +91,21 @@ function recordVisibleTime() {
     });
 }
 
-watch(() => props.product.id, (productId) => {
-    if (visibleSince !== null) {
-        accumulatedVisibleMilliseconds += performance.now() - visibleSince;
-        visibleSince = null;
-    }
+watch(
+    () => props.product.id,
+    (productId) => {
+        if (visibleSince !== null) {
+            accumulatedVisibleMilliseconds += performance.now() - visibleSince;
+            visibleSince = null;
+        }
 
-    recordVisibleTime();
-    accumulatedVisibleMilliseconds = 0;
-    trackedProductId = productId;
-    viewRequest = null;
-    startViewing();
-});
+        recordVisibleTime();
+        accumulatedVisibleMilliseconds = 0;
+        trackedProductId = productId;
+        viewRequest = null;
+        startViewing();
+    },
+);
 
 function handleVisibilityChange() {
     if (document.visibilityState === 'hidden') {
@@ -330,7 +343,13 @@ function returnToCatalog() {
                 <RecommendationSection
                     :recommendations="recommendations"
                     placement="product"
-                    :title="is_personalized ? 'More to explore' : has_featured_fallback ? 'Popular and featured products' : 'Popular products'"
+                    :title="
+                        is_personalized
+                            ? 'More to explore'
+                            : has_featured_fallback
+                              ? 'Popular and featured products'
+                              : 'Popular products'
+                    "
                     :description="
                         is_personalized
                             ? 'Suggestions based on completed orders, your cart, and search or product activity you chose to share.'

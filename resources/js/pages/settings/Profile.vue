@@ -1,18 +1,18 @@
 <script setup>
-import { Form, Head, usePage } from "@inertiajs/vue3";
-import { computed, ref } from "vue";
-import ProfileController from "@/actions/App/Http/Controllers/Settings/ProfileController";
-import Heading from "@/components/Heading.vue";
-import InputError from "@/components/InputError.vue";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { edit } from "@/routes/profile";
+import { Form, Head, usePage } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
+import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
+import Heading from '@/components/Heading.vue';
+import InputError from '@/components/InputError.vue';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { edit } from '@/routes/profile';
 
 const props = defineProps({
     canManageDefaultDeliveryAddress: { type: Boolean, required: true },
-    defaultDeliveryAddress: { type: String, default: "" },
+    defaultDeliveryAddress: { type: String, default: '' },
     searchRecommendationsEnabled: { type: Boolean, default: true },
     productViewRecommendationsEnabled: { type: Boolean, default: true },
     personalizedRecommendationsEnabled: { type: Boolean, default: true },
@@ -22,7 +22,7 @@ defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: "Profile settings",
+                title: 'Profile settings',
                 href: edit(),
             },
         ],
@@ -30,9 +30,13 @@ defineOptions({
 });
 const page = usePage();
 const user = computed(() => page.props.auth.user);
-const personalizedRecommendationsEnabled = ref(props.personalizedRecommendationsEnabled);
+const personalizedRecommendationsEnabled = ref(
+    props.personalizedRecommendationsEnabled,
+);
 const searchRecommendationsEnabled = ref(props.searchRecommendationsEnabled);
-const productViewRecommendationsEnabled = ref(props.productViewRecommendationsEnabled);
+const productViewRecommendationsEnabled = ref(
+    props.productViewRecommendationsEnabled,
+);
 </script>
 
 <template>
@@ -107,10 +111,21 @@ const productViewRecommendationsEnabled = ref(props.productViewRecommendationsEn
                 />
             </div>
 
-            <div v-if="props.canManageDefaultDeliveryAddress" class="grid gap-2">
-                <Label for="personalized-recommendations-enabled">Personalized recommendations</Label>
-                <input type="hidden" name="personalized_recommendations_enabled" value="0" />
-                <label class="text-muted-foreground flex items-start gap-3 text-sm">
+            <div
+                v-if="props.canManageDefaultDeliveryAddress"
+                class="grid gap-2"
+            >
+                <Label for="personalized-recommendations-enabled"
+                    >Personalized recommendations</Label
+                >
+                <input
+                    type="hidden"
+                    name="personalized_recommendations_enabled"
+                    value="0"
+                />
+                <label
+                    class="text-muted-foreground flex items-start gap-3 text-sm"
+                >
                     <input
                         id="personalized-recommendations-enabled"
                         type="checkbox"
@@ -119,13 +134,23 @@ const productViewRecommendationsEnabled = ref(props.productViewRecommendationsEn
                         v-model="personalizedRecommendationsEnabled"
                         class="border-input accent-primary mt-0.5 size-4"
                     />
-                    <span>Use your activity and shopping history for personalized product recommendations. Turning this off pauses personalized suggestions and stops recording searches and views. Saved search and view history is kept until its 90-day expiry and can be used again if you turn personalization back on before then. Your cart and order records remain available for store services.</span>
+                    <span
+                        >Use your activity and shopping history for personalized
+                        product recommendations. Turning this off pauses
+                        personalized suggestions and stops recording searches
+                        and views. Saved search and view history is kept until
+                        its 90-day expiry and can be used again if you turn
+                        personalization back on before then. Your cart and order
+                        records remain available for store services.</span
+                    >
                 </label>
-                <div class="grid gap-3 border-l border-border pl-4">
+                <div class="border-border grid gap-3 border-l pl-4">
                     <p class="text-muted-foreground text-sm">
-                        {{ personalizedRecommendationsEnabled
-                            ? 'Choose which browsing signals to use while personalization is on.'
-                            : 'Turn on personalized recommendations to change which browsing signals may be used. These signals are currently off.' }}
+                        {{
+                            personalizedRecommendationsEnabled
+                                ? 'Choose which browsing signals to use while personalization is on.'
+                                : 'Turn on personalized recommendations to change which browsing signals may be used. These signals are currently off.'
+                        }}
                     </p>
                     <input
                         type="hidden"
@@ -133,18 +158,31 @@ const productViewRecommendationsEnabled = ref(props.productViewRecommendationsEn
                         value="0"
                         :disabled="!personalizedRecommendationsEnabled"
                     />
-                    <label class="text-muted-foreground flex items-start gap-3 text-sm">
+                    <label
+                        class="text-muted-foreground flex items-start gap-3 text-sm"
+                    >
                         <input
                             id="search-recommendations-enabled"
                             type="checkbox"
                             name="search_recommendations_enabled"
                             value="1"
-                            :checked="personalizedRecommendationsEnabled && searchRecommendationsEnabled"
-                            @change="searchRecommendationsEnabled = $event.target.checked"
+                            :checked="
+                                personalizedRecommendationsEnabled &&
+                                searchRecommendationsEnabled
+                            "
+                            @change="
+                                searchRecommendationsEnabled =
+                                    $event.target.checked
+                            "
                             :disabled="!personalizedRecommendationsEnabled"
                             class="border-input accent-primary mt-0.5 size-4"
                         />
-                        <span>Use catalog searches. Turning this off pauses search-based suggestions and recording. Saved search history is kept until its 90-day expiry and used again if you turn this back on before then.</span>
+                        <span
+                            >Use catalog searches. Turning this off pauses
+                            search-based suggestions and recording. Saved search
+                            history is kept until its 90-day expiry and used
+                            again if you turn this back on before then.</span
+                        >
                     </label>
                     <input
                         type="hidden"
@@ -152,18 +190,31 @@ const productViewRecommendationsEnabled = ref(props.productViewRecommendationsEn
                         value="0"
                         :disabled="!personalizedRecommendationsEnabled"
                     />
-                    <label class="text-muted-foreground flex items-start gap-3 text-sm">
+                    <label
+                        class="text-muted-foreground flex items-start gap-3 text-sm"
+                    >
                         <input
                             id="product-view-recommendations-enabled"
                             type="checkbox"
                             name="product_view_recommendations_enabled"
                             value="1"
-                            :checked="personalizedRecommendationsEnabled && productViewRecommendationsEnabled"
-                            @change="productViewRecommendationsEnabled = $event.target.checked"
+                            :checked="
+                                personalizedRecommendationsEnabled &&
+                                productViewRecommendationsEnabled
+                            "
+                            @change="
+                                productViewRecommendationsEnabled =
+                                    $event.target.checked
+                            "
                             :disabled="!personalizedRecommendationsEnabled"
                             class="border-input accent-primary mt-0.5 size-4"
                         />
-                        <span>Use products you view. Turning this off pauses view-based suggestions and recording. Saved view history is kept until its 90-day expiry and used again if you turn this back on before then.</span>
+                        <span
+                            >Use products you view. Turning this off pauses
+                            view-based suggestions and recording. Saved view
+                            history is kept until its 90-day expiry and used
+                            again if you turn this back on before then.</span
+                        >
                     </label>
                 </div>
             </div>

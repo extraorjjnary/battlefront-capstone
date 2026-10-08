@@ -31,25 +31,23 @@ Send `Accept: application/json`. JSON bodies use `Content-Type: application/json
 
 ### Errors
 
-| HTTP | Meaning / shape |
-|---|---|
-| 401 | Missing/invalid required bearer auth: `{"message":"Unauthenticated."}`; invalid login (including administrators): `{"message":"Invalid credentials."}` |
-| 403 | Valid authenticated identity is not allowed; JSON `message` |
-| 404 | Unknown route/product or missing/foreign cart item/order; JSON `message`; do not rely on exact message text |
-| 422 | Request validation or business conflict; `message` plus `errors` mapping field names to arrays of messages |
-| 429 | Rate limit reached; JSON `message`, `Retry-After` header |
-| 500 | With `APP_DEBUG=false`: `{"message":"Server Error"}`. Debug deployments can include diagnostic fields; these are not a client contract. |
+| HTTP | Meaning / shape                                                                                                                                        |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 401  | Missing/invalid required bearer auth: `{"message":"Unauthenticated."}`; invalid login (including administrators): `{"message":"Invalid credentials."}` |
+| 403  | Valid authenticated identity is not allowed; JSON `message`                                                                                            |
+| 404  | Unknown route/product or missing/foreign cart item/order; JSON `message`; do not rely on exact message text                                            |
+| 422  | Request validation or business conflict; `message` plus `errors` mapping field names to arrays of messages                                             |
+| 429  | Rate limit reached; JSON `message`, `Retry-After` header                                                                                               |
+| 500  | With `APP_DEBUG=false`: `{"message":"Server Error"}`. Debug deployments can include diagnostic fields; these are not a client contract.                |
 
 Representative quantity error:
 
 ```json
 {
-  "message": "Quantity must be at least 1.",
-  "errors": {
-    "quantity": [
-      "Quantity must be at least 1."
-    ]
-  }
+    "message": "Quantity must be at least 1.",
+    "errors": {
+        "quantity": ["Quantity must be at least 1."]
+    }
 }
 ```
 
@@ -67,13 +65,13 @@ Catalog validates `page` as an integer >=1; order history uses Laravel's paginat
 
 ### Rate limits
 
-| Scope | Limit |
-|---|---|
-| API v1 | 60 requests/minute/IP across the version group |
-| Registration | Additional 5/minute/IP |
-| Login | Additional 5/minute/lowercased email + IP, shared named login limiter |
-| Chatbot guest | Additional 5/minute/IP, shared with web guests |
-| Chatbot customer | Additional 10/minute/customer, shared across tokens/devices and web |
+| Scope            | Limit                                                                 |
+| ---------------- | --------------------------------------------------------------------- |
+| API v1           | 60 requests/minute/IP across the version group                        |
+| Registration     | Additional 5/minute/IP                                                |
+| Login            | Additional 5/minute/lowercased email + IP, shared named login limiter |
+| Chatbot guest    | Additional 5/minute/IP, shared with web guests                        |
+| Chatbot customer | Additional 10/minute/customer, shared across tokens/devices and web   |
 
 The chatbot-specific 429 message is `Too many questions. Please wait a minute and try again.` The general API limit can be reached first. Respect `Retry-After`. Limits count requests, not only failed attempts. Users behind one LAN can share the IP allowance.
 
@@ -87,37 +85,37 @@ Registration/login create a new Sanctum personal access token with a **30-day pe
 
 All paths below are relative to `base_url`. GET routes also support HEAD through Laravel.
 
-| Method | Path | Access | Success |
-|---|---|---|---|
-| GET | /health | Public | 200 |
-| POST | /auth/register | Public | 201 |
-| POST | /auth/login | Public | 200 |
-| POST | /auth/logout | Customer | 204 |
-| GET | /profile | Customer | 200 |
-| PATCH | /profile | Customer | 200 |
-| GET | /products | Public | 200 |
-| GET | /products/filters | Public | 200 |
-| GET | /products/{product} | Public | 200 |
-| GET | /branches | Public | 200 |
-| GET | /cart | Customer | 200 |
-| POST | /cart/items | Customer | 200 |
-| PATCH | /cart/items/{cartItem} | Customer | 200 |
-| DELETE | /cart/items/{cartItem} | Customer | 200 |
-| GET | /checkout | Customer | 200 |
-| POST | /orders | Customer | 201 |
-| GET | /orders | Customer | 200 |
-| GET | /orders/{order} | Customer | 200 |
-| POST | /orders/{order}/payment-proof | Customer | 200 |
-| GET | /notifications | Customer | 200 |
-| GET | /notifications/unread-count | Customer | 200 |
-| PATCH | /notifications/{notification}/read | Customer | 200 |
-| PATCH | /notifications/read-all | Customer | 200 |
-| PUT | /push-devices/{device} | Customer | 200 |
-| DELETE | /push-devices/{device} | Customer | 204 |
-| POST | /chatbot | Guest/customer | 200 |
-| GET | /recommendations | Guest/customer | 200 |
-| GET | /recommendations/personalized | Customer | 200 |
-| POST | /recommendations/interactions | Guest/customer | 204 |
+| Method | Path                               | Access         | Success |
+| ------ | ---------------------------------- | -------------- | ------- |
+| GET    | /health                            | Public         | 200     |
+| POST   | /auth/register                     | Public         | 201     |
+| POST   | /auth/login                        | Public         | 200     |
+| POST   | /auth/logout                       | Customer       | 204     |
+| GET    | /profile                           | Customer       | 200     |
+| PATCH  | /profile                           | Customer       | 200     |
+| GET    | /products                          | Public         | 200     |
+| GET    | /products/filters                  | Public         | 200     |
+| GET    | /products/{product}                | Public         | 200     |
+| GET    | /branches                          | Public         | 200     |
+| GET    | /cart                              | Customer       | 200     |
+| POST   | /cart/items                        | Customer       | 200     |
+| PATCH  | /cart/items/{cartItem}             | Customer       | 200     |
+| DELETE | /cart/items/{cartItem}             | Customer       | 200     |
+| GET    | /checkout                          | Customer       | 200     |
+| POST   | /orders                            | Customer       | 201     |
+| GET    | /orders                            | Customer       | 200     |
+| GET    | /orders/{order}                    | Customer       | 200     |
+| POST   | /orders/{order}/payment-proof      | Customer       | 200     |
+| GET    | /notifications                     | Customer       | 200     |
+| GET    | /notifications/unread-count        | Customer       | 200     |
+| PATCH  | /notifications/{notification}/read | Customer       | 200     |
+| PATCH  | /notifications/read-all            | Customer       | 200     |
+| PUT    | /push-devices/{device}             | Customer       | 200     |
+| DELETE | /push-devices/{device}             | Customer       | 204     |
+| POST   | /chatbot                           | Guest/customer | 200     |
+| GET    | /recommendations                   | Guest/customer | 200     |
+| GET    | /recommendations/personalized      | Customer       | 200     |
+| POST   | /recommendations/interactions      | Guest/customer | 204     |
 
 Public health/catalog/branches do not authenticate supplied credentials. Registration/login authenticate their submitted fields, not a bearer header.
 
@@ -131,13 +129,13 @@ Customer-only routes require Sanctum plus the customer role gate: missing/invali
 
 Required fields:
 
-| Field | Validation |
-|---|---|
-| name | String, max 255 |
-| email | Valid email string, max 255, unique; lowercased by current Fortify setting |
-| password | String, confirmed by password_confirmation |
-| password_confirmation | Must match password |
-| device_name | String, max 255 |
+| Field                 | Validation                                                                 |
+| --------------------- | -------------------------------------------------------------------------- |
+| name                  | String, max 255                                                            |
+| email                 | Valid email string, max 255, unique; lowercased by current Fortify setting |
+| password              | String, confirmed by password_confirmation                                 |
+| password_confirmation | Must match password                                                        |
+| device_name           | String, max 255                                                            |
 
 The password default outside production is minimum 8 characters. Production config requires at least 12, upper/lowercase, letters, numbers, symbols, and uncompromised-password validation. Use a suitable local test password rather than a committed example.
 
@@ -151,17 +149,17 @@ Both authentication success responses use:
 
 ```json
 {
-  "data": {
-    "user": {
-      "id": 1,
-      "name": "Example Customer",
-      "email": "customer@example.test",
-      "default_delivery_address": null
-    },
-    "token": "<issued-only-at-runtime>",
-    "token_type": "Bearer",
-    "expires_at": "2026-10-31T08:00:00+00:00"
-  }
+    "data": {
+        "user": {
+            "id": 1,
+            "name": "Example Customer",
+            "email": "customer@example.test",
+            "default_delivery_address": null
+        },
+        "token": "<issued-only-at-runtime>",
+        "token_type": "Bearer",
+        "expires_at": "2026-10-31T08:00:00+00:00"
+    }
 }
 ```
 
@@ -175,15 +173,15 @@ GET returns:
 
 ```json
 {
-  "data": {
-    "id": 1,
-    "name": "Example Customer",
-    "email": "customer@example.test",
-    "default_delivery_address": null,
-    "search_recommendations_enabled": true,
-    "product_view_recommendations_enabled": true,
-    "personalized_recommendations_enabled": true
-  }
+    "data": {
+        "id": 1,
+        "name": "Example Customer",
+        "email": "customer@example.test",
+        "default_delivery_address": null,
+        "search_recommendations_enabled": true,
+        "product_view_recommendations_enabled": true,
+        "personalized_recommendations_enabled": true
+    }
 }
 ```
 
@@ -191,12 +189,12 @@ PATCH requires `name` and `email` (same length/email/uniqueness rules, excluding
 
 ```json
 {
-  "name": "Example Customer",
-  "email": "customer@example.test",
-  "default_delivery_address": "Example delivery address",
-  "search_recommendations_enabled": true,
-  "product_view_recommendations_enabled": true,
-  "personalized_recommendations_enabled": true
+    "name": "Example Customer",
+    "email": "customer@example.test",
+    "default_delivery_address": "Example delivery address",
+    "search_recommendations_enabled": true,
+    "product_view_recommendations_enabled": true,
+    "personalized_recommendations_enabled": true
 }
 ```
 
@@ -208,17 +206,17 @@ Successful PATCH returns the same profile shape with all three recommendation pr
 
 Optional query parameters:
 
-| Parameter | Meaning |
-|---|---|
-| q | Nullable string <=255; substring search across product name, brand, description |
-| category_id | Nullable integer; existing active category |
-| category_ids | Nullable array of up to 50 distinct existing active category IDs; matches any selected category |
-| brand | Nullable string <=255; catalog brand equality filter |
-| tag_id | Nullable integer; existing tag (single tag filter) |
-| min_price | Nullable numeric peso amount, 0..9999999999.99, at most 2 decimal places; inclusive effective-price minimum |
-| max_price | Same amount rules; inclusive effective-price maximum; must be >= min_price when both are supplied |
-| sort | Nullable featured, price_asc, or price_desc; omitted/null/blank defaults to featured |
-| page | Nullable integer >=1 |
+| Parameter    | Meaning                                                                                                     |
+| ------------ | ----------------------------------------------------------------------------------------------------------- |
+| q            | Nullable string <=255; substring search across product name, brand, description                             |
+| category_id  | Nullable integer; existing active category                                                                  |
+| category_ids | Nullable array of up to 50 distinct existing active category IDs; matches any selected category             |
+| brand        | Nullable string <=255; catalog brand equality filter                                                        |
+| tag_id       | Nullable integer; existing tag (single tag filter)                                                          |
+| min_price    | Nullable numeric peso amount, 0..9999999999.99, at most 2 decimal places; inclusive effective-price minimum |
+| max_price    | Same amount rules; inclusive effective-price maximum; must be >= min_price when both are supplied           |
+| sort         | Nullable featured, price_asc, or price_desc; omitted/null/blank defaults to featured                        |
+| page         | Nullable integer >=1                                                                                        |
 
 Filters combine. Send multiple categories as indexed query parameters such as `category_ids[0]=1&category_ids[1]=2`, using real IDs from filter options; comma-separated values are not supported. Array keys are normalized to a list. A null or empty category list imposes no additional restriction. Do not send populated `category_id` and `category_ids` together: the API returns 422 with `errors.category_ids`. Invalid elements use dotted error keys such as `category_ids.0`.
 
@@ -230,21 +228,21 @@ When a customer sends a valid Sanctum bearer token, page-one searches are retain
 
 ```json
 {
-  "data": {
-    "categories": [
-      {
-        "id": 1,
-        "name": "Peripherals"
-      }
-    ],
-    "brands": [],
-    "tags": [
-      {
-        "id": 1,
-        "name": "Gaming"
-      }
-    ]
-  }
+    "data": {
+        "categories": [
+            {
+                "id": 1,
+                "name": "Peripherals"
+            }
+        ],
+        "brands": [],
+        "tags": [
+            {
+                "id": 1,
+                "name": "Gaming"
+            }
+        ]
+    }
 }
 ```
 
@@ -252,29 +250,29 @@ List entries and `GET /products/{product}` share this product shape (detail wrap
 
 ```json
 {
-  "data": {
-    "id": 1,
-    "name": "Example Mouse",
-    "description": null,
-    "brand": null,
-    "price": "100.00",
-    "discount_price": null,
-    "image_url": null,
-    "is_featured": false,
-    "category": {
-      "id": 1,
-      "name": "Peripherals"
-    },
-    "tags": [
-      {
+    "data": {
         "id": 1,
-        "name": "Gaming"
-      }
-    ],
-    "inventory": {
-      "status": "in_stock"
+        "name": "Example Mouse",
+        "description": null,
+        "brand": null,
+        "price": "100.00",
+        "discount_price": null,
+        "image_url": null,
+        "is_featured": false,
+        "category": {
+            "id": 1,
+            "name": "Peripherals"
+        },
+        "tags": [
+            {
+                "id": 1,
+                "name": "Gaming"
+            }
+        ],
+        "inventory": {
+            "status": "in_stock"
+        }
     }
-  }
 }
 ```
 
@@ -290,20 +288,20 @@ Unpaginated `data` array. Returns current static directory rows, operational Sag
 
 ```json
 {
-  "data": [
-    {
-      "id": 1,
-      "name": "Example Store",
-      "address": null,
-      "city": "Sagay City",
-      "contact_number": null,
-      "latitude": null,
-      "longitude": null,
-      "email": null,
-      "operating_hours": "8:00 AM–6:00 PM",
-      "is_operational": true
-    }
-  ]
+    "data": [
+        {
+            "id": 1,
+            "name": "Example Store",
+            "address": null,
+            "city": "Sagay City",
+            "contact_number": null,
+            "latitude": null,
+            "longitude": null,
+            "email": null,
+            "operating_hours": "8:00 AM–6:00 PM",
+            "is_operational": true
+        }
+    ]
 }
 ```
 
@@ -322,33 +320,33 @@ All successful operations return **200 with the full refreshed cart**:
 
 ```json
 {
-  "data": {
-    "items": [
-      {
-        "id": 1,
-        "quantity": 2,
-        "product": {
-          "id": 1,
-          "name": "Example Mouse",
-          "brand": null,
-          "image_url": null,
-          "category": "Peripherals",
-          "price": "100.00",
-          "discount_price": null
-        },
-        "unit_price": "100.00",
-        "line_total": "200.00",
-        "availability": {
-          "status": "available",
-          "available_quantity": 5
-        }
-      }
-    ],
-    "item_count": 1,
-    "total_quantity": 2,
-    "total": "200.00",
-    "conflict_count": 0
-  }
+    "data": {
+        "items": [
+            {
+                "id": 1,
+                "quantity": 2,
+                "product": {
+                    "id": 1,
+                    "name": "Example Mouse",
+                    "brand": null,
+                    "image_url": null,
+                    "category": "Peripherals",
+                    "price": "100.00",
+                    "discount_price": null
+                },
+                "unit_price": "100.00",
+                "line_total": "200.00",
+                "availability": {
+                    "status": "available",
+                    "available_quantity": 5
+                }
+            }
+        ],
+        "item_count": 1,
+        "total_quantity": 2,
+        "total": "200.00",
+        "conflict_count": 0
+    }
 }
 ```
 
@@ -362,13 +360,13 @@ Empty cart:
 
 ```json
 {
-  "data": {
-    "items": [],
-    "item_count": 0,
-    "total_quantity": 0,
-    "total": "0.00",
-    "conflict_count": 0
-  }
+    "data": {
+        "items": [],
+        "item_count": 0,
+        "total_quantity": 0,
+        "total": "0.00",
+        "conflict_count": 0
+    }
 }
 ```
 
@@ -380,95 +378,85 @@ Requires an explicit nonempty `cart_item_ids` list of distinct positive integer 
 
 ```json
 {
-  "data": {
-    "cart": {
-      "items": [
-        {
-          "id": 1,
-          "quantity": 2,
-          "product": {
-            "id": 1,
-            "name": "Example Mouse",
-            "brand": null,
-            "image_url": null
-          },
-          "unit_price": "100.00",
-          "line_total": "200.00"
-        }
-      ],
-      "item_count": 1,
-      "total_quantity": 2,
-      "total": "200.00"
-    },
-    "customer": {
-      "name": "Example Customer",
-      "default_delivery_address": null
-    },
-    "pickup_location": {
-      "name": "Example Store — Sagay City",
-      "address": null,
-      "contact_number": null,
-      "operating_hours": "8:00 AM–6:00 PM"
-    },
-    "fulfillment_methods": [
-      {
-        "value": "pickup",
-        "label": "Pickup"
-      },
-      {
-        "value": "delivery",
-        "label": "Delivery"
-      }
-    ],
-    "payment_methods": [
-      {
-        "value": "cash",
-        "label": "Cash",
-        "requires_proof": false,
-        "payment_account": null,
-        "available_for": [
-          "pickup"
-        ]
-      },
-      {
-        "value": "card_at_store",
-        "label": "Card at store",
-        "requires_proof": false,
-        "payment_account": null,
-        "available_for": [
-          "pickup"
-        ]
-      },
-      {
-        "value": "gcash",
-        "label": "GCash",
-        "requires_proof": true,
-        "payment_account": {
-          "account_name": "Example demo account",
-          "account_number": "EXAMPLE",
-          "is_demo": true
+    "data": {
+        "cart": {
+            "items": [
+                {
+                    "id": 1,
+                    "quantity": 2,
+                    "product": {
+                        "id": 1,
+                        "name": "Example Mouse",
+                        "brand": null,
+                        "image_url": null
+                    },
+                    "unit_price": "100.00",
+                    "line_total": "200.00"
+                }
+            ],
+            "item_count": 1,
+            "total_quantity": 2,
+            "total": "200.00"
         },
-        "available_for": [
-          "pickup",
-          "delivery"
-        ]
-      },
-      {
-        "value": "maya",
-        "label": "Maya",
-        "requires_proof": true,
-        "payment_account": {
-          "account_name": "Example demo account",
-          "account_number": "EXAMPLE",
-          "is_demo": true
+        "customer": {
+            "name": "Example Customer",
+            "default_delivery_address": null
         },
-        "available_for": [
-          "pickup",
-          "delivery"
+        "pickup_location": {
+            "name": "Example Store — Sagay City",
+            "address": null,
+            "contact_number": null,
+            "operating_hours": "8:00 AM–6:00 PM"
+        },
+        "fulfillment_methods": [
+            {
+                "value": "pickup",
+                "label": "Pickup"
+            },
+            {
+                "value": "delivery",
+                "label": "Delivery"
+            }
+        ],
+        "payment_methods": [
+            {
+                "value": "cash",
+                "label": "Cash",
+                "requires_proof": false,
+                "payment_account": null,
+                "available_for": ["pickup"]
+            },
+            {
+                "value": "card_at_store",
+                "label": "Card at store",
+                "requires_proof": false,
+                "payment_account": null,
+                "available_for": ["pickup"]
+            },
+            {
+                "value": "gcash",
+                "label": "GCash",
+                "requires_proof": true,
+                "payment_account": {
+                    "account_name": "Example demo account",
+                    "account_number": "EXAMPLE",
+                    "is_demo": true
+                },
+                "available_for": ["pickup", "delivery"]
+            },
+            {
+                "value": "maya",
+                "label": "Maya",
+                "requires_proof": true,
+                "payment_account": {
+                    "account_name": "Example demo account",
+                    "account_number": "EXAMPLE",
+                    "is_demo": true
+                },
+                "available_for": ["pickup", "delivery"]
+            }
         ]
-      }
-    ]
-  }
+    }
 }
 ```
 
@@ -478,28 +466,28 @@ Checkout cart lines omit the ordinary cart's availability and category/price fie
 
 ```json
 {
-  "origin_city": "Sagay City",
-  "destination": "Sagay City",
-  "is_demo": true,
-  "assumption_label": "Battlefront-configured demo delivery assumptions; not official LBC rates.",
-  "shipping_profile": "standard",
-  "base_fee": "80.00",
-  "handling_surcharge": "0.00",
-  "delivery_fee": "80.00",
-  "preparation_days": 1,
-  "transit_min_days": 0,
-  "transit_max_days": 1,
-  "eta_min_days": 1,
-  "eta_max_days": 2,
-  "carrier": "lbc",
-  "packing_expectation": "Standard packing",
-  "product_subtotal": "200.00",
-  "total": "280.00",
-  "eta_anchor_date": "2026-10-08",
-  "eta_timezone": "UTC",
-  "estimated_delivery_start": "2026-10-09",
-  "estimated_delivery_end": "2026-10-10",
-  "notice": "Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification."
+    "origin_city": "Sagay City",
+    "destination": "Sagay City",
+    "is_demo": true,
+    "assumption_label": "Battlefront-configured demo delivery assumptions; not official LBC rates.",
+    "shipping_profile": "standard",
+    "base_fee": "80.00",
+    "handling_surcharge": "0.00",
+    "delivery_fee": "80.00",
+    "preparation_days": 1,
+    "transit_min_days": 0,
+    "transit_max_days": 1,
+    "eta_min_days": 1,
+    "eta_max_days": 2,
+    "carrier": "lbc",
+    "packing_expectation": "Standard packing",
+    "product_subtotal": "200.00",
+    "total": "280.00",
+    "eta_anchor_date": "2026-10-08",
+    "eta_timezone": "UTC",
+    "estimated_delivery_start": "2026-10-09",
+    "estimated_delivery_end": "2026-10-10",
+    "notice": "Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification."
 }
 ```
 
@@ -511,26 +499,26 @@ Calendar dates are checkout-only presentation. One server quote-generation date 
 
 Required fields:
 
-| Field | Rule |
-|---|---|
-| cart_item_ids | Required nonempty list of distinct positive integer cart-item IDs owned by the customer |
-| recipient_name | String <=255 |
-| contact_number | String <=20; preserve formatting as text |
-| fulfillment_method | pickup or delivery |
-| payment_method | cash, card_at_store, gcash, maya |
-| delivery_address | String <=255, required for delivery; prohibited when nonempty for pickup |
+| Field                | Rule                                                                                                                 |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| cart_item_ids        | Required nonempty list of distinct positive integer cart-item IDs owned by the customer                              |
+| recipient_name       | String <=255                                                                                                         |
+| contact_number       | String <=20; preserve formatting as text                                                                             |
+| fulfillment_method   | pickup or delivery                                                                                                   |
+| payment_method       | cash, card_at_store, gcash, maya                                                                                     |
+| delivery_address     | String <=255, required for delivery; prohibited when nonempty for pickup                                             |
 | delivery_destination | Exactly one canonical destination from `delivery_quotes`, required for delivery; prohibited when nonempty for pickup |
-| payment_proof | Required for gcash/maya; prohibited for cash/card_at_store |
+| payment_proof        | Required for gcash/maya; prohibited for cash/card_at_store                                                           |
 
 Pickup accepts all four payment methods. Delivery accepts only gcash/maya. Submit JSON for cash/card pickup:
 
 ```json
 {
-  "cart_item_ids": [12, 15],
-  "recipient_name": "Example Customer",
-  "contact_number": "EXAMPLE",
-  "fulfillment_method": "pickup",
-  "payment_method": "cash"
+    "cart_item_ids": [12, 15],
+    "recipient_name": "Example Customer",
+    "contact_number": "EXAMPLE",
+    "fulfillment_method": "pickup",
+    "payment_method": "cash"
 }
 ```
 
@@ -548,60 +536,60 @@ Client fee/base fee/surcharge/profile/preparation/transit/ETA/subtotal/total val
 
 ```json
 {
-  "data": {
-    "id": 1,
-    "reference": "BF-000001",
-    "created_at": "2026-10-01T08:00:00+00:00",
-    "status": {
-      "value": "pending",
-      "label": "Pending"
-    },
-    "recipient": {
-      "name": "Example Customer",
-      "contact_number": "EXAMPLE"
-    },
-    "fulfillment": {
-      "value": "pickup",
-      "label": "Pickup",
-      "delivery_address": null,
-      "delivery_destination": null
-    },
-    "payment": {
-      "method": {
-        "value": "cash",
-        "label": "Cash"
-      },
-      "status": {
-        "value": "pending",
-        "label": "Pending"
-      },
-      "proof_submitted": false,
-      "notice": "Payment will be handled when you collect your order.",
-      "rejection": null,
-      "can_resubmit_proof": false
-    },
-    "items": [
-      {
+    "data": {
         "id": 1,
-        "product": {
-          "id": 1,
-          "name": "Example Mouse",
-          "brand": null,
-          "image_url": null
+        "reference": "BF-000001",
+        "created_at": "2026-10-01T08:00:00+00:00",
+        "status": {
+            "value": "pending",
+            "label": "Pending"
         },
-        "quantity": 2,
-        "unit_price": "100.00",
-        "line_total": "200.00"
-      }
-    ],
-    "item_count": 1,
-    "total_quantity": 2,
-    "product_subtotal": "200.00",
-    "delivery_fee": "0.00",
-    "delivery_quote": null,
-    "shipment": null,
-    "total": "200.00"
-  }
+        "recipient": {
+            "name": "Example Customer",
+            "contact_number": "EXAMPLE"
+        },
+        "fulfillment": {
+            "value": "pickup",
+            "label": "Pickup",
+            "delivery_address": null,
+            "delivery_destination": null
+        },
+        "payment": {
+            "method": {
+                "value": "cash",
+                "label": "Cash"
+            },
+            "status": {
+                "value": "pending",
+                "label": "Pending"
+            },
+            "proof_submitted": false,
+            "notice": "Payment will be handled when you collect your order.",
+            "rejection": null,
+            "can_resubmit_proof": false
+        },
+        "items": [
+            {
+                "id": 1,
+                "product": {
+                    "id": 1,
+                    "name": "Example Mouse",
+                    "brand": null,
+                    "image_url": null
+                },
+                "quantity": 2,
+                "unit_price": "100.00",
+                "line_total": "200.00"
+            }
+        ],
+        "item_count": 1,
+        "total_quantity": 2,
+        "product_subtotal": "200.00",
+        "delivery_fee": "0.00",
+        "delivery_quote": null,
+        "shipment": null,
+        "total": "200.00"
+    }
 }
 ```
 
@@ -617,22 +605,30 @@ GET order detail, successful placement and payment-proof replacement share the s
 
 ```json
 {
-  "carrier": "lbc",
-  "status": {"value": "preparing", "label": "Preparing for shipment"},
-  "tracking_reference": null,
-  "eta": {
-    "anchor_date": "2026-10-08",
-    "timezone": "UTC",
-    "estimated_delivery_start": "2026-10-10",
-    "estimated_delivery_end": "2026-10-11",
-    "notice": "Battlefront estimate from the start of preparation; arrival is not guaranteed."
-  },
-  "timeline": [
-    {"status": "awaiting_preparation", "label": "Awaiting preparation", "occurred_at": "2026-10-08T08:00:00+00:00"},
-    {"status": "preparing", "label": "Preparing for shipment", "occurred_at": "2026-10-08T09:00:00+00:00"}
-  ],
-  "notice": "Shipment status is manually maintained by Battlefront. This is not live LBC or GPS tracking.",
-  "history_notice": null
+    "carrier": "lbc",
+    "status": { "value": "preparing", "label": "Preparing for shipment" },
+    "tracking_reference": null,
+    "eta": {
+        "anchor_date": "2026-10-08",
+        "timezone": "UTC",
+        "estimated_delivery_start": "2026-10-10",
+        "estimated_delivery_end": "2026-10-11",
+        "notice": "Battlefront estimate from the start of preparation; arrival is not guaranteed."
+    },
+    "timeline": [
+        {
+            "status": "awaiting_preparation",
+            "label": "Awaiting preparation",
+            "occurred_at": "2026-10-08T08:00:00+00:00"
+        },
+        {
+            "status": "preparing",
+            "label": "Preparing for shipment",
+            "occurred_at": "2026-10-08T09:00:00+00:00"
+        }
+    ],
+    "notice": "Shipment status is manually maintained by Battlefront. This is not live LBC or GPS tracking.",
+    "history_notice": null
 }
 ```
 
@@ -652,30 +648,30 @@ History is customer-owned, paginated at 10. Each `data` entry is:
 
 ```json
 {
-  "id": 1,
-  "reference": "BF-000001",
-  "created_at": "2026-10-01T08:00:00+00:00",
-  "status": {
-    "value": "pending",
-    "label": "Pending"
-  },
-  "fulfillment": {
-    "value": "pickup",
-    "label": "Pickup"
-  },
-  "payment": {
-    "method": {
-      "value": "cash",
-      "label": "Cash"
-    },
+    "id": 1,
+    "reference": "BF-000001",
+    "created_at": "2026-10-01T08:00:00+00:00",
     "status": {
-      "value": "pending",
-      "label": "Pending"
-    }
-  },
-  "item_count": 1,
-  "total_quantity": 2,
-  "total": "200.00"
+        "value": "pending",
+        "label": "Pending"
+    },
+    "fulfillment": {
+        "value": "pickup",
+        "label": "Pickup"
+    },
+    "payment": {
+        "method": {
+            "value": "cash",
+            "label": "Cash"
+        },
+        "status": {
+            "value": "pending",
+            "label": "Pending"
+        }
+    },
+    "item_count": 1,
+    "total_quantity": 2,
+    "total": "200.00"
 }
 ```
 
@@ -701,21 +697,21 @@ The web bell separately refreshes its summary every 30 seconds while its tab is 
 
 ```json
 {
-  "id": "12345678-1234-4234-8234-123456789abc",
-  "event": "shipment.in_transit",
-  "title": "Shipment in transit",
-  "body": "There is an update for order BF-000001. Open your order for details.",
-  "occurred_at": "2026-10-08T10:00:00+00:00",
-  "created_at": "2026-10-08T10:00:00+00:00",
-  "read_at": null,
-  "is_read": false,
-  "order": {
-    "id": 1,
-    "reference": "BF-000001",
-    "web_url": "<backend-origin>/orders/1",
-    "api_url": "<backend-origin>/api/v1/orders/1",
-    "deep_link": {"screen": "order_detail", "order_id": 1}
-  }
+    "id": "12345678-1234-4234-8234-123456789abc",
+    "event": "shipment.in_transit",
+    "title": "Shipment in transit",
+    "body": "There is an update for order BF-000001. Open your order for details.",
+    "occurred_at": "2026-10-08T10:00:00+00:00",
+    "created_at": "2026-10-08T10:00:00+00:00",
+    "read_at": null,
+    "is_read": false,
+    "order": {
+        "id": 1,
+        "reference": "BF-000001",
+        "web_url": "<backend-origin>/orders/1",
+        "api_url": "<backend-origin>/api/v1/orders/1",
+        "deep_link": { "screen": "order_detail", "order_id": 1 }
+    }
 }
 ```
 
@@ -732,7 +728,10 @@ Customer events: `payment.verified`, `payment.rejected`, `order.cancelled`, and 
 Generate and retain a device-installation UUID in the mobile app; use it as `{device}`. `PUT /push-devices/{device}` accepts:
 
 ```json
-{"expo_push_token":"ExpoPushToken[client_obtained_token]","platform":"android"}
+{
+    "expo_push_token": "ExpoPushToken[client_obtained_token]",
+    "platform": "android"
+}
 ```
 
 `platform` is required and is `android` or `ios`. Tokens must use a nonempty `ExpoPushToken[...]` or `ExponentPushToken[...]` format and be at most 255 characters. Use Expo's actual project/device token; do not substitute an FCM/APNs token or bearer token. No provider credentials are passed by the client. Invalid fields return 422; malformed device UUID routes return 404.
@@ -770,8 +769,8 @@ POST /chatbot JSON:
 
 ```json
 {
-  "message": "Where is the Sagay store?",
-  "context_token": null
+    "message": "Where is the Sagay store?",
+    "context_token": null
 }
 ```
 
@@ -779,11 +778,11 @@ POST /chatbot JSON:
 
 ```json
 {
-  "data": {
-    "message": "Please sign in with a customer account to check order status.",
-    "source": "fallback",
-    "context_token": "<opaque-context-returned-at-runtime>"
-  }
+    "data": {
+        "message": "Please sign in with a customer account to check order status.",
+        "source": "fallback",
+        "context_token": "<opaque-context-returned-at-runtime>"
+    }
 }
 ```
 
@@ -808,27 +807,30 @@ The example response illustrates a guest order question. Actual text depends on 
 
 ```json
 {
-  "data": [
-    {
-      "product": {
-        "id": 1,
-        "name": "Example Graphics Card",
-        "description": null,
-        "brand": "Example",
-        "price": "10000.00",
-        "discount_price": null,
-        "image_url": null,
-        "is_featured": false,
-        "category": { "id": 1, "name": "Graphics Cards" },
-        "tags": [],
-        "inventory": { "status": "in_stock" }
-      },
-      "effective_price": "10000.00",
-      "reasons": [
-        { "code": "matched_recent_searches", "value": "Matches a recent catalog search" }
-      ]
-    }
-  ]
+    "data": [
+        {
+            "product": {
+                "id": 1,
+                "name": "Example Graphics Card",
+                "description": null,
+                "brand": "Example",
+                "price": "10000.00",
+                "discount_price": null,
+                "image_url": null,
+                "is_featured": false,
+                "category": { "id": 1, "name": "Graphics Cards" },
+                "tags": [],
+                "inventory": { "status": "in_stock" }
+            },
+            "effective_price": "10000.00",
+            "reasons": [
+                {
+                    "code": "matched_recent_searches",
+                    "value": "Matches a recent catalog search"
+                }
+            ]
+        }
+    ]
 }
 ```
 
@@ -853,27 +855,27 @@ The collection uses the [Postman v2.1 JSON format](https://schema.postman.com/) 
 3. Set local values. Do not export/commit populated secrets or personal data. Sensitive variables are marked secret, but that is not a substitute for keeping exports clean.
 4. Select individual requests or a prepared subset. **Do not blindly run every folder**: registration, login, logout, alternative order placements, uploads and negative checks have different prerequisites.
 
-| Variables | Configuration |
-|---|---|
-| base_url | Reachable API root, ending /api/v1; blank in export |
-| email, password, name, device_name | Your disposable local customer; credentials blank in export |
-| token | Automatically captured after successful register/login; protected requests inherit it |
-| product_id, category_id, tag_id, brand | Select actual values from catalog/detail/filter responses |
-| category_id_2 | Another real active category ID for the optional category_ids[1] query entry; leave singular category_id disabled when enabling category_ids entries |
-| min_price, max_price, sort | Optional catalog bounds and featured/price_asc/price_desc ordering; bounds start blank and query entries are disabled |
-| cart_item_id | Captured after Add product; manually selectable from own cart |
-| order_id, order_reference | Captured after placement; manually selectable from history |
-| rejected_order_id | Owned wallet order prepared with rejected payment in web administration |
-| quantity, page, search | Representative nonsecret defaults where useful; optional catalog filters initially disabled |
-| recipient_name, contact_number, delivery_address | Locally supplied test checkout/profile values |
-| delivery_destination | Canonical configured destination; defaults to Sagay City for disposable delivery tests |
-| chatbot_message, follow_up_message | Representative public questions provided |
-| context_token, guest_context_token | Separate customer/guest continuation values captured by chatbot scripts |
-| other_cart_item_id, other_order_id, other_order_reference | Another disposable customer's resources, for ownership checks |
-| admin_token | Local administrator test token supplied out of band; mobile login cannot issue it |
-| invalid_token | Enter any deliberately invalid string locally |
-| revoked_token | Captured locally at successful logout for a revocation check |
-| expired_token | A genuinely expired local test token supplied out of band |
+| Variables                                                 | Configuration                                                                                                                                        |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| base_url                                                  | Reachable API root, ending /api/v1; blank in export                                                                                                  |
+| email, password, name, device_name                        | Your disposable local customer; credentials blank in export                                                                                          |
+| token                                                     | Automatically captured after successful register/login; protected requests inherit it                                                                |
+| product_id, category_id, tag_id, brand                    | Select actual values from catalog/detail/filter responses                                                                                            |
+| category_id_2                                             | Another real active category ID for the optional category_ids[1] query entry; leave singular category_id disabled when enabling category_ids entries |
+| min_price, max_price, sort                                | Optional catalog bounds and featured/price_asc/price_desc ordering; bounds start blank and query entries are disabled                                |
+| cart_item_id                                              | Captured after Add product; manually selectable from own cart                                                                                        |
+| order_id, order_reference                                 | Captured after placement; manually selectable from history                                                                                           |
+| rejected_order_id                                         | Owned wallet order prepared with rejected payment in web administration                                                                              |
+| quantity, page, search                                    | Representative nonsecret defaults where useful; optional catalog filters initially disabled                                                          |
+| recipient_name, contact_number, delivery_address          | Locally supplied test checkout/profile values                                                                                                        |
+| delivery_destination                                      | Canonical configured destination; defaults to Sagay City for disposable delivery tests                                                               |
+| chatbot_message, follow_up_message                        | Representative public questions provided                                                                                                             |
+| context_token, guest_context_token                        | Separate customer/guest continuation values captured by chatbot scripts                                                                              |
+| other_cart_item_id, other_order_id, other_order_reference | Another disposable customer's resources, for ownership checks                                                                                        |
+| admin_token                                               | Local administrator test token supplied out of band; mobile login cannot issue it                                                                    |
+| invalid_token                                             | Enter any deliberately invalid string locally                                                                                                        |
+| revoked_token                                             | Captured locally at successful logout for a revocation check                                                                                         |
+| expired_token                                             | A genuinely expired local test token supplied out of band                                                                                            |
 
 No file path is committed. Select a file in each multipart request after import. IDs start blank so the collection cannot silently assume database IDs. Raw JSON scripts serialize environment values to preserve quotes/backslashes in names/passwords; edit the script template if changing the represented body. Requests never log tokens.
 
