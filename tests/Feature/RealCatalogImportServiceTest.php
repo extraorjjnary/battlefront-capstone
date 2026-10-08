@@ -6,6 +6,7 @@ use App\Models\Inventory;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\User;
+use App\Repositories\Reporting\SalesHistoryCoverageRepository;
 use App\Services\CatalogImagePipeline;
 use App\Services\RealCatalogImportService;
 use Carbon\CarbonImmutable;
@@ -62,6 +63,7 @@ function realCatalogMapping(array $rows = [['00123', 'Exact Product™', 'Graphi
 }
 
 test('historical fixtures and verified catalog imports remain separate across reseeding and reimport', function () {
+    Storage::fake('local');
     $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00'));
     Storage::fake('public');
     $manifest = realCatalogManifest();
@@ -76,12 +78,15 @@ test('historical fixtures and verified catalog imports remain separate across re
         $this->seed(DevelopmentHistoricalSalesSeeder::class);
         expect($realProduct->fresh(['inventory', 'category', 'tags'])->toArray())->toBe($before);
         $fixtureProducts = Product::with('inventory')->where('is_catalog_imported', false)->orderBy('id')->get()->toArray();
+        $coverageBefore = Storage::disk('local')->get(config('forecasting.development_manifest'));
         $second = $importer->execute($mapping, $manifest);
 
         expect($second)->toBe(['created' => 0, 'updated' => 1]);
+        expect(Storage::disk('local')->get(config('forecasting.development_manifest')))->toBe($coverageBefore);
+        expect(app(SalesHistoryCoverageRepository::class)->forProductCode('00123'))->toBeNull();
         expect(Product::with('inventory')->where('is_catalog_imported', false)->orderBy('id')->get()->toArray())->toBe($fixtureProducts);
-        $this->assertDatabaseCount('products', 8);
-        $this->assertDatabaseCount('sales', 16);
+        $this->assertDatabaseCount('products', 14);
+        $this->assertDatabaseCount('sales', 96);
         $this->seed(DevelopmentHistoricalSalesSeeder::class);
         expect($realProduct->fresh(['inventory', 'category', 'tags'])->toArray())->toBe($before);
     } finally {

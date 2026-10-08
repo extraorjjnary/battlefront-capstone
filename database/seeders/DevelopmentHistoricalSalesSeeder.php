@@ -12,6 +12,7 @@ use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
+use App\Repositories\Reporting\SalesHistoryCoverageRepository;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\App;
@@ -26,46 +27,82 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
      * Seed synthetic sales history. Customer ownership satisfies Order persistence
      * only; customer identity is not a forecasting input.
      */
-    public function run(): void
+    public function run(SalesHistoryCoverageRepository $coverage): void
     {
         if (! App::environment(['local', 'testing'])) {
             throw new RuntimeException('Historical sales development data is only allowed in local and testing environments.');
         }
 
         $historyEnd = CarbonImmutable::instance(now(config('app.timezone')))->startOfQuarter();
-        $firstQuarter = $historyEnd->subQuarters(8);
+        $firstMonth = $historyEnd->subMonths(48);
 
-        DB::transaction(function () use ($firstQuarter, $historyEnd): void {
-            $customer = $this->seedCustomer($firstQuarter->subDay());
-            $products = $this->seedProducts($firstQuarter->subDay());
-            $this->removeObsoleteHistory($customer, $products, $firstQuarter, $historyEnd);
+        $coverage->clearDevelopment();
+        $productCodes = DB::transaction(function () use ($firstMonth, $historyEnd): array {
+            $customer = $this->seedCustomer($firstMonth->subDay());
+            $products = $this->seedProducts($firstMonth->subDay());
+            $this->removeObsoleteHistory($customer, $products, $firstMonth, $historyEnd);
 
-            foreach (range(0, 7) as $quarterIndex) {
-                $start = $firstQuarter->addQuarters($quarterIndex);
-                $label = 'Historical Sales Q'.$start->quarter.' '.$start->year;
+            foreach (range(0, 47) as $monthIndex) {
+                $start = $firstMonth->addMonths($monthIndex);
+                $calendarIndex = $start->month - 1;
+                $seasonalQuantity = [8, 10, 12, 16, 20, 24, 28, 26, 22, 18, 14, 12][$calendarIndex];
+                $label = 'Historical Sales '.$start->format('F Y');
 
                 $this->seedOrder($customer, $label, $start, [
                     ['product' => $products['STABLE'], 'quantity' => 4, 'price' => '1000.00'],
-                    ['product' => $products['INCREASING'], 'quantity' => [5, 10, 15, 20, 25, 30, 35, 40][$quarterIndex], 'price' => '2000.00'],
-                    ['product' => $products['DECLINING'], 'quantity' => [40, 35, 30, 25, 20, 15, 10, 5][$quarterIndex], 'price' => '1500.00'],
+                    ['product' => $products['INCREASING'], 'quantity' => $seasonalQuantity + 2 * $monthIndex, 'price' => '2000.00'],
+                    ['product' => $products['DECLINING'], 'quantity' => 120 - 2 * $monthIndex, 'price' => '1500.00'],
                 ]);
 
                 $closingItems = [
                     ['product' => $products['STABLE'], 'quantity' => 6, 'price' => '1000.00'],
-                    ['product' => $products['REPEATING'], 'quantity' => [4, 8, 12, 20, 4, 8, 12, 20][$quarterIndex], 'price' => '500.00'],
-                    ['product' => $products['PRICE'], 'quantity' => 4, 'price' => ['100.00', '100.00', '125.00', '125.00', '150.00', '150.00', '175.00', '175.00'][$quarterIndex]],
+                    ['product' => $products['REPEATING'], 'quantity' => $seasonalQuantity, 'price' => '500.00'],
+                    ['product' => $products['PRICE'], 'quantity' => 4, 'price' => ['100.00', '100.00', '125.00', '125.00', '150.00', '150.00', '175.00', '175.00', '200.00', '200.00', '225.00', '225.00'][$calendarIndex]],
                 ];
-                $sparseQuantity = [0, 0, 3, 0, 0, 6, 0, 9][$quarterIndex];
+                $closingItems[] = ['product' => $products['ABRUPT'], 'quantity' => [...array_fill(0, 12, 10), ...array_fill(0, 12, 15), 80, 5, 120, 8, 90, 6, 150, 12, 100, 4, 130, 9, ...array_fill(0, 6, 5), ...array_fill(0, 6, 120)][$monthIndex], 'price' => '1000.00'];
+                foreach (['UNKNOWN', 'STALE', 'GAPPED'] as $scenario) {
+                    $closingItems[] = ['product' => $products[$scenario], 'quantity' => 10, 'price' => '1000.00'];
+                }
+                if ($monthIndex >= 13) {
+                    $closingItems[] = ['product' => $products['SHORT'], 'quantity' => 10, 'price' => '1000.00'];
+                }
+                $mixedQuantity = [0, 10, 0, 12, 0, 14, 0, 16, 0, 18, 0, 20][$calendarIndex];
+                if ($mixedQuantity > 0) {
+                    $closingItems[] = ['product' => $products['MIXEDZERO'], 'quantity' => $mixedQuantity, 'price' => '1000.00'];
+                }
+                $sparseQuantity = match ($start->month) {
+                    3 => 3,
+                    9 => 9,
+                    default => 0,
+                };
                 if ($sparseQuantity > 0) {
                     $closingItems[] = ['product' => $products['SPARSE'], 'quantity' => $sparseQuantity, 'price' => '2500.00'];
                 }
 
-                $this->seedOrder($customer, $label, $start->endOfQuarter(), $closingItems);
+                $this->seedOrder($customer, $label, $start->endOfMonth(), $closingItems);
             }
+
+            return array_map(fn (Product $product): string => $product->product_code, $products);
         });
 
-        $lastQuarter = $historyEnd->subQuarter();
-        $this->command->info("Synthetic development sales history: Q{$firstQuarter->quarter} {$firstQuarter->year}–Q{$lastQuarter->quarter} {$lastQuarter->year} (8 completed quarters).");
+        $entries = [];
+        foreach ($productCodes as $scenario => $code) {
+            if ($scenario === 'UNKNOWN') {
+                continue;
+            }
+            $entries[$code] = [
+                'granularity' => 'month',
+                'start' => ($scenario === 'SHORT' ? $historyEnd->subMonths(35) : $firstMonth)->toDateString(),
+                'end_exclusive' => ($scenario === 'STALE' ? $historyEnd->subMonth() : $historyEnd)->toDateString(),
+                'unavailable_months' => $scenario === 'GAPPED' ? [$historyEnd->subMonths(6)->toDateString()] : [],
+                'timezone' => config('app.timezone'),
+                'source_kind' => 'synthetic_development',
+                'sales_scope' => 'development_fixture_transactions',
+            ];
+        }
+        $coverage->writeDevelopment($entries);
+
+        $this->command->info('Synthetic development sales history: '.$firstMonth->format('F Y').' - '.$historyEnd->subMonth()->format('F Y').' (48 completed months).');
     }
 
     private function seedCustomer(CarbonImmutable $createdAt): User
@@ -113,6 +150,12 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
             ['code' => 'SPARSE', 'name' => 'Sparse Demand Reference Product', 'category' => 'Peripherals', 'price' => '2500.00', 'stock' => 0],
             ['code' => 'PRICE', 'name' => 'Price Snapshot Reference Product', 'category' => 'Peripherals', 'price' => '200.00', 'stock' => 8],
             ['code' => 'NOHISTORY', 'name' => 'No History Reference Product', 'category' => 'Peripherals', 'price' => '750.00', 'stock' => 25],
+            ['code' => 'MIXEDZERO', 'name' => 'Eligible Mixed Zero Reference Product', 'category' => 'Peripherals', 'price' => '1000.00', 'stock' => 50],
+            ['code' => 'ABRUPT', 'name' => 'Abrupt Change Reference Product', 'category' => 'Peripherals', 'price' => '1000.00', 'stock' => 30],
+            ['code' => 'SHORT', 'name' => 'Short History Reference Product', 'category' => 'Components', 'price' => '1000.00', 'stock' => 10],
+            ['code' => 'UNKNOWN', 'name' => 'Unavailable History Reference Product', 'category' => 'Components', 'price' => '1000.00', 'stock' => 10],
+            ['code' => 'STALE', 'name' => 'Stale Coverage Reference Product', 'category' => 'Components', 'price' => '1000.00', 'stock' => 10],
+            ['code' => 'GAPPED', 'name' => 'Gapped Coverage Reference Product', 'category' => 'Components', 'price' => '1000.00', 'stock' => 10],
         ];
 
         $products = [];
@@ -165,10 +208,14 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
             }
 
             $date = CarbonImmutable::instance($order->created_at);
-            $label = "Historical Sales Q{$date->quarter} {$date->year}";
+            $legacy = $order->recipient_name === "Historical Sales Q{$date->quarter} {$date->year}";
+            $label = $legacy ? "Historical Sales Q{$date->quarter} {$date->year}" : 'Historical Sales '.$date->format('F Y');
+            $boundaries = $legacy
+                ? [$date->startOfQuarter()->toDateTimeString(), $date->endOfQuarter()->toDateTimeString()]
+                : [$date->startOfMonth()->toDateTimeString(), $date->endOfMonth()->toDateTimeString()];
             $identity = $label.' '.$date->toDateTimeString();
             if ($order->recipient_name !== $label
-                || ! in_array($date->toDateTimeString(), [$date->startOfQuarter()->toDateTimeString(), $date->endOfQuarter()->toDateTimeString()], true)
+                || ! in_array($date->toDateTimeString(), $boundaries, true)
                 || isset($identities[$identity])
                 || $itemProductIds === []
                 || array_diff($itemProductIds, $productIds) !== []
@@ -181,7 +228,7 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
         }
 
         foreach ($ownedOrders as $order) {
-            if ($order->created_at->lt($start) || $order->created_at->gte($end)) {
+            if (preg_match('/^Historical Sales Q[1-4] [0-9]{4}$/D', $order->recipient_name) === 1 || $order->created_at->lt($start) || $order->created_at->gte($end)) {
                 $order->sale()->delete();
                 $order->delete();
             }

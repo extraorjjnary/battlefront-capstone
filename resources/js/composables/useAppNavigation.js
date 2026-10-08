@@ -15,6 +15,7 @@ import { computed } from 'vue';
 import CategoryController from '@/actions/App/Http/Controllers/Administration/CategoryController';
 import ChatbotKnowledgeController from '@/actions/App/Http/Controllers/Administration/ChatbotKnowledgeController';
 import CustomerController from '@/actions/App/Http/Controllers/Administration/CustomerController';
+import ForecastingController from '@/actions/App/Http/Controllers/Administration/ForecastingController';
 import InventoryController from '@/actions/App/Http/Controllers/Administration/InventoryController';
 import AdministrationOrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
@@ -75,6 +76,11 @@ export function useAppNavigation() {
             items.push({
                 title: 'Sales reports',
                 href: SalesReportController.index(),
+                icon: ChartNoAxesCombined,
+            });
+            items.push({
+                title: 'Forecasting',
+                href: ForecastingController.index(),
                 icon: ChartNoAxesCombined,
             });
             items.push({

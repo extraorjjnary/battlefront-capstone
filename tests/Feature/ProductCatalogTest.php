@@ -487,3 +487,58 @@ test('the catalog returns an explicit empty result when filters have no matches'
             ->has('products.data', 0)
             ->where('products.total', 0));
 });
+
+test('web catalog ignores mobile inputs while preserving filters pagination and scroll resets', function (array $mobileFilters) {
+    $category = Category::factory()->create();
+    $tag = Tag::factory()->create();
+    $products = Product::factory()->count(13)->for($category)
+        ->sequence(fn ($sequence): array => [
+            'name' => sprintf('Atlas Part %02d', $sequence->index),
+            'brand' => 'Atlas',
+            'price' => (string) ($sequence->index * 100),
+        ])->create();
+    $products->each(fn (Product $product) => $product->tags()->attach($tag));
+    $products[5]->update(['is_featured' => true]);
+    $filters = ['q' => 'Atlas', 'category_id' => $category->id, 'brand' => 'Atlas', 'tag_id' => $tag->id];
+    $baseline = $this->get(route('products.index', $filters));
+    $secondPageBaseline = $this->get(route('products.index', [...$filters, 'page' => 2]));
+
+    $response = $this->get(route('products.index', [...$filters, ...$mobileFilters]));
+
+    $response->assertOk()->assertSessionHasNoErrors();
+    expect($response->inertiaProps('filters'))->toBe($filters);
+    expect($response->inertiaProps('products'))->toBe($baseline->inertiaProps('products'));
+    expect($response->inertiaProps('filter_options'))->toBe($baseline->inertiaProps('filter_options'));
+
+    $version = $baseline->viewData('page')['version'];
+    $scrollResponse = $this->withHeaders([
+        'X-Inertia' => 'true',
+        'X-Inertia-Version' => $version,
+        'X-Inertia-Partial-Component' => 'Products/Index',
+        'X-Inertia-Partial-Data' => 'products',
+    ])->get(route('products.index', [...$filters, ...$mobileFilters, 'page' => 2]));
+
+    $scrollResponse->assertOk()
+        ->assertJsonPath('props.products', $secondPageBaseline->inertiaProps('products'))
+        ->assertJsonPath('scrollProps.products.currentPage', 2)
+        ->assertJsonPath('scrollProps.products.nextPage', null)
+        ->assertJsonPath('scrollProps.products.reset', false)
+        ->assertJsonMissingPath('props.filter_options');
+
+    $resetResponse = $this->withHeaders(['X-Inertia-Reset' => 'products'])
+        ->get(route('products.index', [...$filters, ...$mobileFilters, 'q' => 'No matching product']));
+
+    $resetResponse->assertOk()->assertJsonCount(0, 'props.products.data')
+        ->assertJsonPath('props.products.total', 0)
+        ->assertJsonPath('scrollProps.products.reset', true);
+})->with([
+    'valid mobile inputs with ascending sort' => [[
+        'category_ids' => [999999], 'min_price' => '2000', 'max_price' => '3000', 'sort' => 'price_asc',
+    ]],
+    'valid price and descending sort inputs' => [[
+        'min_price' => '0', 'max_price' => '0', 'sort' => 'price_desc',
+    ]],
+    'malformed mobile inputs' => [[
+        'category_ids' => 'invalid', 'min_price' => ['invalid'], 'max_price' => '-1', 'sort' => 'unsupported',
+    ]],
+]);

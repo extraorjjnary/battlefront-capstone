@@ -57,7 +57,7 @@ Stock conflicts use **422, not 409**. Display field messages instead of parsing 
 
 ### Pagination
 
-`GET /products?page=1`: fixed **12/page**; featured first, then name, then ID.
+`GET /products?page=1`: fixed **12/page**; by default featured first, then name, then ID. Optional price sorting is described below.
 `GET /orders?page=1`: fixed **10/page**; newest creation timestamp, then highest ID.
 There is no configurable `per_page` parameter.
 
@@ -203,11 +203,19 @@ Optional query parameters:
 |---|---|
 | q | Nullable string <=255; substring search across product name, brand, description |
 | category_id | Nullable integer; existing active category |
+| category_ids | Nullable array of up to 50 distinct existing active category IDs; matches any selected category |
 | brand | Nullable string <=255; catalog brand equality filter |
 | tag_id | Nullable integer; existing tag (single tag filter) |
+| min_price | Nullable numeric peso amount, 0..9999999999.99, at most 2 decimal places; inclusive effective-price minimum |
+| max_price | Same amount rules; inclusive effective-price maximum; must be >= min_price when both are supplied |
+| sort | Nullable featured, price_asc, or price_desc; omitted/null/blank defaults to featured |
 | page | Nullable integer >=1 |
 
-Filters combine. There is no stock, budget, sort, or multi-tag catalog filter. Use `GET /products/filters` to populate selectors:
+Filters combine. Send multiple categories as indexed query parameters such as `category_ids[0]=1&category_ids[1]=2`, using real IDs from filter options; comma-separated values are not supported. Array keys are normalized to a list. A null or empty category list imposes no additional restriction. Do not send populated `category_id` and `category_ids` together: the API returns 422 with `errors.category_ids`. Invalid elements use dotted error keys such as `category_ids.0`.
+
+Price filtering and ordering use `discount_price ?? price`, including a zero discount. Bounds are inclusive and either may be omitted; scientific notation and more than two decimal places are rejected. `price_asc` orders by effective price ascending, `price_desc` descending; ties use name ascending, then ID ascending. Featured status is the first sort only for the default/featured order. Pagination links retain supported filters. Ordering is deterministic for unchanged data; concurrent price or catalog changes can shift offset-based pages.
+
+These additions apply only to `/api/v1/products`. The Inertia web catalog retains its existing search, singular category/brand/tag filters and default ordering; it ignores these mobile-only parameters. Product response fields and filter-option responses are unchanged. There is no stock, budget, or multi-tag catalog filter. Use `GET /products/filters` to populate selectors:
 
 When a customer sends a valid Sanctum bearer token, page-one searches are retained unless `search_recommendations_enabled` is false. Guests and customers who disabled search tracking are not tracked. `GET /products/{product}` remains public; a valid customer bearer token records an eligible product view unless `product_view_recommendations_enabled` is false. Repeated views of the same product within 30 minutes are deduplicated. Both activity types are retained for up to 90 days and deleted immediately when their preference is disabled.
 
@@ -817,6 +825,8 @@ The collection uses the [Postman v2.1 JSON format](https://schema.postman.com/) 
 | email, password, name, device_name | Your disposable local customer; credentials blank in export |
 | token | Automatically captured after successful register/login; protected requests inherit it |
 | product_id, category_id, tag_id, brand | Select actual values from catalog/detail/filter responses |
+| category_id_2 | Another real active category ID for the optional category_ids[1] query entry; leave singular category_id disabled when enabling category_ids entries |
+| min_price, max_price, sort | Optional catalog bounds and featured/price_asc/price_desc ordering; bounds start blank and query entries are disabled |
 | cart_item_id | Captured after Add product; manually selectable from own cart |
 | order_id, order_reference | Captured after placement; manually selectable from history |
 | rejected_order_id | Owned wallet order prepared with rejected payment in web administration |
@@ -838,8 +848,8 @@ Successful login/registration replace `token`, clear conversation state and clea
 
 Use a disposable development database/account with an active product, live Sagay stock, and seeded branch/reference data.
 
-1. **Connectivity/public reads:** Health (200), product filters/list/detail and branches (200). Enable catalog filters individually; check pagination and nullable fields.
-2. **Access:** Profile without token (401). New public `GET /recommendations` (200); legacy recommendation options/results remain callable during the transition. Guest chatbot public question/follow-up (200). Guest order question returns sign-in fallback. Pace calls under guest limits.
+1. **Connectivity/public reads:** Health (200), product filters/list/detail and branches (200). Enable catalog filters individually, then combine search/brand/tag with multiple categories and price bounds. Disable singular `category_id` when using `category_ids` entries. Check discount-aware price sorting in both directions and follow `links.next` to confirm filters persist. Try conflicting category inputs, invalid category IDs, reversed bounds, and an invalid sort (422); restore valid params afterward. Check nullable fields and compare the existing web catalog behavior separately.
+2. **Access:** Profile without token (401). Guest recommendations/options (200); legacy recommendation options/results remain callable during the transition. Guest chatbot public question/follow-up (200). Guest order question returns sign-in fallback. Pace calls under guest limits.
 3. **Authentication/profile:** Register a unique customer (201) OR log in (200); confirm token capture. Read/update profile (200), verify only approved fields. Invalid login gives 401; duplicate/invalid registration gives 422.
 4. **Cart:** Add stock-eligible product (200), verify captured cart_item_id; update quantity and totals; remove (200). Add again before checkout. Try quantity zero, quantity above stock, and an unavailable product (422); failed operations must not corrupt the cart.
 5. **Checkout/orders:** Preview checkout (200). Submit cash/card pickup (201), inspect order/history (200), and verify cart is empty. Refill before each alternative wallet placement. Select an image; test gcash/maya and delivery address rules. Verify order/payment initially pending and inventory deduction through existing web inventory.

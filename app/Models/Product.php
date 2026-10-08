@@ -39,6 +39,7 @@ use Illuminate\Support\Facades\Storage;
  * @property-read Collection<int, Tag> $tags
  * @property-read Collection<int, CartItem> $cartItems
  * @property-read Collection<int, OrderItem> $orderItems
+ * @property-read Collection<int, Forecast> $forecasts
  */
 #[Fillable([
     'product_code',
@@ -158,6 +159,16 @@ class Product extends Model
     public function orderItems(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    /**
+     * Get the product's persisted demand forecasts.
+     *
+     * @return HasMany<Forecast, $this>
+     */
+    public function forecasts(): HasMany
+    {
+        return $this->hasMany(Forecast::class);
     }
 
     /**

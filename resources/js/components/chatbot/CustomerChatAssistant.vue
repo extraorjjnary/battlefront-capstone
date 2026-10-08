@@ -46,11 +46,7 @@ async function closePanel() {
 }
 
 function handleComposerKeydown(event) {
-    if (
-        event.key === 'Enter' &&
-        (event.ctrlKey || event.metaKey) &&
-        !event.isComposing
-    ) {
+    if (event.key === 'Enter' && !event.isComposing) {
         event.preventDefault();
         void submitMessage();
     }
@@ -289,7 +285,7 @@ async function submitMessage() {
                         :aria-invalid="
                             Boolean(inputError || inquiry.errors.message)
                         "
-                        aria-describedby="floating-chatbot-help floating-chatbot-error"
+                        aria-describedby="floating-chatbot-error"
                         @input="inputError = ''"
                         @keydown="handleComposerKeydown"
                     />
@@ -308,13 +304,7 @@ async function submitMessage() {
                     >
                         {{ requestError }}
                     </p>
-                    <div class="mt-2 flex items-center justify-between gap-2">
-                        <p
-                            id="floating-chatbot-help"
-                            class="text-muted-foreground text-xs"
-                        >
-                            Ctrl+Enter to send. Enter for a new line.
-                        </p>
+                    <div class="mt-2 flex items-center justify-end gap-2">
                         <Button
                             type="submit"
                             size="sm"

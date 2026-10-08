@@ -6,6 +6,7 @@ use App\Http\Controllers\Administration\ChatbotKnowledgeActivationController;
 use App\Http\Controllers\Administration\ChatbotKnowledgeController;
 use App\Http\Controllers\Administration\ChatbotKnowledgePreviewController;
 use App\Http\Controllers\Administration\CustomerController;
+use App\Http\Controllers\Administration\ForecastingController;
 use App\Http\Controllers\Administration\InventoryController;
 use App\Http\Controllers\Administration\OrderController as AdministrationOrderController;
 use App\Http\Controllers\Administration\OrderPaymentProofController;
@@ -152,6 +153,12 @@ Route::middleware(['auth', 'can:access-administration'])
         // sales report
         Route::get('reports/sales', [SalesReportController::class, 'index'])
             ->name('reports.sales');
+
+        // predictive analytics
+        Route::get('forecasting', [ForecastingController::class, 'index'])
+            ->name('forecasting.index');
+        Route::post('forecasting', [ForecastingController::class, 'store'])
+            ->name('forecasting.store');
     });
 
 // profile settings

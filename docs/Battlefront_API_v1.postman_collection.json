@@ -600,10 +600,35 @@
                   "key": "tag_id",
                   "value": "{{tag_id}}",
                   "disabled": true
+                },
+                {
+                  "key": "category_ids[0]",
+                  "value": "{{category_id}}",
+                  "disabled": true
+                },
+                {
+                  "key": "category_ids[1]",
+                  "value": "{{category_id_2}}",
+                  "disabled": true
+                },
+                {
+                  "key": "min_price",
+                  "value": "{{min_price}}",
+                  "disabled": true
+                },
+                {
+                  "key": "max_price",
+                  "value": "{{max_price}}",
+                  "disabled": true
+                },
+                {
+                  "key": "sort",
+                  "value": "{{sort}}",
+                  "disabled": true
                 }
               ]
             },
-            "description": "Enable optional Params after populating variables. q searches name/brand/description; category/brand/single tag combine. Fixed 12/page. No per_page, sort, or stock filter.",
+            "description": "Enable optional Params after populating variables. q, brand and single tag combine with category_id OR up to 50 distinct active category_ids entries. Disable singular category_id when using category_ids. Bounds are inclusive effective prices (discount_price ?? price), 0..9999999999.99, at most 2 decimals; max_price >= min_price. sort is featured (default), price_asc or price_desc; price ties use name then ID. Fixed 12/page; follow links.next with filters retained. Conflicting category inputs, invalid IDs, reversed bounds or invalid sort return native 422 errors. New options apply only to the API; the web catalog ignores them. No per_page or stock filter.",
             "auth": {
               "type": "noauth"
             }
@@ -620,6 +645,14 @@
                   "  const body = pm.response.json();",
                   "  pm.test(\"Response contract\", () => pm.expect(body).to.have.property(\"data\"));",
                   "  pm.test(\"Pagination\", () => { pm.expect(body).to.have.property(\"links\"); pm.expect(body.meta.per_page).to.equal(12); pm.expect(body.data).to.be.an(\"array\"); });",
+                  "  const params = pm.request.url.query.all().filter(p => !p.disabled).map(p => ({ key: p.key, value: pm.variables.replaceIn(p.value || \"\") }));",
+                  "  const options = Object.fromEntries(params.map(p => [p.key, p.value]));",
+                  "  const prices = body.data.map(p => Number(p.discount_price ?? p.price));",
+                  "  if (options.min_price && options.min_price.trim()) pm.test(\"Inclusive minimum effective price\", () => prices.forEach(price => pm.expect(price).to.be.at.least(Number(options.min_price))));",
+                  "  if (options.max_price && options.max_price.trim()) pm.test(\"Inclusive maximum effective price\", () => prices.forEach(price => pm.expect(price).to.be.at.most(Number(options.max_price))));",
+                  "  if ([\"price_asc\", \"price_desc\"].includes(options.sort)) pm.test(\"Effective price order\", () => prices.slice(1).forEach((price, i) => options.sort === \"price_asc\" ? pm.expect(price).to.be.at.least(prices[i]) : pm.expect(price).to.be.at.most(prices[i])));",
+                  "  const categories = params.filter(p => /^category_ids\\[\\d*\\]$/.test(p.key)).map(p => Number(p.value));",
+                  "  if (categories.length) pm.test(\"Selected categories\", () => body.data.forEach(p => pm.expect(categories).to.include(p.category.id)));",
                   "}"
                 ]
               }
@@ -668,10 +701,35 @@
                       "key": "tag_id",
                       "value": "{{tag_id}}",
                       "disabled": true
+                    },
+                    {
+                      "key": "category_ids[0]",
+                      "value": "{{category_id}}",
+                      "disabled": true
+                    },
+                    {
+                      "key": "category_ids[1]",
+                      "value": "{{category_id_2}}",
+                      "disabled": true
+                    },
+                    {
+                      "key": "min_price",
+                      "value": "{{min_price}}",
+                      "disabled": true
+                    },
+                    {
+                      "key": "max_price",
+                      "value": "{{max_price}}",
+                      "disabled": true
+                    },
+                    {
+                      "key": "sort",
+                      "value": "{{sort}}",
+                      "disabled": true
                     }
                   ]
                 },
-                "description": "Enable optional Params after populating variables. q searches name/brand/description; category/brand/single tag combine. Fixed 12/page. No per_page, sort, or stock filter.",
+                "description": "Enable optional Params after populating variables. q, brand and single tag combine with category_id OR up to 50 distinct active category_ids entries. Disable singular category_id when using category_ids. Bounds are inclusive effective prices (discount_price ?? price), 0..9999999999.99, at most 2 decimals; max_price >= min_price. sort is featured (default), price_asc or price_desc; price ties use name then ID. Fixed 12/page; follow links.next with filters retained. Conflicting category inputs, invalid IDs, reversed bounds or invalid sort return native 422 errors. New options apply only to the API; the web catalog ignores them. No per_page or stock filter.",
                 "auth": {
                   "type": "noauth"
                 }

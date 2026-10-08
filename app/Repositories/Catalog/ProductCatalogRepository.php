@@ -48,7 +48,7 @@ class ProductCatalogRepository
         $sort = $filters['sort'] ?? 'featured';
 
         if ($sort === 'price_asc' || $sort === 'price_desc') {
-            $query->orderByRaw('COALESCE(discount_price, price) '.($sort === 'price_asc' ? 'asc' : 'desc'));
+            $query->orderByRaw('CAST(COALESCE(discount_price, price) AS DECIMAL(12, 2)) '.($sort === 'price_asc' ? 'asc' : 'desc'));
         } else {
             $query->orderByDesc('is_featured');
         }
@@ -57,7 +57,12 @@ class ProductCatalogRepository
             ->orderBy('name')
             ->orderBy('id')
             ->paginate(12)
-            ->appends(array_filter($filters, fn (mixed $value): bool => $value !== null));
+            ->appends(array_filter(
+                $filters,
+                fn (mixed $value): bool => $value !== null
+                    && $value !== ''
+                    && !(is_array($value) && $value === []),
+            ));
     }
 
     public function findEligibleOrFail(int $productId): Product
@@ -318,10 +323,11 @@ class ProductCatalogRepository
                 fn (Builder $query, array $categoryIds): Builder => $query->whereIn('category_id', $categoryIds),
             )
             ->where(function (Builder $query) use ($filters): void {
-                if (isset($filters['min_price'])) {
+                if (isset($filters['min_price']) && $filters['min_price'] !== '') {
                     $query->whereRaw('COALESCE(discount_price, price) >= CAST(? AS DECIMAL(12, 2))', [$filters['min_price']]);
                 }
-                if (isset($filters['max_price'])) {
+
+                if (isset($filters['max_price']) && $filters['max_price'] !== '') {
                     $query->whereRaw('COALESCE(discount_price, price) <= CAST(? AS DECIMAL(12, 2))', [$filters['max_price']]);
                 }
             })
