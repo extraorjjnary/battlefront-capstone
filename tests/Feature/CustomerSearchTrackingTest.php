@@ -106,7 +106,7 @@ test('profile settings let customers control search-based recommendation consent
     expect($customer->refresh()->search_recommendations_enabled)->toBeFalse();
 });
 
-test('withdrawing search recommendation consent immediately deletes retained searches', function () {
+test('withdrawing search recommendation consent pauses tracking and retains unexpired searches', function () {
     $customer = User::factory()->customer()->create([
         'search_recommendations_enabled' => true,
     ]);
@@ -119,7 +119,7 @@ test('withdrawing search recommendation consent immediately deletes retained sea
     ])->assertSessionHasNoErrors();
 
     expect($customer->refresh()->search_recommendations_enabled)->toBeFalse();
-    $this->assertDatabaseCount('customer_searches', 0);
+    $this->assertDatabaseCount('customer_searches', 2);
 });
 
 test('the scheduled cleanup command removes expired searches and retains current ones', function () {

@@ -74,7 +74,7 @@ test('profile settings expose an independent product view recommendation consent
     expect($customer->refresh()->product_view_recommendations_enabled)->toBeTrue();
 });
 
-test('withdrawing product view consent deletes retained views immediately', function () {
+test('withdrawing product view consent pauses tracking and retains unexpired views', function () {
     $customer = User::factory()->customer()->create([
         'product_view_recommendations_enabled' => true,
     ]);
@@ -87,7 +87,7 @@ test('withdrawing product view consent deletes retained views immediately', func
     ])->assertSessionHasNoErrors();
 
     expect($customer->refresh()->product_view_recommendations_enabled)->toBeFalse();
-    $this->assertDatabaseCount('customer_product_views', 0);
+    $this->assertDatabaseCount('customer_product_views', 2);
 });
 
 test('the retention command removes expired product views and keeps unexpired ones', function () {

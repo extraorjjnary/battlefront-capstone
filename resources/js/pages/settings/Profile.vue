@@ -119,7 +119,7 @@ const productViewRecommendationsEnabled = ref(props.productViewRecommendationsEn
                         v-model="personalizedRecommendationsEnabled"
                         class="border-input accent-primary mt-0.5 size-4"
                     />
-                    <span>Use your activity and shopping history for personalized product recommendations. Turning this off stops personalization from searches, views, cart, and completed purchases, and deletes saved search and view history. Your cart and order records remain available for store services.</span>
+                    <span>Use your activity and shopping history for personalized product recommendations. Turning this off pauses personalized suggestions and stops recording searches and views. Saved search and view history is kept until its 90-day expiry and can be used again if you turn personalization back on before then. Your cart and order records remain available for store services.</span>
                 </label>
                 <div class="grid gap-3 border-l border-border pl-4">
                     <p class="text-muted-foreground text-sm">
@@ -144,7 +144,7 @@ const productViewRecommendationsEnabled = ref(props.productViewRecommendationsEn
                             :disabled="!personalizedRecommendationsEnabled"
                             class="border-input accent-primary mt-0.5 size-4"
                         />
-                        <span>Use catalog searches. Turning this off stops recording searches and deletes saved search history.</span>
+                        <span>Use catalog searches. Turning this off pauses search-based suggestions and recording. Saved search history is kept until its 90-day expiry and used again if you turn this back on before then.</span>
                     </label>
                     <input
                         type="hidden"
@@ -163,7 +163,7 @@ const productViewRecommendationsEnabled = ref(props.productViewRecommendationsEn
                             :disabled="!personalizedRecommendationsEnabled"
                             class="border-input accent-primary mt-0.5 size-4"
                         />
-                        <span>Use products you view. Turning this off stops recording views and deletes saved view history.</span>
+                        <span>Use products you view. Turning this off pauses view-based suggestions and recording. Saved view history is kept until its 90-day expiry and used again if you turn this back on before then.</span>
                     </label>
                 </div>
             </div>
