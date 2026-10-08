@@ -105,7 +105,8 @@ async function submitMessage() {
         inquiry.message = '';
         inquiry.context_token = response.context_token ?? null;
     } catch {
-        requestError.value ||= 'Unable to send your question. Please try again.';
+        requestError.value ||=
+            'Unable to send your question. Please try again.';
     } finally {
         pendingMessage.value = '';
         void scrollToLatest();

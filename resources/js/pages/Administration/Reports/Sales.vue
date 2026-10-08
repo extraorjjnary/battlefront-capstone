@@ -919,9 +919,13 @@ defineOptions({
         </section>
 
         <section aria-labelledby="recommendation-engagement-heading">
-            <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div
+                class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"
+            >
                 <div>
-                    <p class="text-primary text-xs font-semibold tracking-widest uppercase">
+                    <p
+                        class="text-primary text-xs font-semibold tracking-widest uppercase"
+                    >
                         Anonymous web events
                     </p>
                     <h2
@@ -942,7 +946,11 @@ defineOptions({
                 <div class="border-border bg-card border p-5">
                     <p class="text-muted-foreground text-sm">Impressions</p>
                     <p class="mt-2 text-3xl font-bold tabular-nums">
-                        {{ numberFormatter.format(recommendation_engagement.summary.impressions) }}
+                        {{
+                            numberFormatter.format(
+                                recommendation_engagement.summary.impressions,
+                            )
+                        }}
                     </p>
                     <p class="text-muted-foreground mt-1 text-xs">
                         Cards at least half visible for one second
@@ -951,7 +959,11 @@ defineOptions({
                 <div class="border-border bg-card border p-5">
                     <p class="text-muted-foreground text-sm">Product clicks</p>
                     <p class="mt-2 text-3xl font-bold tabular-nums">
-                        {{ numberFormatter.format(recommendation_engagement.summary.clicks) }}
+                        {{
+                            numberFormatter.format(
+                                recommendation_engagement.summary.clicks,
+                            )
+                        }}
                     </p>
                     <p class="text-muted-foreground mt-1 text-xs">
                         Clicks from a recommendation card
@@ -960,16 +972,26 @@ defineOptions({
                 <div class="border-border bg-card border p-5">
                     <p class="text-muted-foreground text-sm">Hidden</p>
                     <p class="mt-2 text-3xl font-bold tabular-nums">
-                        {{ numberFormatter.format(recommendation_engagement.summary.dismissals) }}
+                        {{
+                            numberFormatter.format(
+                                recommendation_engagement.summary.dismissals,
+                            )
+                        }}
                     </p>
                     <p class="text-muted-foreground mt-1 text-xs">
                         Recommendations shoppers chose to hide
                     </p>
                 </div>
                 <div class="border-border bg-card border p-5">
-                    <p class="text-muted-foreground text-sm">Reported as a problem</p>
+                    <p class="text-muted-foreground text-sm">
+                        Reported as a problem
+                    </p>
                     <p class="mt-2 text-3xl font-bold tabular-nums">
-                        {{ numberFormatter.format(recommendation_engagement.summary.wrong_reports) }}
+                        {{
+                            numberFormatter.format(
+                                recommendation_engagement.summary.wrong_reports,
+                            )
+                        }}
                     </p>
                     <p class="text-muted-foreground mt-1 text-xs">
                         Anonymous product suggestion reports
@@ -978,11 +1000,17 @@ defineOptions({
             </div>
 
             <div
-                v-if="Object.values(recommendation_engagement.summary).every((count) => count === 0)"
+                v-if="
+                    Object.values(recommendation_engagement.summary).every(
+                        (count) => count === 0,
+                    )
+                "
                 class="border-border bg-card mt-4 border p-8 text-center"
                 role="status"
             >
-                <p class="font-medium">No recommendation activity in this range</p>
+                <p class="font-medium">
+                    No recommendation activity in this range
+                </p>
                 <p class="text-muted-foreground mt-1 text-sm">
                     Anonymous web event counts will appear here as customers
                     view, select, hide, or report recommendations.
@@ -998,13 +1026,23 @@ defineOptions({
                         </p>
                     </div>
                     <table class="w-full min-w-2xl text-left text-sm">
-                        <thead class="bg-secondary/60 text-muted-foreground text-xs uppercase">
+                        <thead
+                            class="bg-secondary/60 text-muted-foreground text-xs uppercase"
+                        >
                             <tr>
                                 <th class="px-5 py-3 font-medium">Placement</th>
-                                <th class="px-5 py-3 text-right font-medium">Impressions</th>
-                                <th class="px-5 py-3 text-right font-medium">Clicks</th>
-                                <th class="px-5 py-3 text-right font-medium">Hidden</th>
-                                <th class="px-5 py-3 text-right font-medium">Reports</th>
+                                <th class="px-5 py-3 text-right font-medium">
+                                    Impressions
+                                </th>
+                                <th class="px-5 py-3 text-right font-medium">
+                                    Clicks
+                                </th>
+                                <th class="px-5 py-3 text-right font-medium">
+                                    Hidden
+                                </th>
+                                <th class="px-5 py-3 text-right font-medium">
+                                    Reports
+                                </th>
                             </tr>
                         </thead>
                         <tbody class="divide-border divide-y">
@@ -1012,18 +1050,34 @@ defineOptions({
                                 v-for="placement in recommendation_engagement.placements"
                                 :key="placement.placement"
                             >
-                                <td class="px-5 py-4 font-medium">{{ placement.label }}</td>
-                                <td class="px-5 py-4 text-right tabular-nums">
-                                    {{ numberFormatter.format(placement.impressions) }}
+                                <td class="px-5 py-4 font-medium">
+                                    {{ placement.label }}
                                 </td>
                                 <td class="px-5 py-4 text-right tabular-nums">
-                                    {{ numberFormatter.format(placement.clicks) }}
+                                    {{
+                                        numberFormatter.format(
+                                            placement.impressions,
+                                        )
+                                    }}
                                 </td>
                                 <td class="px-5 py-4 text-right tabular-nums">
-                                    {{ numberFormatter.format(placement.dismissals) }}
+                                    {{
+                                        numberFormatter.format(placement.clicks)
+                                    }}
                                 </td>
                                 <td class="px-5 py-4 text-right tabular-nums">
-                                    {{ numberFormatter.format(placement.wrong_reports) }}
+                                    {{
+                                        numberFormatter.format(
+                                            placement.dismissals,
+                                        )
+                                    }}
+                                </td>
+                                <td class="px-5 py-4 text-right tabular-nums">
+                                    {{
+                                        numberFormatter.format(
+                                            placement.wrong_reports,
+                                        )
+                                    }}
                                 </td>
                             </tr>
                         </tbody>
@@ -1034,17 +1088,28 @@ defineOptions({
                     <div class="border-border border-b p-5">
                         <h3 class="font-semibold">By recommendation reason</h3>
                         <p class="text-muted-foreground mt-1 text-xs">
-                            Which recommendation signals were attached to the cards.
+                            Which recommendation signals were attached to the
+                            cards.
                         </p>
                     </div>
                     <table class="w-full min-w-2xl text-left text-sm">
-                        <thead class="bg-secondary/60 text-muted-foreground text-xs uppercase">
+                        <thead
+                            class="bg-secondary/60 text-muted-foreground text-xs uppercase"
+                        >
                             <tr>
                                 <th class="px-5 py-3 font-medium">Reason</th>
-                                <th class="px-5 py-3 text-right font-medium">Impressions</th>
-                                <th class="px-5 py-3 text-right font-medium">Clicks</th>
-                                <th class="px-5 py-3 text-right font-medium">Hidden</th>
-                                <th class="px-5 py-3 text-right font-medium">Reports</th>
+                                <th class="px-5 py-3 text-right font-medium">
+                                    Impressions
+                                </th>
+                                <th class="px-5 py-3 text-right font-medium">
+                                    Clicks
+                                </th>
+                                <th class="px-5 py-3 text-right font-medium">
+                                    Hidden
+                                </th>
+                                <th class="px-5 py-3 text-right font-medium">
+                                    Reports
+                                </th>
                             </tr>
                         </thead>
                         <tbody class="divide-border divide-y">
@@ -1052,42 +1117,73 @@ defineOptions({
                                 v-for="reason in recommendation_engagement.reasons"
                                 :key="reason.reason_code"
                             >
-                                <td class="px-5 py-4 font-medium">{{ reason.label }}</td>
+                                <td class="px-5 py-4 font-medium">
+                                    {{ reason.label }}
+                                </td>
                                 <td class="px-5 py-4 text-right tabular-nums">
-                                    {{ numberFormatter.format(reason.impressions) }}
+                                    {{
+                                        numberFormatter.format(
+                                            reason.impressions,
+                                        )
+                                    }}
                                 </td>
                                 <td class="px-5 py-4 text-right tabular-nums">
                                     {{ numberFormatter.format(reason.clicks) }}
                                 </td>
                                 <td class="px-5 py-4 text-right tabular-nums">
-                                    {{ numberFormatter.format(reason.dismissals) }}
+                                    {{
+                                        numberFormatter.format(
+                                            reason.dismissals,
+                                        )
+                                    }}
                                 </td>
                                 <td class="px-5 py-4 text-right tabular-nums">
-                                    {{ numberFormatter.format(reason.wrong_reports) }}
+                                    {{
+                                        numberFormatter.format(
+                                            reason.wrong_reports,
+                                        )
+                                    }}
                                 </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
 
-                <div class="border-border bg-card overflow-x-auto border xl:col-span-2">
+                <div
+                    class="border-border bg-card overflow-x-auto border xl:col-span-2"
+                >
                     <div class="border-border border-b p-5">
                         <h3 class="font-semibold">Most clicked products</h3>
                         <p class="text-muted-foreground mt-1 text-xs">
-                            Products selected from a recommendation card in this date range.
+                            Products selected from a recommendation card in this
+                            date range.
                         </p>
                     </div>
                     <table class="w-full min-w-lg text-left text-sm">
-                        <thead class="bg-secondary/60 text-muted-foreground text-xs uppercase">
+                        <thead
+                            class="bg-secondary/60 text-muted-foreground text-xs uppercase"
+                        >
                             <tr>
                                 <th class="px-5 py-3 font-medium">Product</th>
-                                <th class="px-5 py-3 text-right font-medium">Impressions</th>
-                                <th class="px-5 py-3 text-right font-medium">Clicks</th>
+                                <th class="px-5 py-3 text-right font-medium">
+                                    Impressions
+                                </th>
+                                <th class="px-5 py-3 text-right font-medium">
+                                    Clicks
+                                </th>
                             </tr>
                         </thead>
                         <tbody class="divide-border divide-y">
-                            <tr v-if="recommendation_engagement.top_clicked_products.length === 0">
-                                <td colspan="3" class="text-muted-foreground px-5 py-4">
+                            <tr
+                                v-if="
+                                    recommendation_engagement
+                                        .top_clicked_products.length === 0
+                                "
+                            >
+                                <td
+                                    colspan="3"
+                                    class="text-muted-foreground px-5 py-4"
+                                >
                                     No product clicks in this range.
                                 </td>
                             </tr>
@@ -1095,9 +1191,15 @@ defineOptions({
                                 v-for="product in recommendation_engagement.top_clicked_products"
                                 :key="product.product_id"
                             >
-                                <td class="px-5 py-4 font-medium">{{ product.product_name }}</td>
+                                <td class="px-5 py-4 font-medium">
+                                    {{ product.product_name }}
+                                </td>
                                 <td class="px-5 py-4 text-right tabular-nums">
-                                    {{ numberFormatter.format(product.impressions) }}
+                                    {{
+                                        numberFormatter.format(
+                                            product.impressions,
+                                        )
+                                    }}
                                 </td>
                                 <td class="px-5 py-4 text-right tabular-nums">
                                     {{ numberFormatter.format(product.clicks) }}

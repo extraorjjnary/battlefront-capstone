@@ -1,6 +1,6 @@
 <script setup>
-import Breadcrumbs from "@/components/Breadcrumbs.vue";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import Breadcrumbs from '@/components/Breadcrumbs.vue';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 defineProps({
     breadcrumbs: { type: Array, default: () => [] },
 });

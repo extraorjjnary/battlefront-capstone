@@ -243,11 +243,13 @@ defineOptions({
             :recommendations="recommendations"
             placement="cart"
             title="Keep building your selection"
-            :description="is_personalized
-                ? 'Suggestions based on items in your cart, completed orders, and product activity you chose to share.'
-                : has_featured_fallback
-                  ? 'Featured and popular picks that are currently available in Sagay.'
-                  : 'Products purchased often by Battlefront customers and currently available in Sagay.'"
+            :description="
+                is_personalized
+                    ? 'Suggestions based on items in your cart, completed orders, and product activity you chose to share.'
+                    : has_featured_fallback
+                      ? 'Featured and popular picks that are currently available in Sagay.'
+                      : 'Products purchased often by Battlefront customers and currently available in Sagay.'
+            "
         />
     </main>
 </template>

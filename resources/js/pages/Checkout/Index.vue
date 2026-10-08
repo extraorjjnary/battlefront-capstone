@@ -1,5 +1,5 @@
 <script setup>
-import { Form, Head, Link } from "@inertiajs/vue3";
+import { Form, Head, Link } from '@inertiajs/vue3';
 import {
     ArrowLeft,
     BadgeCheck,
@@ -12,19 +12,19 @@ import {
     Store,
     Truck,
     Upload,
-} from "@lucide/vue";
-import { computed, ref } from "vue";
-import { store as storeOrder } from "@/actions/App/Http/Controllers/OrderController";
-import InputError from "@/components/InputError.vue";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Spinner } from "@/components/ui/spinner";
-import { Textarea } from "@/components/ui/textarea";
-import { formatCurrency } from "@/lib/currency";
-import { index as cartIndex } from "@/routes/cart";
-import { index as checkoutIndex } from "@/routes/checkout";
+} from '@lucide/vue';
+import { computed, ref } from 'vue';
+import { store as storeOrder } from '@/actions/App/Http/Controllers/OrderController';
+import InputError from '@/components/InputError.vue';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Spinner } from '@/components/ui/spinner';
+import { Textarea } from '@/components/ui/textarea';
+import { formatCurrency } from '@/lib/currency';
+import { index as cartIndex } from '@/routes/cart';
+import { index as checkoutIndex } from '@/routes/checkout';
 
 const props = defineProps({
     cart: { type: Object, required: true },
@@ -34,8 +34,8 @@ const props = defineProps({
     paymentMethods: { type: Array, required: true },
 });
 
-const fulfillmentMethod = ref("pickup");
-const paymentMethod = ref("cash");
+const fulfillmentMethod = ref('pickup');
+const paymentMethod = ref('cash');
 const paymentProofKey = ref(0);
 
 const availablePaymentMethods = computed(() =>
@@ -73,8 +73,8 @@ function choosePayment(value) {
 defineOptions({
     layout: {
         breadcrumbs: [
-            { title: "Cart", href: cartIndex() },
-            { title: "Checkout", href: checkoutIndex() },
+            { title: 'Cart', href: cartIndex() },
+            { title: 'Checkout', href: checkoutIndex() },
         ],
     },
 });
@@ -247,9 +247,9 @@ defineOptions({
                                     class="text-muted-foreground mt-1 block text-xs leading-5"
                                 >
                                     {{
-                                        method.value === "pickup"
-                                            ? "Collect your order from Battlefront."
-                                            : "Send the order to your supplied address."
+                                        method.value === 'pickup'
+                                            ? 'Collect your order from Battlefront.'
+                                            : 'Send the order to your supplied address.'
                                     }}
                                 </span>
                             </span>
@@ -346,8 +346,8 @@ defineOptions({
                             v-if="customer.default_delivery_address"
                             class="text-muted-foreground text-xs leading-5"
                         >
-                            Pre-filled from your profile. Changes here apply only
-                            to this order.
+                            Pre-filled from your profile. Changes here apply
+                            only to this order.
                         </p>
                         <InputError :message="errors.delivery_address" />
                     </div>
@@ -406,10 +406,10 @@ defineOptions({
                                 >
                                     {{
                                         method.requires_proof
-                                            ? "Manual e-wallet payment with proof."
-                                            : fulfillmentMethod === "delivery"
-                                              ? "Available for pickup only."
-                                              : "Pay when you collect your order."
+                                            ? 'Manual e-wallet payment with proof.'
+                                            : fulfillmentMethod === 'delivery'
+                                              ? 'Available for pickup only.'
+                                              : 'Pay when you collect your order.'
                                     }}
                                 </span>
                             </span>
@@ -597,7 +597,7 @@ defineOptions({
                 <Button type="submit" class="w-full" :disabled="processing">
                     <Spinner v-if="processing" />
                     <BadgeCheck v-else aria-hidden="true" />
-                    {{ processing ? "Placing order..." : "Place order" }}
+                    {{ processing ? 'Placing order...' : 'Place order' }}
                 </Button>
 
                 <p

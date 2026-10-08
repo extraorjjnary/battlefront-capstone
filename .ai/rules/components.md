@@ -1,6 +1,6 @@
 ---
 paths:
-    - "database/seeders/**,app/Http/Controllers/BranchController.php,resources/js/components/BranchMap.vue"
+    - 'database/seeders/**,app/Http/Controllers/BranchController.php,resources/js/components/BranchMap.vue'
 ---
 
 # Components
