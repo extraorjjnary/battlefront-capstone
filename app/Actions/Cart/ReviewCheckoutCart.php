@@ -15,6 +15,7 @@ class ReviewCheckoutCart
     /**
      * Build a checkout-ready snapshot from current cart state.
      *
+     * @param  list<int>  $cartItemIds
      * @return array{
      *     items: list<array{id: int, quantity: int, product: array{id: int, name: string, brand: string|null, image_url: string|null}, unit_price: string, line_total: string}>,
      *     item_count: int,
@@ -22,16 +23,20 @@ class ReviewCheckoutCart
      *     total: string
      * }
      */
-    public function execute(User $customer): array
+    public function execute(User $customer, array $cartItemIds): array
     {
-        return DB::transaction(function () use ($customer): array {
-            $totals = $this->cartService->totals($customer);
+        if (! $this->cartService->isValidCheckoutSelection($cartItemIds)) {
+            throw CheckoutUnavailableException::invalidSelection();
+        }
 
-            if ($totals['item_count'] === 0) {
-                throw CheckoutUnavailableException::emptyCart();
+        return DB::transaction(function () use ($customer, $cartItemIds): array {
+            $totals = $this->cartService->totals($customer, $cartItemIds);
+
+            if ($totals['item_count'] !== count($cartItemIds)) {
+                throw CheckoutUnavailableException::invalidSelection();
             }
 
-            $availability = $this->cartService->availability($customer);
+            $availability = $this->cartService->availability($customer, $cartItemIds);
 
             if (collect($availability)->contains(
                 fn (array $item): bool => $item['status'] !== CartAvailability::Available->value,
@@ -44,6 +49,7 @@ class ReviewCheckoutCart
                 ->with([
                     'items' => fn ($query) => $query
                         ->select(['id', 'cart_id', 'product_id', 'quantity'])
+                        ->whereKey($cartItemIds)
                         ->orderBy('id'),
                     'items.product:id,name,brand,image_path',
                 ])

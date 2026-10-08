@@ -20,9 +20,10 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 /** @return array{recipient_name: string, contact_number: string, fulfillment_method: FulfillmentMethod, delivery_address: string|null, payment_method: PaymentMethod, payment_proof_path: string|null} */
-function quotedDeliveryCheckoutData(): array
+function quotedDeliveryCheckoutData(array $cartItemIds): array
 {
     return [
+        'cart_item_ids' => $cartItemIds,
         'recipient_name' => 'Delivery Customer',
         'contact_number' => '09171234567',
         'fulfillment_method' => FulfillmentMethod::Delivery,
@@ -47,7 +48,7 @@ test('delivery placement snapshots each profile and the relative quote in one st
     $stock = Inventory::factory()->for($product)->create(['quantity' => 5]);
     app(CartService::class)->add($customer, $product->id, 2);
 
-    $order = app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData(), 'Bacolod City');
+    $order = app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData($customer->cart->items->modelKeys()), 'Bacolod City');
 
     $this->assertDatabaseHas('orders', [
         'id' => $order->id, 'delivery_destination' => 'Bacolod City',
@@ -89,7 +90,7 @@ test('mixed-cart delivery charges the highest profile once for all purchased qua
         app(CartService::class)->add($customer, $product->id, 3);
     }
 
-    $order = app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData(), 'Sagay City');
+    $order = app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData($customer->cart->items->modelKeys()), 'Sagay City');
 
     expect($order)->product_subtotal->toBe('120.00')->shipping_profile->toBe(ShippingProfile::Bulky)
         ->handling_surcharge->toBe('100.00')->delivery_fee->toBe('180.00')->total_amount->toBe('300.00');
@@ -102,7 +103,7 @@ test('pickup snapshots its subtotal with zero delivery fee and no shipment', fun
     $product = Product::factory()->bulky()->create(['price' => '0.10']);
     Inventory::factory()->for($product)->create(['quantity' => 10]);
     app(CartService::class)->add($customer, $product->id, 3);
-    $checkout = array_replace(quotedDeliveryCheckoutData(), [
+    $checkout = array_replace(quotedDeliveryCheckoutData($customer->cart->items->modelKeys()), [
         'fulfillment_method' => FulfillmentMethod::Pickup, 'delivery_address' => null,
         'payment_method' => PaymentMethod::Cash, 'payment_proof_path' => null,
     ]);
@@ -121,7 +122,7 @@ test('the compatibility delivery path retains current totals without inferring a
     Inventory::factory()->for($product)->create(['quantity' => 10]);
     app(CartService::class)->add($customer, $product->id, 1);
 
-    $order = app(OrderPlacementService::class)->execute($customer, quotedDeliveryCheckoutData());
+    $order = app(OrderPlacementService::class)->execute($customer, quotedDeliveryCheckoutData($customer->cart->items->modelKeys()));
 
     expect($order)->product_subtotal->toBe('100.00')->total_amount->toBe('100.00')
         ->delivery_fee->toBe('0.00')->delivery_destination->toBeNull()->shipment->toBeNull();
@@ -133,7 +134,7 @@ test('stored commercial and fulfillment snapshots survive configuration and prod
     $product = Product::factory()->fragile()->create(['price' => '100.00']);
     Inventory::factory()->for($product)->create(['quantity' => 10]);
     app(CartService::class)->add($customer, $product->id, 1);
-    $order = app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData(), 'Sagay City');
+    $order = app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData($customer->cart->items->modelKeys()), 'Sagay City');
     $order->refresh();
     $commercial = $order->getAttributes();
     $fulfillment = $order->shipment->getAttributes();
@@ -162,7 +163,7 @@ test('a shipment creation failure rolls back the order items stock and cart cons
     Shipment::creating(fn (): never => throw new RuntimeException('Shipment persistence failed.'));
 
     try {
-        expect(fn () => app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData(), 'Sagay City'))
+        expect(fn () => app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData($customer->cart->items->modelKeys()), 'Sagay City'))
             ->toThrow(RuntimeException::class, 'Shipment persistence failed.');
     } finally {
         Shipment::flushEventListeners();
@@ -182,7 +183,7 @@ test('unsupported destinations fail before consuming any order stock or cart', f
     $stock = Inventory::factory()->for($product)->create(['quantity' => 10]);
     $cartItem = app(CartService::class)->add($customer, $product->id, 1);
 
-    expect(fn () => app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData(), 'Guihulngan City'))
+    expect(fn () => app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData($customer->cart->items->modelKeys()), 'Guihulngan City'))
         ->toThrow(DomainException::class, 'Unsupported delivery destination.');
     $this->assertDatabaseCount('orders', 0);
     $this->assertDatabaseCount('shipments', 0);
@@ -192,7 +193,7 @@ test('unsupported destinations fail before consuming any order stock or cart', f
 
 test('the strict delivery entrypoint rejects pickup fulfillment', function () {
     $customer = User::factory()->customer()->create();
-    $checkout = array_replace(quotedDeliveryCheckoutData(), ['fulfillment_method' => FulfillmentMethod::Pickup]);
+    $checkout = array_replace(quotedDeliveryCheckoutData([]), ['fulfillment_method' => FulfillmentMethod::Pickup]);
 
     expect(fn () => app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, $checkout, 'Sagay City'))
         ->toThrow(InvalidArgumentException::class, 'Quoted delivery placement requires delivery fulfillment.');
@@ -207,7 +208,7 @@ test('payment rejection and proof replacement retain stock and delivery snapshot
     $product = Product::factory()->fragile()->create(['price' => '100.00']);
     $stock = Inventory::factory()->for($product)->create(['quantity' => 10]);
     app(CartService::class)->add($customer, $product->id, 2);
-    $order = app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData(), 'Sagay City');
+    $order = app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData($customer->cart->items->modelKeys()), 'Sagay City');
     $shipment = $order->shipment->getAttributes();
 
     app(OrderProcessingService::class)->updatePaymentStatus($order, PaymentStatus::Rejected, PaymentRejectionReason::ImageUnclear);
@@ -228,7 +229,7 @@ test('verified shipment delivery records the snapshotted final total without cha
     $product = Product::factory()->fragile()->create(['price' => '100.00']);
     $stock = Inventory::factory()->for($product)->create(['quantity' => 10]);
     app(CartService::class)->add($customer, $product->id, 2);
-    $order = app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData(), 'Sagay City');
+    $order = app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData($customer->cart->items->modelKeys()), 'Sagay City');
     $processing = app(OrderProcessingService::class);
 
     $processing->updatePaymentStatus($order, PaymentStatus::Verified);
@@ -249,7 +250,7 @@ test('cancellation restores quoted order stock once while retaining its snapshot
     $product = Product::factory()->bulky()->create(['price' => '100.00']);
     $stock = Inventory::factory()->for($product)->create(['quantity' => 10]);
     app(CartService::class)->add($customer, $product->id, 2);
-    $order = app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData(), 'Sagay City');
+    $order = app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData($customer->cart->items->modelKeys()), 'Sagay City');
     $shipment = $order->shipment->getAttributes();
     $processing = app(OrderProcessingService::class);
 
@@ -272,7 +273,7 @@ test('decimal-capacity overflow rolls back before stock consumption', function (
     $stock = Inventory::factory()->for($product)->create(['quantity' => 10]);
     $cartItem = app(CartService::class)->add($customer, $product->id, 1);
 
-    expect(fn () => app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData(), 'Sagay City'))
+    expect(fn () => app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData($customer->cart->items->modelKeys()), 'Sagay City'))
         ->toThrow(InvalidArgumentException::class, 'Order total exceeds the supported monetary limit.');
     $this->assertDatabaseCount('orders', 0);
     $this->assertModelExists($cartItem);

@@ -23,9 +23,10 @@ use Illuminate\Support\Facades\Event;
  *     payment_proof_path: string|null
  * }
  */
-function validOrderPlacementData(array $overrides = []): array
+function validOrderPlacementData(array $cartItemIds, array $overrides = []): array
 {
     return array_replace([
+        'cart_item_ids' => $cartItemIds,
         'recipient_name' => 'Alex Customer',
         'contact_number' => '09171234567',
         'fulfillment_method' => FulfillmentMethod::Pickup,
@@ -48,7 +49,7 @@ test('places an order with current price snapshots and consumes stock and cart',
     $cartService->add($customer, $regularProduct->id, 2);
     $cartService->add($customer, $discountedProduct->id, 3);
 
-    $order = app(OrderPlacementService::class)->execute($customer, validOrderPlacementData([
+    $order = app(OrderPlacementService::class)->execute($customer, validOrderPlacementData($customer->cart->items->modelKeys(), [
         'fulfillment_method' => FulfillmentMethod::Delivery,
         'delivery_address' => 'Sagay City, Negros Occidental',
         'payment_method' => PaymentMethod::GCash,
@@ -98,7 +99,7 @@ test('rolls back order stock and cart changes when an order item fails', functio
     );
 
     try {
-        expect(fn () => app(OrderPlacementService::class)->execute($customer, validOrderPlacementData()))
+        expect(fn () => app(OrderPlacementService::class)->execute($customer, validOrderPlacementData($customer->cart->items->modelKeys())))
             ->toThrow(RuntimeException::class, 'Forced order item failure.');
     } finally {
         Event::forget('eloquent.creating: '.OrderItem::class);
@@ -122,9 +123,9 @@ test('prevents competing carts from overselling current stock', function () {
     $cartService->add($firstCustomer, $product->id, 2);
     $secondItem = $cartService->add($secondCustomer, $product->id, 2);
 
-    app(OrderPlacementService::class)->execute($firstCustomer, validOrderPlacementData());
+    app(OrderPlacementService::class)->execute($firstCustomer, validOrderPlacementData($firstCustomer->cart->items->modelKeys()));
 
-    expect(fn () => app(OrderPlacementService::class)->execute($secondCustomer, validOrderPlacementData()))
+    expect(fn () => app(OrderPlacementService::class)->execute($secondCustomer, validOrderPlacementData($secondCustomer->cart->items->modelKeys())))
         ->toThrow(
             OrderPlacementException::class,
             'Review unavailable products or quantities in your cart before placing an order.',
@@ -142,9 +143,9 @@ test('a repeated placement cannot deduct initial stock twice', function () {
     (new CartService)->add($customer, $product->id, 2);
     $orderPlacementService = app(OrderPlacementService::class);
 
-    $orderPlacementService->execute($customer, validOrderPlacementData());
+    $orderPlacementService->execute($customer, validOrderPlacementData($customer->cart->items->modelKeys()));
 
-    expect(fn () => $orderPlacementService->execute($customer, validOrderPlacementData()))
+    expect(fn () => $orderPlacementService->execute($customer, validOrderPlacementData($customer->cart->items->modelKeys())))
         ->toThrow(
             OrderPlacementException::class,
             'Add at least one available product before placing an order.',
@@ -160,7 +161,7 @@ test('later order and payment status changes do not deduct stock again', functio
     $product = Product::factory()->create();
     $inventory = Inventory::factory()->for($product)->create(['quantity' => 5]);
     (new CartService)->add($customer, $product->id, 2);
-    $order = app(OrderPlacementService::class)->execute($customer, validOrderPlacementData());
+    $order = app(OrderPlacementService::class)->execute($customer, validOrderPlacementData($customer->cart->items->modelKeys()));
 
     $this->actingAs($administrator)
         ->patch(route('administration.orders.payment-status.update', $order), [

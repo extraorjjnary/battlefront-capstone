@@ -92,6 +92,7 @@ class CartService
     /**
      * Calculate current cart line totals and aggregate totals.
      *
+     * @param  list<int>|null  $cartItemIds
      * @return array{
      *     lines: list<array{cart_item_id: int, quantity: int, unit_price: string, line_total: string}>,
      *     item_count: int,
@@ -99,10 +100,11 @@ class CartService
      *     total: string
      * }
      */
-    public function totals(User $customer): array
+    public function totals(User $customer, ?array $cartItemIds = null): array
     {
         $customer = $this->currentCustomer($customer);
         $items = $this->customerItemsQuery($customer)
+            ->when($cartItemIds !== null, fn (Builder $query): Builder => $query->whereKey($cartItemIds))
             ->with('product:id,price,discount_price')
             ->orderBy('id')
             ->get();
@@ -139,6 +141,7 @@ class CartService
     /**
      * Report current availability for every persisted cart item.
      *
+     * @param  list<int>|null  $cartItemIds
      * @return list<array{
      *     cart_item_id: int,
      *     requested_quantity: int,
@@ -146,10 +149,11 @@ class CartService
      *     status: string
      * }>
      */
-    public function availability(User $customer): array
+    public function availability(User $customer, ?array $cartItemIds = null): array
     {
         $customer = $this->currentCustomer($customer);
         $items = $this->customerItemsQuery($customer)
+            ->when($cartItemIds !== null, fn (Builder $query): Builder => $query->whereKey($cartItemIds))
             ->with([
                 'product:id,category_id,is_active',
                 'product.category:id,is_active',
@@ -178,6 +182,15 @@ class CartService
         }
 
         return $availability;
+    }
+
+    /** @param array<array-key, mixed> $cartItemIds */
+    public function isValidCheckoutSelection(array $cartItemIds): bool
+    {
+        return $cartItemIds !== []
+            && array_is_list($cartItemIds)
+            && ! collect($cartItemIds)->contains(fn ($id): bool => ! is_int($id) || $id <= 0)
+            && count(array_unique($cartItemIds)) === count($cartItemIds);
     }
 
     /**

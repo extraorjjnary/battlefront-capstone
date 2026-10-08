@@ -280,15 +280,16 @@ test('checkout rejects a stale cart referencing an inactive historical fixture',
     $product = Product::with('inventory')->where('product_code', 'DEVHIST40STABLE')->sole();
     $product->update(['is_active' => true]);
     $product->category->update(['is_active' => true]);
-    CartItem::factory()->for($product)->for($customer->cart()->create())->create(['quantity' => 1]);
+    $cartItem = CartItem::factory()->for($product)->for($customer->cart()->create())->create(['quantity' => 1]);
     $product->update(['is_active' => false]);
     $product->category->update(['is_active' => false]);
 
     expect(fn () => app(OrderPlacementService::class)->execute($customer, [
+        'cart_item_ids' => [$cartItem->id],
         'recipient_name' => 'Customer', 'contact_number' => '09000000000',
         'fulfillment_method' => FulfillmentMethod::Pickup, 'delivery_address' => null,
         'payment_method' => PaymentMethod::Cash, 'payment_proof_path' => null,
-    ]))->toThrow(OrderPlacementException::class);
+    ]))->toThrow(OrderPlacementException::class, 'Review unavailable products or quantities in your cart before placing an order.');
 
     expect($customer->orders()->count())->toBe(0);
     expect($product->inventory->refresh()->quantity)->toBe(100);

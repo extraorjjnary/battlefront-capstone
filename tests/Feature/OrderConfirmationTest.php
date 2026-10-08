@@ -213,6 +213,7 @@ test('refreshing confirmation does not place or deduct an order again', function
     (new CartService)->add($customer, $product->id, 2);
 
     $placementResponse = $this->actingAs($customer)->post(route('orders.store'), [
+        'cart_item_ids' => $customer->cart->items->modelKeys(),
         'recipient_name' => 'Alex Customer',
         'contact_number' => '09171234567',
         'fulfillment_method' => 'pickup',

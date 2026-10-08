@@ -23,11 +23,12 @@ class PrepareCheckout
     /**
      * Build the complete checkout-page payload.
      *
+     * @param  list<int>  $cartItemIds
      * @return array<string, mixed>
      */
-    public function execute(User $customer): array
+    public function execute(User $customer, array $cartItemIds): array
     {
-        $cart = $this->reviewCheckoutCart->execute($customer);
+        $cart = $this->reviewCheckoutCart->execute($customer, $cartItemIds);
         $products = Product::query()
             ->select(['id', 'shipping_profile'])
             ->whereKey(array_column(array_column($cart['items'], 'product'), 'id'))

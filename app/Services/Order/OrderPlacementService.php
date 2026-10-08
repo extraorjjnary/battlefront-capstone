@@ -27,6 +27,7 @@ use InvalidArgumentException;
 
 /**
  * @phpstan-type CheckoutData array{
+ *     cart_item_ids: list<int>,
  *     recipient_name: string, contact_number: string, fulfillment_method: FulfillmentMethod,
  *     delivery_address: string|null, payment_method: PaymentMethod, payment_proof_path: string|null
  * }
@@ -43,6 +44,7 @@ class OrderPlacementService
      * Create an order and consume its cart and stock atomically.
      *
      * @param  array{
+     *     cart_item_ids: list<int>,
      *     recipient_name: string,
      *     contact_number: string,
      *     fulfillment_method: FulfillmentMethod,
@@ -83,6 +85,12 @@ class OrderPlacementService
                 throw new AuthorizationException('Orders may only be placed by customers.');
             }
 
+            $cartItemIds = $checkout['cart_item_ids'];
+
+            if (! $this->cartService->isValidCheckoutSelection($cartItemIds)) {
+                throw OrderPlacementException::invalidSelection();
+            }
+
             $cart = Cart::query()
                 ->where('user_id', $lockedCustomer->id)
                 ->lockForUpdate()
@@ -95,12 +103,13 @@ class OrderPlacementService
             /** @var Collection<int, CartItem> $cartItems */
             $cartItems = CartItem::query()
                 ->where('cart_id', $cart->id)
+                ->whereKey($cartItemIds)
                 ->orderBy('product_id')
                 ->lockForUpdate()
                 ->get();
 
-            if ($cartItems->isEmpty()) {
-                throw OrderPlacementException::emptyCart();
+            if ($cartItems->count() !== count($cartItemIds)) {
+                throw OrderPlacementException::invalidSelection();
             }
 
             $productIds = $cartItems->pluck('product_id')->all();
@@ -217,7 +226,11 @@ class OrderPlacementService
                 ]);
             }
 
-            $cart->delete();
+            $cart->items()->whereKey($cartItemIds)->delete();
+
+            if (! $cart->items()->exists()) {
+                $cart->delete();
+            }
 
             return $order->load('items');
         }, attempts: 3);

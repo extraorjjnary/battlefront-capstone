@@ -361,7 +361,7 @@ Empty cart:
 
 ### GET /checkout
 
-Requires a nonempty conflict-free cart, otherwise 422 `errors.cart`. Returns a current snapshot, payment/fulfillment options, `pickup_quote`, and 12 `delivery_quotes`. No destination query parameter is needed: choose exactly one canonical `destination` from the returned quotes. Existing cart/payment fields are shown below; the new quote fields follow separately:
+Requires an explicit nonempty `cart_item_ids` list of distinct positive integer IDs from the owning customer's cart. Send repeated query parameters, for example `GET /checkout?cart_item_ids[]=12&cart_item_ids[]=15`. Missing/empty/malformed/duplicate selections return 422 `errors.cart_item_ids` or `errors.cart_item_ids.<index>`; foreign/missing/removed IDs and unavailable selected items return 422 `errors.cart` without disclosing ownership. Unselected items are excluded from the snapshot and all quotes, including fragile/bulky handling and ETA, and may remain unavailable without blocking checkout. Returns a current snapshot, payment/fulfillment options, `pickup_quote`, and 12 `delivery_quotes`. No destination query parameter is needed: choose exactly one canonical `destination` from the returned quotes. Existing cart/payment fields are shown below; the new quote fields follow separately:
 
 ```json
 {
@@ -498,6 +498,7 @@ Required fields:
 
 | Field | Rule |
 |---|---|
+| cart_item_ids | Required nonempty list of distinct positive integer cart-item IDs owned by the customer |
 | recipient_name | String <=255 |
 | contact_number | String <=20; preserve formatting as text |
 | fulfillment_method | pickup or delivery |
@@ -510,6 +511,7 @@ Pickup accepts all four payment methods. Delivery accepts only gcash/maya. Submi
 
 ```json
 {
+  "cart_item_ids": [12, 15],
   "recipient_name": "Example Customer",
   "contact_number": "EXAMPLE",
   "fulfillment_method": "pickup",
@@ -517,13 +519,13 @@ Pickup accepts all four payment methods. Delivery accepts only gcash/maya. Submi
 }
 ```
 
-For wallet orders submit the fields above using multipart form data, including an actual file part named `payment_proof`. JPEG/JPG, PNG, WebP only; contents must be an image, filename extension must match allowed extensions; max **5120 KB (5 MB)**. Do not send a filesystem path or base64 string as the proof, and do not manually specify a multipart boundary/Content-Type in Postman or React Native FormData.
+For wallet orders submit the fields above using multipart form data with repeated `cart_item_ids[]` text fields (one ID per field), including an actual file part named `payment_proof`. JPEG/JPG, PNG, WebP only; contents must be an image, filename extension must match allowed extensions; max **5120 KB (5 MB)**. Do not send a filesystem path or base64 string as the proof, and do not manually specify a multipart boundary/Content-Type in Postman or React Native FormData.
 
 For delivery, include `delivery_destination` (for example `Sagay City`) and a separate detailed `delivery_address`. For pickup, omit both fields. Supported canonical names are Sagay City, Escalante City, Cadiz City, Toboso, Manapla, Calatrava, Victorias City, E.B. Magalona, San Carlos City, Silay City, Talisay City, and Bacolod City. Do not infer a destination from the address. Missing, unsupported, wrong-case and array destination values receive 422 `errors.delivery_destination`.
 
-The server places the entire current cart through shared transactional order placement, locks/rechecks stock, snapshots prices/recipient/fulfillment, deducts inventory and clears the cart atomically. Order and payment initially remain pending; payment verification is manual. Failed stock validation uses 422 `errors.cart` and rolls back the operation.
+The server re-resolves every selected ID through shared transactional order placement, locks/rechecks ownership, quantities, eligibility and stock, snapshots current prices/recipient/fulfillment, and deducts selected inventory atomically. Only purchased cart items are removed; unselected items remain. The cart container is removed only when empty. Missing or empty selection never falls back to full-cart checkout. To purchase all items, explicitly submit all IDs from GET /cart. Selection is temporary client/checkout intent, with no permanent selection flag. Order and payment initially remain pending; payment verification is manual. Failed stock validation uses 422 `errors.cart` and rolls back the operation.
 
-Do not send client totals, item prices, inventory adjustments or a user ID. There is no idempotency-key contract: a repeated request after successful cart consumption fails on the empty cart. On an uncertain network outcome, inspect history before attempting a new placement; do not assume retries return the original order.
+Do not send client totals, item prices, inventory adjustments or a user ID. There is no idempotency-key contract: a repeated request with already-purchased IDs fails even when unselected items remain; it never purchases the remaining cart. On an uncertain network outcome, inspect history before attempting a new placement; do not assume retries return the original order.
 
 Client fee/base fee/surcharge/profile/preparation/transit/ETA/subtotal/total values are ignored, including nested quotes. Delivery uses the same strict internal placement transaction as web checkout: the accepted quote is recalculated and saved with exactly one `awaiting_preparation` Shipment. That initial record does not imply packing or dispatch. Pickup saves zero delivery fee and creates no Shipment.
 
@@ -885,7 +887,7 @@ Use a disposable development database/account with an active product, live Sagay
 2. **Access:** Profile without token (401). Guest recommendations/options (200). Guest chatbot public question/follow-up (200). Guest order question returns sign-in fallback. Pace calls under guest limits.
 3. **Authentication/profile:** Register a unique customer (201) OR log in (200); confirm token capture. Read/update profile (200), verify only approved fields. Invalid login gives 401; duplicate/invalid registration gives 422.
 4. **Cart:** Add stock-eligible product (200), verify captured cart_item_id; update quantity and totals; remove (200). Add again before checkout. Try quantity zero, quantity above stock, and an unavailable product (422); failed operations must not corrupt the cart.
-5. **Checkout/orders:** Preview checkout (200), verify all 12 server quotes and select a destination. Check standard/fragile/bulky and mixed carts, subtotal/fee/final total, LBC/demo wording and provisional calendar windows. Submit cash/card pickup (201, zero fee/no Shipment); omit address and destination. Refill before each wallet placement, select an image, and include canonical destination plus detailed address for delivery. Try missing/unsupported/wrong-case/array destinations, pickup destination/address, and forged quote fields. Verify recalculated saved fees/relative ETA, pending order/payment, cart consumption and inventory deduction through existing web administration.
+5. **Checkout/orders:** Select one, multiple, or all owned cart-item IDs and include them in both preview and placement. Preview checkout (200), verify all 12 server quotes and select a destination. Check standard/fragile/bulky and mixed carts, subtotal/fee/final total, LBC/demo wording and provisional calendar windows. Submit cash/card pickup (201, zero fee/no Shipment); omit address and destination. Refill before each wallet placement, select an image, and include canonical destination plus detailed address for delivery. Try missing/unsupported/wrong-case/array destinations, pickup destination/address, and forged quote fields. Verify recalculated saved fees/relative ETA, pending order/payment, selected-item removal, unselected-item retention and selected inventory deduction through existing web administration. Confirm no selection, duplicates, foreign/missing/removed IDs and stale selected stock fail without changes. Leave bulky/fragile products unselected and verify their handling/ETA do not affect the order.
 6. **Replacement proof:** Reject the test wallet payment through existing web administration. Set rejected_order_id, select a replacement image, submit (200). Verify pending payment, cleared rejection, unchanged order status/stock. Retry while payment is pending (422). Test unsupported file type and >5 MB (422 when Laravel handles it).
 
    **Shipment tracking:** Using a delivery test order, verify that pending payment/order offers no shipment progression. Manually verify payment, move the order to Processing, and advance each shipment milestone separately through web administration. After each action compare customer web detail and GET /orders/{order}: status, saved ETA/fees/destination and chronological timestamps must agree. Leave reference blank unless a real value is available. Confirm Delivered completes the order with one sale; use a second eligible order to verify cancellation terminates shipment and restores stock once. Verify pickup/legacy orders have no shipment UI and a second customer's token receives 404. No notification, map or live carrier data is expected.

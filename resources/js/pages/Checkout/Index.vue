@@ -31,7 +31,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { formatCurrency } from "@/lib/currency";
 import { index as cartIndex } from "@/routes/cart";
-import { index as checkoutIndex } from "@/routes/checkout";
 
 const props = defineProps({
     cart: { type: Object, required: true },
@@ -100,7 +99,7 @@ defineOptions({
     layout: {
         breadcrumbs: [
             { title: "Cart", href: cartIndex() },
-            { title: "Checkout", href: checkoutIndex() },
+            { title: "Checkout" },
         ],
     },
 });
@@ -155,11 +154,19 @@ defineOptions({
             class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start"
             v-slot="{ errors, processing, progress }"
         >
+            <input
+                v-for="item in cart.items"
+                :key="`selected-${item.id}`"
+                type="hidden"
+                name="cart_item_ids[]"
+                :value="item.id"
+            />
             <div class="grid gap-6">
                 <Alert v-if="errors.cart" variant="destructive">
                     <AlertTitle>Your cart changed</AlertTitle>
                     <AlertDescription>{{ errors.cart }}</AlertDescription>
                 </Alert>
+                <InputError :message="errors.cart_item_ids" />
 
                 <section
                     class="border-border bg-card grid gap-6 border p-6"
@@ -663,7 +670,7 @@ defineOptions({
                     />
                 </div>
 
-                <Button type="submit" class="w-full" :disabled="processing || !selectedQuote">
+                <Button type="submit" class="w-full" :disabled="processing || !selectedQuote || !cart.items.length">
                     <Spinner v-if="processing" />
                     <BadgeCheck v-else aria-hidden="true" />
                     {{ processing ? "Placing order..." : "Place order" }}

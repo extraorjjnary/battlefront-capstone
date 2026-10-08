@@ -31,9 +31,10 @@ function deliveryCheckoutCart(ShippingProfile $profile = ShippingProfile::Standa
 }
 
 /** @return array<string, mixed> */
-function deliveryCheckoutSubmission(array $overrides = []): array
+function deliveryCheckoutSubmission(array $cartItemIds, array $overrides = []): array
 {
     return array_replace([
+        'cart_item_ids' => $cartItemIds,
         'recipient_name' => 'Delivery Customer',
         'contact_number' => '09171234567',
         'fulfillment_method' => 'delivery',
@@ -51,9 +52,9 @@ test('web and mobile checkout expose equivalent quotes for all destination fees 
     Http::preventStrayRequests();
     ['customer' => $customer, 'stock' => $stock] = deliveryCheckoutCart($profile);
 
-    $web = $this->actingAs($customer)->get(route('checkout.index'))->assertOk();
+    $web = $this->actingAs($customer)->get(route('checkout.index', ['cart_item_ids' => $customer->cart->items->modelKeys()]))->assertOk();
     $api = $this->withToken($customer->createToken('Phone')->plainTextToken)
-        ->get('/api/v1/checkout')->assertOk();
+        ->get('/api/v1/checkout?'.http_build_query(['cart_item_ids' => $customer->cart->items->modelKeys()]))->assertOk();
     $quotes = $api->json('data.delivery_quotes');
 
     expect($quotes)->toBe($web->inertiaProps('deliveryQuotes'))->toHaveCount(12);
@@ -103,7 +104,7 @@ test('checkout calendar windows use the configured timezone across leap days', f
     ['customer' => $customer] = deliveryCheckoutCart();
 
     $this->withToken($customer->createToken('Phone')->plainTextToken)
-        ->get('/api/v1/checkout')->assertOk()
+        ->get('/api/v1/checkout?'.http_build_query(['cart_item_ids' => $customer->cart->items->modelKeys()]))->assertOk()
         ->assertJsonPath('data.delivery_quotes.0.eta_anchor_date', '2028-02-28')
         ->assertJsonPath('data.delivery_quotes.0.eta_timezone', 'Asia/Manila')
         ->assertJsonPath('data.delivery_quotes.0.estimated_delivery_start', '2028-02-29')
@@ -115,7 +116,7 @@ test('delivery placement snapshots each profile through the shared web and mobil
     ['customer' => $customer, 'stock' => $stock] = deliveryCheckoutCart($profile);
     $this->actingAs($customer)->withToken($customer->createToken('Phone')->plainTextToken);
 
-    $response = $this->post($channel === 'web' ? route('orders.store') : '/api/v1/orders', deliveryCheckoutSubmission(['payment_method' => 'maya']));
+    $response = $this->post($channel === 'web' ? route('orders.store') : '/api/v1/orders', deliveryCheckoutSubmission($customer->cart->items->modelKeys(), ['payment_method' => 'maya']));
     $order = Order::sole();
 
     if ($channel === 'web') {
@@ -149,13 +150,13 @@ test('mixed cart preview and placement charge the highest handling profile only 
         app(CartService::class)->add($customer, $product->id, 3);
     }
     $this->actingAs($customer)->withToken($customer->createToken('Phone')->plainTextToken);
-    $this->get('/api/v1/checkout')->assertOk()
+    $this->get('/api/v1/checkout?'.http_build_query(['cart_item_ids' => $customer->cart->items->modelKeys()]))->assertOk()
         ->assertJsonPath('data.delivery_quotes.0.product_subtotal', '120.00')
         ->assertJsonPath('data.delivery_quotes.0.handling_surcharge', '100.00')
         ->assertJsonPath('data.delivery_quotes.0.delivery_fee', '180.00')
         ->assertJsonPath('data.delivery_quotes.0.total', '300.00');
 
-    $response = $this->post($channel === 'web' ? route('orders.store') : '/api/v1/orders', deliveryCheckoutSubmission());
+    $response = $this->post($channel === 'web' ? route('orders.store') : '/api/v1/orders', deliveryCheckoutSubmission($customer->cart->items->modelKeys()));
 
     $channel === 'web' ? $response->assertSessionHasNoErrors() : $response->assertCreated();
     expect(Order::sole())->product_subtotal->toBe('120.00')->handling_surcharge->toBe('100.00')
@@ -169,13 +170,13 @@ test('placement ignores forged quote values and recalculates changed prices prof
     $this->seed(BranchSeeder::class);
     ['customer' => $customer, 'product' => $product, 'stock' => $stock] = deliveryCheckoutCart();
     $this->actingAs($customer)->withToken($customer->createToken('Phone')->plainTextToken);
-    $this->get('/api/v1/checkout')->assertOk()->assertJsonPath('data.delivery_quotes.0.total', '98.66');
+    $this->get('/api/v1/checkout?'.http_build_query(['cart_item_ids' => $customer->cart->items->modelKeys()]))->assertOk()->assertJsonPath('data.delivery_quotes.0.total', '98.66');
     $product->update(['discount_price' => null, 'shipping_profile' => ShippingProfile::Bulky]);
     config([
         'battlefront.delivery.destinations.Sagay City' => ['base_fee' => '80.15', 'transit_min_days' => 2, 'transit_max_days' => 3],
         'battlefront.delivery.profiles.bulky' => ['surcharge' => '100.25', 'preparation_days' => 4],
     ]);
-    $payload = deliveryCheckoutSubmission([
+    $payload = deliveryCheckoutSubmission($customer->cart->items->modelKeys(), [
         'delivery_fee' => '0.01', 'base_fee' => '0.01', 'delivery_base_fee' => '0.01', 'handling_surcharge' => '0.01',
         'shipping_profile' => 'standard', 'preparation_days' => 0, 'transit_min_days' => 0, 'transit_max_days' => 0,
         'eta_min_days' => 0, 'eta_max_days' => 0, 'eta_anchor_date' => '1900-01-01',
@@ -211,7 +212,7 @@ test('delivery rejects missing unsupported noncanonical and nonscalar destinatio
     ['customer' => $customer, 'stock' => $stock] = deliveryCheckoutCart();
     $this->actingAs($customer)->withToken($customer->createToken('Phone')->plainTextToken);
 
-    $response = $this->post($channel === 'web' ? route('orders.store') : '/api/v1/orders', deliveryCheckoutSubmission(['delivery_destination' => $destination]));
+    $response = $this->post($channel === 'web' ? route('orders.store') : '/api/v1/orders', deliveryCheckoutSubmission($customer->cart->items->modelKeys(), ['delivery_destination' => $destination]));
 
     if ($channel === 'web') {
         $response->assertSessionHasErrors(['delivery_destination' => $message]);
@@ -235,7 +236,7 @@ test('pickup prohibits a destination and preserves zero fee placement', function
     Storage::fake('local');
     ['customer' => $customer, 'stock' => $stock] = deliveryCheckoutCart(ShippingProfile::Bulky);
     $this->actingAs($customer)->withToken($customer->createToken('Phone')->plainTextToken);
-    $payload = ['recipient_name' => 'Pickup Customer', 'contact_number' => '09171234567', 'fulfillment_method' => 'pickup', 'payment_method' => 'cash'];
+    $payload = ['cart_item_ids' => $customer->cart->items->modelKeys(), 'recipient_name' => 'Pickup Customer', 'contact_number' => '09171234567', 'fulfillment_method' => 'pickup', 'payment_method' => 'cash'];
     $url = $channel === 'web' ? route('orders.store') : '/api/v1/orders';
 
     $invalid = $this->post($url, [...$payload, 'delivery_destination' => 'Sagay City']);
@@ -263,7 +264,7 @@ test('delivery shipment failure rolls back placement and deletes newly uploaded 
     config(['app.debug' => false]);
 
     try {
-        $this->post($channel === 'web' ? route('orders.store') : '/api/v1/orders', deliveryCheckoutSubmission())->assertInternalServerError();
+        $this->post($channel === 'web' ? route('orders.store') : '/api/v1/orders', deliveryCheckoutSubmission($customer->cart->items->modelKeys()))->assertInternalServerError();
     } finally {
         Event::forget('eloquent.creating: '.Shipment::class);
     }
@@ -279,7 +280,7 @@ test('delivery shipment failure rolls back placement and deletes newly uploaded 
 test('a destination removed before internal placement becomes a validation error with proof cleanup', function () {
     Storage::fake('local');
     ['customer' => $customer, 'stock' => $stock] = deliveryCheckoutCart();
-    $payload = deliveryCheckoutSubmission();
+    $payload = deliveryCheckoutSubmission($customer->cart->items->modelKeys());
     config(['battlefront.delivery.destinations' => []]);
 
     try {

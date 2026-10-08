@@ -21,7 +21,7 @@ class PlaceCustomerOrder
     ) {}
 
     /**
-     * @param  array{recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address?: string|null, delivery_destination: string|null, payment_method: string}  $validated
+     * @param  array{cart_item_ids: list<int>, recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address?: string|null, delivery_destination: string|null, payment_method: string}  $validated
      */
     public function execute(User $customer, array $validated, ?UploadedFile $paymentProof): Order
     {
@@ -33,6 +33,7 @@ class PlaceCustomerOrder
 
         try {
             $checkout = [
+                'cart_item_ids' => $validated['cart_item_ids'],
                 'recipient_name' => $validated['recipient_name'],
                 'contact_number' => $validated['contact_number'],
                 'fulfillment_method' => FulfillmentMethod::from($validated['fulfillment_method']),

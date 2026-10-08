@@ -6,21 +6,21 @@ use App\Enums\FulfillmentMethod;
 use App\Enums\PaymentMethod;
 use App\Services\Order\DeliveryRules;
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
 use Illuminate\Validation\Validator;
 
-class ValidateCheckoutRequest extends FormRequest
+class ValidateCheckoutRequest extends CheckoutPreviewRequest
 {
     /**
      * Return the validated checkout fields shared by web and API placement.
      *
-     * @return array{recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address: string|null, delivery_destination: string|null, payment_method: string}
+     * @return array{cart_item_ids: list<int>, recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address: string|null, delivery_destination: string|null, payment_method: string}
      */
     public function checkoutData(): array
     {
         return [
+            'cart_item_ids' => $this->cartItemIds(),
             'recipient_name' => $this->string('recipient_name')->toString(),
             'contact_number' => $this->string('contact_number')->toString(),
             'fulfillment_method' => $this->string('fulfillment_method')->toString(),
@@ -32,14 +32,6 @@ class ValidateCheckoutRequest extends FormRequest
                 : null,
             'payment_method' => $this->string('payment_method')->toString(),
         ];
-    }
-
-    /**
-     * Determine if the user is authorized to make this request.
-     */
-    public function authorize(): bool
-    {
-        return $this->user()?->can('use-customer-cart') ?? false;
     }
 
     /**
@@ -56,6 +48,7 @@ class ValidateCheckoutRequest extends FormRequest
         );
 
         return [
+            ...parent::rules(),
             'recipient_name' => ['bail', 'required', 'string', 'max:255'],
             'contact_number' => ['bail', 'required', 'string', 'max:20'],
             'fulfillment_method' => ['bail', 'required', new Enum(FulfillmentMethod::class)],
@@ -123,6 +116,7 @@ class ValidateCheckoutRequest extends FormRequest
     public function messages(): array
     {
         return [
+            ...parent::messages(),
             'recipient_name.required' => 'Enter the recipient name.',
             'recipient_name.max' => 'The recipient name may not exceed 255 characters.',
             'contact_number.required' => 'Enter a contact number.',

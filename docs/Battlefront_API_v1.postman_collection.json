@@ -1377,7 +1377,7 @@
     },
     {
       "name": "Checkout and Orders",
-      "description": "Use disposable local data. Placement consumes the current cart and deducts inventory. Refill the cart before each alternative placement request.",
+      "description": "Use disposable local data. Explicitly submit selected cart-item IDs for preview and placement. Only purchased rows are removed and their inventory deducted; unselected rows remain. Refill purchased products before another placement.",
       "item": [
         {
           "name": "Preview checkout",
@@ -1390,15 +1390,21 @@
               }
             ],
             "url": {
-              "raw": "{{base_url}}/checkout",
+              "raw": "{{base_url}}/checkout?cart_item_ids[]={{cart_item_id}}",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "checkout"
+              ],
+              "query": [
+                {
+                  "key": "cart_item_ids[]",
+                  "value": "{{cart_item_id}}"
+                }
               ]
             },
-            "description": "Returns the ready cart, pickup_quote and 12 delivery_quotes. Select one canonical destination from the server quotes; show subtotal, fee, total, packing, LBC/demo notice and provisional calendar dates. No destination query parameter is needed. Refresh before payment. 422 errors.cart for an empty/conflicting cart."
+            "description": "Preview explicitly selected owned cart-item IDs. Repeat cart_item_ids[] query parameters for multiple/all items. Returns selected-only subtotal, pickup_quote and 12 delivery_quotes; unselected fragile/bulky items never affect handling or ETA. Missing/empty/malformed/duplicate selection: 422 selection validation errors. Foreign/missing/stale/unavailable items: 422 errors.cart. Select a canonical destination from server quotes and refresh before payment."
           },
           "event": [
             {
@@ -1438,15 +1444,21 @@
                   }
                 ],
                 "url": {
-                  "raw": "{{base_url}}/checkout",
+                  "raw": "{{base_url}}/checkout?cart_item_ids[]={{cart_item_id}}",
                   "host": [
                     "{{base_url}}"
                   ],
                   "path": [
                     "checkout"
+                  ],
+                  "query": [
+                    {
+                      "key": "cart_item_ids[]",
+                      "value": "{{cart_item_id}}"
+                    }
                   ]
                 },
-                "description": "Returns the ready cart, pickup_quote and 12 delivery_quotes. Select one canonical destination from the server quotes; show subtotal, fee, total, packing, LBC/demo notice and provisional calendar dates. No destination query parameter is needed. Refresh before payment. 422 errors.cart for an empty/conflicting cart."
+                "description": "Preview explicitly selected owned cart-item IDs. Repeat cart_item_ids[] query parameters for multiple/all items. Returns selected-only subtotal, pickup_quote and 12 delivery_quotes; unselected fragile/bulky items never affect handling or ETA. Missing/empty/malformed/duplicate selection: 422 selection validation errors. Foreign/missing/stale/unavailable items: 422 errors.cart. Select a canonical destination from server quotes and refresh before payment."
               },
               "status": "OK",
               "code": 200,
@@ -1483,10 +1495,10 @@
                 "orders"
               ]
             },
-            "description": "Use cash or card_at_store. Omit delivery_destination, delivery_address and payment_proof. Server snapshots current subtotal with zero delivery fee and no Shipment. 422 on empty/conflicting cart.",
+            "description": "Use cash or card_at_store. Omit delivery_destination, delivery_address and payment_proof. Server snapshots current subtotal with zero delivery fee and no Shipment. 422 on empty/conflicting cart. Submit only selected cart-item IDs; add IDs to the array for multiple/all-item checkout. Purchased items alone are removed; unselected items remain. No omitted-selection fallback.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"recipient_name\": \"{{recipient_name}}\",\n  \"contact_number\": \"{{contact_number}}\",\n  \"fulfillment_method\": \"pickup\",\n  \"payment_method\": \"cash\"\n}",
+              "raw": "{\n  \"cart_item_ids\": [\n    \"{{cart_item_id}}\"\n  ],\n  \"recipient_name\": \"{{recipient_name}}\",\n  \"contact_number\": \"{{contact_number}}\",\n  \"fulfillment_method\": \"pickup\",\n  \"payment_method\": \"cash\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1500,7 +1512,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "const template = {\"recipient_name\":\"{{recipient_name}}\",\"contact_number\":\"{{contact_number}}\",\"fulfillment_method\":\"pickup\",\"payment_method\":\"cash\"};",
+                  "const template = {\"cart_item_ids\":[\"{{cart_item_id}}\"],\"recipient_name\":\"{{recipient_name}}\",\"contact_number\":\"{{contact_number}}\",\"fulfillment_method\":\"pickup\",\"payment_method\":\"cash\"};",
                   "function resolve(value) {",
                   "  if (typeof value === \"string\") return value.replace(/\\{\\{([^{}]+)\\}\\}/g, (_, key) => String(pm.environment.get(key) ?? \"\"));",
                   "  if (Array.isArray(value)) return value.map(resolve);",
@@ -1551,10 +1563,10 @@
                     "orders"
                   ]
                 },
-                "description": "Use cash or card_at_store. Omit delivery_destination, delivery_address and payment_proof. Server snapshots current subtotal with zero delivery fee and no Shipment. 422 on empty/conflicting cart.",
+                "description": "Use cash or card_at_store. Omit delivery_destination, delivery_address and payment_proof. Server snapshots current subtotal with zero delivery fee and no Shipment. 422 on empty/conflicting cart. Submit only selected cart-item IDs; add IDs to the array for multiple/all-item checkout. Purchased items alone are removed; unselected items remain. No omitted-selection fallback.",
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"recipient_name\": \"{{recipient_name}}\",\n  \"contact_number\": \"{{contact_number}}\",\n  \"fulfillment_method\": \"pickup\",\n  \"payment_method\": \"cash\"\n}",
+                  "raw": "{\n  \"cart_item_ids\": [\n    \"{{cart_item_id}}\"\n  ],\n  \"recipient_name\": \"{{recipient_name}}\",\n  \"contact_number\": \"{{contact_number}}\",\n  \"fulfillment_method\": \"pickup\",\n  \"payment_method\": \"cash\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -1593,10 +1605,15 @@
                 "orders"
               ]
             },
-            "description": "Select a local JPEG/PNG/WebP image <=5 MB for GCash/Maya. Delivery requires one canonical delivery_destination from checkout quotes plus a separate detailed delivery_address. For pickup, disable BOTH destination and address fields. Never submit quote/pricing/ETA fields. Server recalculates and snapshots delivery fees/relative ETA; payment remains pending manual verification. Do not manually set Content-Type.",
+            "description": "Select a local JPEG/PNG/WebP image <=5 MB for GCash/Maya. Delivery requires one canonical delivery_destination from checkout quotes plus a separate detailed delivery_address. For pickup, disable BOTH destination and address fields. Never submit quote/pricing/ETA fields. Server recalculates and snapshots delivery fees/relative ETA; payment remains pending manual verification. Do not manually set Content-Type. Repeat cart_item_ids[] text fields for multiple/all selected items. Selected products alone determine subtotal, handling and ETA; unselected items remain after success.",
             "body": {
               "mode": "formdata",
               "formdata": [
+                {
+                  "key": "cart_item_ids[]",
+                  "value": "{{cart_item_id}}",
+                  "type": "text"
+                },
                 {
                   "key": "recipient_name",
                   "value": "{{recipient_name}}",
@@ -1672,10 +1689,15 @@
                     "orders"
                   ]
                 },
-                "description": "Select a local JPEG/PNG/WebP image <=5 MB for GCash/Maya. Delivery requires one canonical delivery_destination from checkout quotes plus a separate detailed delivery_address. For pickup, disable BOTH destination and address fields. Never submit quote/pricing/ETA fields. Server recalculates and snapshots delivery fees/relative ETA; payment remains pending manual verification. Do not manually set Content-Type.",
+                "description": "Select a local JPEG/PNG/WebP image <=5 MB for GCash/Maya. Delivery requires one canonical delivery_destination from checkout quotes plus a separate detailed delivery_address. For pickup, disable BOTH destination and address fields. Never submit quote/pricing/ETA fields. Server recalculates and snapshots delivery fees/relative ETA; payment remains pending manual verification. Do not manually set Content-Type. Repeat cart_item_ids[] text fields for multiple/all selected items. Selected products alone determine subtotal, handling and ETA; unselected items remain after success.",
                 "body": {
                   "mode": "formdata",
                   "formdata": [
+                    {
+                      "key": "cart_item_ids[]",
+                      "value": "{{cart_item_id}}",
+                      "type": "text"
+                    },
                     {
                       "key": "recipient_name",
                       "value": "{{recipient_name}}",
