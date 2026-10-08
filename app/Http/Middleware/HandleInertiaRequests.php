@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Enums\AppearancePreference;
+use App\Services\Notifications\NotificationHistory;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -43,6 +44,8 @@ class HandleInertiaRequests extends Middleware
         return [
             ...parent::share($request),
             'name' => config('app.name'),
+            'notificationSummary' => fn (): ?array => $request->user() === null
+                ? null : app(NotificationHistory::class)->summary($request->user()),
             'appearance' => $request->user()?->appearance->value
                 ?? AppearancePreference::System->value,
             'auth' => [

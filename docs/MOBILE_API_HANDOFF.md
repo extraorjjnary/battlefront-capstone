@@ -108,6 +108,12 @@ All paths below are relative to `base_url`. GET routes also support HEAD through
 | GET | /orders | Customer | 200 |
 | GET | /orders/{order} | Customer | 200 |
 | POST | /orders/{order}/payment-proof | Customer | 200 |
+| GET | /notifications | Customer | 200 |
+| GET | /notifications/unread-count | Customer | 200 |
+| PATCH | /notifications/{notification}/read | Customer | 200 |
+| PATCH | /notifications/read-all | Customer | 200 |
+| PUT | /push-devices/{device} | Customer | 200 |
+| DELETE | /push-devices/{device} | Customer | 204 |
 | POST | /chatbot | Guest/customer | 200 |
 | GET | /recommendations/options | Guest/customer | 200 |
 | POST | /recommendations | Guest/customer | 200 |
@@ -594,7 +600,7 @@ Order item prices/quantities are persisted snapshots; displayed product names/br
 
 Detail `fulfillment.delivery_destination` contains the separately selected canonical city/municipality saved on the order. Display it alongside `fulfillment.delivery_address` in submitted details. It remains null for pickup and legacy orders without a saved destination; never infer it from the free-text address or current configuration. Web and API expose the same value, including when shipment data is unavailable. History summaries retain their existing shape.
 
-Detail responses add saved `product_subtotal`, `delivery_fee`, `delivery_quote` and nullable `shipment`; existing `total` remains the final total. Quoted delivery `delivery_quote` contains the quote-entry fields above **except** `eta_anchor_date`, `eta_timezone`, `estimated_delivery_start`, and `estimated_delivery_end`. Its fees, destination, profile, carrier, assumptions and relative ETA come from saved Order/Shipment snapshots, never current configuration. Pickup/legacy unquoted delivery has `delivery_quote: null` and `shipment: null`; unknown legacy `product_subtotal` stays null and original totals remain unchanged. History summaries retain their existing shape. EXT-89's shipment detail contract follows; notifications remain deferred to EXT-90.
+Detail responses add saved `product_subtotal`, `delivery_fee`, `delivery_quote` and nullable `shipment`; existing `total` remains the final total. Quoted delivery `delivery_quote` contains the quote-entry fields above **except** `eta_anchor_date`, `eta_timezone`, `estimated_delivery_start`, and `estimated_delivery_end`. Its fees, destination, profile, carrier, assumptions and relative ETA come from saved Order/Shipment snapshots, never current configuration. Pickup/legacy unquoted delivery has `delivery_quote: null` and `shipment: null`; unknown legacy `product_subtotal` stays null and original totals remain unchanged. History summaries retain their existing shape. EXT-89's shipment detail contract follows; EXT-90 supplies shared notifications as documented below.
 
 ### Manual shipment detail — EXT-89
 
@@ -673,6 +679,81 @@ Multipart with one required `payment_proof` file; same image/extension/size rule
 200 returns full order detail, resets payment status to pending and clears rejection feedback. Order status/inventory stay unchanged. Other payment states/methods/terminal orders return 422 `errors.payment_proof`; valid uploads against foreign/missing orders return 404.
 
 There is no separate initial-proof upload endpoint: initial wallet proof belongs to POST /orders.
+
+## Shared notifications and Expo push — EXT-90
+
+Notification history/read state belongs to the authenticated account and is shared by web and mobile. All endpoints below require a valid customer bearer token. Missing/invalid/expired/revoked tokens return 401; administrator tokens return 403. Foreign notification/device IDs return 404. Browser sessions never authenticate these API endpoints.
+
+The web bell separately refreshes its summary every 30 seconds while its tab is visible using session-only web routes; hidden tabs pause and requests cannot overlap. It updates only the notification summary prop without visiting/reloading the current page or refreshing order/form data. The mobile endpoints below are unchanged: mobile should fetch its own history/count when appropriate for its screen lifecycle and Expo events.
+
+### History, unread count and read actions
+
+`GET /notifications?page=1` returns 10 entries per page, newest creation time then UUID first, using Laravel's `data/links/meta` pagination envelope and `meta.unread_count`. IDs are notification UUID strings, not integers. One illustrative item is:
+
+```json
+{
+  "id": "12345678-1234-4234-8234-123456789abc",
+  "event": "shipment.in_transit",
+  "title": "Shipment in transit",
+  "body": "There is an update for order BF-000001. Open your order for details.",
+  "occurred_at": "2026-10-08T10:00:00+00:00",
+  "created_at": "2026-10-08T10:00:00+00:00",
+  "read_at": null,
+  "is_read": false,
+  "order": {
+    "id": 1,
+    "reference": "BF-000001",
+    "web_url": "<backend-origin>/orders/1",
+    "api_url": "<backend-origin>/api/v1/orders/1",
+    "deep_link": {"screen": "order_detail", "order_id": 1}
+  }
+}
+```
+
+`order` is nullable when an owned order cannot be resolved. Do not render a destination from an absent order. Deep-link metadata is a screen identifier plus resource ID, not an application URI or authentication credential. The separate Expo client maps `order_detail` to its order screen and fetches `GET /orders/{order_id}` with its current bearer token; existing ownership checks still apply. Reset account-specific UI on logout/account change.
+
+`GET /notifications/unread-count` returns `{"data":{"unread_count":2}}`.
+`PATCH /notifications/{notification}/read` accepts no body and returns the updated item under `data`, with `meta.unread_count`.
+`PATCH /notifications/read-all` accepts no body and returns `{"data":{"unread_count":0}}` (fresh concurrent events can increase that count). Read operations are idempotent; individual retries preserve the original read timestamp.
+
+Customer events: `payment.verified`, `payment.rejected`, `order.cancelled`, and `shipment.preparing/ready_for_dispatch/handed_to_lbc/in_transit/out_for_delivery/delivered`. Proof paths, payment rejection notes and personal addresses are absent; read the authorized order detail for available feedback. Initial shipment creation and reference corrections generate no notice, and current ETA cannot be revised. Administrator operational notifications remain web-only.
+
+### Device registration and revocation
+
+Generate and retain a device-installation UUID in the mobile app; use it as `{device}`. `PUT /push-devices/{device}` accepts:
+
+```json
+{"expo_push_token":"ExpoPushToken[client_obtained_token]","platform":"android"}
+```
+
+`platform` is required and is `android` or `ios`. Tokens must use a nonempty `ExpoPushToken[...]` or `ExponentPushToken[...]` format and be at most 255 characters. Use Expo's actual project/device token; do not substitute an FCM/APNs token or bearer token. No provider credentials are passed by the client. Invalid fields return 422; malformed device UUID routes return 404.
+
+Registration returns `{"data":{"id":1,"device_id":"<installation-uuid>","platform":"android","is_active":true,"updated_at":"<ISO timestamp>"}}`. Account/session ownership comes from bearer authentication, never submitted IDs. Raw push tokens and session identifiers are not returned. Repeated identical registration is idempotent; changed token/session creates a new registration version.
+
+Multiple devices are supported. An active token already registered to a different account/device returns 422; do not silently transfer it. Revoke the previous registration or sign out before switching accounts. Ineligible expired/revoked registrations can be deactivated by server cleanup when encountered, permitting a fresh authenticated registration.
+
+`DELETE /push-devices/{device}` deactivates the caller's registration and clears its stored token; repeated revocation returns 204 without a body. Unknown/foreign registrations return 404. Mobile logout disables registrations belonging to the presented session and revokes that session only. Other valid device sessions remain eligible. Expiry/revocation is also rechecked before queued sending. Sign in and PUT the device registration again to resume push; tokens never authenticate API requests.
+
+### Push behavior, backend setup and limitations
+
+Set `EXPO_PUSH_ENABLED=true` only after the separate Expo project has working platform credentials and physical-device push setup. `EXPO_PUSH_ACCESS_TOKEN` is optional server-side configuration for Expo enhanced push security; keep it outside source control and client responses. Run:
+
+```shell
+php artisan migrate --no-interaction
+php artisan queue:work database --queue=notifications,default --timeout=30 --tries=3
+```
+
+The migrations add Laravel history, device registrations and delivery records; there is no historical backfill. Database history persists immediately after business commit without waiting for the worker. Push and persistence retries explicitly use the asynchronous database connection even when the application's default queue is sync. Workers must process delayed jobs. Rebuild deployment event caches and restart workers after deploying notification classes.
+
+Push text is generic: “An update is available. Open Battlefront to view your order.” Its `data` contains `notification_id`, `order_id` and `deep_link`; it contains no proof URLs, addresses, amounts or personal/payment details. Client receipt/tapping a push must not mutate order/payment/shipment business state. Refresh history/count when opening the app and after read actions; push availability does not establish read state.
+
+The adapter checks send tickets and receipts about 15 minutes later; absent receipts are rechecked within 24 hours of acceptance. Confirmed `DeviceNotRegistered` deactivates the matching registration; old feedback cannot disable a refreshed device. Connection/429/5xx/malformed-response failures use bounded retries. Other provider errors retain tokens unless confirmed unusable. Inspect sanitized notification diagnostics and failed queue jobs for recovery; do not log raw credentials or provider bodies.
+
+Push is best effort: provider acceptance is not device delivery, and uncertain network/process failures can cause missing/duplicate push. An in-flight push cannot be recalled by logout. Enqueue failure can leave delivery/receipt work pending. After-commit persistence retries have no outbox: a crash between commit/history persistence, or simultaneous persistence/queue failure, can leave a history entry missing. These failures never roll back or fail successful business actions.
+
+No browser Web Push, email/SMS, live LBC API, direct Firebase server integration or React Native UI is included. Real Expo/native-client validation remains pending.
+
+Postman acceptance: list/count, mark one/all read and compare web state; verify foreign IDs and invalid/admin sessions; register two devices, revoke one, and verify session-specific logout. Trigger payment/shipment changes through web administration and refresh customer history. Provider errors/receipt timing require the focused automated fakes or a separately configured real Expo device, not synthetic Postman token examples.
 
 ## 7. Chatbot (guest and customer)
 
@@ -890,7 +971,7 @@ Use a disposable development database/account with an active product, live Sagay
 5. **Checkout/orders:** Select one, multiple, or all owned cart-item IDs and include them in both preview and placement. Preview checkout (200), verify all 12 server quotes and select a destination. Check standard/fragile/bulky and mixed carts, subtotal/fee/final total, LBC/demo wording and provisional calendar windows. Submit cash/card pickup (201, zero fee/no Shipment); omit address and destination. Refill before each wallet placement, select an image, and include canonical destination plus detailed address for delivery. Try missing/unsupported/wrong-case/array destinations, pickup destination/address, and forged quote fields. Verify recalculated saved fees/relative ETA, pending order/payment, selected-item removal, unselected-item retention and selected inventory deduction through existing web administration. Confirm no selection, duplicates, foreign/missing/removed IDs and stale selected stock fail without changes. Leave bulky/fragile products unselected and verify their handling/ETA do not affect the order.
 6. **Replacement proof:** Reject the test wallet payment through existing web administration. Set rejected_order_id, select a replacement image, submit (200). Verify pending payment, cleared rejection, unchanged order status/stock. Retry while payment is pending (422). Test unsupported file type and >5 MB (422 when Laravel handles it).
 
-   **Shipment tracking:** Using a delivery test order, verify that pending payment/order offers no shipment progression. Manually verify payment, move the order to Processing, and advance each shipment milestone separately through web administration. After each action compare customer web detail and GET /orders/{order}: status, saved ETA/fees/destination and chronological timestamps must agree. Leave reference blank unless a real value is available. Confirm Delivered completes the order with one sale; use a second eligible order to verify cancellation terminates shipment and restores stock once. Verify pickup/legacy orders have no shipment UI and a second customer's token receives 404. No notification, map or live carrier data is expected.
+   **Shipment tracking:** Using a delivery test order, verify that pending payment/order offers no shipment progression. Manually verify payment, move the order to Processing, and advance each shipment milestone separately through web administration. After each action compare customer web detail and GET /orders/{order}: status, saved ETA/fees/destination and chronological timestamps must agree. Leave reference blank unless a real value is available. Confirm Delivered completes the order with one sale; use a second eligible order to verify cancellation terminates shipment and restores stock once. Verify pickup/legacy orders have no shipment UI and a second customer's token receives 404. EXT-90 now supplies customer milestone notifications; no map or live carrier data is expected.
 7. **Customer chatbot/recommendations:** Ask about the captured own order reference. Check customer follow-up. Exercise recommendation preferences, omitted/null brand, a budget with no matches, ranking/reasons, and available stock. Compare with web using the same current data.
 8. **Ownership/roles:** Prepare a second customer's cart/order and use their IDs under the first token: 404. Foreign order chatbot: safe 200 fallback. With an out-of-band valid administrator test token: profile/chatbot/recommendations 403. Invalid/expired/revoked credentials: 401. Web session alone is insufficient for personal API data.
 9. **Rate limits:** After the window resets, send five guest unsupported chatbot questions (e.g. Tell me a joke.), then the dedicated sixth-request check expects 429/Retry-After. Customer limit is ten across web/devices. Registration/login have five-request limits; global limit is 60/IP. Perform these separately to avoid unrelated limits masking results.

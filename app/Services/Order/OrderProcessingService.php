@@ -11,6 +11,7 @@ use App\Enums\PaymentStatus;
 use App\Enums\ShipmentStatus;
 use App\Models\Order;
 use App\Models\Shipment;
+use App\Services\Notifications\OrderNotificationPublisher;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -22,6 +23,7 @@ class OrderProcessingService
     public function __construct(
         private readonly RestoreOrderInventory $restoreOrderInventory,
         private readonly RecordCompletedOrderSale $recordCompletedOrderSale,
+        private readonly OrderNotificationPublisher $notifications,
     ) {}
 
     /**
@@ -121,6 +123,8 @@ class OrderProcessingService
                 $this->transitionLockedOrder($lockedOrder, OrderStatus::Completed, $shipment);
             }
 
+            $this->notifications->afterCommit($lockedOrder, 'shipment.'.$status->value);
+
             return $lockedOrder->refresh();
         }, attempts: 3);
     }
@@ -176,6 +180,9 @@ class OrderProcessingService
         }
 
         $order->update(['status' => $status]);
+        if ($status === OrderStatus::Cancelled) {
+            $this->notifications->afterCommit($order, 'order.cancelled');
+        }
         if ($status === OrderStatus::Completed) {
             $this->recordCompletedOrderSale->execute($order);
         }
@@ -254,6 +261,8 @@ class OrderProcessingService
                 'payment_rejection_reason' => $rejectingWalletPayment ? $rejectionReason : null,
                 'payment_rejection_note' => $rejectingWalletPayment ? $normalizedRejectionNote : null,
             ]);
+
+            $this->notifications->afterCommit($lockedOrder, 'payment.'.$paymentStatus->value);
 
             return $lockedOrder->refresh();
         }, attempts: 3);

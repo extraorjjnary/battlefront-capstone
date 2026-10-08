@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Battlefront Customer API v1",
-    "description": "EXT-62 React Native handoff. Implemented API only. Read MOBILE_API_HANDOFF.md before running. Use disposable local data: cart/order requests mutate data and deduct inventory. Select individual requests; this is not an unattended end-to-end runner. Examples are synthetic. Set base_url to your reachable API root ending /api/v1. Public and guest requests explicitly use No Auth. No credentials are included.",
+    "description": "EXT-62 React Native handoff. Implemented API only. Read MOBILE_API_HANDOFF.md before running. Use disposable local data: cart/order requests mutate data and deduct inventory. Select individual requests; this is not an unattended end-to-end runner. Examples are synthetic. Set base_url to your reachable API root ending /api/v1. Public and guest requests explicitly use No Auth. No credentials are included. EXT-90 adds notification history/read state and session-bound Expo device registration. Push is optional, asynchronous and best effort; provider credentials and real Expo consumer validation remain outside this collection.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -4405,6 +4405,480 @@
                   "  pm.test(\"Response contract\", () => pm.expect(body).to.have.property(\"message\"));",
                   "  pm.test(\"Retry hint\", () => pm.expect(pm.response.headers.get(\"Retry-After\")).to.exist);",
                   "}"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications — EXT-90",
+      "description": "Account-bound shared history/read state. Generate customer events via web administration first. UUID notification IDs; read actions do not change business state.",
+      "item": [
+        {
+          "name": "Notification history",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications?page={{page}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "{{page}}"
+                }
+              ]
+            },
+            "description": "10/page; data/links/meta with meta.unread_count. Captures the first notification UUID when present."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "if (pm.response.code < 300) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test(\"Response envelope\", () => pm.expect(body).to.have.property(\"data\"));",
+                  "  pm.test(\"Unread count\", () => pm.expect(body.meta.unread_count).to.be.a(\"number\"));",
+                  "  if (body.data.length) pm.environment.set(\"notification_id\", body.data[0].id);",
+                  " }"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Unread count",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications/unread-count",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications",
+                "unread-count"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "if (pm.response.code < 300) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test(\"Response envelope\", () => pm.expect(body).to.have.property(\"data\"));",
+                  " }"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Mark notification read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications/{{notification_id}}/read",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications",
+                "{{notification_id}}",
+                "read"
+              ]
+            },
+            "description": "Idempotent. Returns updated item and meta.unread_count."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "if (pm.response.code < 300) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test(\"Response envelope\", () => pm.expect(body).to.have.property(\"data\"));",
+                  " }"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Mark all read",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications/read-all",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications",
+                "read-all"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "if (pm.response.code < 300) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test(\"Response envelope\", () => pm.expect(body).to.have.property(\"data\"));",
+                  " }"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Missing bearer is 401",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Administrator bearer is 403",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Foreign notification is 404",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications/{{other_notification_id}}/read",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications",
+                "{{other_notification_id}}",
+                "read"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Expo push devices — EXT-90",
+      "description": "Set device_id to an installation UUID and expo_push_token to a token obtained from the actual Expo app. Bearer session ownership is server-derived. Push is disabled by default; see handoff for worker/platform setup. No provider credentials belong here.",
+      "item": [
+        {
+          "name": "Register or update device",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/push-devices/{{device_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "push-devices",
+                "{{device_id}}"
+              ]
+            },
+            "description": "Idempotent for the same token/session/device. Active token collisions return 422. Response omits raw token and session.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expo_push_token\": \"{{expo_push_token}}\",\n  \"platform\": \"android\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                  "if (pm.response.code < 300) {",
+                  "  const body = pm.response.json();",
+                  "  pm.test(\"Response envelope\", () => pm.expect(body).to.have.property(\"data\"));",
+                  "  pm.test(\"No raw push token\", () => pm.expect(body.data).not.to.have.property(\"expo_push_token\"));",
+                  " }"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Revoke device",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/push-devices/{{device_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "push-devices",
+                "{{device_id}}"
+              ]
+            },
+            "description": "Clears token and deactivates registration. Repeating revocation remains 204; no JSON body."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Foreign device revocation is 404",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/push-devices/{{other_device_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "push-devices",
+                "{{other_device_id}}"
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Invalid bearer registration is 401",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/push-devices/{{device_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "push-devices",
+                "{{device_id}}"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expo_push_token\": \"{{expo_push_token}}\",\n  \"platform\": \"android\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{invalid_token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
                 ]
               }
             }

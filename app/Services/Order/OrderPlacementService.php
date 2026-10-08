@@ -19,6 +19,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\Cart\CartService;
+use App\Services\Notifications\OrderNotificationPublisher;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Config;
@@ -38,6 +39,7 @@ class OrderPlacementService
         private readonly CartService $cartService,
         private readonly AdjustInventoryStock $adjustInventoryStock,
         private readonly DeliveryRules $deliveryRules,
+        private readonly OrderNotificationPublisher $notifications,
     ) {}
 
     /**
@@ -230,6 +232,11 @@ class OrderPlacementService
 
             if (! $cart->items()->exists()) {
                 $cart->delete();
+            }
+
+            $this->notifications->afterCommit($order, 'order.placed');
+            if ($order->payment_method->requiresPaymentProof() && $order->payment_proof_path !== null) {
+                $this->notifications->afterCommit($order, 'payment.proof_submitted');
             }
 
             return $order->load('items');

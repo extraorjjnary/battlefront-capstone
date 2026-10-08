@@ -6,10 +6,12 @@ use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Api\V1\CartItemController;
 use App\Http\Controllers\Api\V1\ChatbotController;
 use App\Http\Controllers\Api\V1\CheckoutController;
+use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\OrderPaymentProofController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProfileController;
+use App\Http\Controllers\Api\V1\PushDeviceController;
 use App\Http\Controllers\Api\V1\RecommendationController;
 use App\Http\Middleware\AuthorizeApiChatbot;
 use App\Http\Middleware\AuthorizeApiRecommendations;
@@ -52,6 +54,14 @@ Route::prefix('v1')
         // auth customers endpoint
         Route::middleware(['auth:sanctum', 'can:use-customer-cart'])->group(function (): void {
             Route::post('auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
+
+            // notifications and push devices
+            Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+            Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
+            Route::patch('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
+            Route::patch('notifications/{notification}/read', [NotificationController::class, 'update'])->whereUuid('notification')->name('notifications.update');
+            Route::put('push-devices/{device}', [PushDeviceController::class, 'update'])->whereUuid('device')->name('push-devices.update');
+            Route::delete('push-devices/{device}', [PushDeviceController::class, 'destroy'])->whereUuid('device')->name('push-devices.destroy');
 
             // profile
             Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');

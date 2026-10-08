@@ -20,6 +20,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | config/battlefront.php,app/Http/Controllers/CheckoutController.php,resources/js/pages/Checkout/** | .ai/rules/checkout.md |
 | app/Actions/Chatbot/**,app/Services/Chatbot/**,resources/js/components/chatbot/** | .ai/rules/components-chatbot.md |
 | database/seeders/**,app/Http/Controllers/BranchController.php,resources/js/components/BranchMap.vue | .ai/rules/components.md |
+| resources/js/composables/useNotificationPolling* | .ai/rules/composables.md |
 | routes/**,app/Http/Controllers/** | .ai/rules/controllers.md |
 | app/Actions/Forecasting/** | .ai/rules/forecasting.md |
 | ** | .ai/rules/general.md |
@@ -45,3 +46,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/Chatbot/**,database/seeders/DevelopmentChatbotKnowledgeSeeder.php | .ai/rules/seeders.md |
 | app/Services/Chatbot/** | .ai/rules/services-chatbot.md |
 | routes/settings.php,app/Http/Controllers/Settings/**,resources/js/pages/settings/** | .ai/rules/settings.md |
+| app/Services/Notifications/**,app/Services/Order/**,app/Actions/Order/**,app/Jobs/**,app/Http/Controllers/**/*Notification*,app/Http/Controllers/Api/V1/PushDeviceController.php | .ai/rules/v1.md |

@@ -809,7 +809,7 @@ Priority is explicitly `standard < fragile < bulky`. Delivery fee is the destina
 
 `DeliveryRules::destinations()` lists canonical names and rules; `destination()` rejects unsupported names with `DomainException`. `handling()` accepts a `ShippingProfile`, and `highestProfile()` reads an iterable of server-loaded Products. `quote()` accepts a `FulfillmentMethod`, optional canonical destination name, and those Products; callers cannot supply fee, preparation, surcharge, or ETA values. Quotes include origin, demo identification, selected profile, fee components, and day ranges. Destination lookup is exact and never parses a free-text address. Empty delivery product lists or products lacking a loaded profile raise `InvalidArgumentException`. Pickup returns no delivery quote before destination or product evaluation.
 
-EXT-86 implements the rule layer and product assignment field only. EXT-87 supplies quote snapshot/shipment persistence, and EXT-88 applies the rules through shared web/mobile checkout and strict delivery placement. EXT-89 adds manual shipment progression and customer tracking. Notifications remain EXT-90 work; live courier/GPS tracking is outside scope.
+EXT-86 implements the rule layer and product assignment field only. EXT-87 supplies quote snapshot/shipment persistence, and EXT-88 applies the rules through shared web/mobile checkout and strict delivery placement. EXT-89 adds manual shipment progression and customer tracking. EXT-90 now supplies shared database notifications and optional customer Expo push; live courier/GPS tracking remains outside scope.
 
 ### Delivery Snapshot and Shipment Persistence — EXT-87
 
@@ -861,7 +861,7 @@ Administrator-only web PATCH routes are `administration/orders/{order}/shipment/
 
 Shared customer web/API order detail adds nullable `shipment`: saved carrier, labeled manual status, nullable real reference, persisted operational ETA, chronologically sorted recorded milestones, manual-tracking notice and nullable historical notice. Existing `delivery_quote`, fees and fulfillment address retain their contracts. Owning-customer queries conceal foreign orders with 404. The administrator detail reuses those facts and supplies only eligible shipment actions. Wording explicitly states that Battlefront maintains status manually and this is not live LBC/GPS tracking. No maps, invented references, external carrier calls or automatic booking are introduced.
 
-The forward migration expands existing MySQL checks/SQLite triggers without changing quote constraints or historical commercial values. Existing shipments attached to cancelled orders become `cancelled` without invented cancellation dates. Previously completed orders remain readable and read-only without reconstructing delivered milestones. Orders without shipments retain null shipment data; no historical shipments are created. Rollback refuses to discard recorded workflow or ETA data. Notifications—including database/in-app, browser and Expo push—remain deferred to EXT-90.
+The forward migration expands existing MySQL checks/SQLite triggers without changing quote constraints or historical commercial values. Existing shipments attached to cancelled orders become `cancelled` without invented cancellation dates. Previously completed orders remain readable and read-only without reconstructing delivered milestones. Orders without shipments retain null shipment data; no historical shipments are created. Rollback refuses to discard recorded workflow or ETA data. EXT-90 adds database/in-app and optional Expo push notifications after committed milestones; browser Web Push remains outside scope.
 
 Outside scope:
 
@@ -913,6 +913,24 @@ Outside scope:
 Product recommendations remain the responsibility of the Product Recommendation Module.
 
 ---
+
+### Shared Order and Shipment Notifications — EXT-90
+
+Laravel database notifications are the authoritative account-bound history for customer web/mobile and administrator web. Existing order placement, payment review, proof replacement and shipment services publish events only after successful commit. Notification persistence runs immediately afterward; failed persistence is retried on the existing database queue. Notification or push failure cannot change a committed business outcome or trigger checkout proof cleanup. Event/recipient notification UUIDs and per-device delivery uniqueness prevent duplicate history on replay; subsequent payment-review cycles remain separate events.
+
+Customer events are payment verified/rejected, order cancelled, and shipment preparing, ready for dispatch, handed to LBC, in transit, out for delivery and delivered. All administrators receive new-order and initial/replacement wallet-proof notices. Shipment creation, reference corrections and insignificant updates are silent. Operational ETA remains immutable, so there is no ETA-revision notification. Existing shipment delivery/completion/sale consistency and cancellation restoration remain authoritative.
+
+Authenticated web headers expose a notification bell, unread count, five recent entries and a paginated history page. Individual/all-read actions update the same database state used by mobile. Customer and administrator routes retain their existing role gates, recipient/audience scoping and ownership checks on order destinations. No browser Web Push, email/SMS or courier API is introduced.
+
+The web bell polls every 30 seconds while visible through dedicated session-authenticated `notifications/summary` and `administration/notifications/summary` GET routes. Inertia's standalone `useHttp` client retrieves only unread count/five recent entries, then `replaceProp` updates only `notificationSummary`, preserving the current page, scroll and form state. This avoids re-running the current page's checkout/reporting/forecasting controller. Hidden tabs pause, slow requests cannot overlap, navigation/read actions invalidate stale responses, and identity changes/unmount cancel pending work. Unauthorized sessions stop polling. Response metadata identifies the current server user/audience; a cross-tab account mismatch clears the old summary and stops polling until the page/account is refreshed. The response is private/no-store and uses three bounded notification/owned-order queries; no page-data polling, extra mobile endpoint or dependency is added.
+
+Customer-only Sanctum endpoints add history/count/read actions and device registration/revocation under `/api/v1`. Resources expose only safe notification fields and nullable owned-order metadata, including `{screen: "order_detail", order_id}`. See the mobile API handoff and Postman collection for exact routes, examples and failure responses.
+
+Push devices are account/device scoped, support multiple devices and bind to the registering Sanctum session. Logout, token revocation/expiry or explicit device revocation stops future sends; registration must be repeated after login. Raw Expo tokens are encrypted and omitted from responses/logs; active token collisions cannot transfer another account's registration. Invalid/unregistered provider feedback deactivates only the matching registration version.
+
+Expo push is disabled by default, implemented through Laravel HTTP behind an adapter, and queued on the existing `database` connection's `notifications` queue. Persisted tickets receive delayed receipt checks; transient provider failures use bounded retries, while history stays available. Push text is generic and metadata cannot authorize order access. Accepted tickets/receipts establish provider acceptance, not phone delivery. Push can be missing or duplicated after uncertain network/process outcomes.
+
+The developer selected after-commit persistence with queue retries without a transactional outbox. A crash between business commit and notification persistence, or simultaneous persistence/queue failure, can leave history missing. Queue enqueue failures can leave pending push/receipt work unsent; sanitized diagnostics and worker failures require operator review. No historical notifications are reconstructed. Actual Expo/native consumer validation remains separate from automated backend/UI verification.
 
 # 13. Development Methodology
 
@@ -967,7 +985,7 @@ General status snapshot verified against Linear on **2026-10-01**; the forecasti
 
 ## Completed Mobile API Scope
 
-`routes/api.php` defines 22 `/api/v1` endpoints covering health, customer registration/login/logout, profile read/update, catalog search/filter/detail, branch information, cart operations, checkout preview, order placement/history/detail, rejected-proof replacement, chatbot, and recommendation options/results.
+`routes/api.php` defines 28 `/api/v1` endpoints covering health, customer registration/login/logout, profile read/update, catalog search/filter/detail, branch information, cart operations, checkout preview, order placement/history/detail, rejected-proof replacement, chatbot, recommendation options/results, shared notification history/read state, and Expo device registration/revocation.
 
 The mobile product list additionally supports multiple active categories (`category_ids`), inclusive effective-price bounds (`min_price`, `max_price`), and `featured`/`price_asc`/`price_desc` sorting. These parameters are enabled only for the named API product-list route; the existing Inertia web catalog keeps its singular category/brand/tag filters, search, default ordering, and scroll behavior. Both clients retain shared catalog eligibility and presentation. This extension adds no endpoints or schema changes; see the handoff for validation and pagination details. React Native consumer validation of the additions remains pending.
 
