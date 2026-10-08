@@ -14,6 +14,7 @@ import ProductPrice from '@/components/catalog/ProductPrice.vue';
 import StockAvailability from '@/components/catalog/StockAvailability.vue';
 import StorefrontHeader from '@/components/StorefrontHeader.vue';
 import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
+import { useProductPrefetch } from '@/composables/useProductPrefetch';
 import { rememberCatalogVisit } from '@/lib/catalogReturn';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,7 @@ const props = defineProps({
 const categoryId = ref(String(props.filters.category_id ?? 'all'));
 const brand = ref(props.filters.brand ?? 'all');
 const tagId = ref(String(props.filters.tag_id ?? 'all'));
+const { prefetchProduct, cancelProductPrefetch } = useProductPrefetch();
 
 const { search, isSearching, clearSearch, cancelPendingSearch } =
     useDebouncedSearch({
@@ -380,8 +382,12 @@ watch([categoryId, brand, tagId], updateFilters);
                         v-for="product in products.data"
                         :key="product.id"
                         :href="productShow(product.id)"
-                        prefetch
+                        @pointerenter="prefetchProduct($event, productShow(product.id))"
+                        @pointerleave="cancelProductPrefetch"
+                        @pointercancel="cancelProductPrefetch"
+                        @pointerdown="cancelProductPrefetch"
                         @click.capture="
+                            cancelProductPrefetch();
                             rememberCatalogVisit($event, product.id)
                         "
                         class="border-border bg-card focus-visible:ring-ring group hover:border-primary/60 flex min-h-full flex-col overflow-hidden border transition-colors focus-visible:ring-2 focus-visible:outline-none"
