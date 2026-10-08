@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Battlefront Customer API v1",
-    "description": "EXT-62 React Native handoff. Implemented API only. Read MOBILE_API_HANDOFF.md before running. Use disposable local data: cart/order requests mutate data and deduct inventory. Select individual requests; this is not an unattended end-to-end runner. Examples are synthetic. Set base_url to your reachable API root ending /api/v1. Public and guest requests explicitly use No Auth. No credentials are included.",
+    "description": "React Native handoff. Implemented API only. Read MOBILE_API_HANDOFF.md before running. Behavior-driven recommendation feeds are additive; legacy criteria routes remain during mobile cutover. Use disposable local data: cart/order requests mutate data and deduct inventory. Select individual requests; this is not an unattended end-to-end runner. Examples are synthetic. Set base_url to your reachable API root ending /api/v1. Public and guest requests explicitly use No Auth. No credentials are included.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -2207,8 +2207,60 @@
     },
     {
       "name": "Recommendations",
-      "description": "Deterministic shared engine only. Guests and customers allowed; invalid supplied auth 401; admin 403.",
+      "description": "Behavior-driven public and customer feeds plus legacy criteria routes during mobile cutover. Invalid supplied auth 401; admin 403.",
       "item": [
+        {
+          "name": "Behavior-driven public feed (guest)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/recommendations",
+              "host": ["{{base_url}}"],
+              "path": ["recommendations"]
+            },
+            "auth": { "type": "noauth" }
+          },
+          "event": [],
+          "response": []
+        },
+        {
+          "name": "Behavior-driven personalized feed",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": {
+              "raw": "{{base_url}}/recommendations/personalized",
+              "host": ["{{base_url}}"],
+              "path": ["recommendations", "personalized"]
+            }
+          },
+          "event": [],
+          "response": []
+        },
+        {
+          "name": "Record recommendation interaction",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"{{$guid}}\",\n  \"product_id\": {{product_id}},\n  \"event_type\": \"impression\",\n  \"placement\": \"recommendations\",\n  \"position\": 1,\n  \"reason_code\": \"popular_with_customers\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/recommendations/interactions",
+              "host": ["{{base_url}}"],
+              "path": ["recommendations", "interactions"]
+            },
+            "auth": { "type": "noauth" }
+          },
+          "event": [],
+          "response": []
+        },
         {
           "name": "Guest options",
           "request": {

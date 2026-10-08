@@ -24,6 +24,12 @@ class ProfileController extends Controller
             'defaultDeliveryAddress' => $canManageDefaultDeliveryAddress
                 ? $request->user()->default_delivery_address
                 : null,
+            'searchRecommendationsEnabled' => $canManageDefaultDeliveryAddress
+                ? $request->user()->search_recommendations_enabled
+                : false,
+            'productViewRecommendationsEnabled' => $canManageDefaultDeliveryAddress
+                ? $request->user()->product_view_recommendations_enabled
+                : false,
         ]);
     }
 

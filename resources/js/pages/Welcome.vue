@@ -13,9 +13,16 @@ import {
     SlidersHorizontal,
 } from '@lucide/vue';
 import StorefrontHeader from '@/components/StorefrontHeader.vue';
+import RecommendationSection from '@/components/recommendations/RecommendationSection.vue';
 import { Button } from '@/components/ui/button';
 import { dashboard, register } from '@/routes';
 import { index as branchIndex } from '@/routes/branches';
+
+defineProps({
+    is_personalized: { type: Boolean, default: false },
+    has_featured_fallback: { type: Boolean, default: false },
+    recommendations: { type: Array, default: () => [] },
+});
 
 const hardwareAreas = [
     { name: 'Processors', icon: Cpu },
@@ -28,13 +35,13 @@ const customerHighlights = [
     {
         title: 'Find the right hardware',
         description:
-            'Explore computer products by category, brand, and the requirements that matter to your setup.',
+            'Browse computer products by category, brand, and price using the catalog filters.',
         icon: Search,
     },
     {
         title: 'Choose with confidence',
         description:
-            'Use guided, requirement-based recommendations to narrow down suitable products for your needs.',
+            'Explore product suggestions shaped by your catalog searches, viewed products, cart, and completed purchases. You can disable search or view personalization in your profile.',
         icon: SlidersHorizontal,
     },
     {
@@ -164,6 +171,21 @@ const customerHighlights = [
                     </div>
                 </div>
             </section>
+
+            <div class="mx-auto max-w-7xl px-5 py-12 sm:px-8">
+                <RecommendationSection
+                    :recommendations="recommendations"
+                    placement="home"
+                    :title="is_personalized ? 'Picked from your activity' : has_featured_fallback ? 'Popular and featured products' : 'Popular with customers'"
+                    :description="
+                        is_personalized
+                            ? 'Suggestions from your catalog searches, viewed products, cart, and completed purchases.'
+                            : has_featured_fallback
+                              ? 'Popular products and featured picks with current Sagay stock.'
+                              : 'Products appearing often in completed Battlefront orders.'
+                    "
+                />
+            </div>
 
             <section
                 class="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-24"

@@ -1,9 +1,14 @@
 <?php
 
 use App\Ai\Agents\ChatbotResponseAgent;
+use App\Enums\OrderStatus;
+use App\Enums\PaymentStatus;
 use App\Enums\RecommendationIntendedUse;
 use App\Models\Category;
+use App\Models\CustomerSearch;
 use App\Models\Inventory;
+use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Tag;
 use App\Models\User;
@@ -56,12 +61,45 @@ test('recommendation routes enforce optional bearer authentication', function (s
     }
 })->with([
     ['post', '/api/v1/recommendations'],
+    ['get', '/api/v1/recommendations'],
     ['get', '/api/v1/recommendations/options'],
 ])->with([
     ['guest', 200], ['customer', 200], ['administrator', 403],
     ['invalid', 401], ['expired', 401], ['revoked', 401],
     ['malformed', 401], ['session', 200],
 ]);
+
+test('public recommendation feed uses one shared product and reason shape for guests and customers', function () {
+    $category = Category::factory()->create(['name' => 'Graphics Cards']);
+    $popularProduct = Product::factory()->for($category)->create(['name' => 'Popular graphics card']);
+    Inventory::factory()->for($popularProduct)->create(['quantity' => 5]);
+    $customer = User::factory()->customer()->create(['search_recommendations_enabled' => true]);
+    $searchMatch = Product::factory()->for($category)->create(['name' => 'RTX 5070 graphics card']);
+    Inventory::factory()->for($searchMatch)->create(['quantity' => 5]);
+    CustomerSearch::factory()->for($customer)->create([
+        'query' => 'rtx 5070',
+        'expires_at' => now()->addDays(90),
+    ]);
+    $order = Order::factory()->for(User::factory()->customer()->create())->create([
+        'status' => OrderStatus::Completed,
+        'payment_status' => PaymentStatus::Verified,
+    ]);
+    OrderItem::factory()->for($order)->for($popularProduct)->create();
+
+    $guestResponse = $this->getJson('/api/v1/recommendations')->assertOk();
+    $guestResponse->assertJsonPath('data.0.product.id', $popularProduct->id)
+        ->assertJsonPath('data.0.reasons.0.code', 'popular_with_customers');
+
+    $customerResponse = $this->withToken($customer->createToken('Phone')->plainTextToken)
+        ->getJson('/api/v1/recommendations')->assertOk();
+    $customerResponse->assertJsonPath('data.0.product.id', $searchMatch->id)
+        ->assertJsonPath('data.0.reasons.0.code', 'matched_recent_searches')
+        ->assertJsonStructure(['data' => [[
+            'product' => ['id', 'name', 'price', 'inventory'],
+            'effective_price',
+            'reasons' => [['code', 'value']],
+        ]]]);
+});
 
 test('omitted null and blank preferences retain unbranded eligible products', function (array $preferences) {
     $product = Product::factory()->create(['price' => '100.00', 'brand' => null]);

@@ -1,5 +1,7 @@
 <?php
 
+use App\Console\Commands\PruneExpiredCustomerSearches;
+use App\Console\Commands\PruneExpiredRecommendationInteractions;
 use App\Services\CatalogImagePipeline;
 use App\Services\RealCatalogImportService;
 use Illuminate\Foundation\Inspiring;
@@ -7,6 +9,8 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
 Schedule::command('sanctum:prune-expired --hours=24')->daily();
+Schedule::command(PruneExpiredCustomerSearches::class)->daily();
+Schedule::command(PruneExpiredRecommendationInteractions::class)->daily();
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\OrderPaymentProofController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\RecommendationController;
+use App\Http\Controllers\RecommendationInteractionController;
 use App\Http\Middleware\AuthorizeApiChatbot;
 use App\Http\Middleware\AuthorizeApiRecommendations;
 use Illuminate\Support\Facades\Route;
@@ -41,6 +42,9 @@ Route::prefix('v1')
 
         // recommendations
         Route::middleware(AuthorizeApiRecommendations::class)->group(function (): void {
+            Route::get('recommendations', [RecommendationController::class, 'feed'])->name('recommendations.feed');
+            Route::post('recommendations/interactions', RecommendationInteractionController::class)
+                ->name('recommendations.interactions.store');
             Route::get('recommendations/options', [RecommendationController::class, 'options'])->name('recommendations.options');
             Route::post('recommendations', [RecommendationController::class, 'results'])->name('recommendations.results');
         });
@@ -52,6 +56,10 @@ Route::prefix('v1')
         // auth customers endpoint
         Route::middleware(['auth:sanctum', 'can:use-customer-cart'])->group(function (): void {
             Route::post('auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
+
+            // personalized recommendations
+            Route::get('recommendations/personalized', [RecommendationController::class, 'personalized'])
+                ->name('recommendations.personalized');
 
             // profile
             Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');

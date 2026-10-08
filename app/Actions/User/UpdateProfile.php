@@ -21,6 +21,20 @@ class UpdateProfile
 
         $user->save();
 
+        if (
+            array_key_exists('search_recommendations_enabled', $validated)
+            && ! (bool) $validated['search_recommendations_enabled']
+        ) {
+            $user->searches()->delete();
+        }
+
+        if (
+            array_key_exists('product_view_recommendations_enabled', $validated)
+            && ! (bool) $validated['product_view_recommendations_enabled']
+        ) {
+            $user->productViews()->delete();
+        }
+
         return $user;
     }
 }

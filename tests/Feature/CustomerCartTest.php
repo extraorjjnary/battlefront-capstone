@@ -30,7 +30,10 @@ test('customers see an explicit empty cart', function () {
             ->where('cart.item_count', 0)
             ->where('cart.total_quantity', 0)
             ->where('cart.total', '0.00')
-            ->where('cart.conflict_count', 0));
+            ->where('cart.conflict_count', 0)
+            ->where('is_personalized', false)
+            ->where('has_featured_fallback', false)
+            ->where('recommendations', []));
 });
 
 test('customers see only their authoritative cart prices totals and stock conflicts', function () {

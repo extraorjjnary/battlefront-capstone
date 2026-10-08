@@ -172,22 +172,26 @@ GET returns:
     "id": 1,
     "name": "Example Customer",
     "email": "customer@example.test",
-    "default_delivery_address": null
+    "default_delivery_address": null,
+    "search_recommendations_enabled": true,
+    "product_view_recommendations_enabled": true
   }
 }
 ```
 
-PATCH requires `name` and `email` (same length/email/uniqueness rules, excluding the current user). Optional `default_delivery_address` is nullable/max 255: omit to preserve, send null/blank to clear. Email changes clear the stored email verification timestamp; verification is currently optional/disabled.
+PATCH requires `name` and `email` (same length/email/uniqueness rules, excluding the current user). Optional `default_delivery_address` is nullable/max 255: omit to preserve, send null/blank to clear. New customers have `search_recommendations_enabled` and `product_view_recommendations_enabled` enabled by default, so no profile setup is needed. PATCH can independently disable either preference; turning one off immediately deletes that customer's retained activity for that type. Retained activity expires after 90 days. Email changes clear the stored email verification timestamp; verification is currently optional/disabled.
 
 ```json
 {
   "name": "Example Customer",
   "email": "customer@example.test",
-  "default_delivery_address": "Example delivery address"
+  "default_delivery_address": "Example delivery address",
+  "search_recommendations_enabled": true,
+  "product_view_recommendations_enabled": true
 }
 ```
 
-Successful PATCH returns the same four-field profile shape. No user ID is accepted to select a profile. No password, role, remember token, recovery code, or two-factor data is exposed.
+Successful PATCH returns the same profile shape with both recommendation preferences. No user ID is accepted to select a profile. No password, role, remember token, recovery code, or two-factor data is exposed.
 
 ## 4. Catalog and branches
 
@@ -204,6 +208,8 @@ Optional query parameters:
 | page | Nullable integer >=1 |
 
 Filters combine. There is no stock, budget, sort, or multi-tag catalog filter. Use `GET /products/filters` to populate selectors:
+
+When a customer sends a valid Sanctum bearer token, page-one searches are retained unless `search_recommendations_enabled` is false. Guests and customers who disabled search tracking are not tracked. `GET /products/{product}` remains public; a valid customer bearer token records an eligible product view unless `product_view_recommendations_enabled` is false. Repeated views of the same product within 30 minutes are deduplicated. Both activity types are retained for up to 90 days and deleted immediately when their preference is disabled.
 
 ```json
 {
@@ -620,6 +626,48 @@ The example response illustrates a guest order question. Actual text depends on 
 
 ## 8. Recommendations
 
+### Behavior-driven feed (new client direction; additive v1 routes)
+
+`GET /recommendations` is the shared feed for guests and signed-in customers. With no bearer token it returns currently available popular or featured products. With a valid customer bearer token it returns that customer's behavior-driven feed. Invalid supplied credentials return 401; administrator tokens return 403; a browser session does not authenticate an API request.
+
+`GET /recommendations/personalized` is the authenticated-customer form of the same feed. It requires `auth:sanctum` and the customer role. Both endpoints use the same `data` item shape:
+
+```json
+{
+  "data": [
+    {
+      "product": {
+        "id": 1,
+        "name": "Example Graphics Card",
+        "description": null,
+        "brand": "Example",
+        "price": "10000.00",
+        "discount_price": null,
+        "image_url": null,
+        "is_featured": false,
+        "category": { "id": 1, "name": "Graphics Cards" },
+        "tags": [],
+        "inventory": { "status": "in_stock" }
+      },
+      "effective_price": "10000.00",
+      "reasons": [
+        { "code": "matched_recent_searches", "value": "Matches a recent catalog search" }
+      ]
+    }
+  ]
+}
+```
+
+Reason codes identify the signal actually used: `matched_recent_searches`, `similar_to_viewed_product`, `bought_with_cart_products`, `bought_with_viewed_products`, `bought_with_purchase_history`, `popular_with_customers`, and `featured_fallback`. Reasons are explanatory labels, not a compatibility guarantee. The response checks active product/category state and current positive Sagay inventory each time it is requested.
+
+Search and product-view personalization are enabled by default for authenticated customers. Customers may independently disable these signals through `PATCH /profile`; disabling a signal deletes its retained history. Search and view events expire after 90 days. Guests receive only general popular/featured suggestions in the first release.
+
+Catalog search is recorded when the customer requests the first results page; product detail requests record a view; the next feed request uses the current cart and completed purchases. Request the feed again after search, product detail, or cart changes to get fresh results. No batch recomputation is required. Mobile impressions, clicks, dismissals, and wrong reports may use `POST /recommendations/interactions`; events are anonymous and expire after 90 days.
+
+The mobile client must switch only after the responsible React Native developer confirms the new contract and verifies guest/customer journeys. Until that cutover, the released criteria-based `GET /recommendations/options` and `POST /recommendations` endpoints remain available below; they are legacy compatibility routes and are not the new web recommendation experience.
+
+### Legacy criteria-based v1 contract (retained during mobile cutover)
+
 GET /recommendations/options returns:
 
 ```json
@@ -791,12 +839,12 @@ Successful login/registration replace `token`, clear conversation state and clea
 Use a disposable development database/account with an active product, live Sagay stock, and seeded branch/reference data.
 
 1. **Connectivity/public reads:** Health (200), product filters/list/detail and branches (200). Enable catalog filters individually; check pagination and nullable fields.
-2. **Access:** Profile without token (401). Guest recommendations/options (200). Guest chatbot public question/follow-up (200). Guest order question returns sign-in fallback. Pace calls under guest limits.
+2. **Access:** Profile without token (401). New public `GET /recommendations` (200); legacy recommendation options/results remain callable during the transition. Guest chatbot public question/follow-up (200). Guest order question returns sign-in fallback. Pace calls under guest limits.
 3. **Authentication/profile:** Register a unique customer (201) OR log in (200); confirm token capture. Read/update profile (200), verify only approved fields. Invalid login gives 401; duplicate/invalid registration gives 422.
 4. **Cart:** Add stock-eligible product (200), verify captured cart_item_id; update quantity and totals; remove (200). Add again before checkout. Try quantity zero, quantity above stock, and an unavailable product (422); failed operations must not corrupt the cart.
 5. **Checkout/orders:** Preview checkout (200). Submit cash/card pickup (201), inspect order/history (200), and verify cart is empty. Refill before each alternative wallet placement. Select an image; test gcash/maya and delivery address rules. Verify order/payment initially pending and inventory deduction through existing web inventory.
 6. **Replacement proof:** Reject the test wallet payment through existing web administration. Set rejected_order_id, select a replacement image, submit (200). Verify pending payment, cleared rejection, unchanged order status/stock. Retry while payment is pending (422). Test unsupported file type and >5 MB (422 when Laravel handles it).
-7. **Customer chatbot/recommendations:** Ask about the captured own order reference. Check customer follow-up. Exercise recommendation preferences, omitted/null brand, a budget with no matches, ranking/reasons, and available stock. Compare with web using the same current data.
+7. **Customer chatbot/recommendations:** Ask about the captured own order reference. Check customer follow-up. Search the catalog, view a product, change the cart, and request the new feed after each action. Confirm personal reason codes, opt-out deletion through `PATCH /profile`, current stock, and the shared response shape. Test the legacy criteria contract only if the current mobile build still calls it.
 8. **Ownership/roles:** Prepare a second customer's cart/order and use their IDs under the first token: 404. Foreign order chatbot: safe 200 fallback. With an out-of-band valid administrator test token: profile/chatbot/recommendations 403. Invalid/expired/revoked credentials: 401. Web session alone is insufficient for personal API data.
 9. **Rate limits:** After the window resets, send five guest unsupported chatbot questions (e.g. Tell me a joke.), then the dedicated sixth-request check expects 429/Retry-After. Customer limit is ten across web/devices. Registration/login have five-request limits; global limit is 60/IP. Perform these separately to avoid unrelated limits masking results.
 10. **Logout last:** 204 empty body; confirm environment token cleared. Run Profile with revoked token (401). A separate device token remains valid.
@@ -806,7 +854,7 @@ Provider fallback and expiration scenarios are deterministically covered by exis
 
 ### Verification status
 
-Automated verification during this handoff: 275 existing API tests passed (1,732 assertions). Both JSON files parse; all 22 registered endpoints have collection coverage; all 33 environment references resolve; request scripts compile and JSON body scripts handle quotes/backslashes. Twelve local HTTP smoke checks passed, covering public reads, guest recommendations/chatbot, missing/invalid authentication, and catalog validation. No live customer/order data was mutated by these HTTP checks.
+Historical EXT-62 verification recorded 275 API tests passing (1,732 assertions), coverage for the then-current 22 endpoints, all environment references resolving, and twelve local HTTP smoke checks. For the behavior-driven recommendation update, the focused suite passed 126 tests (1,051 assertions); route generation and the frontend production build completed. The current API has 25 routes and the collection includes the additive public/personal feeds and interaction request. The React Native client has not yet been cut over or validated against them.
 
 The developer subsequently reported completing manual tests in Postman Desktop with no API issues and approved EXT-62. The execution date, individual run results, and screenshots were not supplied to the coding agent. This is developer-reported manual verification, not an agent-executed Postman run. Keep the sequence above for repeat runs. JSON/structural checks are not full external-schema validation. No generator or validator dependency was installed. Actual React Native consumer validation is tracked separately in [EXT-63](MOBILE_INTEGRATION_VALIDATION.md).
 
@@ -820,4 +868,4 @@ The developer subsequently reported completing manual tests in Postman Desktop w
 
 Known implementation details are documented, not changed: registration's validated-but-unsaved address; different page validation between products/orders; stateless guest context is not per-device identity; private proof has no mobile download endpoint.
 
-No mobile password reset/change, token refresh, customer order cancellation, admin operations, payment gateways, courier tracking, compatibility checking, or new endpoints are introduced by this handoff.
+This update adds the public recommendation feed and anonymous aggregate interaction endpoint while retaining the criteria endpoints for compatibility. No mobile password reset/change, token refresh, customer order cancellation, admin operations, payment gateways, courier tracking, or compatibility checking are introduced.

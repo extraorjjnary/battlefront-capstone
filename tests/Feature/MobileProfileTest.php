@@ -36,6 +36,8 @@ test('a customer sees only their own four approved profile fields', function () 
             'name' => $user->name,
             'email' => $user->email,
             'default_delivery_address' => '12 Mabini Street, Sagay City',
+            'search_recommendations_enabled' => true,
+            'product_view_recommendations_enabled' => true,
         ]]);
 });
 
@@ -48,6 +50,8 @@ test('a customer can update only their own approved profile fields', function ()
         'name' => 'Updated Customer',
         'email' => 'updated@example.com',
         'default_delivery_address' => '45 Rizal Avenue, Escalante City',
+        'search_recommendations_enabled' => true,
+        'product_view_recommendations_enabled' => true,
         'role' => UserRole::Administrator->value,
         'appearance' => 'dark',
         'password' => 'changed-password',
@@ -58,6 +62,8 @@ test('a customer can update only their own approved profile fields', function ()
             'name' => 'Updated Customer',
             'email' => 'updated@example.com',
             'default_delivery_address' => '45 Rizal Avenue, Escalante City',
+            'search_recommendations_enabled' => true,
+            'product_view_recommendations_enabled' => true,
         ]]);
 
     $user->refresh();

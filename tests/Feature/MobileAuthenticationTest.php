@@ -32,6 +32,8 @@ test('registration creates a customer and returns a 30-day bearer token', functi
         'name' => 'Mobile Customer',
         'email' => 'mobile@example.com',
         'default_delivery_address' => null,
+        'search_recommendations_enabled' => true,
+        'product_view_recommendations_enabled' => true,
     ]);
     expect($response->json('data.token'))->toBeString()->toContain('|');
     $this->assertDatabaseHas('personal_access_tokens', [

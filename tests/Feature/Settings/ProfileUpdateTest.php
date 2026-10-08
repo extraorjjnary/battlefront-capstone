@@ -16,7 +16,8 @@ test('profile page is displayed', function () {
     $response->assertInertia(fn (Assert $page) => $page
         ->component('settings/Profile')
         ->where('canManageDefaultDeliveryAddress', true)
-        ->where('defaultDeliveryAddress', '12 Mabini Street, Sagay City'));
+        ->where('defaultDeliveryAddress', '12 Mabini Street, Sagay City')
+        ->where('searchRecommendationsEnabled', true));
 });
 
 test('administrator profile excludes the default delivery address', function () {

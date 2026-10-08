@@ -25,6 +25,8 @@ use Laravel\Sanctum\HasApiTokens;
  * @property UserRole $role
  * @property AppearancePreference $appearance
  * @property string|null $default_delivery_address
+ * @property bool $search_recommendations_enabled
+ * @property bool $product_view_recommendations_enabled
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
  * @property Carbon|null $two_factor_confirmed_at
@@ -34,7 +36,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property-read Cart|null $cart
  * @property-read Collection<int, Order> $orders
  */
-#[Fillable(['name', 'email', 'password', 'default_delivery_address', 'appearance'])]
+#[Fillable(['name', 'email', 'password', 'default_delivery_address', 'appearance', 'search_recommendations_enabled', 'product_view_recommendations_enabled'])]
 #[Hidden([
     'password',
     'default_delivery_address',
@@ -55,6 +57,8 @@ class User extends Authenticatable
     protected $attributes = [
         'appearance' => 'system',
         'role' => 'customer',
+        'search_recommendations_enabled' => true,
+        'product_view_recommendations_enabled' => true,
     ];
 
     /**
@@ -69,6 +73,8 @@ class User extends Authenticatable
             'password' => 'hashed',
             'appearance' => AppearancePreference::class,
             'role' => UserRole::class,
+            'search_recommendations_enabled' => 'boolean',
+            'product_view_recommendations_enabled' => 'boolean',
         ];
     }
 
@@ -98,5 +104,25 @@ class User extends Authenticatable
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    /**
+     * Get this customer's retained catalog searches.
+     *
+     * @return HasMany<CustomerSearch, $this>
+     */
+    public function searches(): HasMany
+    {
+        return $this->hasMany(CustomerSearch::class);
+    }
+
+    /**
+     * Get this customer's retained product views.
+     *
+     * @return HasMany<CustomerProductView, $this>
+     */
+    public function productViews(): HasMany
+    {
+        return $this->hasMany(CustomerProductView::class);
     }
 }

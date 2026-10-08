@@ -20,14 +20,16 @@ use App\Http\Controllers\CartItemController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderPaymentProofController as CustomerOrderPaymentProofController;
 use App\Http\Controllers\ProductCatalogController;
 use App\Http\Controllers\RecommendationController;
+use App\Http\Controllers\RecommendationInteractionController;
 use Illuminate\Support\Facades\Route;
 
 // guest landing page
-Route::inertia('/', 'Welcome')->name('home');
+Route::get('/', [HomeController::class, 'index'])->name('home');
 
 // public/customer branches
 Route::get('branches', [BranchController::class, 'index'])->name('branches.index');
@@ -40,7 +42,9 @@ Route::resource('products', ProductCatalogController::class)
 // public/customer recommendations
 Route::middleware('can:use-recommendations')->group(function () {
     Route::get('recommendations', [RecommendationController::class, 'index'])->name('recommendations.index');
-    Route::get('recommendations/results', [RecommendationController::class, 'results'])->name('recommendations.results');
+    Route::post('recommendations/interactions', RecommendationInteractionController::class)
+        ->middleware('throttle:60,1')
+        ->name('recommendations.interactions.store');
 });
 
 // dynamic dashboard for customer and admin
@@ -151,4 +155,4 @@ Route::middleware(['auth', 'can:access-administration'])
     });
 
 // profile settings
-require __DIR__ . '/settings.php';
+require __DIR__.'/settings.php';

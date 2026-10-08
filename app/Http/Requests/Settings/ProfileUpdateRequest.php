@@ -22,6 +22,16 @@ class ProfileUpdateRequest extends FormRequest
         $rules['default_delivery_address'][] = Rule::excludeIf(
             ! $this->user()->can('use-customer-cart'),
         );
+        $rules['search_recommendations_enabled'] = [
+            Rule::excludeIf(! $this->user()->can('use-customer-cart')),
+            'sometimes',
+            'boolean',
+        ];
+        $rules['product_view_recommendations_enabled'] = [
+            Rule::excludeIf(! $this->user()->can('use-customer-cart')),
+            'sometimes',
+            'boolean',
+        ];
 
         return $rules;
     }

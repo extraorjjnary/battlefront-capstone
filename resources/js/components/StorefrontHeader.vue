@@ -17,7 +17,7 @@ const page = usePage();
 const isAuthenticated = computed(() => Boolean(page.props.auth?.user));
 const storefrontLinks = [
     { title: "Products", mobileTitle: "Shop", section: "products", href: productIndex() },
-    { title: "Recommendations", mobileTitle: "Find", section: "recommendations", href: recommendationIndex() },
+    { title: "Recommendations", mobileTitle: "For you", section: "recommendations", href: recommendationIndex() },
     { title: "Branches", mobileTitle: "Stores", section: "branches", href: branchIndex() },
 ];
 </script>

@@ -25,9 +25,9 @@ use Illuminate\Support\Facades\Storage;
  * @property string|null $description
  * @property int $category_id
  * @property string|null $brand
- * @property string $price
+ * @property numeric-string $price
  * @property bool $is_featured
- * @property string|null $discount_price
+ * @property numeric-string|null $discount_price
  * @property string|null $image_path
  * @property-read string|null $image_url
  * @property bool $is_active

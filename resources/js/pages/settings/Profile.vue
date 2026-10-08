@@ -13,6 +13,8 @@ import { edit } from "@/routes/profile";
 const props = defineProps({
     canManageDefaultDeliveryAddress: { type: Boolean, required: true },
     defaultDeliveryAddress: { type: String, default: "" },
+    searchRecommendationsEnabled: { type: Boolean, default: true },
+    productViewRecommendationsEnabled: { type: Boolean, default: true },
 });
 
 defineOptions({
@@ -99,6 +101,34 @@ const user = computed(() => page.props.auth.user);
                     class="mt-2"
                     :message="errors.default_delivery_address"
                 />
+            </div>
+
+            <div v-if="props.canManageDefaultDeliveryAddress" class="grid gap-2">
+                <Label for="search-recommendations-enabled">Search-based recommendations</Label>
+                <input type="hidden" name="search_recommendations_enabled" value="0" />
+                <input type="hidden" name="product_view_recommendations_enabled" value="0" />
+                <label class="text-muted-foreground flex items-start gap-3 text-sm">
+                    <input
+                        id="search-recommendations-enabled"
+                        type="checkbox"
+                        name="search_recommendations_enabled"
+                        value="1"
+                        :checked="props.searchRecommendationsEnabled"
+                        class="border-input accent-primary mt-0.5 size-4"
+                    />
+                    <span>Use your catalog searches to personalize product recommendations. Turn this off to stop recording searches and delete saved search history. Search history is kept for up to 90 days while enabled.</span>
+                </label>
+                <label class="text-muted-foreground flex items-start gap-3 text-sm">
+                    <input
+                        id="product-view-recommendations-enabled"
+                        type="checkbox"
+                        name="product_view_recommendations_enabled"
+                        value="1"
+                        :checked="props.productViewRecommendationsEnabled"
+                        class="border-input accent-primary mt-0.5 size-4"
+                    />
+                    <span>Use products you view to personalize recommendations. Turn this off to stop recording views and delete saved view history. View history is kept for up to 90 days while enabled.</span>
+                </label>
             </div>
 
             <div class="flex items-center gap-4">

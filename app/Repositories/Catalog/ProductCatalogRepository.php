@@ -115,6 +115,69 @@ class ProductCatalogRepository
     }
 
     /**
+     * Find products with related category, brand, or tag attributes for a viewed product.
+     *
+     * @param  array<int, int>  $productIds
+     * @param  array<int, int>  $excludedProductIds
+     * @return EloquentCollection<int, Product>
+     */
+    public function similarProducts(array $productIds, array $excludedProductIds = [], int $limit = 40): EloquentCollection
+    {
+        if ($productIds === [] || $limit < 1) {
+            return (new Product)->newCollection();
+        }
+
+        $anchors = Product::query()
+            ->customerEligible()
+            ->with('tags:id')
+            ->whereKey($productIds)
+            ->get(['id', 'category_id', 'brand', 'price', 'discount_price']);
+
+        if ($anchors->isEmpty()) {
+            return (new Product)->newCollection();
+        }
+
+        $categoryIds = $anchors->pluck('category_id')->unique()->all();
+        $brands = $anchors->pluck('brand')->filter()->unique()->all();
+        $tagIds = $anchors->flatMap(fn (Product $product): array => $product->tags->modelKeys())->unique()->all();
+
+        return $this->contextQuery()
+            ->whereNotIn('products.id', array_values(array_unique([...$excludedProductIds, ...$productIds])))
+            ->where(function (Builder $query) use ($categoryIds, $brands, $tagIds): void {
+                $query->whereIn('category_id', $categoryIds);
+
+                if ($brands !== []) {
+                    $query->orWhereIn('brand', $brands);
+                }
+
+                if ($tagIds !== []) {
+                    $query->orWhereHas('tags', fn (Builder $tagQuery): Builder => $tagQuery->whereIn('tags.id', $tagIds));
+                }
+            })
+            ->orderBy('name')
+            ->orderBy('id')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Provide a small catalog fallback when there is not enough purchase history.
+     *
+     * @param  array<int, int>  $excludedProductIds
+     * @return EloquentCollection<int, Product>
+     */
+    public function featuredFallback(array $excludedProductIds = [], int $limit = 40): EloquentCollection
+    {
+        return $this->contextQuery()
+            ->whereNotIn('products.id', $excludedProductIds)
+            ->where('is_featured', true)
+            ->orderBy('name')
+            ->orderBy('id')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
      * @return Builder<Product>
      */
     private function contextQuery(): Builder

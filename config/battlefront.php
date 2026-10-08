@@ -3,6 +3,10 @@
 return [
     'chatbot_timeout_seconds' => env('CHATBOT_TIMEOUT_SECONDS', 20),
 
+    'recommendations' => [
+        'slow_query_threshold_ms' => (int) env('BATTLEFRONT_RECOMMENDATION_SLOW_QUERY_THRESHOLD_MS', 750),
+    ],
+
     'operational_branch_city' => 'Sagay City',
 
     'operating_hours' => '8:00 AM–6:00 PM',

@@ -4,11 +4,13 @@
 
 **Integrated Web and Mobile Business Management System with Product Recommendation, Predictive Analytics, and Integrated Chatbot for Battlefront Computer Trading**
 
-This document records the current Battlefront Computer Trading repository implementation, completed work, pending work, and development boundaries, verified on **2026-10-01** against repository files and Linear issue descriptions/statuses.
+This document records the current Battlefront Computer Trading repository implementation, completed work, pending work, and development boundaries. The repository snapshot was reviewed on **2026-10-08**; Linear status references below remain the historical **2026-10-01** snapshot unless explicitly rechecked.
 
 For current implementation facts, use the repository first, then Linear issue state and approved scope, existing handoff/context documents, and existing Postman/mobile API documentation. Planned capabilities are explicitly distinguished from implemented behavior.
 
 This is a development reference, not an academic manuscript revision. `docs/capstone_manuscript.docx` is academically sensitive and read-only for agent work: do not modify, rename, format, convert, or regenerate it. The developer will revise it manually. This document makes no claim that the manuscript has already been synchronized with the implementation.
+
+**Scope review required:** the current product direction replaces explicit budget/intended-use recommendation criteria with search, product-view, cart, and purchase signals. This is a scope extension from the approved manuscript/context baseline. No adviser-approved amendment was provided for this implementation, so it must not be presented as approved capstone evaluation scope until that amendment is recorded and the developer revises the manuscript.
 
 ---
 
@@ -44,7 +46,7 @@ The system supports:
 
 The intelligent features are intended to support customer and managerial decisions, not replace human judgment.
 
-Core catalog/inventory, customer commerce, administrator order/payment processing, sales reports, deterministic recommendations, chatbot, and mobile API implementation are complete. Real React Native + Expo consumer validation, predictive analytics, and the remaining integration/release work are pending; see Section 14.
+Core catalog/inventory, customer commerce, administrator order/payment processing, sales reports, chatbot, and the released criteria-based recommendation baseline are implemented. The behavior-driven recommendation replacement is in progress; real React Native + Expo consumer validation, predictive analytics, and the remaining integration/release work are pending; see Section 14.
 
 ---
 
@@ -300,7 +302,7 @@ Customers can:
 
 - register, authenticate, and manage their profile;
 - browse, search, filter, and view product details;
-- receive rule-based product recommendations;
+- receive behavior-driven product recommendations in the current product direction;
 - manage a shopping cart;
 - place orders and select an available payment method;
 - monitor order status and view order history;
@@ -367,7 +369,7 @@ Forecast generation/review is planned for administrators but is not implemented.
 
 ## Intelligent Modules
 
-- Product Recommendation — complete
+- Product Recommendation - behavioral replacement in progress; academic scope approval pending
 - Predictive Analytics — pending
 - Integrated Chatbot — complete
 
@@ -403,42 +405,20 @@ Shared actions/services implement these rules for both Inertia and mobile API co
 
 # 8. Product Recommendation Module
 
-The Product Recommendation Module uses **deterministic rule-based filtering**.
+The approved manuscript baseline specifies recommendations from explicit customer criteria, including budget, intended use, brand/category/tags, and Sagay inventory. That remains the academic source of truth until an adviser-approved amendment is recorded.
 
-**Status: complete.** EXT-35 and its criteria, engine, customer workflow, and test issues are Done; EXT-64 adds the completed mobile endpoints. Web and mobile use the same `RecommendationEngine` and eligible catalog query.
+**Current product direction (scope extension; approval pending):** replace the customer questionnaire with behavior-driven suggestions. Signed-in customers' catalog searches and product views are recorded by default unless disabled in their profile; the engine also considers current cart items and completed purchases. Guests and customers without usable personal signals receive clearly labeled popular or featured products.
 
-It is intentionally **not** collaborative filtering, machine learning, deep learning, or generative-AI recommendation.
+The deterministic first pass combines candidate scores: fresh searches start at 55 points and fade by age; cart co-purchases start at 38; viewed-product similarity contributes up to 48 and works without order history; purchase relationships start at 15; popularity adds at most 5 as a tie-breaker. Similarity uses shared category, brand, or tags and requires an effective-price ratio between 0.5 and 2.
 
-The design works without historical user-item interaction data and does not depend on a learned recommendation model.
+Search and view personalization are enabled by default for signed-in customers, so recommendations respond without a profile setup step. Customers can independently turn off either signal in profile settings; opting out stops future recording and deletes that signal's retained history. Search and view history expire after 90 days. Recommendation feedback is reported in aggregate; no individual search text is exposed in administrator reports.
 
-## Recommendation Inputs
+Every response rechecks active product/category eligibility and positive live Sagay stock. Recommendations use current effective prices, exclude items already purchased or in the cart from personalized candidates, avoid duplicate products, mix categories when enough relevant candidates exist, and include a reason tied to the signal used. The engine does not claim technical PC-part compatibility.
 
-- customer budget;
-- intended use;
-- preferred brand;
-- selected product category;
-- preferred product tags;
-- available Sagay inventory.
 
-```text
-Customer Requirements
-        ↓
-Rule-Based Criteria
-        ↓
-Match Against Product Attributes
-        ↓
-Consider Available Catalog / Inventory
-        ↓
-Suitable Product Results
-```
+The web page and home/product/cart sections use the behavior-driven engine. The mobile API has an additive public GET feed and an authenticated personalized feed with the same product/reason shape. The released v1 criteria/options endpoints remain during the mobile client transition; removing them requires confirmed mobile cutover. React Native client integration and refresh validation remain pending.
 
-Explicit PC-part compatibility checking and configurator behavior are outside the current capstone scope. The recommendation module does not use a dedicated product-to-product compatibility relationship or a `product_compatibilities` table.
-
-Budget and intended use are required. Category, brand, and preferred tags are optional. Eligibility requires an active product/category, positive Sagay stock, an effective price within budget, an intended-use category/tag signal, and any explicit category/brand restrictions. Effective price is the discount price when present, otherwise the regular price. Brand matching is trimmed and case-insensitive; null-brand products remain eligible when no brand preference is supplied.
-
-Results rank by intended-use match count descending, preferred-tag match count descending, effective price ascending, then product ID ascending. Preferred tags affect ranking rather than requiring every selected tag. Results include match reasons; no match is an explicit empty result, not a fabricated recommendation. Recommendations are not persisted.
-
-The module operates using Battlefront's internal product catalog and inventory data.
+The module operates using Battlefront's internal catalog, completed orders, cart, and signed-in customer search/view activity unless the customer disables either activity signal in profile settings. The chatbot does not receive recommendation history or make recommendation decisions.
 
 The **Product Recommendation Module**, not the chatbot, owns recommendation logic.
 
@@ -768,7 +748,8 @@ Status snapshot verified against Linear on **2026-10-01**:
 | --- | --- | --- |
 | Core catalog, inventory, roles, and branch reference | Complete | Implemented routes/models/services and completed core issues |
 | Cart, checkout, orders, manual payments, cancellation restoration, sales/reports | Complete | EXT-22–27, EXT-28–34, EXT-80–83 Done |
-| Deterministic recommendations | Complete | EXT-35, EXT-37–39, EXT-41, EXT-64 Done |
+| Criteria-based recommendations | Historically complete | EXT-35, EXT-37-39, EXT-41, EXT-64 Done; approved manuscript baseline and released mobile contract |
+| Behavior-driven recommendation replacement | In progress | Product direction implemented in the current workspace; adviser amendment, mobile cutover, and evaluation approval are not recorded |
 | Integrated chatbot | Complete | EXT-47–55 and EXT-61 Done |
 | Mobile API foundation/customer endpoints | Complete | EXT-56–61 and EXT-64 Done |
 | Mobile handoff and Postman collection | Complete | EXT-62 Done; developer-reported successful manual Postman Desktop verification |
@@ -779,7 +760,7 @@ Status snapshot verified against Linear on **2026-10-01**:
 
 ## Completed Mobile API Scope
 
-`routes/api.php` defines 22 `/api/v1` endpoints covering health, customer registration/login/logout, profile read/update, catalog search/filter/detail, branch information, cart operations, checkout preview, order placement/history/detail, rejected-proof replacement, chatbot, and recommendation options/results.
+`routes/api.php` defines 25 `/api/v1` endpoints covering health, customer registration/login/logout, profile read/update, catalog search/filter/detail, branch information, cart operations, checkout preview, order placement/history/detail, rejected-proof replacement, chatbot, and recommendation feeds/interactions plus the retained criteria options/results.
 
 Controllers reuse shared business logic and safe resource presenters. Responses use the documented JSON envelopes, pagination, validation/access errors, and rate limits. The global API limit is 60 requests per minute per IP, with additional authentication/chatbot limits. No mobile administrator operations, token refresh, password-reset/change, customer cancellation, payment gateway, or courier endpoints are present.
 

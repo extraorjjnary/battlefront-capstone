@@ -7,6 +7,7 @@ import {
     TriangleAlert,
 } from '@lucide/vue';
 import CartItemRow from '@/components/cart/CartItemRow.vue';
+import RecommendationSection from '@/components/recommendations/RecommendationSection.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/currency';
@@ -16,6 +17,9 @@ import { index as productIndex } from '@/routes/products';
 
 defineProps({
     cart: { type: Object, required: true },
+    is_personalized: { type: Boolean, default: false },
+    has_featured_fallback: { type: Boolean, default: false },
+    recommendations: { type: Array, default: () => [] },
 });
 
 defineOptions({
@@ -235,5 +239,15 @@ defineOptions({
                 </aside>
             </div>
         </template>
+        <RecommendationSection
+            :recommendations="recommendations"
+            placement="cart"
+            title="Keep building your selection"
+            :description="is_personalized
+                ? 'Suggestions based on items in your cart, completed orders, and product activity you chose to share.'
+                : has_featured_fallback
+                  ? 'Featured and popular picks that are currently available in Sagay.'
+                  : 'Products purchased often by Battlefront customers and currently available in Sagay.'"
+        />
     </main>
 </template>
