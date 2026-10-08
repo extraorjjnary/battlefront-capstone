@@ -3,26 +3,28 @@
 namespace App\Services\Recommendation;
 
 use App\Enums\UserRole;
+use App\Models\GuestRecommendationProfile;
 use App\Models\User;
 
 class RecordCustomerSearch
 {
-    public function record(?User $user, ?string $query): void
+    public function record(?User $user, ?string $query, ?GuestRecommendationProfile $guestProfile = null): void
     {
         $normalizedQuery = mb_strtolower(trim((string) $query));
         $normalizedQuery = preg_replace('/[^\\pL\\pN]+/u', ' ', $normalizedQuery) ?? '';
         $normalizedQuery = trim(preg_replace('/\\s+/u', ' ', $normalizedQuery) ?? '');
 
         if (
-            $user === null
-            || $user->role !== UserRole::Customer
-            || ! $user->search_recommendations_enabled
+            ($user === null && $guestProfile === null)
+            || ($user !== null && $user->role !== UserRole::Customer)
+            || ($user !== null && ! $user->search_recommendations_enabled)
             || $normalizedQuery === ''
         ) {
             return;
         }
 
-        $recentSearch = $user->searches()
+        $owner = $user ?? $guestProfile;
+        $recentSearch = $owner->searches()
             ->where('created_at', '>=', now()->subMinutes(10))
             ->latest('created_at')
             ->first();
@@ -36,7 +38,7 @@ class RecordCustomerSearch
             return;
         }
 
-        $user->searches()->create([
+        $owner->searches()->create([
             'query' => $normalizedQuery,
             'expires_at' => now()->addDays(90),
         ]);

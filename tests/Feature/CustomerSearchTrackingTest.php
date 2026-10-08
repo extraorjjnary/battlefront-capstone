@@ -2,6 +2,7 @@
 
 use App\Models\CustomerProductView;
 use App\Models\CustomerSearch;
+use App\Models\GuestRecommendationProfile;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -46,7 +47,7 @@ test('incremental query typing updates one recent search instead of storing ever
     expect(CustomerSearch::query()->sole()->query)->toBe('graphics card');
 });
 
-test('guest, opted-out customer, and administrator searches are not retained', function () {
+test('guest searches are retained temporarily while opted-out customers and administrators are not tracked', function () {
     $customer = User::factory()->customer()->create(['search_recommendations_enabled' => false]);
     $administrator = User::factory()->administrator()->create([
         'search_recommendations_enabled' => true,
@@ -56,7 +57,12 @@ test('guest, opted-out customer, and administrator searches are not retained', f
     $this->actingAs($customer)->get(route('products.index', ['q' => 'mouse']))->assertOk();
     $this->actingAs($administrator)->get(route('products.index', ['q' => 'monitor']))->assertOk();
 
-    $this->assertDatabaseCount('customer_searches', 0);
+    $this->assertDatabaseCount('customer_searches', 1);
+    $this->assertDatabaseHas('customer_searches', [
+        'user_id' => null,
+        'guest_recommendation_profile_id' => GuestRecommendationProfile::query()->sole()->id,
+        'query' => 'keyboard',
+    ]);
 });
 
 test('mobile catalog records an opted-in customer search from the bearer identity', function () {

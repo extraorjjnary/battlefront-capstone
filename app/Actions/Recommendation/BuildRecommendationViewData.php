@@ -2,6 +2,7 @@
 
 namespace App\Actions\Recommendation;
 
+use App\Models\GuestRecommendationProfile;
 use App\Models\User;
 use App\Services\CatalogProductPresenter;
 use App\Services\Recommendation\BehavioralRecommendationEngine;
@@ -27,8 +28,12 @@ class BuildRecommendationViewData
      *     }>
      * }
      */
-    public function __invoke(?User $customer, ?int $excludeProductId = null, int $limit = 4): array
-    {
+    public function __invoke(
+        ?User $customer,
+        ?int $excludeProductId = null,
+        int $limit = 4,
+        ?GuestRecommendationProfile $guestProfile = null,
+    ): array {
         if ($customer !== null && ! $customer->can('use-recommendations')) {
             return [
                 'is_personalized' => false,
@@ -38,7 +43,9 @@ class BuildRecommendationViewData
 
         $recommendations = $customer !== null
             ? $this->recommendationEngine->recommendFor($customer, $limit)
-            : $this->recommendationEngine->popular($limit);
+            : ($guestProfile !== null
+                ? $this->recommendationEngine->recommendFor($guestProfile, $limit)
+                : $this->recommendationEngine->popular($limit));
         $recommendations = $recommendations
             ->reject(fn (BehavioralRecommendedProduct $recommendation): bool => $recommendation->product->id === $excludeProductId)
             ->values();

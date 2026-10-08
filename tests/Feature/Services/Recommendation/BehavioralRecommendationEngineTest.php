@@ -7,6 +7,7 @@ use App\Models\CartItem;
 use App\Models\Category;
 use App\Models\CustomerProductView;
 use App\Models\CustomerSearch;
+use App\Models\GuestRecommendationProfile;
 use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -47,6 +48,23 @@ test('personalized recommendations use recent opted-in catalog searches and rank
     $recommendations = app(BehavioralRecommendationEngine::class)->recommendFor($customer);
 
     expect($recommendations->pluck('product.id')->all())->toBe([$newerSearchMatch->id, $olderSearchMatch->id])
+        ->and($recommendations->first()->reasons)->toContain([
+            'code' => 'matched_recent_searches',
+            'value' => 'Matches a recent catalog search',
+        ]);
+});
+
+test('guest recommendations use the same recent search ranking as customer recommendations', function () {
+    $profile = GuestRecommendationProfile::factory()->create();
+    $match = createBehavioralRecommendationTestProduct(['name' => 'RTX 5080 Graphics Card']);
+    $profile->searches()->create([
+        'query' => 'rtx 5080',
+        'expires_at' => now()->addDays(90),
+    ]);
+
+    $recommendations = app(BehavioralRecommendationEngine::class)->recommendFor($profile);
+
+    expect($recommendations->first()->product->id)->toBe($match->id)
         ->and($recommendations->first()->reasons)->toContain([
             'code' => 'matched_recent_searches',
             'value' => 'Matches a recent catalog search',

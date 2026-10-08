@@ -4,6 +4,7 @@ namespace App\Services\Recommendation;
 
 use App\Enums\OrderStatus;
 use App\Models\CartItem;
+use App\Models\GuestRecommendationProfile;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\User;
@@ -32,22 +33,22 @@ class BehavioralRecommendationEngine
      *
      * @return Collection<int, BehavioralRecommendedProduct>
      */
-    public function recommendFor(User $customer, int $limit = 12): Collection
+    public function recommendFor(User|GuestRecommendationProfile $customer, int $limit = 12): Collection
     {
-        $purchasedProductIds = OrderItem::query()
+        $purchasedProductIds = $customer instanceof User ? OrderItem::query()
             ->whereHas('order', fn (Builder $query): Builder => $query
                 ->whereBelongsTo($customer)
                 ->where('status', OrderStatus::Completed->value))
             ->distinct()
             ->pluck('product_id')
             ->map(static fn (int|string $id): int => (int) $id)
-            ->all();
+            ->all() : [];
 
-        $cartProductIds = CartItem::query()
+        $cartProductIds = $customer instanceof User ? CartItem::query()
             ->whereHas('cart', fn (Builder $query): Builder => $query->whereBelongsTo($customer))
             ->pluck('product_id')
             ->map(static fn (int|string $id): int => (int) $id)
-            ->all();
+            ->all() : [];
 
         $viewedProductCounts = $this->recentlyViewedProductCounts($customer);
         $viewedProductIds = array_keys($viewedProductCounts);
@@ -59,7 +60,7 @@ class BehavioralRecommendationEngine
         $scores = [];
         $reasons = [];
 
-        if ($customer->search_recommendations_enabled) {
+        if ($customer instanceof GuestRecommendationProfile || $customer->search_recommendations_enabled) {
             $this->addSearchCandidates($customer, $excludedProductIds, $scores, $reasons);
         }
 
@@ -144,7 +145,7 @@ class BehavioralRecommendationEngine
      * @param  array<int, float>  $scores
      * @param  array<int, list<array{code: string, value: string}>>  $reasons
      */
-    private function addSearchCandidates(User $customer, array $excludedProductIds, array &$scores, array &$reasons): void
+    private function addSearchCandidates(User|GuestRecommendationProfile $customer, array $excludedProductIds, array &$scores, array &$reasons): void
     {
         $searches = $customer->searches()
             ->where('expires_at', '>', now())
@@ -359,9 +360,9 @@ class BehavioralRecommendationEngine
      *
      * @return array<int, int> product ID to recent view count
      */
-    private function recentlyViewedProductCounts(User $customer): array
+    private function recentlyViewedProductCounts(User|GuestRecommendationProfile $customer): array
     {
-        if (! $customer->product_view_recommendations_enabled) {
+        if ($customer instanceof User && ! $customer->product_view_recommendations_enabled) {
             return [];
         }
 

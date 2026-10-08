@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\CustomerProductView;
 use App\Models\CustomerSearch;
+use App\Models\GuestRecommendationProfile;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -24,7 +25,11 @@ class PruneExpiredCustomerSearches extends Command
             ->where('expires_at', '<=', now())
             ->delete();
 
-        $this->info("Deleted {$deleted} expired customer searches and {$deletedProductViews} expired product views.");
+        $deletedGuestProfiles = GuestRecommendationProfile::query()
+            ->where('expires_at', '<=', now())
+            ->delete();
+
+        $this->info("Deleted {$deleted} expired customer searches, {$deletedProductViews} expired product views, and {$deletedGuestProfiles} expired guest profiles.");
 
         return self::SUCCESS;
     }

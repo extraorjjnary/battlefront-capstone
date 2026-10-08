@@ -15,6 +15,10 @@ class RecommendationController extends Controller
         $user = $request->user();
         $customer = $user instanceof User ? $user : null;
 
-        return Inertia::render('Recommendations/Index', $buildRecommendationViewData($customer, limit: 12));
+        return Inertia::render('Recommendations/Index', $buildRecommendationViewData(
+            $customer,
+            limit: 12,
+            guestProfile: $request->attributes->get('guest_recommendation_profile'),
+        ));
     }
 }

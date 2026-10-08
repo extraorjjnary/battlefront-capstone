@@ -29,7 +29,11 @@ class ProductCatalogController extends Controller
         $filters = $request->filters();
 
         if ($request->integer('page', 1) === 1) {
-            $recordCustomerSearch->record($request->user(), $filters['q']);
+            $recordCustomerSearch->record(
+                $request->user(),
+                $filters['q'],
+                $request->attributes->get('guest_recommendation_profile'),
+            );
         }
 
         $products = $this->productCatalogRepository->paginate($filters)
@@ -52,13 +56,21 @@ class ProductCatalogController extends Controller
         BuildRecommendationViewData $buildRecommendationViewData,
     ): Response {
         $catalogProduct = $this->productCatalogRepository->findEligibleOrFail($product);
-        $recordCustomerProductView($request->user(), $catalogProduct);
+        $recordCustomerProductView(
+            $request->user(),
+            $catalogProduct,
+            $request->attributes->get('guest_recommendation_profile'),
+        );
         $user = $request->user();
         $customer = $user instanceof User ? $user : null;
 
         return Inertia::render('Products/Show', [
             'product' => $this->catalogProductPresenter->present($catalogProduct),
-            ...$buildRecommendationViewData($customer, $catalogProduct->id),
+            ...$buildRecommendationViewData(
+                $customer,
+                $catalogProduct->id,
+                guestProfile: $request->attributes->get('guest_recommendation_profile'),
+            ),
         ]);
     }
 }

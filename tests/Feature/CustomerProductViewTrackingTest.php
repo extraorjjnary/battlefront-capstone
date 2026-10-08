@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\CustomerProductView;
+use App\Models\GuestRecommendationProfile;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Support\Carbon;
@@ -37,7 +38,7 @@ test('mobile product views use the authenticated bearer identity', function () {
     ]);
 });
 
-test('guest, opted-out customer, and administrator product views are not retained', function () {
+test('guest product views are retained temporarily while opted-out customers and administrators are not tracked', function () {
     $customer = User::factory()->customer()->create(['product_view_recommendations_enabled' => false]);
     $administrator = User::factory()->administrator()->create([
         'product_view_recommendations_enabled' => true,
@@ -48,7 +49,12 @@ test('guest, opted-out customer, and administrator product views are not retaine
     $this->actingAs($customer)->get(route('products.show', $product))->assertOk();
     $this->actingAs($administrator)->get(route('products.show', $product))->assertOk();
 
-    $this->assertDatabaseCount('customer_product_views', 0);
+    $this->assertDatabaseCount('customer_product_views', 1);
+    $this->assertDatabaseHas('customer_product_views', [
+        'user_id' => null,
+        'guest_recommendation_profile_id' => GuestRecommendationProfile::query()->sole()->id,
+        'product_id' => $product->id,
+    ]);
 });
 
 test('profile settings expose an independent product view recommendation consent', function () {

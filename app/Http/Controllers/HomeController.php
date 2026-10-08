@@ -15,6 +15,9 @@ class HomeController extends Controller
         $user = $request->user();
         $customer = $user instanceof User ? $user : null;
 
-        return Inertia::render('Welcome', $buildRecommendationViewData($customer));
+        return Inertia::render('Welcome', $buildRecommendationViewData(
+            $customer,
+            guestProfile: $request->attributes->get('guest_recommendation_profile'),
+        ));
     }
 }
