@@ -482,7 +482,7 @@ Checkout cart lines omit the ordinary cart's availability and category/price fie
   "total": "280.00",
   "eta_anchor_date": "2026-10-08",
   "eta_timezone": "UTC",
-  "estimated_delivery_start": "2026-10-10",
+  "estimated_delivery_start": "2026-10-09",
   "estimated_delivery_end": "2026-10-10",
   "notice": "Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification."
 }

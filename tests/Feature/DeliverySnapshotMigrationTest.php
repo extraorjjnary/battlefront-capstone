@@ -93,6 +93,7 @@ test('rollback refuses to discard saved delivery quotes or shipments', function 
 });
 
 test('empty shipment migration rolls back cleanly and can be reapplied', function () {
+    config(['battlefront.delivery.destinations.Sagay City.transit_min_days' => 1]);
     $migration = require database_path('migrations/2026_10_07_160343_create_shipments_table.php');
 
     $migration->down();

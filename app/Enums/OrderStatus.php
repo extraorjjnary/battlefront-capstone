@@ -28,10 +28,7 @@ enum OrderStatus: string
     public function customerLabel(FulfillmentMethod $fulfillmentMethod): string
     {
         return match ($this) {
-            self::Processing => match ($fulfillmentMethod) {
-                FulfillmentMethod::Pickup => 'Preparing for pickup',
-                FulfillmentMethod::Delivery => 'Preparing for delivery',
-            },
+            self::Processing => 'Processing',
             self::Completed => match ($fulfillmentMethod) {
                 FulfillmentMethod::Pickup => 'Picked up / Completed',
                 FulfillmentMethod::Delivery => 'Delivered / Completed',

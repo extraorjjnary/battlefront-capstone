@@ -14,7 +14,7 @@ test('shipment factories produce coherent relative snapshots for the order profi
     $shipment = Shipment::factory()->for($order)->create();
 
     expect($shipment->refresh())->carrier->toBe('lbc')->status->toBe(ShipmentStatus::AwaitingPreparation)
-        ->preparation_days->toBe($preparation)->transit_min_days->toBe(2)->transit_max_days->toBe(4)
+        ->preparation_days->toBe($preparation)->transit_min_days->toBe(1)->transit_max_days->toBe(2)
         ->eta_min_days->toBe($minimum)->eta_max_days->toBe($maximum)
         ->tracking_reference->toBeNull()->handed_to_carrier_at->toBeNull()->delivered_at->toBeNull();
     expect($shipment->order->shipping_profile)->toBe($profile);
@@ -22,9 +22,9 @@ test('shipment factories produce coherent relative snapshots for the order profi
     expect($order->refresh()->shipment->is($shipment))->toBeTrue();
     expect($shipment->getAttributes())->not->toHaveKey('shipping_profile');
 })->with([
-    'standard' => [ShippingProfile::Standard, 1, 3, 5],
-    'fragile' => [ShippingProfile::Fragile, 2, 4, 6],
-    'bulky' => [ShippingProfile::Bulky, 3, 5, 7],
+    'standard' => [ShippingProfile::Standard, 1, 2, 3],
+    'fragile' => [ShippingProfile::Fragile, 2, 3, 4],
+    'bulky' => [ShippingProfile::Bulky, 3, 4, 5],
 ]);
 
 test('the default shipment factory creates one quoted delivery order', function () {
@@ -126,12 +126,13 @@ test('explicitly supplied reference and timestamps can be stored without computi
 });
 
 test('shipment constraints reject invalid status and relative ranges', function (string $field, mixed $value) {
+    config(['battlefront.delivery.destinations.Sagay City.transit_min_days' => 1]);
     $shipment = Shipment::factory()->create();
 
     expect(fn () => DB::table('shipments')->where('id', $shipment->id)->update([$field => $value]))
         ->toThrow(QueryException::class);
 })->with([
-    'unsupported status' => ['status', 'delivered'],
+    'unsupported status' => ['status', 'booked'],
     'wrong status case' => ['status', 'AWAITING_PREPARATION'],
     'empty carrier' => ['carrier', ''],
     'zero preparation' => ['preparation_days', 0],

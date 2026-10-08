@@ -61,10 +61,10 @@ test('web and mobile checkout expose equivalent quotes for all destination fees 
         'product_subtotal' => '18.66', 'delivery_fee' => '0.00', 'total' => '18.66',
     ])->toBe($web->inertiaProps('pickupQuote'));
     foreach ([
-        ['Sagay City', 80, 1, 1], ['Escalante City', 100, 1, 2], ['Cadiz City', 120, 1, 2],
-        ['Toboso', 140, 2, 3], ['Manapla', 160, 2, 3], ['Calatrava', 180, 2, 3],
-        ['Victorias City', 180, 2, 3], ['E.B. Magalona', 200, 2, 4], ['San Carlos City', 220, 2, 4],
-        ['Silay City', 220, 2, 4], ['Talisay City', 240, 2, 4], ['Bacolod City', 250, 2, 4],
+        ['Sagay City', 80, 0, 1], ['Escalante City', 100, 1, 1], ['Cadiz City', 120, 1, 1],
+        ['Toboso', 140, 1, 1], ['Manapla', 160, 1, 1], ['Calatrava', 180, 1, 1],
+        ['Victorias City', 180, 1, 1], ['E.B. Magalona', 200, 1, 2], ['San Carlos City', 220, 1, 2],
+        ['Silay City', 220, 1, 2], ['Talisay City', 240, 1, 2], ['Bacolod City', 250, 1, 2],
     ] as $index => [$destination, $base, $minimum, $maximum]) {
         expect($quotes[$index])->destination->toBe($destination)
             ->base_fee->toBe($base.'.00')->handling_surcharge->toBe($surcharge.'.00')
@@ -77,10 +77,13 @@ test('web and mobile checkout expose equivalent quotes for all destination fees 
         expect($quotes[$index]['notice'])->toContain('not live LBC quotations or tracking', 'subject to payment verification');
     }
     expect($quotes[0]['estimated_delivery_start'])->toBe(match ($profile) {
+        ShippingProfile::Standard => '2026-12-31', ShippingProfile::Fragile => '2027-01-01', ShippingProfile::Bulky => '2027-01-02',
+    });
+    expect($quotes[0]['estimated_delivery_end'])->toBe(match ($profile) {
         ShippingProfile::Standard => '2027-01-01', ShippingProfile::Fragile => '2027-01-02', ShippingProfile::Bulky => '2027-01-03',
-    })->toBe($quotes[0]['estimated_delivery_end']);
+    });
     expect($quotes[11]['estimated_delivery_end'])->toBe(match ($profile) {
-        ShippingProfile::Standard => '2027-01-04', ShippingProfile::Fragile => '2027-01-05', ShippingProfile::Bulky => '2027-01-06',
+        ShippingProfile::Standard => '2027-01-02', ShippingProfile::Fragile => '2027-01-03', ShippingProfile::Bulky => '2027-01-04',
     });
     expect($stock->refresh()->quantity)->toBe(10);
     $this->assertDatabaseCount('orders', 0);
@@ -103,8 +106,8 @@ test('checkout calendar windows use the configured timezone across leap days', f
         ->get('/api/v1/checkout')->assertOk()
         ->assertJsonPath('data.delivery_quotes.0.eta_anchor_date', '2028-02-28')
         ->assertJsonPath('data.delivery_quotes.0.eta_timezone', 'Asia/Manila')
-        ->assertJsonPath('data.delivery_quotes.0.estimated_delivery_start', '2028-03-01')
-        ->assertJsonPath('data.delivery_quotes.11.estimated_delivery_end', '2028-03-04');
+        ->assertJsonPath('data.delivery_quotes.0.estimated_delivery_start', '2028-02-29')
+        ->assertJsonPath('data.delivery_quotes.11.estimated_delivery_end', '2028-03-02');
 });
 
 test('delivery placement snapshots each profile through the shared web and mobile boundaries', function (string $channel, ShippingProfile $profile, string $fee, string $total, int $preparation) {

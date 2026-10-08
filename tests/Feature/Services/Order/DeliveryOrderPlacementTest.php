@@ -62,7 +62,7 @@ test('delivery placement snapshots each profile and the relative quote in one st
         ->delivery_assumption_label->toBe('Battlefront-configured demo delivery assumptions; not official LBC rates.')
         ->status->toBe(OrderStatus::Pending)->payment_status->toBe(PaymentStatus::Pending);
     expect($order->shipment)->carrier->toBe('lbc')->status->toBe(ShipmentStatus::AwaitingPreparation)
-        ->preparation_days->toBe($preparation)->transit_min_days->toBe(2)->transit_max_days->toBe(4)
+        ->preparation_days->toBe($preparation)->transit_min_days->toBe(1)->transit_max_days->toBe(2)
         ->eta_min_days->toBe($etaMinimum)->eta_max_days->toBe($etaMaximum)
         ->tracking_reference->toBeNull()->handed_to_carrier_at->toBeNull()->delivered_at->toBeNull();
     expect($order->shipment->order->is($order))->toBeTrue();
@@ -71,9 +71,9 @@ test('delivery placement snapshots each profile and the relative quote in one st
     expect($customer->refresh()->cart)->toBeNull();
     Http::assertNothingSent();
 })->with([
-    'standard' => [ShippingProfile::Standard, '0.00', '250.00', '268.66', 1, 3, 5],
-    'fragile' => [ShippingProfile::Fragile, '50.00', '300.00', '318.66', 2, 4, 6],
-    'bulky' => [ShippingProfile::Bulky, '100.00', '350.00', '368.66', 3, 5, 7],
+    'standard' => [ShippingProfile::Standard, '0.00', '250.00', '268.66', 1, 2, 3],
+    'fragile' => [ShippingProfile::Fragile, '50.00', '300.00', '318.66', 2, 3, 4],
+    'bulky' => [ShippingProfile::Bulky, '100.00', '350.00', '368.66', 3, 4, 5],
 ]);
 
 test('mixed-cart delivery charges the highest profile once for all purchased quantities', function () {
@@ -93,7 +93,7 @@ test('mixed-cart delivery charges the highest profile once for all purchased qua
 
     expect($order)->product_subtotal->toBe('120.00')->shipping_profile->toBe(ShippingProfile::Bulky)
         ->handling_surcharge->toBe('100.00')->delivery_fee->toBe('180.00')->total_amount->toBe('300.00');
-    expect($order->shipment)->preparation_days->toBe(3)->eta_min_days->toBe(4)->eta_max_days->toBe(4);
+    expect($order->shipment)->preparation_days->toBe(3)->eta_min_days->toBe(3)->eta_max_days->toBe(4);
     $this->assertDatabaseCount('shipments', 1);
 });
 
@@ -221,7 +221,7 @@ test('payment rejection and proof replacement retain stock and delivery snapshot
     Storage::disk('local')->assertExists('payment-proofs/replacement.jpg');
 });
 
-test('verified completion records the snapshotted final total without advancing the shipment', function () {
+test('verified shipment delivery records the snapshotted final total without changing stock', function () {
     Storage::fake('local');
     Storage::disk('local')->put('payment-proofs/verified.jpg', 'proof');
     $customer = User::factory()->customer()->create();
@@ -233,10 +233,13 @@ test('verified completion records the snapshotted final total without advancing 
 
     $processing->updatePaymentStatus($order, PaymentStatus::Verified);
     $processing->updateStatus($order, OrderStatus::Processing);
-    $processing->updateStatus($order, OrderStatus::Completed);
+    foreach ([ShipmentStatus::Preparing, ShipmentStatus::ReadyForDispatch, ShipmentStatus::HandedToLbc, ShipmentStatus::InTransit, ShipmentStatus::OutForDelivery, ShipmentStatus::Delivered] as $status) {
+        $processing->updateShipmentStatus($order, $status);
+    }
 
     expect($order->refresh()->sale->amount)->toBe('330.00');
-    expect($order->shipment)->status->toBe(ShipmentStatus::AwaitingPreparation)->handed_to_carrier_at->toBeNull()->delivered_at->toBeNull();
+    expect($order->status)->toBe(OrderStatus::Completed);
+    expect($order->shipment)->status->toBe(ShipmentStatus::Delivered)->handed_to_carrier_at->not->toBeNull()->delivered_at->not->toBeNull();
     expect($stock->refresh()->quantity)->toBe(8);
     $this->assertDatabaseCount('sales', 1);
 });
@@ -254,7 +257,11 @@ test('cancellation restores quoted order stock once while retaining its snapshot
 
     expect($stock->refresh()->quantity)->toBe(10);
     expect($order->refresh())->total_amount->toBe('380.00')->delivery_fee->toBe('180.00');
-    expect($order->shipment->getAttributes())->toBe($shipment);
+    expect($order->shipment->getAttributes())->toMatchArray([
+        ...array_diff_key($shipment, array_flip(['status', 'cancelled_at', 'updated_at'])),
+        'status' => ShipmentStatus::Cancelled->value,
+    ]);
+    expect($order->shipment->cancelled_at)->not->toBeNull();
     expect(fn () => $processing->updateStatus($order, OrderStatus::Cancelled))->toThrow(ValidationException::class);
     expect($stock->refresh()->quantity)->toBe(10);
 });

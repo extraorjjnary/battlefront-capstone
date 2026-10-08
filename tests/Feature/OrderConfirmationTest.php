@@ -145,11 +145,11 @@ test('customer order details use fulfillment-specific status labels', function (
             ]));
 })->with([
     'pickup pending' => [FulfillmentMethod::Pickup, OrderStatus::Pending, 'Pending'],
-    'pickup processing' => [FulfillmentMethod::Pickup, OrderStatus::Processing, 'Preparing for pickup'],
+    'pickup processing' => [FulfillmentMethod::Pickup, OrderStatus::Processing, 'Processing'],
     'pickup completed' => [FulfillmentMethod::Pickup, OrderStatus::Completed, 'Picked up / Completed'],
     'pickup cancelled' => [FulfillmentMethod::Pickup, OrderStatus::Cancelled, 'Cancelled'],
     'delivery pending' => [FulfillmentMethod::Delivery, OrderStatus::Pending, 'Pending'],
-    'delivery processing' => [FulfillmentMethod::Delivery, OrderStatus::Processing, 'Preparing for delivery'],
+    'delivery processing' => [FulfillmentMethod::Delivery, OrderStatus::Processing, 'Processing'],
     'delivery completed' => [FulfillmentMethod::Delivery, OrderStatus::Completed, 'Delivered / Completed'],
     'delivery cancelled' => [FulfillmentMethod::Delivery, OrderStatus::Cancelled, 'Cancelled'],
 ]);

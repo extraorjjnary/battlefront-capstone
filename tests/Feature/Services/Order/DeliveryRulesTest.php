@@ -45,18 +45,18 @@ test('all configured destinations resolve approved fees and transit ranges witho
     ]);
     Http::assertNothingSent();
 })->with([
-    'Sagay City' => ['Sagay City', '80.00', 1, 1, 2, 2],
-    'Escalante City' => ['Escalante City', '100.00', 1, 2, 2, 3],
-    'Cadiz City' => ['Cadiz City', '120.00', 1, 2, 2, 3],
-    'Toboso' => ['Toboso', '140.00', 2, 3, 3, 4],
-    'Manapla' => ['Manapla', '160.00', 2, 3, 3, 4],
-    'Calatrava' => ['Calatrava', '180.00', 2, 3, 3, 4],
-    'Victorias City' => ['Victorias City', '180.00', 2, 3, 3, 4],
-    'E.B. Magalona' => ['E.B. Magalona', '200.00', 2, 4, 3, 5],
-    'San Carlos City' => ['San Carlos City', '220.00', 2, 4, 3, 5],
-    'Silay City' => ['Silay City', '220.00', 2, 4, 3, 5],
-    'Talisay City' => ['Talisay City', '240.00', 2, 4, 3, 5],
-    'Bacolod City' => ['Bacolod City', '250.00', 2, 4, 3, 5],
+    'Sagay City' => ['Sagay City', '80.00', 0, 1, 1, 2],
+    'Escalante City' => ['Escalante City', '100.00', 1, 1, 2, 2],
+    'Cadiz City' => ['Cadiz City', '120.00', 1, 1, 2, 2],
+    'Toboso' => ['Toboso', '140.00', 1, 1, 2, 2],
+    'Manapla' => ['Manapla', '160.00', 1, 1, 2, 2],
+    'Calatrava' => ['Calatrava', '180.00', 1, 1, 2, 2],
+    'Victorias City' => ['Victorias City', '180.00', 1, 1, 2, 2],
+    'E.B. Magalona' => ['E.B. Magalona', '200.00', 1, 2, 2, 3],
+    'San Carlos City' => ['San Carlos City', '220.00', 1, 2, 2, 3],
+    'Silay City' => ['Silay City', '220.00', 1, 2, 2, 3],
+    'Talisay City' => ['Talisay City', '240.00', 1, 2, 2, 3],
+    'Bacolod City' => ['Bacolod City', '250.00', 1, 2, 2, 3],
 ]);
 
 test('destination listing contains exactly the supported destinations', function () {
@@ -106,12 +106,12 @@ test('handling values and priority match each approved profile', function (
         ->eta_min_days->toBe($etaMinimum)
         ->eta_max_days->toBe($etaMaximum);
 })->with([
-    'standard' => [ShippingProfile::Standard, 0, '0.00', 1, '250.00', 3, 5],
-    'fragile' => [ShippingProfile::Fragile, 1, '50.00', 2, '300.00', 4, 6],
-    'bulky' => [ShippingProfile::Bulky, 2, '100.00', 3, '350.00', 5, 7],
+    'standard' => [ShippingProfile::Standard, 0, '0.00', 1, '250.00', 2, 3],
+    'fragile' => [ShippingProfile::Fragile, 1, '50.00', 2, '300.00', 3, 4],
+    'bulky' => [ShippingProfile::Bulky, 2, '100.00', 3, '350.00', 4, 5],
 ]);
 
-test('mixed products select the highest profile once independent of ordering or repetition', function (array $profiles, string $highest, string $fee, int $eta) {
+test('mixed products select the highest profile once independent of ordering or repetition', function (array $profiles, string $highest, string $fee, int $etaMinimum, int $etaMaximum) {
     $products = array_map(
         fn (ShippingProfile $profile): Product => Product::factory()->make(['category_id' => 1, 'shipping_profile' => $profile]),
         $profiles,
@@ -123,12 +123,12 @@ test('mixed products select the highest profile once independent of ordering or 
     expect($rules->highestProfile($products)->value)->toBe($highest);
     expect($quote)->shipping_profile->toBe($highest)
         ->delivery_fee->toBe($fee)
-        ->eta_min_days->toBe($eta)
-        ->eta_max_days->toBe($eta);
+        ->eta_min_days->toBe($etaMinimum)
+        ->eta_max_days->toBe($etaMaximum);
 })->with([
-    'fragile outranks standard' => [[ShippingProfile::Standard, ShippingProfile::Fragile, ShippingProfile::Standard], 'fragile', '130.00', 3],
-    'bulky last' => [[ShippingProfile::Standard, ShippingProfile::Fragile, ShippingProfile::Bulky], 'bulky', '180.00', 4],
-    'bulky first and repeated' => [[ShippingProfile::Bulky, ShippingProfile::Fragile, ShippingProfile::Bulky, ShippingProfile::Standard], 'bulky', '180.00', 4],
+    'fragile outranks standard' => [[ShippingProfile::Standard, ShippingProfile::Fragile, ShippingProfile::Standard], 'fragile', '130.00', 2, 3],
+    'bulky last' => [[ShippingProfile::Standard, ShippingProfile::Fragile, ShippingProfile::Bulky], 'bulky', '180.00', 3, 4],
+    'bulky first and repeated' => [[ShippingProfile::Bulky, ShippingProfile::Fragile, ShippingProfile::Bulky, ShippingProfile::Standard], 'bulky', '180.00', 3, 4],
 ]);
 
 test('persisted mixed carts keep one surcharge when line quantities change', function () {
@@ -155,7 +155,7 @@ test('persisted mixed carts keep one surcharge when line quantities change', fun
         ->delivery_fee->toBe('220.00')
         ->preparation_days->toBe(3)
         ->eta_min_days->toBe(4)
-        ->eta_max_days->toBe(5);
+        ->eta_max_days->toBe(4);
 });
 
 test('pickup bypasses destination lookup and product evaluation', function (?string $destination) {

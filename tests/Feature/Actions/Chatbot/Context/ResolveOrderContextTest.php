@@ -26,7 +26,7 @@ test('returns only minimal customer-facing status fields for an owned order refe
             'created_at' => '2026-09-20T10:00:00+00:00',
             'status' => [
                 'value' => 'processing',
-                'label' => 'Preparing for delivery',
+                'label' => 'Processing',
             ],
             'fulfillment' => [
                 'value' => 'delivery',
