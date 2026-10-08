@@ -5,6 +5,7 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
+use App\Enums\ShippingProfile;
 use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -103,10 +104,10 @@ test('administrators can review authoritative order processing details', functio
             'value' => FulfillmentMethod::Delivery->value,
             'label' => 'Delivery',
             'delivery_address' => 'Sagay City, Negros Occidental',
+            'delivery_destination' => null,
         ])
         ->where('order.status', ['value' => 'pending', 'label' => 'Pending'])
         ->where('order.allowed_status_transitions', [
-            ['value' => 'processing', 'label' => 'Processing'],
             ['value' => 'cancelled', 'label' => 'Cancelled'],
         ])
         ->where('order.payment.method', [
@@ -127,9 +128,55 @@ test('administrators can review authoritative order processing details', functio
         ->where('order.items.0.quantity', 2)
         ->where('order.items.0.unit_price', '1250.00')
         ->where('order.items.0.line_total', '2500.00')
+        ->where('order.product_subtotal', null)
+        ->where('order.delivery_fee', '0.00')
         ->where('order.total', '2500.00')
         ->missing('order.payment_proof_path'));
 });
+
+test('administrator processing details expose the saved delivery destination without inferring legacy or pickup destinations', function (string $scenario, ?string $destination, ?string $address) {
+    $factory = match ($scenario) {
+        'quoted delivery' => Order::factory()->withDeliverySnapshot('Calatrava'),
+        'legacy delivery' => Order::factory()->delivery(),
+        default => Order::factory(),
+    };
+    $order = $factory->create(['delivery_address' => 'Amihan 1, Bridge Area']);
+    config(['battlefront.delivery.destinations' => []]);
+
+    $this->actingAs(User::factory()->administrator()->create())
+        ->get(route('administration.orders.show', $order))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('order.fulfillment.delivery_address', $address)
+            ->where('order.fulfillment.delivery_destination', $destination));
+})->with([
+    'quoted delivery' => ['quoted delivery', 'Calatrava', 'Amihan 1, Bridge Area'],
+    'legacy delivery' => ['legacy delivery', null, 'Amihan 1, Bridge Area'],
+    'pickup' => ['pickup', null, null],
+]);
+
+test('administrator item ledger exposes saved product subtotal delivery fee and final total', function (bool $delivery, string $fee, string $total) {
+    $administrator = User::factory()->administrator()->create();
+    $factory = $delivery
+        ? Order::factory()->withDeliverySnapshot(profile: ShippingProfile::Bulky, subtotal: '280.00')
+        : Order::factory()->state(['product_subtotal' => '280.00', 'total_amount' => '280.00']);
+    $order = $factory->create();
+    OrderItem::factory()->for($order)->create(['quantity' => 1, 'price_at_time' => '250.00']);
+    OrderItem::factory()->for($order)->create(['quantity' => 2, 'price_at_time' => '15.00']);
+    config(['battlefront.delivery.destinations' => [], 'battlefront.delivery.profiles' => []]);
+
+    $this->actingAs($administrator)
+        ->get(route('administration.orders.show', $order))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Administration/Orders/Show')
+            ->where('order.product_subtotal', '280.00')
+            ->where('order.delivery_fee', $fee)
+            ->where('order.total', $total)
+            ->where('order.items.0.line_total', '250.00')
+            ->where('order.items.1.line_total', '30.00'));
+})->with([
+    'delivery' => [true, '180.00', '460.00'],
+    'pickup' => [false, '0.00', '280.00'],
+]);
 
 test('administrator order directory defaults to active orders newest first and paginated', function () {
     $administrator = User::factory()->administrator()->create();

@@ -319,7 +319,7 @@ test('passes only minimized owned order context to Gemini', function () {
         'orders' => [[
             'reference' => $order->reference,
             'created_at' => '2026-09-20T10:00:00+00:00',
-            'status' => ['value' => 'processing', 'label' => 'Preparing for delivery'],
+            'status' => ['value' => 'processing', 'label' => 'Processing'],
             'fulfillment' => ['value' => 'delivery', 'label' => 'Delivery'],
         ]],
     ];

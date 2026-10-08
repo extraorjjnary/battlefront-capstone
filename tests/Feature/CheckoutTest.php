@@ -34,10 +34,7 @@ test('customers with an empty cart return to the cart', function () {
     $this->actingAs($customer)
         ->get(route('checkout.index'))
         ->assertRedirectToRoute('cart.index')
-        ->assertInertiaFlash(
-            'toast.message',
-            'Add at least one available product before checking out.',
-        );
+        ->assertSessionHasErrors('cart_item_ids');
 });
 
 test('checkout validation rejects a cart that is empty at submission time', function () {
@@ -46,6 +43,7 @@ test('checkout validation rejects a cart that is empty at submission time', func
     $this->actingAs($customer)
         ->from(route('checkout.index'))
         ->post(route('orders.store'), [
+            'cart_item_ids' => [PHP_INT_MAX],
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'pickup',
@@ -75,7 +73,7 @@ test('checkout renders current customer items, pickup location, and supported op
     $item = $cartService->add($customer, $product->id, 2);
     $cartService->add($otherCustomer, $otherProduct->id, 1);
 
-    $response = $this->actingAs($customer)->get(route('checkout.index'));
+    $response = $this->actingAs($customer)->get(route('checkout.index', ['cart_item_ids' => $customer->cart->items->modelKeys()]));
 
     $response->assertInertia(fn (Assert $page) => $page
         ->component('Checkout/Index')
@@ -149,7 +147,7 @@ test('checkout provides the saved default delivery address for prefill', functio
     (new CartService)->add($customer, $product->id, 1);
 
     $this->actingAs($customer)
-        ->get(route('checkout.index'))
+        ->get(route('checkout.index', ['cart_item_ids' => $customer->cart->items->modelKeys()]))
         ->assertInertia(fn (Assert $page) => $page
             ->where(
                 'customer.default_delivery_address',
@@ -174,7 +172,7 @@ test('checkout uses separately configured receiving details for each wallet', fu
     Inventory::factory()->for($product)->create(['quantity' => 2]);
     (new CartService)->add($customer, $product->id, 1);
 
-    $response = $this->actingAs($customer)->get(route('checkout.index'));
+    $response = $this->actingAs($customer)->get(route('checkout.index', ['cart_item_ids' => $customer->cart->items->modelKeys()]));
 
     $response->assertInertia(fn (Assert $page) => $page
         ->where('paymentMethods.0.payment_account', null)
@@ -218,9 +216,11 @@ test('delivery requires an address', function () {
     $this->actingAs($customer)
         ->from(route('checkout.index'))
         ->post(route('orders.store'), [
+            'cart_item_ids' => $customer->cart->items->modelKeys(),
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'delivery',
+            'delivery_destination' => 'Sagay City',
             'payment_method' => 'gcash',
             'payment_proof' => UploadedFile::fake()->image('proof.png'),
         ])
@@ -238,6 +238,7 @@ test('pickup rejects a delivery address', function () {
     $this->actingAs($customer)
         ->from(route('checkout.index'))
         ->post(route('orders.store'), [
+            'cart_item_ids' => $customer->cart->items->modelKeys(),
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'pickup',
@@ -258,9 +259,11 @@ test('delivery rejects payment methods that require paying at the store', functi
     $this->actingAs($customer)
         ->from(route('checkout.index'))
         ->post(route('orders.store'), [
+            'cart_item_ids' => $customer->cart->items->modelKeys(),
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'delivery',
+            'delivery_destination' => 'Sagay City',
             'delivery_address' => 'Sagay City, Negros Occidental',
             'payment_method' => $paymentMethod,
         ])
@@ -278,6 +281,7 @@ test('gcash and maya require payment proof', function (string $paymentMethod) {
     $this->actingAs($customer)
         ->from(route('checkout.index'))
         ->post(route('orders.store'), [
+            'cart_item_ids' => $customer->cart->items->modelKeys(),
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'pickup',
@@ -297,6 +301,7 @@ test('cash and card at store reject online payment proof', function (string $pay
     $this->actingAs($customer)
         ->from(route('checkout.index'))
         ->post(route('orders.store'), [
+            'cart_item_ids' => $customer->cart->items->modelKeys(),
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'pickup',
@@ -317,6 +322,7 @@ test('payment proof must be a supported image no larger than five megabytes', fu
     $this->actingAs($customer)
         ->from(route('checkout.index'))
         ->post(route('orders.store'), [
+            'cart_item_ids' => $customer->cart->items->modelKeys(),
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'pickup',
@@ -346,6 +352,7 @@ test('all eligible fulfillment and payment combinations place an order', functio
     $inventory = Inventory::factory()->for($product)->create(['quantity' => 3]);
     $item = (new CartService)->add($customer, $product->id, 2);
     $payload = [
+        'cart_item_ids' => $customer->cart->items->modelKeys(),
         'recipient_name' => 'Alex Customer',
         'contact_number' => '09171234567',
         'fulfillment_method' => $fulfillmentMethod,
@@ -354,6 +361,7 @@ test('all eligible fulfillment and payment combinations place an order', functio
 
     if ($fulfillmentMethod === 'delivery') {
         $payload['delivery_address'] = 'Sagay City, Negros Occidental';
+        $payload['delivery_destination'] = 'Sagay City';
     }
 
     if ($requiresProof) {
@@ -399,6 +407,7 @@ test('checkout rechecks current stock on submission', function () {
     $this->actingAs($customer)
         ->from(route('checkout.index'))
         ->post(route('orders.store'), [
+            'cart_item_ids' => $customer->cart->items->modelKeys(),
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'pickup',
@@ -426,10 +435,12 @@ test('a checkout override is snapshotted without changing the profile default', 
 
     $this->actingAs($customer)
         ->post(route('orders.store'), [
+            'cart_item_ids' => $customer->cart->items->modelKeys(),
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'delivery',
             'delivery_address' => '99 Lopez Jaena Street, Sagay City',
+            'delivery_destination' => 'Sagay City',
             'payment_method' => 'gcash',
             'payment_proof' => UploadedFile::fake()->image('proof.png'),
         ])
@@ -460,6 +471,7 @@ test('pickup ignores the saved default delivery address', function () {
 
     $this->actingAs($customer)
         ->post(route('orders.store'), [
+            'cart_item_ids' => $customer->cart->items->modelKeys(),
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'pickup',

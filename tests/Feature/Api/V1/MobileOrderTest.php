@@ -92,7 +92,7 @@ test('mobile detail uses persisted prices shared status labels and safe payment 
         ->assertExactJson(['data' => app(CustomerOrderPresenter::class)->detail(
             app(CustomerOrderRepository::class)->find($customer, $order->id),
         )])
-        ->assertJsonPath('data.status.label', 'Preparing for delivery')
+        ->assertJsonPath('data.status.label', 'Processing')
         ->assertJsonPath('data.items.0.unit_price', '10.15')
         ->assertJsonPath('data.items.0.line_total', '20.30')
         ->assertJsonPath('data.payment.can_resubmit_proof', true)

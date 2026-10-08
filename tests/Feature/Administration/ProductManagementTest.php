@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ShippingProfile;
 use App\Models\Category;
 use App\Models\Inventory;
 use App\Models\Product;
@@ -493,13 +494,13 @@ test('product images reject invalid file types and files larger than 5 MB', func
     ],
 ]);
 
-test('administrators can update product details and synchronize tags', function () {
+test('administrators can update product details and synchronize tags while preserving shipping assignments', function () {
     $administrator = User::factory()->administrator()->create();
     $oldCategory = Category::factory()->create();
     $newCategory = Category::factory()->inactive()->create();
     $oldTag = Tag::factory()->create();
     $newTag = Tag::factory()->create();
-    $product = Product::factory()->for($oldCategory)->inactive()->create([
+    $product = Product::factory()->for($oldCategory)->inactive()->bulky()->create([
         'name' => 'Old product name',
     ]);
     $product->tags()->attach($oldTag);
@@ -516,6 +517,7 @@ test('administrators can update product details and synchronize tags', function 
             'discount_price' => null,
             'is_featured' => false,
             'is_active' => true,
+            'shipping_profile' => 'standard',
             'tag_ids' => [$newTag->id],
         ]);
 
@@ -526,6 +528,7 @@ test('administrators can update product details and synchronize tags', function 
     expect($product->name)->toBe('Updated product name')
         ->and($product->category->is($newCategory))->toBeTrue()
         ->and($product->is_active)->toBeFalse()
+        ->and($product->shipping_profile)->toBe(ShippingProfile::Bulky)
         ->and($product->tags->modelKeys())->toBe([$newTag->id]);
     $this->assertDatabaseMissing('product_tag', [
         'product_id' => $product->id,

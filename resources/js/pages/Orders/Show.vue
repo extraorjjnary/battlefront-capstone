@@ -16,6 +16,7 @@ import {
 import OrderController from '@/actions/App/Http/Controllers/OrderController';
 import OrderPaymentProofController from '@/actions/App/Http/Controllers/OrderPaymentProofController';
 import InputError from '@/components/InputError.vue';
+import ShipmentTracking from '@/components/ShipmentTracking.vue';
 import ProductImage from '@/components/catalog/ProductImage.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -145,6 +146,8 @@ function submitReplacementProof() {
                 </div>
             </section>
 
+            <ShipmentTracking v-if="order.shipment" :shipment="order.shipment" :quote="order.delivery_quote" />
+
             <div
                 class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_23rem] xl:items-start"
             >
@@ -235,6 +238,16 @@ function submitReplacementProof() {
                                 Order total
                             </h2>
                         </div>
+                        <dl v-if="order.product_subtotal !== null" class="mt-5 grid gap-3 text-sm">
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-muted-foreground">Product subtotal</dt>
+                                <dd class="font-semibold tabular-nums">{{ formatCurrency(order.product_subtotal) }}</dd>
+                            </div>
+                            <div class="flex justify-between gap-4">
+                                <dt class="text-muted-foreground">Delivery fee</dt>
+                                <dd class="font-semibold tabular-nums">{{ formatCurrency(order.delivery_fee) }}</dd>
+                            </div>
+                        </dl>
                         <p class="mt-5 text-3xl font-bold tabular-nums">
                             {{ formatCurrency(order.total) }}
                         </p>
@@ -242,6 +255,13 @@ function submitReplacementProof() {
                             Based on the prices recorded when this order was
                             placed.
                         </p>
+                        <div v-if="order.delivery_quote && !order.shipment" class="border-border mt-5 grid gap-2 border-t pt-4 text-sm">
+                            <p class="font-semibold">{{ order.delivery_quote.carrier.toUpperCase() }} · {{ order.delivery_quote.destination }}</p>
+                            <p>{{ order.delivery_quote.packing_expectation }}</p>
+                            <p>Estimated preparation and transit: {{ order.delivery_quote.eta_min_days }}<template v-if="order.delivery_quote.eta_min_days !== order.delivery_quote.eta_max_days">–{{ order.delivery_quote.eta_max_days }}</template> calendar days.</p>
+                            <p class="text-muted-foreground text-xs leading-5">{{ order.delivery_quote.notice }}</p>
+                            <p v-if="order.delivery_quote.is_demo" class="text-muted-foreground text-xs leading-5">{{ order.delivery_quote.assumption_label }}</p>
+                        </div>
                     </section>
 
                     <section
@@ -313,6 +333,12 @@ function submitReplacementProof() {
                                         class="text-muted-foreground mt-1 text-sm leading-5"
                                     >
                                         {{ order.fulfillment.delivery_address }}
+                                    </dd>
+                                    <dd
+                                        v-if="order.fulfillment.value === 'delivery' && order.fulfillment.delivery_destination"
+                                        class="text-muted-foreground mt-1 text-sm leading-5"
+                                    >
+                                        {{ order.fulfillment.delivery_destination }}
                                     </dd>
                                 </div>
                             </div>

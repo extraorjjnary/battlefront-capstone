@@ -11,6 +11,11 @@ use InvalidArgumentException;
 
 class CustomerOrderPresenter
 {
+    public function __construct(
+        private readonly DeliveryQuotePresenter $deliveryQuotePresenter,
+        private readonly ShipmentPresenter $shipmentPresenter,
+    ) {}
+
     /**
      * Build a compact order record for the customer history.
      *
@@ -51,6 +56,10 @@ class CustomerOrderPresenter
     public function detail(Order $order): array
     {
         return [
+            'product_subtotal' => $order->product_subtotal,
+            'delivery_fee' => $order->delivery_fee,
+            'delivery_quote' => $this->deliveryQuotePresenter->stored($order),
+            'shipment' => $this->shipmentPresenter->detail($order),
             'id' => $order->id,
             'reference' => $order->reference,
             'created_at' => $order->created_at->toIso8601String(),
@@ -63,6 +72,7 @@ class CustomerOrderPresenter
                 'value' => $order->fulfillment_method->value,
                 'label' => $order->fulfillment_method->label(),
                 'delivery_address' => $order->delivery_address,
+                'delivery_destination' => $order->delivery_destination,
             ],
             'payment' => [
                 'method' => [

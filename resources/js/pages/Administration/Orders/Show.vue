@@ -19,7 +19,10 @@ import OrderController from '@/actions/App/Http/Controllers/Administration/Order
 import OrderPaymentProofController from '@/actions/App/Http/Controllers/Administration/OrderPaymentProofController';
 import OrderPaymentStatusController from '@/actions/App/Http/Controllers/Administration/OrderPaymentStatusController';
 import OrderStatusController from '@/actions/App/Http/Controllers/Administration/OrderStatusController';
+import OrderShipmentStatusController from '@/actions/App/Http/Controllers/Administration/OrderShipmentStatusController';
+import OrderShipmentReferenceController from '@/actions/App/Http/Controllers/Administration/OrderShipmentReferenceController';
 import InputError from '@/components/InputError.vue';
+import ShipmentTracking from '@/components/ShipmentTracking.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -33,6 +36,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import {
     Select,
     SelectContent,
@@ -53,6 +57,9 @@ const selectedOrderStatus = ref('');
 const orderConfirmationOpen = ref(false);
 const paymentConfirmationOpen = ref(false);
 const orderStatusForm = useForm({ status: '' });
+const shipmentConfirmationOpen = ref(false);
+const shipmentStatusForm = useForm({ status: '', tracking_reference: null });
+const shipmentReferenceForm = useForm({ tracking_reference: props.order.shipment?.tracking_reference ?? '' });
 const paymentStatusForm = useForm({
     payment_status: '',
     manual_verification_confirmed: false,
@@ -128,6 +135,37 @@ function submitOrderStatus() {
         onError: () => {
             orderConfirmationOpen.value = false;
         },
+    });
+}
+
+function requestShipmentUpdate() {
+    const next = props.order.shipment_actions?.next_status;
+    if (!next || shipmentStatusForm.processing) {
+        return;
+    }
+    shipmentStatusForm.status = next.value;
+    if (next.value === 'delivered') {
+        shipmentConfirmationOpen.value = true;
+        return;
+    }
+    submitShipmentStatus();
+}
+
+function submitShipmentStatus() {
+    shipmentStatusForm.submit(OrderShipmentStatusController.update(props.order.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            shipmentConfirmationOpen.value = false;
+            shipmentStatusForm.reset();
+            shipmentReferenceForm.tracking_reference = props.order.shipment?.tracking_reference ?? '';
+        },
+        onError: () => { shipmentConfirmationOpen.value = false; },
+    });
+}
+
+function submitShipmentReference() {
+    shipmentReferenceForm.submit(OrderShipmentReferenceController.update(props.order.id), {
+        preserveScroll: true,
     });
 }
 
@@ -244,6 +282,7 @@ defineOptions({
             class="grid gap-8 xl:grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.8fr)]"
         >
             <div class="flex min-w-0 flex-col gap-8">
+                <ShipmentTracking v-if="order.shipment" :shipment="order.shipment" :quote="order.delivery_quote" />
                 <section aria-labelledby="processing-details-heading">
                     <div class="mb-4">
                         <p class="text-muted-foreground text-sm">
@@ -325,6 +364,12 @@ defineOptions({
                                             'Not applicable for store pickup'
                                         }}
                                     </p>
+                                    <p
+                                        v-if="order.fulfillment.value === 'delivery' && order.fulfillment.delivery_destination"
+                                        class="text-muted-foreground mt-1 text-sm"
+                                    >
+                                        {{ order.fulfillment.delivery_destination }}
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -332,7 +377,7 @@ defineOptions({
                 </section>
 
                 <section aria-labelledby="order-items-heading">
-                    <div class="mb-4 flex items-end justify-between gap-4">
+                    <div class="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                         <div>
                             <p class="text-muted-foreground text-sm">
                                 {{ order.total_quantity }} units across
@@ -345,9 +390,26 @@ defineOptions({
                                 Purchase-time item ledger
                             </h2>
                         </div>
-                        <p class="font-semibold tabular-nums">
-                            {{ formatCurrency(order.total) }}
-                        </p>
+                        <dl class="grid grid-cols-3 gap-4 text-sm sm:text-right">
+                            <div>
+                                <dt class="text-muted-foreground">Product subtotal</dt>
+                                <dd class="mt-1 font-semibold tabular-nums">
+                                    {{ order.product_subtotal === null ? 'Not recorded' : formatCurrency(order.product_subtotal) }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-muted-foreground">Delivery fee</dt>
+                                <dd class="mt-1 font-semibold tabular-nums">
+                                    {{ formatCurrency(order.delivery_fee) }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-muted-foreground">Final total</dt>
+                                <dd class="mt-1 font-semibold tabular-nums">
+                                    {{ formatCurrency(order.total) }}
+                                </dd>
+                            </div>
+                        </dl>
                     </div>
 
                     <div
@@ -393,6 +455,53 @@ defineOptions({
             </div>
 
             <aside class="flex flex-col gap-6" aria-label="Order actions">
+                <section v-if="order.shipment" class="border-border bg-card grid gap-4 border p-5" aria-label="Shipment actions">
+                    <h2 class="font-semibold">Manual shipment actions</h2>
+                    <template v-if="order.shipment_actions?.next_status">
+                        <div v-if="order.shipment_actions.next_status.value === 'handed_to_lbc'" class="grid gap-2">
+                            <Label for="handoff-reference">Real LBC tracking / reference (optional)</Label>
+                            <Input id="handoff-reference" v-model="shipmentStatusForm.tracking_reference" maxlength="255" />
+                            <p class="text-muted-foreground text-xs">Leave blank unless LBC has supplied a real value.</p>
+                            <InputError :message="shipmentStatusForm.errors.tracking_reference" />
+                        </div>
+                        <Button type="button" :disabled="shipmentStatusForm.processing || shipmentReferenceForm.processing" @click="requestShipmentUpdate">
+                            <Spinner v-if="shipmentStatusForm.processing" />
+                            Mark {{ order.shipment_actions.next_status.label }}
+                        </Button>
+                    </template>
+                    <p v-else-if="['pending', 'processing'].includes(order.status.value) && !['delivered', 'cancelled'].includes(order.shipment.status.value)" class="text-muted-foreground text-sm leading-5">
+                        Verify payment and move the order to Processing before advancing shipment milestones.
+                    </p>
+                    <p v-else class="text-muted-foreground text-sm">Shipment progression is closed for this order.</p>
+                    <InputError :message="shipmentStatusForm.errors.status" />
+
+                    <form v-if="order.shipment_actions?.can_update_reference" class="border-border grid gap-3 border-t pt-4" @submit.prevent="submitShipmentReference">
+                        <Label for="shipment-reference">LBC tracking / reference</Label>
+                        <Input id="shipment-reference" v-model="shipmentReferenceForm.tracking_reference" maxlength="255" />
+                        <p class="text-muted-foreground text-xs">Enter only a supplied reference. Clear the field to remove an incorrect value.</p>
+                        <InputError :message="shipmentReferenceForm.errors.tracking_reference" />
+                        <Button type="submit" variant="outline" :disabled="shipmentReferenceForm.processing || shipmentStatusForm.processing">
+                            <Spinner v-if="shipmentReferenceForm.processing" />
+                            Save reference
+                        </Button>
+                    </form>
+
+                    <Dialog v-model:open="shipmentConfirmationOpen">
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Mark {{ order.reference }} delivered?</DialogTitle>
+                                <DialogDescription>Confirm the delivery has finished. This completes the order and records its sale.</DialogDescription>
+                            </DialogHeader>
+                            <DialogFooter>
+                                <DialogClose as-child><Button type="button" variant="outline">Keep out for delivery</Button></DialogClose>
+                                <Button type="button" :disabled="shipmentStatusForm.processing" @click="submitShipmentStatus">
+                                    <Spinner v-if="shipmentStatusForm.processing" />
+                                    Confirm delivered
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                </section>
                 <section class="border-border bg-card border p-5">
                     <div class="flex items-start gap-3">
                         <ShieldCheck

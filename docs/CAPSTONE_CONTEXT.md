@@ -385,13 +385,13 @@ The product-only monthly Holt–Winters forecasting controller/service/requests/
 - Products have required unique product codes, nullable brands, tags, regular/optional discount prices, and managed image paths. Existing catalog import/image tools support catalog preparation; they are not historical-sales import or forecasting features.
 - Live inventory is Sagay-only, with one inventory record per product rather than per-branch stock. Missing or zero stock prevents purchasing and recommendations; out-of-stock products can still appear in the active catalog.
 - Quantities cannot be negative. Low stock means positive quantity strictly below `reorder_level`; zero stock is a separate out-of-stock state. Customer API catalog responses expose availability status rather than exact quantities.
-- Cart operations use current server prices and stock eligibility. Adding to a cart does not reserve or deduct stock; checkout revalidates the entire cart.
+- Cart operations use current server prices and stock eligibility. Adding to a cart does not reserve or deduct stock; checkout revalidates only explicitly selected owned cart items (EXT-91).
 
 ## Current Order, Payment, and Sales Rules
 
-- Pickup accepts `cash`, `card_at_store`, `gcash`, and `maya`. Delivery accepts only GCash/Maya and requires a delivery address; pickup prohibits a nonempty delivery address.
+- Pickup accepts `cash`, `card_at_store`, `gcash`, and `maya`. Delivery accepts only GCash/Maya and requires one supported canonical destination plus a separate detailed delivery address; pickup prohibits nonempty destination/address values, saves zero delivery fee and creates no Shipment.
 - GCash/Maya require an uploaded JPEG/JPG, PNG, or WebP proof image of at most 5 MB. Cash/card-at-store prohibit proof uploads. Proof is private and accessible through authorized administrator routes, never public storage URLs or mobile proof downloads.
-- `OrderPlacementService` locks and rechecks customer/cart, catalog, and stock data. It snapshots recipient/contact/fulfillment, item quantities and current effective prices, creates a pending order/payment, deducts stock, and consumes the cart in one transaction. Failed placement rolls back database changes and cleans up newly stored proof.
+- `OrderPlacementService` locks and rechecks customer/cart, catalog, and stock data. It snapshots recipient/contact/fulfillment, item quantities and current effective prices, creates a pending order/payment, deducts selected stock, and removes only purchased cart items in one transaction. Unselected items remain; the cart container is removed only when empty. Failed placement rolls back database changes and cleans up newly stored proof.
 - Client totals and prices are not authoritative. Later payment verification or processing must not deduct stock again. The API has no idempotency-key contract; after an uncertain placement response, inspect order history before retrying.
 - Administrator transitions are `pending -> processing/cancelled` and `processing -> completed/cancelled`; completed/cancelled are terminal. Both processing and completion require verified payment.
 - Payment decisions are manual: pending becomes verified or rejected. Wallet verification requires accessible evidence and the administrator's payment-account/platform cross-check; uploading proof alone never verifies payment. Configured demo payment accounts must remain clearly identified as demo data.
@@ -658,6 +658,7 @@ Current migrations/models implement the following core entities:
 - Cart Items
 - Orders
 - Order Items
+- Shipments (EXT-87 persistence and EXT-89 manual workflow)
 - Sales
 - Forecasts
 - Chatbot Knowledge
@@ -677,6 +678,7 @@ Implemented relationships include:
 - Cart Items and Products;
 - Orders and Order Items;
 - Order Items and Products;
+- Orders and Shipments through one unique `shipments.order_id` for quoted delivery orders;
 - Orders and Sales;
 - Products and Forecasts.
 
@@ -710,7 +712,9 @@ Subsequent implemented schema/commerce decisions include:
 - the proof column is nullable for non-wallet orders, while checkout requires private proof for GCash/Maya and prohibits it for cash/card-at-store;
 - rejected wallet payments carry customer-facing rejection feedback and allow eligible proof replacement;
 - users have profile delivery-address and appearance fields; products have unique product codes, nullable brands, import tracking, and `image_path` rather than the former image URL field;
+- EXT-86 adds the enum-cast `products.shipping_profile` string field (`standard`, `fragile`, `bulky`), defaulting existing and new products to `standard`. This persisted field is the sole assignment source; category changes do not infer handling. Server-side catalog preparation must explicitly assign fragile/bulky products. Current import and admin forms preserve assignments but do not offer profile editing. Rolling back the profile migration removes those assignments;
 - checkout validation, transactional placement, manual payment decisions, initial stock deduction, explicit cancellation restoration, and completed-order sales recording are implemented, as described in Section 7.
+- EXT-87 adds immutable commercial snapshots on Order and a separate Shipment fulfillment snapshot. Historical order totals remain unchanged; historical subtotal/quote fields stay nullable and delivery fee defaults to zero. No historical shipment or quote is reconstructed. See the delivery persistence contract below.
 
 ---
 
@@ -755,6 +759,89 @@ The system supports:
 - pickup and delivery fulfillment, with recipient and contact snapshots on the order.
 
 Actual delivery continues through Battlefront's existing business processes.
+
+### Configured Delivery Rules — EXT-86
+
+The reusable Laravel `DeliveryRules` service reads `battlefront.delivery` configuration. These are **Battlefront-configured capstone/demo assumptions, not official LBC rates**. Sagay City is the fixed operational origin for the approved table; runtime does not calculate distance or use coordinates, Google Maps, geocoding, routing, or courier APIs.
+
+| Destination | Base fee (PHP) | Transit days |
+| --- | --- | --- |
+| Sagay City | 80.00 | 0–1 |
+| Escalante City | 100.00 | 1 |
+| Cadiz City | 120.00 | 1 |
+| Toboso | 140.00 | 1 |
+| Manapla | 160.00 | 1 |
+| Calatrava | 180.00 | 1 |
+| Victorias City | 180.00 | 1 |
+| E.B. Magalona | 200.00 | 1–2 |
+| San Carlos City | 220.00 | 1–2 |
+| Silay City | 220.00 | 1–2 |
+| Talisay City | 240.00 | 1–2 |
+| Bacolod City | 250.00 | 1–2 |
+
+| Shipping profile | Handling surcharge (PHP) | Preparation days |
+| --- | --- | --- |
+| standard | 0.00 | 1 |
+| fragile | 50.00 | 2 |
+| bulky | 100.00 | 3 |
+
+Priority is explicitly `standard < fragile < bulky`. Delivery fee is the destination base fee plus the highest applicable surcharge **once**, regardless of cart line count or quantity. Money remains two-decimal strings, added with BCMath at scale 2. Relative ETA minimum/maximum is the selected profile's preparation days plus the destination transit minimum/maximum; no date anchor, holiday policy, or guaranteed courier arrival is implied. Zero transit days means same-day transit once preparation is ready. Revised transit assumptions apply to new quotes only; persisted order/shipment snapshots retain their original values. A forward compatibility migration allows non-negative transit minima while preserving the other shipment snapshot constraints and existing rows.
+
+`DeliveryRules::destinations()` lists canonical names and rules; `destination()` rejects unsupported names with `DomainException`. `handling()` accepts a `ShippingProfile`, and `highestProfile()` reads an iterable of server-loaded Products. `quote()` accepts a `FulfillmentMethod`, optional canonical destination name, and those Products; callers cannot supply fee, preparation, surcharge, or ETA values. Quotes include origin, demo identification, selected profile, fee components, and day ranges. Destination lookup is exact and never parses a free-text address. Empty delivery product lists or products lacking a loaded profile raise `InvalidArgumentException`. Pickup returns no delivery quote before destination or product evaluation.
+
+EXT-86 implements the rule layer and product assignment field only. EXT-87 supplies quote snapshot/shipment persistence, and EXT-88 applies the rules through shared web/mobile checkout and strict delivery placement. EXT-89 adds manual shipment progression and customer tracking. EXT-90 now supplies shared database notifications and optional customer Expo push; live courier/GPS tracking remains outside scope.
+
+### Delivery Snapshot and Shipment Persistence — EXT-87
+
+`OrderPlacementService::executeWithDeliveryQuote()` accepts validated checkout data plus a supported canonical destination, and requires delivery fulfillment. It generates one authoritative EXT-86 quote from the locked current products and persists the order, items, shipment, initial stock deduction, and cart consumption in the existing retried transaction. Shipment creation failure rolls back all of those database changes. No caller-supplied fees or estimates are accepted, and no external mapping/courier API is called.
+
+Order owns `delivery_destination`, `delivery_base_fee`, `shipping_profile`, `handling_surcharge`, `delivery_fee`, and `product_subtotal`; existing `total_amount` is the final total, calculated as subtotal plus delivery fee using BCMath at scale 2. All money columns use DECIMAL(12,2) and decimal-string casts. Order also stores `delivery_origin_city`, `delivery_is_demo`, and `delivery_assumption_label` so historical demo assumptions retain their original context. Snapshot values are not re-read from current configuration or product profiles.
+
+Shipment owns the configured manual carrier (`battlefront.delivery.carrier`, initially `lbc`), its separate enum-cast status, and `preparation_days`, `transit_min_days`, `transit_max_days`, `eta_min_days`, and `eta_max_days`. It reads the immutable handling profile through its Order relationship rather than copying that profile into a second column. The unique order foreign key permits one Shipment per quoted delivery order and restricts deletion of its owning order. Shipment model persistence rejects pickup and unquoted legacy orders and protects ownership, carrier, and relative ETA context from subsequent edits.
+
+Initial status is **`awaiting_preparation`** while order/payment are pending. It means only that the shipment record exists; it does not imply packing or dispatch. Payment decisions, order processing and proof resubmission do not advance shipments. EXT-89 now coordinates shipment delivery/order completion and cancellation through the existing service workflow. Sales continue using the persisted final `Order.total_amount`.
+
+`tracking_reference`, `handed_to_carrier_at`, and `delivered_at` remain nullable until the manual workflow records the relevant data. EXT-87 itself introduced no calendar anchor or timeline; EXT-89's operational estimates and milestones are described below. Shipment creation/update timestamps never substitute for preparation or delivery dates. There are no GPS/location, status-note, or notification fields.
+
+Pickup placement saves its product subtotal and zero delivery fee and creates no Shipment. EXT-88 now routes all web/mobile delivery submissions through `OrderPlacementService::executeWithDeliveryQuote()` using the validated canonical destination. The original `execute()` compatibility entrypoint remains available internally and serves pickup; it is no longer the customer delivery HTTP path. A free-text address is never parsed or treated as a configured zone. Existing pre-revision orders remain readable with their original totals and nullable unknown snapshot fields.
+
+Eloquent update guards protect placed commercial snapshots; database constraints validate quote completeness, non-negative amounts, monetary consistency, allowed profile/status values, and relative ETA consistency. Snapshot mutation must not bypass model guards through query-builder updates. Migration rollback refuses to discard saved delivery quotes or shipments; preserve historical data and use a forward migration instead. Opt-in order snapshot and shipment factories use DeliveryRules without changing existing fixture defaults or seeding operational shipments.
+
+EXT-88 implements shared checkout/API quoting and wiring; EXT-89 implements shipment controls, transitions, operational shipment date anchoring, and customer tracking views; EXT-90 owns notifications. None of those behaviors is implemented by EXT-87 itself.
+
+### Shared Delivery Checkout — EXT-88
+
+`PrepareCheckout` obtains quotes from EXT-86 for the authenticated customer's current ready selected cart items and all 12 supported destinations. Existing GET checkout endpoints need no destination query parameter. Web props add `deliveryQuotes` and `pickupQuote`; API checkout exposes the equivalent `delivery_quotes` and `pickup_quote` inside the existing `data` envelope. Clients select exactly one quote's canonical destination without computing fees, profiles, ETA or totals. The pickup quote shows product subtotal, zero delivery fee and unchanged final total.
+
+Delivery quotes include origin/destination, profile, base fee, handling surcharge, delivery fee, preparation/transit/total day ranges, configured carrier, packing expectation, demo assumptions, product subtotal, final `total`, and estimate notice. Highest-profile surcharge applies once per selected checkout irrespective of quantity/line count. Subtotal and final total remain two-decimal BCMath values. The web checkout preserves the recipient/fulfillment/payment flow, requires explicit destination selection alongside the separate address, and shows the selected server quote before placement/payment.
+
+**Checkout calendar anchor:** one server quote-generation date in `config('app.timezone')` (currently UTC), taken once for all quotes in a response. Add EXT-86 minimum/maximum total days as calendar days; apply no weekend/holiday adjustment. Expose `eta_anchor_date`, `eta_timezone`, `estimated_delivery_start` and `estimated_delivery_end` as civil dates/timezone. These windows are checkout-only provisional presentation, not persisted shipment dates. Display LBC as the configured/manual carrier and state: “Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification.” Demo assumptions remain identified.
+
+`ValidateCheckoutRequest` requires a scalar configured `delivery_destination` for delivery and prohibits nonempty destination/address values for pickup. Missing, unsupported, noncanonical/wrong-case and array inputs fail with destination validation errors. The explicit checkout input allowlist ignores supplied prices, surcharge, profile, relative ETA, calendar dates, subtotal/final total and nested quotes. `PlaceCustomerOrder` calls EXT-87's strict entrypoint for delivery and its existing pickup entrypoint otherwise. Placement recalculates fees and relative ETA from locked current products/configuration and retains atomic order/items/Shipment/stock/cart behavior and private proof cleanup. Quote previews never reserve stock or persist shipments.
+
+Shared customer order detail adds saved `product_subtotal`, `delivery_fee` and nullable `delivery_quote`; existing `total` remains the final total and history summaries retain their contract. The detail quote reads immutable Order/Shipment commercial/carrier/relative-ETA facts rather than current rules. It omits checkout calendar windows; legacy unknown subtotal/quote remains null. EXT-89 adds a separate nullable shipment payload and tracking panel; its persisted operational dates are distinct from EXT-88's provisional checkout windows.
+
+### Selective Cart Checkout — EXT-91
+
+The cart starts with all items selected on a fresh visit and offers per-item and Select all/deselect all controls. Selection stays in temporary Vue memory; no database flag or cross-session selection is added. Cart mutations retain surviving selected IDs. Empty selection or selected availability conflicts disable checkout; unselected unavailable items do not block checkout. The cart summary reactively displays selected line count, units and subtotal by aggregating server-provided quantities and line totals; no selection displays zero values. Checkout and placement independently recalculate authoritative selected totals.
+
+Web/API GET checkout requires explicit `cart_item_ids[]` query parameters. POST orders requires the same nonempty list of distinct positive integer IDs in `cart_item_ids` (repeated `cart_item_ids[]` multipart fields for wallets). Missing, empty, malformed or duplicate selection fails validation; there is no full-cart fallback. Shared checkout and placement resolve every ID against the customer's current cart and reject foreign, missing, removed or unavailable selected items safely. Placement revalidates current quantities, eligibility, stock and effective prices under the existing locks.
+
+Subtotal, highest shipping profile, surcharge, preparation, delivery fee, ETA and final total use selected products only. Unselected fragile/bulky items cannot influence the quote. Delivery retains one correctly snapshotted Shipment; pickup and all existing payment/proof rules remain. Purchased rows alone are removed atomically; unselected rows and quantities remain. Replaying purchased IDs cannot order the remaining cart. Cancellation restores only the saved purchased quantities.
+
+### Manual Shipment Workflow and Customer Tracking — EXT-89
+
+The dedicated shipment lifecycle is `awaiting_preparation → preparing → ready_for_dispatch → handed_to_lbc → in_transit → out_for_delivery → delivered`. Every transition requires a quoted delivery shipment, verified payment and an order explicitly in `processing`. Each administrator request advances exactly one milestone; skips, reversals, repeats and terminal transitions fail with validation errors. Payment verification and moving the order to Processing never advance a shipment implicitly.
+
+`OrderProcessingService` locks the Order before its Shipment in a retried transaction. The shipment Delivered action atomically records `delivered_at`, completes the order and invokes the existing sale action once, using the saved final total and completion date. Direct order completion is blocked for orders with shipments. Pickup and legacy delivery orders without shipments keep their existing order workflow. Eligible order cancellation retains stock restoration and atomically marks the Shipment `cancelled`; this terminal status is available only through order cancellation, including after handoff. Repeated cancellation cannot restore stock twice. Payment rejection/proof replacement remain stock-neutral and do not advance milestones.
+
+Shipment adds nullable `preparing_at`, `ready_for_dispatch_at`, `in_transit_at`, `out_for_delivery_at` and `cancelled_at`, retaining the handoff/delivery fields. At Preparing, one application-timezone calendar date anchors the saved `eta_min_days`/`eta_max_days`; `eta_anchor_date`, `eta_timezone`, `estimated_delivery_start` and `estimated_delivery_end` are persisted together and cannot subsequently change. Apply calendar days without weekend/holiday adjustments. Arrival remains an estimate, not a courier guarantee. Before preparation, expose the saved relative range and null calendar dates. Cancelling retains the original estimate as historical context.
+
+Administrator-only web PATCH routes are `administration/orders/{order}/shipment/status` and `/shipment/reference`, protected by session authentication and `access-administration`. Status accepts the approved next status and an optional real reference at handoff; reference updates accept a nullable string of at most 255 characters. References can first be supplied at handoff, then corrected or cleared during transit or after delivery. Cancelled shipments are read-only. Submitted carrier, fees, dates or other operational fields are ignored. No customer/mobile shipment mutation endpoint exists, and no customer-safe shipment note is added.
+
+Shared customer web/API order detail adds nullable `shipment`: saved carrier, labeled manual status, nullable real reference, persisted operational ETA, chronologically sorted recorded milestones, manual-tracking notice and nullable historical notice. Existing `delivery_quote`, fees and fulfillment address retain their contracts. Owning-customer queries conceal foreign orders with 404. The administrator detail reuses those facts and supplies only eligible shipment actions. Wording explicitly states that Battlefront maintains status manually and this is not live LBC/GPS tracking. No maps, invented references, external carrier calls or automatic booking are introduced.
+
+The forward migration expands existing MySQL checks/SQLite triggers without changing quote constraints or historical commercial values. Existing shipments attached to cancelled orders become `cancelled` without invented cancellation dates. Previously completed orders remain readable and read-only without reconstructing delivered milestones. Orders without shipments retain null shipment data; no historical shipments are created. Rollback refuses to discard recorded workflow or ETA data. EXT-90 adds database/in-app and optional Expo push notifications after committed milestones; browser Web Push remains outside scope.
 
 Outside scope:
 
@@ -806,6 +893,24 @@ Outside scope:
 Product recommendations remain the responsibility of the Product Recommendation Module.
 
 ---
+
+### Shared Order and Shipment Notifications — EXT-90
+
+Laravel database notifications are the authoritative account-bound history for customer web/mobile and administrator web. Existing order placement, payment review, proof replacement and shipment services publish events only after successful commit. Notification persistence runs immediately afterward; failed persistence is retried on the existing database queue. Notification or push failure cannot change a committed business outcome or trigger checkout proof cleanup. Event/recipient notification UUIDs and per-device delivery uniqueness prevent duplicate history on replay; subsequent payment-review cycles remain separate events.
+
+Customer events are payment verified/rejected, order cancelled, and shipment preparing, ready for dispatch, handed to LBC, in transit, out for delivery and delivered. All administrators receive new-order and initial/replacement wallet-proof notices. Shipment creation, reference corrections and insignificant updates are silent. Operational ETA remains immutable, so there is no ETA-revision notification. Existing shipment delivery/completion/sale consistency and cancellation restoration remain authoritative.
+
+Authenticated web headers expose a notification bell, unread count, five recent entries and a paginated history page. Individual/all-read actions update the same database state used by mobile. Customer and administrator routes retain their existing role gates, recipient/audience scoping and ownership checks on order destinations. No browser Web Push, email/SMS or courier API is introduced.
+
+The web bell polls every 30 seconds while visible through dedicated session-authenticated `notifications/summary` and `administration/notifications/summary` GET routes. Inertia's standalone `useHttp` client retrieves only unread count/five recent entries, then `replaceProp` updates only `notificationSummary`, preserving the current page, scroll and form state. This avoids re-running the current page's checkout/reporting/forecasting controller. Hidden tabs pause, slow requests cannot overlap, navigation/read actions invalidate stale responses, and identity changes/unmount cancel pending work. Unauthorized sessions stop polling. Response metadata identifies the current server user/audience; a cross-tab account mismatch clears the old summary and stops polling until the page/account is refreshed. The response is private/no-store and uses three bounded notification/owned-order queries; no page-data polling, extra mobile endpoint or dependency is added.
+
+Customer-only Sanctum endpoints add history/count/read actions and device registration/revocation under `/api/v1`. Resources expose only safe notification fields and nullable owned-order metadata, including `{screen: "order_detail", order_id}`. See the mobile API handoff and Postman collection for exact routes, examples and failure responses.
+
+Push devices are account/device scoped, support multiple devices and bind to the registering Sanctum session. Logout, token revocation/expiry or explicit device revocation stops future sends; registration must be repeated after login. Raw Expo tokens are encrypted and omitted from responses/logs; active token collisions cannot transfer another account's registration. Invalid/unregistered provider feedback deactivates only the matching registration version.
+
+Expo push is disabled by default, implemented through Laravel HTTP behind an adapter, and queued on the existing `database` connection's `notifications` queue. Persisted tickets receive delayed receipt checks; transient provider failures use bounded retries, while history stays available. Push text is generic and metadata cannot authorize order access. Accepted tickets/receipts establish provider acceptance, not phone delivery. Push can be missing or duplicated after uncertain network/process outcomes.
+
+The developer selected after-commit persistence with queue retries without a transactional outbox. A crash between business commit and notification persistence, or simultaneous persistence/queue failure, can leave history missing. Queue enqueue failures can leave pending push/receipt work unsent; sanitized diagnostics and worker failures require operator review. No historical notifications are reconstructed. Actual Expo/native consumer validation remains separate from automated backend/UI verification.
 
 # 13. Development Methodology
 
@@ -861,7 +966,7 @@ General status snapshot verified against Linear on **2026-10-01**; the forecasti
 
 ## Completed Mobile API Scope
 
-`routes/api.php` defines 25 `/api/v1` endpoints covering health, customer registration/login/logout, profile read/update, catalog search/filter/detail, branch information, cart operations, checkout preview, order placement/history/detail, rejected-proof replacement, chatbot, and recommendation feeds/interactions plus the retained criteria options/results.
+`routes/api.php` defines 31 `/api/v1` endpoints covering health, customer registration/login/logout, profile read/update, catalog search/filter/detail, branch information, cart operations, checkout preview, order placement/history/detail, rejected-proof replacement, chatbot, behavior-driven recommendation feeds/interactions, retained criteria options/results, shared notification history/read state, and Expo device registration/revocation.
 
 The mobile product list additionally supports multiple active categories (`category_ids`), inclusive effective-price bounds (`min_price`, `max_price`), and `featured`/`price_asc`/`price_desc` sorting. These parameters are enabled only for the named API product-list route; the existing Inertia web catalog keeps its singular category/brand/tag filters, search, default ordering, and scroll behavior. Both clients retain shared catalog eligibility and presentation. This extension adds no endpoints or schema changes; see the handoff for validation and pagination details. React Native consumer validation of the additions remains pending.
 

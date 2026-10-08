@@ -8,9 +8,12 @@ use App\Http\Controllers\Administration\ChatbotKnowledgePreviewController;
 use App\Http\Controllers\Administration\CustomerController;
 use App\Http\Controllers\Administration\ForecastingController;
 use App\Http\Controllers\Administration\InventoryController;
+use App\Http\Controllers\Administration\NotificationController as AdministrationNotificationController;
 use App\Http\Controllers\Administration\OrderController as AdministrationOrderController;
 use App\Http\Controllers\Administration\OrderPaymentProofController;
 use App\Http\Controllers\Administration\OrderPaymentStatusController;
+use App\Http\Controllers\Administration\OrderShipmentReferenceController;
+use App\Http\Controllers\Administration\OrderShipmentStatusController;
 use App\Http\Controllers\Administration\OrderStatusController;
 use App\Http\Controllers\Administration\ProductActivationController;
 use App\Http\Controllers\Administration\ProductController;
@@ -22,6 +25,7 @@ use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\NotificationController as CustomerNotificationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderPaymentProofController as CustomerOrderPaymentProofController;
 use App\Http\Controllers\ProductCatalogController;
@@ -91,6 +95,10 @@ Route::middleware(['auth', 'can:use-customer-cart'])
 
 // customer orders
 Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {
+    Route::get('notifications', [CustomerNotificationController::class, 'index'])->name('notifications.index');
+    Route::get('notifications/summary', [CustomerNotificationController::class, 'summary'])->name('notifications.summary');
+    Route::patch('notifications/read-all', [CustomerNotificationController::class, 'readAll'])->name('notifications.read-all');
+    Route::patch('notifications/{notification}/read', [CustomerNotificationController::class, 'update'])->whereUuid('notification')->name('notifications.update');
     Route::get('orders', [OrderController::class, 'index'])
         ->name('orders.index');
     Route::post('orders', [OrderController::class, 'store'])
@@ -113,6 +121,12 @@ Route::middleware(['auth', 'can:access-administration'])
     ->prefix('administration')
     ->name('administration.')
     ->group(function () {
+        // notifications
+        Route::get('notifications', [AdministrationNotificationController::class, 'index'])->name('notifications.index');
+        Route::get('notifications/summary', [AdministrationNotificationController::class, 'summary'])->name('notifications.summary');
+        Route::patch('notifications/read-all', [AdministrationNotificationController::class, 'readAll'])->name('notifications.read-all');
+        Route::patch('notifications/{notification}/read', [AdministrationNotificationController::class, 'update'])->whereUuid('notification')->name('notifications.update');
+
         // products
         Route::resource('products', ProductController::class)
             ->except(['destroy']);
@@ -155,6 +169,10 @@ Route::middleware(['auth', 'can:access-administration'])
             ->only(['index', 'show']);
         Route::patch('orders/{order}/status', [OrderStatusController::class, 'update'])
             ->name('orders.status.update');
+        Route::patch('orders/{order}/shipment/status', [OrderShipmentStatusController::class, 'update'])
+            ->name('orders.shipment.status.update');
+        Route::patch('orders/{order}/shipment/reference', [OrderShipmentReferenceController::class, 'update'])
+            ->name('orders.shipment.reference.update');
         Route::patch('orders/{order}/payment-status', [OrderPaymentStatusController::class, 'update'])
             ->name('orders.payment-status.update');
         Route::get('orders/{order}/payment-proof', OrderPaymentProofController::class)

@@ -13,9 +13,10 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 
 /** @return array<string, mixed> */
-function mobileCheckoutData(array $overrides = []): array
+function mobileCheckoutData(array $cartItemIds, array $overrides = []): array
 {
     return array_replace([
+        'cart_item_ids' => $cartItemIds,
         'recipient_name' => 'Mobile Customer',
         'contact_number' => '09171234567',
         'fulfillment_method' => 'pickup',
@@ -34,14 +35,16 @@ beforeEach(function () {
 
 test('mobile checkout returns shared preparation and manual payment options', function () {
     $this->seed(BranchSeeder::class);
-    $prepared = app(PrepareCheckout::class)->execute($this->customer);
+    $prepared = app(PrepareCheckout::class)->execute($this->customer, [$this->cartItem->id]);
 
-    $this->get('/api/v1/checkout')->assertOk()->assertExactJson(['data' => [
+    $this->get('/api/v1/checkout?'.http_build_query(['cart_item_ids' => [$this->cartItem->id]]))->assertOk()->assertExactJson(['data' => [
         'cart' => $prepared['cart'],
         'customer' => $prepared['customer'],
         'pickup_location' => $prepared['pickupLocation'],
         'fulfillment_methods' => $prepared['fulfillmentMethods'],
         'payment_methods' => $prepared['paymentMethods'],
+        'delivery_quotes' => $prepared['deliveryQuotes'],
+        'pickup_quote' => $prepared['pickupQuote'],
     ]])->assertJsonPath('data.cart.total', '18.66')
         ->assertJsonPath('data.customer.default_delivery_address', 'Saved address');
 
@@ -52,7 +55,7 @@ test('mobile checkout returns shared preparation and manual payment options', fu
 
 test('mobile checkout places all approved payment and fulfillment combinations', function (string $fulfillment, string $payment) {
     $wallet = in_array($payment, ['gcash', 'maya'], true);
-    $payload = mobileCheckoutData([
+    $payload = mobileCheckoutData([$this->cartItem->id], [
         'fulfillment_method' => $fulfillment,
         'payment_method' => $payment,
         'user_id' => User::factory()->customer()->create()->id,
@@ -63,13 +66,14 @@ test('mobile checkout places all approved payment and fulfillment combinations',
     ]);
     if ($fulfillment === 'delivery') {
         $payload['delivery_address'] = 'Checkout address';
+        $payload['delivery_destination'] = 'Sagay City';
     }
     if ($wallet) {
         $payload['payment_proof'] = UploadedFile::fake()->image('proof.png');
     }
 
     $response = $this->post('/api/v1/orders', $payload)->assertCreated()
-        ->assertJsonPath('data.total', '18.66')
+        ->assertJsonPath('data.total', $fulfillment === 'delivery' ? '98.66' : '18.66')
         ->assertJsonPath('data.status.value', 'pending')
         ->assertJsonPath('data.payment.status.value', 'pending')
         ->assertJsonPath('data.payment.method.value', $payment)
@@ -110,7 +114,7 @@ test('mobile checkout returns native required-field validation', function () {
 });
 
 test('mobile checkout applies shared fulfillment payment and upload validation', function (Closure $changes, string $field) {
-    $this->post('/api/v1/orders', mobileCheckoutData($changes()))
+    $this->post('/api/v1/orders', mobileCheckoutData([$this->cartItem->id], $changes()))
         ->assertUnprocessable()->assertJsonValidationErrors($field)
         ->assertJsonStructure(['message', 'errors']);
     $this->assertDatabaseCount('orders', 0);
@@ -118,10 +122,10 @@ test('mobile checkout applies shared fulfillment payment and upload validation',
     expect($this->stock->refresh()->quantity)->toBe(5)
         ->and(Storage::disk('local')->allFiles())->toBe([]);
 })->with([
-    'delivery address' => [fn () => ['fulfillment_method' => 'delivery', 'payment_method' => 'gcash', 'payment_proof' => UploadedFile::fake()->image('proof.png')], 'delivery_address'],
+    'delivery address' => [fn () => ['fulfillment_method' => 'delivery', 'delivery_destination' => 'Sagay City', 'payment_method' => 'gcash', 'payment_proof' => UploadedFile::fake()->image('proof.png')], 'delivery_address'],
     'pickup address' => [fn () => ['delivery_address' => 'Unexpected address'], 'delivery_address'],
-    'delivery cash' => [fn () => ['fulfillment_method' => 'delivery', 'delivery_address' => 'Address'], 'payment_method'],
-    'delivery card' => [fn () => ['fulfillment_method' => 'delivery', 'delivery_address' => 'Address', 'payment_method' => 'card_at_store'], 'payment_method'],
+    'delivery cash' => [fn () => ['fulfillment_method' => 'delivery', 'delivery_destination' => 'Sagay City', 'delivery_address' => 'Address'], 'payment_method'],
+    'delivery card' => [fn () => ['fulfillment_method' => 'delivery', 'delivery_destination' => 'Sagay City', 'delivery_address' => 'Address', 'payment_method' => 'card_at_store'], 'payment_method'],
     'unknown payment' => [fn () => ['payment_method' => 'paypal'], 'payment_method'],
     'missing wallet proof' => [fn () => ['payment_method' => 'gcash'], 'payment_proof'],
     'cash proof' => [fn () => ['payment_proof' => UploadedFile::fake()->image('proof.png')], 'payment_proof'],
@@ -137,9 +141,9 @@ test('mobile checkout rejects unavailable stock without orders deductions or orp
         'empty' => $this->stock->update(['quantity' => 0]),
         'insufficient' => $this->stock->update(['quantity' => 1]),
     };
-    $this->get('/api/v1/checkout')->assertUnprocessable()->assertJsonValidationErrors('cart');
+    $this->get('/api/v1/checkout?'.http_build_query(['cart_item_ids' => [$this->cartItem->id]]))->assertUnprocessable()->assertJsonValidationErrors('cart');
 
-    $this->post('/api/v1/orders', mobileCheckoutData([
+    $this->post('/api/v1/orders', mobileCheckoutData([$this->cartItem->id], [
         'payment_method' => 'gcash',
         'payment_proof' => UploadedFile::fake()->image('proof.png'),
     ]))->assertUnprocessable()->assertExactJson([
@@ -159,10 +163,10 @@ test('mobile checkout rejects unavailable stock without orders deductions or orp
 })->with(['inactive', 'category', 'missing', 'empty', 'insufficient']);
 
 test('mobile order retries cannot place or deduct twice after cart consumption', function () {
-    $this->postJson('/api/v1/orders', mobileCheckoutData())->assertCreated();
-    $this->postJson('/api/v1/orders', mobileCheckoutData())->assertUnprocessable()
+    $this->postJson('/api/v1/orders', mobileCheckoutData([$this->cartItem->id]))->assertCreated();
+    $this->postJson('/api/v1/orders', mobileCheckoutData([$this->cartItem->id]))->assertUnprocessable()
         ->assertJsonPath('errors.cart', ['Add at least one available product before placing an order.']);
-    $this->get('/api/v1/checkout')->assertUnprocessable()->assertJsonValidationErrors('cart');
+    $this->get('/api/v1/checkout?'.http_build_query(['cart_item_ids' => [$this->cartItem->id]]))->assertUnprocessable()->assertJsonValidationErrors('cart');
     $this->assertDatabaseCount('orders', 1);
     expect($this->stock->refresh()->quantity)->toBe(3);
 });
@@ -179,7 +183,7 @@ test('mobile placement rolls back stock order and cart on a later line failure a
     config(['app.debug' => false]);
 
     try {
-        $this->post('/api/v1/orders', mobileCheckoutData([
+        $this->post('/api/v1/orders', mobileCheckoutData([$this->cartItem->id, $secondItem->id], [
             'payment_method' => 'gcash',
             'payment_proof' => UploadedFile::fake()->image('proof.png'),
         ]))->assertInternalServerError()->assertExactJson(['message' => 'Server Error']);

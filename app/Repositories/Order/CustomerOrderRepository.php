@@ -40,6 +40,15 @@ class CustomerOrderRepository
                 'contact_number',
                 'fulfillment_method',
                 'delivery_address',
+                'product_subtotal',
+                'delivery_fee',
+                'delivery_destination',
+                'delivery_base_fee',
+                'shipping_profile',
+                'handling_surcharge',
+                'delivery_origin_city',
+                'delivery_is_demo',
+                'delivery_assumption_label',
                 'total_amount',
                 'status',
                 'payment_status',
@@ -50,6 +59,7 @@ class CustomerOrderRepository
                 'created_at',
             ])
             ->with([
+                'shipment',
                 'items' => fn ($query) => $query
                     ->select(['id', 'order_id', 'product_id', 'quantity', 'price_at_time'])
                     ->orderBy('id'),

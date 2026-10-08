@@ -4,9 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Actions\Cart\CheckoutUnavailableException;
 use App\Actions\Checkout\PrepareCheckout;
+use App\Http\Requests\CheckoutPreviewRequest;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -16,14 +16,14 @@ class CheckoutController extends Controller
      * Display checkout for the authenticated customer's ready cart.
      */
     public function index(
-        Request $request,
+        CheckoutPreviewRequest $request,
         PrepareCheckout $prepareCheckout,
     ): Response|RedirectResponse {
         /** @var User $customer */
         $customer = $request->user();
 
         try {
-            $checkout = $prepareCheckout->execute($customer);
+            $checkout = $prepareCheckout->execute($customer, $request->cartItemIds());
         } catch (CheckoutUnavailableException $exception) {
             Inertia::flash('toast', [
                 'type' => 'error',

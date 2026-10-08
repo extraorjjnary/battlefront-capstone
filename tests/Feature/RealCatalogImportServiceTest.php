@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ShippingProfile;
 use App\Models\CartItem;
 use App\Models\Category;
 use App\Models\Inventory;
@@ -138,7 +139,7 @@ test('dry run validates complete images and verified details without changing pr
     }
 });
 
-test('reimport updates the verified reorder level without resetting existing quantity', function () {
+test('reimport updates the verified reorder level without resetting quantity or shipping profile', function () {
     Storage::fake('public');
     $manifest = realCatalogManifest();
     $mapping = realCatalogMapping();
@@ -146,6 +147,8 @@ test('reimport updates the verified reorder level without resetting existing qua
     try {
         $first = app(RealCatalogImportService::class)->execute($mapping, $manifest);
         $product = Product::query()->where('product_code', '00123')->firstOrFail();
+        expect($product->shipping_profile)->toBe(ShippingProfile::Standard);
+        $product->update(['shipping_profile' => ShippingProfile::Fragile]);
         $product->inventory()->update(['quantity' => 2, 'reorder_level' => 7]);
         $administratorProduct = Product::factory()->create();
         $administratorInventory = $administratorProduct->inventory()->create([
@@ -162,6 +165,7 @@ test('reimport updates the verified reorder level without resetting existing qua
             ->and($product->category->name)->toBe('Graphics Card')
             ->and($product->inventory->quantity)->toBe(2)
             ->and($product->inventory->reorder_level)->toBe(3)
+            ->and($product->shipping_profile)->toBe(ShippingProfile::Fragile)
             ->and($product->tags->pluck('name')->sort()->values()->all())->toBe(['Gaming', 'Mid-Range', 'Productivity']);
         expect($administratorInventory->refresh()->quantity)->toBe(9);
         expect($administratorInventory->reorder_level)->toBe(4);
@@ -296,7 +300,7 @@ test('import preserves existing products and their order and cart history', func
     ]);
     $cartProduct = Product::factory()->for($category)->create(['name' => 'Crucial Archive SATA SSD']);
     foreach ([$orderedProduct, $cartProduct] as $existingProduct) {
-        Inventory::factory()->for($existingProduct)->create();
+        Inventory::factory()->for($existingProduct)->create(['quantity' => 10]);
     }
     $orderItem = OrderItem::factory()->for($orderedProduct)->create(['quantity' => 2, 'price_at_time' => '100.00']);
     $cartItem = CartItem::factory()->for($cartProduct)->create();

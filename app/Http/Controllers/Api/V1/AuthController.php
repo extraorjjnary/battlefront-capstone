@@ -7,6 +7,7 @@ use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\RegisterRequest;
 use App\Http\Resources\Api\V1\CustomerProfileResource;
+use App\Models\PushDevice;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\JsonResponse;
@@ -56,6 +57,10 @@ class AuthController extends Controller
 
     public function logout(Request $request): Response
     {
+        PushDevice::query()
+            ->where('user_id', $request->user()->getAuthIdentifier())
+            ->where('personal_access_token_id', $request->user()->currentAccessToken()->id)
+            ->update(['is_active' => false, 'expo_push_token' => null, 'token_hash' => null, 'updated_at' => now()]);
         $request->user()->currentAccessToken()->delete();
 
         return response()->noContent();

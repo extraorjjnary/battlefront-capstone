@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\User;
+use App\Services\Notifications\OrderNotificationPublisher;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -13,6 +14,8 @@ use Illuminate\Validation\ValidationException;
 
 class ResubmitPaymentProof
 {
+    public function __construct(private readonly OrderNotificationPublisher $notifications) {}
+
     /**
      * Replace rejected wallet evidence and return it to manual review.
      */
@@ -52,6 +55,8 @@ class ResubmitPaymentProof
                     'payment_rejection_reason' => null,
                     'payment_rejection_note' => null,
                 ]);
+
+                $this->notifications->afterCommit($lockedOrder, 'payment.proof_submitted');
 
                 return [$lockedOrder->refresh(), $previousPaymentProofPath];
             },

@@ -16,17 +16,22 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/js/{pages/Cart,components/cart}/**/*.vue | .ai/rules/cartcomponents-cart.md |
 | resources/js/components/catalog/StockAvailability.vue | .ai/rules/catalog.md |
 | app/{Ai,Services/Chatbot}/** | .ai/rules/chatbot.md |
+| app/Services/Order/**,app/Actions/{Checkout,Order}/**,app/Models/Product.php,config/battlefront.php | .ai/rules/checkout-order-models.md |
 | config/battlefront.php,app/Http/Controllers/CheckoutController.php,resources/js/pages/Checkout/** | .ai/rules/checkout.md |
 | app/Actions/Chatbot/**,app/Services/Chatbot/**,resources/js/components/chatbot/** | .ai/rules/components-chatbot.md |
 | database/seeders/**,app/Http/Controllers/BranchController.php,resources/js/components/BranchMap.vue | .ai/rules/components.md |
+| resources/js/composables/useNotificationPolling* | .ai/rules/composables.md |
 | routes/**,app/Http/Controllers/** | .ai/rules/controllers.md |
 | app/Actions/Forecasting/** | .ai/rules/forecasting.md |
 | ** | .ai/rules/general.md |
 | app/Http/Controllers/** | .ai/rules/http-controllers.md |
 | app/Http/Controllers/BranchController.php,resources/js/pages/Branches/**,resources/js/components/BranchMap.vue | .ai/rules/js-components.md |
+| app/Actions/{Checkout,Order}/**,app/Http/Requests/ValidateCheckoutRequest.php,app/Services/DeliveryQuotePresenter.php,resources/js/pages/Checkout/** | .ai/rules/js-pages-checkout.md |
 | app/Actions/Order/**,app/Services/Order/**,app/Http/Controllers/**/*Order*,resources/js/pages/**/Orders/** | .ai/rules/js-pages-orders.md |
 | config/**,app/Models/Branch.php,resources/js/** | .ai/rules/js.md |
+| app/Models/{Order,Shipment}.php,app/Services/Order/**,database/factories/{Order,Shipment}Factory.php,database/migrations/*delivery_snapshots*,database/migrations/*shipments* | .ai/rules/migrations-migrations.md |
 | database/migrations/** | .ai/rules/migrations.md |
+| app/Services/Order/**,app/Models/Shipment.php,resources/js/pages/**/Orders/** | .ai/rules/models-js-pages-orders.md |
 | config/**,database/seeders/**,app/Models/Branch.php,resources/js/** | .ai/rules/models-js.md |
 | app/Models/**,database/migrations/**, app/Models/{Order,OrderItem}.php,database/migrations/*_create_order*_table.php | .ai/rules/models-migrations.md |
 | database/migrations/**,app/Models/** | .ai/rules/models.md |
@@ -41,3 +46,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/Chatbot/**,database/seeders/DevelopmentChatbotKnowledgeSeeder.php | .ai/rules/seeders.md |
 | app/Services/Chatbot/** | .ai/rules/services-chatbot.md |
 | routes/settings.php,app/Http/Controllers/Settings/**,resources/js/pages/settings/** | .ai/rules/settings.md |
+| app/Services/Notifications/**,app/Services/Order/**,app/Actions/Order/**,app/Jobs/**,app/Http/Controllers/**/*Notification*,app/Http/Controllers/Api/V1/PushDeviceController.php | .ai/rules/v1.md |

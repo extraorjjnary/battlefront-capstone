@@ -62,7 +62,7 @@ test('customers receive only their authoritative shopping and order summary', fu
         ->where('dashboard.summary.total_orders', 2)
         ->where('dashboard.latest_order.reference', $latestOrder->reference)
         ->where('dashboard.latest_order.status.value', OrderStatus::Processing->value)
-        ->where('dashboard.latest_order.status.label', 'Preparing for delivery')
+        ->where('dashboard.latest_order.status.label', 'Processing')
         ->where('dashboard.latest_order.item_count', 2)
         ->where('dashboard.latest_order.total_quantity', 5)
         ->where('dashboard.latest_order.total', '2450.75')

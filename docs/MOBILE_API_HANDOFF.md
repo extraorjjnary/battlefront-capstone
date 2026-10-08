@@ -108,6 +108,12 @@ All paths below are relative to `base_url`. GET routes also support HEAD through
 | GET | /orders | Customer | 200 |
 | GET | /orders/{order} | Customer | 200 |
 | POST | /orders/{order}/payment-proof | Customer | 200 |
+| GET | /notifications | Customer | 200 |
+| GET | /notifications/unread-count | Customer | 200 |
+| PATCH | /notifications/{notification}/read | Customer | 200 |
+| PATCH | /notifications/read-all | Customer | 200 |
+| PUT | /push-devices/{device} | Customer | 200 |
+| DELETE | /push-devices/{device} | Customer | 204 |
 | POST | /chatbot | Guest/customer | 200 |
 | GET | /recommendations/options | Guest/customer | 200 |
 | POST | /recommendations | Guest/customer | 200 |
@@ -367,7 +373,7 @@ Empty cart:
 
 ### GET /checkout
 
-Requires a nonempty conflict-free cart, otherwise 422 `errors.cart`. Returns a current snapshot and payment/fulfillment options:
+Requires an explicit nonempty `cart_item_ids` list of distinct positive integer IDs from the owning customer's cart. Send repeated query parameters, for example `GET /checkout?cart_item_ids[]=12&cart_item_ids[]=15`. Missing/empty/malformed/duplicate selections return 422 `errors.cart_item_ids` or `errors.cart_item_ids.<index>`; foreign/missing/removed IDs and unavailable selected items return 422 `errors.cart` without disclosing ownership. Unselected items are excluded from the snapshot and all quotes, including fragile/bulky handling and ETA, and may remain unavailable without blocking checkout. Returns a current snapshot, payment/fulfillment options, `pickup_quote`, and 12 `delivery_quotes`. No destination query parameter is needed: choose exactly one canonical `destination` from the returned quotes. Existing cart/payment fields are shown below; the new quote fields follow separately:
 
 ```json
 {
@@ -465,23 +471,59 @@ Requires a nonempty conflict-free cart, otherwise 422 `errors.cart`. Returns a c
 
 Checkout cart lines omit the ordinary cart's availability and category/price fields; use the shown snapshot shape. `payment_account` is null for cash/card, or an object with account_name/account_number/is_demo for wallets. Display configured values from the response and honor demo labeling; the example account above is synthetic. No transfer is initiated by this API.
 
+`pickup_quote` is `{"product_subtotal":"200.00","delivery_fee":"0.00","total":"200.00"}` for the example cart. Each `delivery_quotes` entry contains the complete server-derived quote for that cart and one destination. Example entry for standard-profile Sagay delivery:
+
+```json
+{
+  "origin_city": "Sagay City",
+  "destination": "Sagay City",
+  "is_demo": true,
+  "assumption_label": "Battlefront-configured demo delivery assumptions; not official LBC rates.",
+  "shipping_profile": "standard",
+  "base_fee": "80.00",
+  "handling_surcharge": "0.00",
+  "delivery_fee": "80.00",
+  "preparation_days": 1,
+  "transit_min_days": 0,
+  "transit_max_days": 1,
+  "eta_min_days": 1,
+  "eta_max_days": 2,
+  "carrier": "lbc",
+  "packing_expectation": "Standard packing",
+  "product_subtotal": "200.00",
+  "total": "280.00",
+  "eta_anchor_date": "2026-10-08",
+  "eta_timezone": "UTC",
+  "estimated_delivery_start": "2026-10-09",
+  "estimated_delivery_end": "2026-10-10",
+  "notice": "Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification."
+}
+```
+
+Display the selected entry's monetary values; `total` is product subtotal plus delivery fee. Mixed carts use their highest persisted shipping profile (`standard < fragile < bulky`) once, regardless of quantities/line count. Fees and dates are Battlefront-configured demo estimates, not live LBC quotations or tracking. Display carrier `lbc` as **LBC**, the packing expectation, estimate notice and demo assumption label.
+
+Calendar dates are checkout-only presentation. One server quote-generation date in `config('app.timezone')` (currently UTC) anchors all 12 windows in a response. Minimum/maximum total days are preparation plus transit, added as calendar days without weekend/holiday adjustment. Zero transit days means same-day transit once preparation is ready; persisted historical snapshots keep their original ranges. Treat date strings as civil dates in the returned timezone; do not shift them through the device timezone. Arrival is provisional and subject to payment verification. Refresh checkout after cart changes and before paying; placement independently recalculates current prices, profiles and configured fees/relative ETA. Neither preview quotes nor calendar windows are trusted placement inputs.
+
 ### POST /orders
 
 Required fields:
 
 | Field | Rule |
 |---|---|
+| cart_item_ids | Required nonempty list of distinct positive integer cart-item IDs owned by the customer |
 | recipient_name | String <=255 |
 | contact_number | String <=20; preserve formatting as text |
 | fulfillment_method | pickup or delivery |
 | payment_method | cash, card_at_store, gcash, maya |
 | delivery_address | String <=255, required for delivery; prohibited when nonempty for pickup |
+| delivery_destination | Exactly one canonical destination from `delivery_quotes`, required for delivery; prohibited when nonempty for pickup |
 | payment_proof | Required for gcash/maya; prohibited for cash/card_at_store |
 
 Pickup accepts all four payment methods. Delivery accepts only gcash/maya. Submit JSON for cash/card pickup:
 
 ```json
 {
+  "cart_item_ids": [12, 15],
   "recipient_name": "Example Customer",
   "contact_number": "EXAMPLE",
   "fulfillment_method": "pickup",
@@ -489,11 +531,15 @@ Pickup accepts all four payment methods. Delivery accepts only gcash/maya. Submi
 }
 ```
 
-For wallet orders submit the fields above using multipart form data, including an actual file part named `payment_proof`. JPEG/JPG, PNG, WebP only; contents must be an image, filename extension must match allowed extensions; max **5120 KB (5 MB)**. Do not send a filesystem path or base64 string as the proof, and do not manually specify a multipart boundary/Content-Type in Postman or React Native FormData.
+For wallet orders submit the fields above using multipart form data with repeated `cart_item_ids[]` text fields (one ID per field), including an actual file part named `payment_proof`. JPEG/JPG, PNG, WebP only; contents must be an image, filename extension must match allowed extensions; max **5120 KB (5 MB)**. Do not send a filesystem path or base64 string as the proof, and do not manually specify a multipart boundary/Content-Type in Postman or React Native FormData.
 
-The server places the entire current cart through shared transactional order placement, locks/rechecks stock, snapshots prices/recipient/fulfillment, deducts inventory and clears the cart atomically. Order and payment initially remain pending; payment verification is manual. Failed stock validation uses 422 `errors.cart` and rolls back the operation.
+For delivery, include `delivery_destination` (for example `Sagay City`) and a separate detailed `delivery_address`. For pickup, omit both fields. Supported canonical names are Sagay City, Escalante City, Cadiz City, Toboso, Manapla, Calatrava, Victorias City, E.B. Magalona, San Carlos City, Silay City, Talisay City, and Bacolod City. Do not infer a destination from the address. Missing, unsupported, wrong-case and array destination values receive 422 `errors.delivery_destination`.
 
-Do not send client totals, item prices, inventory adjustments or a user ID. There is no idempotency-key contract: a repeated request after successful cart consumption fails on the empty cart. On an uncertain network outcome, inspect history before attempting a new placement; do not assume retries return the original order.
+The server re-resolves every selected ID through shared transactional order placement, locks/rechecks ownership, quantities, eligibility and stock, snapshots current prices/recipient/fulfillment, and deducts selected inventory atomically. Only purchased cart items are removed; unselected items remain. The cart container is removed only when empty. Missing or empty selection never falls back to full-cart checkout. To purchase all items, explicitly submit all IDs from GET /cart. Selection is temporary client/checkout intent, with no permanent selection flag. Order and payment initially remain pending; payment verification is manual. Failed stock validation uses 422 `errors.cart` and rolls back the operation.
+
+Do not send client totals, item prices, inventory adjustments or a user ID. There is no idempotency-key contract: a repeated request with already-purchased IDs fails even when unselected items remain; it never purchases the remaining cart. On an uncertain network outcome, inspect history before attempting a new placement; do not assume retries return the original order.
+
+Client fee/base fee/surcharge/profile/preparation/transit/ETA/subtotal/total values are ignored, including nested quotes. Delivery uses the same strict internal placement transaction as web checkout: the accepted quote is recalculated and saved with exactly one `awaiting_preparation` Shipment. That initial record does not imply packing or dispatch. Pickup saves zero delivery fee and creates no Shipment.
 
 201 response, also the shape for GET /orders/{order} and successful proof replacement:
 
@@ -514,7 +560,8 @@ Do not send client totals, item prices, inventory adjustments or a user ID. Ther
     "fulfillment": {
       "value": "pickup",
       "label": "Pickup",
-      "delivery_address": null
+      "delivery_address": null,
+      "delivery_destination": null
     },
     "payment": {
       "method": {
@@ -546,12 +593,53 @@ Do not send client totals, item prices, inventory adjustments or a user ID. Ther
     ],
     "item_count": 1,
     "total_quantity": 2,
+    "product_subtotal": "200.00",
+    "delivery_fee": "0.00",
+    "delivery_quote": null,
+    "shipment": null,
     "total": "200.00"
   }
 }
 ```
 
 Order item prices/quantities are persisted snapshots; displayed product names/brand/image come from current related product records. `payment.rejection` is null or `{"reason":"customer-facing explanation","note":null}` (note may be string). Use returned `can_resubmit_proof`; no proof path or download URL is exposed.
+
+Detail `fulfillment.delivery_destination` contains the separately selected canonical city/municipality saved on the order. Display it alongside `fulfillment.delivery_address` in submitted details. It remains null for pickup and legacy orders without a saved destination; never infer it from the free-text address or current configuration. Web and API expose the same value, including when shipment data is unavailable. History summaries retain their existing shape.
+
+Detail responses add saved `product_subtotal`, `delivery_fee`, `delivery_quote` and nullable `shipment`; existing `total` remains the final total. Quoted delivery `delivery_quote` contains the quote-entry fields above **except** `eta_anchor_date`, `eta_timezone`, `estimated_delivery_start`, and `estimated_delivery_end`. Its fees, destination, profile, carrier, assumptions and relative ETA come from saved Order/Shipment snapshots, never current configuration. Pickup/legacy unquoted delivery has `delivery_quote: null` and `shipment: null`; unknown legacy `product_subtotal` stays null and original totals remain unchanged. History summaries retain their existing shape. EXT-89's shipment detail contract follows; EXT-90 supplies shared notifications as documented below.
+
+### Manual shipment detail — EXT-89
+
+GET order detail, successful placement and payment-proof replacement share the same nullable `shipment` object. For example, a standard-profile Bacolod shipment whose preparation started on October 8, 2026 in UTC:
+
+```json
+{
+  "carrier": "lbc",
+  "status": {"value": "preparing", "label": "Preparing for shipment"},
+  "tracking_reference": null,
+  "eta": {
+    "anchor_date": "2026-10-08",
+    "timezone": "UTC",
+    "estimated_delivery_start": "2026-10-10",
+    "estimated_delivery_end": "2026-10-11",
+    "notice": "Battlefront estimate from the start of preparation; arrival is not guaranteed."
+  },
+  "timeline": [
+    {"status": "awaiting_preparation", "label": "Awaiting preparation", "occurred_at": "2026-10-08T08:00:00+00:00"},
+    {"status": "preparing", "label": "Preparing for shipment", "occurred_at": "2026-10-08T09:00:00+00:00"}
+  ],
+  "notice": "Shipment status is manually maintained by Battlefront. This is not live LBC or GPS tracking.",
+  "history_notice": null
+}
+```
+
+Forward values are `awaiting_preparation`, `preparing`, `ready_for_dispatch`, `handed_to_lbc`, `in_transit`, `out_for_delivery`, `delivered`. `cancelled` is a separate terminal outcome from eligible administrator order cancellation. Shipment status is independent of order/payment status: awaiting preparation means only a record exists. Progression starts only after payment verification and explicit order processing. Delivered atomically completes the order and records one sale; cancellation terminates shipment progression and restores eligible order quantities once.
+
+Render the returned status label and `notice`. Read destination/fee components from `delivery_quote`, the detailed address from `fulfillment.delivery_address`, and operational dates from `shipment.eta`. These dates are persisted once at preparation using saved total ETA days; they do not drift when configuration changes or the client refreshes. Before preparation, all four ETA date/timezone fields are null: show the saved relative day range without inventing calendar dates. Treat civil dates in the supplied timezone without converting them through the device timezone. For cancelled shipments, label retained dates as the original estimate.
+
+`tracking_reference` is null until a real value is manually supplied at handoff or later. Display it only when nonempty; Battlefront may correct or clear it without advancing status. Render `timeline` in its returned chronological order, containing only recorded timestamps. Creation is the awaiting-preparation milestone, never proof that packing began. Historical unavailable timestamps remain absent. Previously completed orders may include `history_notice` explaining that delivery milestones were not recorded; show this notice instead of reconstructing dates. Pickup and legacy orders without shipments expose no tracking section.
+
+Only the owning customer can read shipment detail; foreign/missing orders remain 404. Customer bearer tokens cannot mutate shipment milestones, tracking references or payment verification. No shipment mutation endpoint exists under `/api/v1`. Updates occur in the existing web administration workflow. Do not fabricate references, carrier locations, maps or GPS data; there is no live LBC integration, courier booking or notification delivery in EXT-89. The React Native UI remains the separate mobile project's responsibility.
 
 Order status values: pending, processing, completed, cancelled. Labels reflect fulfillment (e.g. Preparing for pickup / Preparing for delivery). Payment statuses: pending, verified, rejected. They are separate state machines; proof submission is not payment verification.
 
@@ -597,6 +685,81 @@ Multipart with one required `payment_proof` file; same image/extension/size rule
 200 returns full order detail, resets payment status to pending and clears rejection feedback. Order status/inventory stay unchanged. Other payment states/methods/terminal orders return 422 `errors.payment_proof`; valid uploads against foreign/missing orders return 404.
 
 There is no separate initial-proof upload endpoint: initial wallet proof belongs to POST /orders.
+
+## Shared notifications and Expo push — EXT-90
+
+Notification history/read state belongs to the authenticated account and is shared by web and mobile. All endpoints below require a valid customer bearer token. Missing/invalid/expired/revoked tokens return 401; administrator tokens return 403. Foreign notification/device IDs return 404. Browser sessions never authenticate these API endpoints.
+
+The web bell separately refreshes its summary every 30 seconds while its tab is visible using session-only web routes; hidden tabs pause and requests cannot overlap. It updates only the notification summary prop without visiting/reloading the current page or refreshing order/form data. The mobile endpoints below are unchanged: mobile should fetch its own history/count when appropriate for its screen lifecycle and Expo events.
+
+### History, unread count and read actions
+
+`GET /notifications?page=1` returns 10 entries per page, newest creation time then UUID first, using Laravel's `data/links/meta` pagination envelope and `meta.unread_count`. IDs are notification UUID strings, not integers. One illustrative item is:
+
+```json
+{
+  "id": "12345678-1234-4234-8234-123456789abc",
+  "event": "shipment.in_transit",
+  "title": "Shipment in transit",
+  "body": "There is an update for order BF-000001. Open your order for details.",
+  "occurred_at": "2026-10-08T10:00:00+00:00",
+  "created_at": "2026-10-08T10:00:00+00:00",
+  "read_at": null,
+  "is_read": false,
+  "order": {
+    "id": 1,
+    "reference": "BF-000001",
+    "web_url": "<backend-origin>/orders/1",
+    "api_url": "<backend-origin>/api/v1/orders/1",
+    "deep_link": {"screen": "order_detail", "order_id": 1}
+  }
+}
+```
+
+`order` is nullable when an owned order cannot be resolved. Do not render a destination from an absent order. Deep-link metadata is a screen identifier plus resource ID, not an application URI or authentication credential. The separate Expo client maps `order_detail` to its order screen and fetches `GET /orders/{order_id}` with its current bearer token; existing ownership checks still apply. Reset account-specific UI on logout/account change.
+
+`GET /notifications/unread-count` returns `{"data":{"unread_count":2}}`.
+`PATCH /notifications/{notification}/read` accepts no body and returns the updated item under `data`, with `meta.unread_count`.
+`PATCH /notifications/read-all` accepts no body and returns `{"data":{"unread_count":0}}` (fresh concurrent events can increase that count). Read operations are idempotent; individual retries preserve the original read timestamp.
+
+Customer events: `payment.verified`, `payment.rejected`, `order.cancelled`, and `shipment.preparing/ready_for_dispatch/handed_to_lbc/in_transit/out_for_delivery/delivered`. Proof paths, payment rejection notes and personal addresses are absent; read the authorized order detail for available feedback. Initial shipment creation and reference corrections generate no notice, and current ETA cannot be revised. Administrator operational notifications remain web-only.
+
+### Device registration and revocation
+
+Generate and retain a device-installation UUID in the mobile app; use it as `{device}`. `PUT /push-devices/{device}` accepts:
+
+```json
+{"expo_push_token":"ExpoPushToken[client_obtained_token]","platform":"android"}
+```
+
+`platform` is required and is `android` or `ios`. Tokens must use a nonempty `ExpoPushToken[...]` or `ExponentPushToken[...]` format and be at most 255 characters. Use Expo's actual project/device token; do not substitute an FCM/APNs token or bearer token. No provider credentials are passed by the client. Invalid fields return 422; malformed device UUID routes return 404.
+
+Registration returns `{"data":{"id":1,"device_id":"<installation-uuid>","platform":"android","is_active":true,"updated_at":"<ISO timestamp>"}}`. Account/session ownership comes from bearer authentication, never submitted IDs. Raw push tokens and session identifiers are not returned. Repeated identical registration is idempotent; changed token/session creates a new registration version.
+
+Multiple devices are supported. An active token already registered to a different account/device returns 422; do not silently transfer it. Revoke the previous registration or sign out before switching accounts. Ineligible expired/revoked registrations can be deactivated by server cleanup when encountered, permitting a fresh authenticated registration.
+
+`DELETE /push-devices/{device}` deactivates the caller's registration and clears its stored token; repeated revocation returns 204 without a body. Unknown/foreign registrations return 404. Mobile logout disables registrations belonging to the presented session and revokes that session only. Other valid device sessions remain eligible. Expiry/revocation is also rechecked before queued sending. Sign in and PUT the device registration again to resume push; tokens never authenticate API requests.
+
+### Push behavior, backend setup and limitations
+
+Set `EXPO_PUSH_ENABLED=true` only after the separate Expo project has working platform credentials and physical-device push setup. `EXPO_PUSH_ACCESS_TOKEN` is optional server-side configuration for Expo enhanced push security; keep it outside source control and client responses. Run:
+
+```shell
+php artisan migrate --no-interaction
+php artisan queue:work database --queue=notifications,default --timeout=30 --tries=3
+```
+
+The migrations add Laravel history, device registrations and delivery records; there is no historical backfill. Database history persists immediately after business commit without waiting for the worker. Push and persistence retries explicitly use the asynchronous database connection even when the application's default queue is sync. Workers must process delayed jobs. Rebuild deployment event caches and restart workers after deploying notification classes.
+
+Push text is generic: “An update is available. Open Battlefront to view your order.” Its `data` contains `notification_id`, `order_id` and `deep_link`; it contains no proof URLs, addresses, amounts or personal/payment details. Client receipt/tapping a push must not mutate order/payment/shipment business state. Refresh history/count when opening the app and after read actions; push availability does not establish read state.
+
+The adapter checks send tickets and receipts about 15 minutes later; absent receipts are rechecked within 24 hours of acceptance. Confirmed `DeviceNotRegistered` deactivates the matching registration; old feedback cannot disable a refreshed device. Connection/429/5xx/malformed-response failures use bounded retries. Other provider errors retain tokens unless confirmed unusable. Inspect sanitized notification diagnostics and failed queue jobs for recovery; do not log raw credentials or provider bodies.
+
+Push is best effort: provider acceptance is not device delivery, and uncertain network/process failures can cause missing/duplicate push. An in-flight push cannot be recalled by logout. Enqueue failure can leave delivery/receipt work pending. After-commit persistence retries have no outbox: a crash between commit/history persistence, or simultaneous persistence/queue failure, can leave a history entry missing. These failures never roll back or fail successful business actions.
+
+No browser Web Push, email/SMS, live LBC API, direct Firebase server integration or React Native UI is included. Real Expo/native-client validation remains pending.
+
+Postman acceptance: list/count, mark one/all read and compare web state; verify foreign IDs and invalid/admin sessions; register two devices, revoke one, and verify session-specific logout. Trigger payment/shipment changes through web administration and refresh customer history. Provider errors/receipt timing require the focused automated fakes or a separately configured real Expo device, not synthetic Postman token examples.
 
 ## 7. Chatbot (guest and customer)
 
@@ -832,6 +995,7 @@ The collection uses the [Postman v2.1 JSON format](https://schema.postman.com/) 
 | rejected_order_id | Owned wallet order prepared with rejected payment in web administration |
 | quantity, page, budget, intended_use, search | Representative nonsecret defaults where useful; optional catalog filters initially disabled |
 | recipient_name, contact_number, delivery_address | Locally supplied test checkout/profile values |
+| delivery_destination | Canonical configured destination; defaults to Sagay City for disposable delivery tests |
 | chatbot_message, follow_up_message | Representative public questions provided |
 | context_token, guest_context_token | Separate customer/guest continuation values captured by chatbot scripts |
 | other_cart_item_id, other_order_id, other_order_reference | Another disposable customer's resources, for ownership checks |
@@ -852,8 +1016,9 @@ Use a disposable development database/account with an active product, live Sagay
 2. **Access:** Profile without token (401). Guest recommendations/options (200); legacy recommendation options/results remain callable during the transition. Guest chatbot public question/follow-up (200). Guest order question returns sign-in fallback. Pace calls under guest limits.
 3. **Authentication/profile:** Register a unique customer (201) OR log in (200); confirm token capture. Read/update profile (200), verify only approved fields. Invalid login gives 401; duplicate/invalid registration gives 422.
 4. **Cart:** Add stock-eligible product (200), verify captured cart_item_id; update quantity and totals; remove (200). Add again before checkout. Try quantity zero, quantity above stock, and an unavailable product (422); failed operations must not corrupt the cart.
-5. **Checkout/orders:** Preview checkout (200). Submit cash/card pickup (201), inspect order/history (200), and verify cart is empty. Refill before each alternative wallet placement. Select an image; test gcash/maya and delivery address rules. Verify order/payment initially pending and inventory deduction through existing web inventory.
+5. **Checkout/orders:** Select one, multiple, or all owned cart-item IDs and include them in both preview and placement. Preview checkout (200), verify all 12 server quotes and select a destination. Check standard/fragile/bulky and mixed carts, subtotal/fee/final total, LBC/demo wording and provisional calendar windows. Submit cash/card pickup (201, zero fee/no Shipment); omit address and destination. Refill before each wallet placement, select an image, and include canonical destination plus detailed address for delivery. Try missing/unsupported/wrong-case/array destinations, pickup destination/address, and forged quote fields. Verify recalculated saved fees/relative ETA, pending order/payment, selected-item removal, unselected-item retention and selected inventory deduction through existing web administration. Confirm no selection, duplicates, foreign/missing/removed IDs and stale selected stock fail without changes. Leave bulky/fragile products unselected and verify their handling/ETA do not affect the order.
 6. **Replacement proof:** Reject the test wallet payment through existing web administration. Set rejected_order_id, select a replacement image, submit (200). Verify pending payment, cleared rejection, unchanged order status/stock. Retry while payment is pending (422). Test unsupported file type and >5 MB (422 when Laravel handles it).
+   **Shipment tracking:** Using a delivery test order, verify that pending payment/order offers no shipment progression. Manually verify payment, move the order to Processing, and advance each shipment milestone separately through web administration. After each action compare customer web detail and GET /orders/{order}: status, saved ETA/fees/destination and chronological timestamps must agree. Leave reference blank unless a real value is available. Confirm Delivered completes the order with one sale; use a second eligible order to verify cancellation terminates shipment and restores stock once. Verify pickup/legacy orders have no shipment UI and a second customer's token receives 404. EXT-90 now supplies customer milestone notifications; no map or live carrier data is expected.
 7. **Customer chatbot/recommendations:** Ask about the captured own order reference. Check customer follow-up. Search the catalog, view a product, change the cart, and request the new feed after each action. Confirm personal reason codes, opt-out deletion through `PATCH /profile`, current stock, and the shared response shape. Test the legacy criteria contract only if the current mobile build still calls it.
 8. **Ownership/roles:** Prepare a second customer's cart/order and use their IDs under the first token: 404. Foreign order chatbot: safe 200 fallback. With an out-of-band valid administrator test token: profile/chatbot/recommendations 403. Invalid/expired/revoked credentials: 401. Web session alone is insufficient for personal API data.
 9. **Rate limits:** After the window resets, send five guest unsupported chatbot questions (e.g. Tell me a joke.), then the dedicated sixth-request check expects 429/Retry-After. Customer limit is ten across web/devices. Registration/login have five-request limits; global limit is 60/IP. Perform these separately to avoid unrelated limits masking results.
@@ -864,7 +1029,7 @@ Provider fallback and expiration scenarios are deterministically covered by exis
 
 ### Verification status
 
-Historical EXT-62 verification recorded 275 API tests passing (1,732 assertions), coverage for the then-current 22 endpoints, all environment references resolving, and twelve local HTTP smoke checks. For the behavior-driven recommendation update, the focused suite passed 126 tests (1,051 assertions); route generation and the frontend production build completed. The current API has 25 routes and the collection includes the additive public/personal feeds and interaction request. The React Native client has not yet been cut over or validated against them.
+Historical EXT-62 verification recorded 275 API tests passing (1,732 assertions), coverage for the then-current 22 endpoints, all environment references resolving, and twelve local HTTP smoke checks. For the behavior-driven recommendation update, the focused suite passed 126 tests (1,051 assertions); route generation and the frontend production build completed. The current API has 31 routes, including the behavior-driven recommendation feeds/interactions, shipment details on existing order endpoints, and EXT-90 notification/device routes; the collection includes the corresponding requests. The React Native client has not yet been cut over or validated against the current contract.
 
 The developer subsequently reported completing manual tests in Postman Desktop with no API issues and approved EXT-62. The execution date, individual run results, and screenshots were not supplied to the coding agent. This is developer-reported manual verification, not an agent-executed Postman run. Keep the sequence above for repeat runs. JSON/structural checks are not full external-schema validation. No generator or validator dependency was installed. Actual React Native consumer validation is tracked separately in [EXT-63](MOBILE_INTEGRATION_VALIDATION.md).
 
@@ -872,10 +1037,10 @@ The developer subsequently reported completing manual tests in Postman Desktop w
 
 - Routing/access: `routes/api.php`, `AuthorizeApiChatbot`, `AuthorizeApiRecommendations`, `AppServiceProvider`, `FortifyServiceProvider`, `config/sanctum.php`, `bootstrap/app.php`.
 - Fields/validation: `app/Http/Requests`, shared profile/password concerns, API AuthController.
-- Response shapes: `app/Http/Resources/Api/V1`, `CatalogProductPresenter`, `CustomerOrderPresenter`, `BuildCartViewData`, `PrepareCheckout`.
-- Domain rules: `CartService`, `OrderPlacementService`, `ResubmitPaymentProof`, `ProductCatalogRepository`, `RecommendationEngine`, shared chatbot services.
+- Response shapes: `app/Http/Resources/Api/V1`, `CatalogProductPresenter`, `CustomerOrderPresenter`, `ShipmentPresenter`, `BuildCartViewData`, `PrepareCheckout`.
+- Domain rules: `CartService`, `OrderPlacementService`, `OrderProcessingService`, `ResubmitPaymentProof`, `ProductCatalogRepository`, `RecommendationEngine`, shared chatbot services.
 - Contract tests: `tests/Feature/ApiFoundationTest.php`, `MobileAuthenticationTest.php`, `MobileProfileTest.php`, `MobileCatalogTest.php`, `MobileBranchTest.php`, and `tests/Feature/Api/V1`.
 
 Known implementation details are documented, not changed: registration's validated-but-unsaved address; different page validation between products/orders; stateless guest context is not per-device identity; private proof has no mobile download endpoint.
 
-This update adds the public recommendation feed and anonymous aggregate interaction endpoint while retaining the criteria endpoints for compatibility. No mobile password reset/change, token refresh, customer order cancellation, admin operations, payment gateways, courier tracking, or compatibility checking are introduced.
+The behavior-driven recommendation update adds the public recommendation feed and anonymous aggregate interaction endpoint while retaining the criteria endpoints for compatibility. EXT-89 exposes manual shipment facts through existing order detail endpoints; EXT-90 adds notification history/read-state and Expo device registration/revocation endpoints. No mobile password reset/change, token refresh, customer order cancellation, admin operations, payment gateways, live courier/GPS tracking, or compatibility checking are introduced.

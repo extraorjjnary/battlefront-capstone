@@ -12,6 +12,7 @@ import ProductPrice from '@/components/catalog/ProductPrice.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogClose,
@@ -30,7 +31,10 @@ import { show as productShow } from '@/routes/products';
 
 const props = defineProps({
     item: { type: Object, required: true },
+    selected: { type: Boolean, default: false },
 });
+
+const emit = defineEmits(['update:selected']);
 
 const removeDialogOpen = ref(false);
 const enteredQuantity = ref(props.item.quantity);
@@ -88,6 +92,16 @@ const availabilityCopy = computed(() => {
 
 <template>
     <article class="grid gap-5 p-5 sm:grid-cols-[9rem_minmax(0,1fr)] sm:p-6">
+        <div class="flex items-center gap-3 sm:col-span-2">
+            <Checkbox
+                :id="`select-cart-item-${item.id}`"
+                :model-value="selected"
+                @update:model-value="emit('update:selected', $event === true)"
+            />
+            <Label :for="`select-cart-item-${item.id}`">
+                Select {{ item.product.name }} for checkout
+            </Label>
+        </div>
         <div class="border-border aspect-square overflow-hidden border">
             <ProductImage
                 :image-url="item.product.image_url"
@@ -99,7 +113,7 @@ const availabilityCopy = computed(() => {
             <div
                 class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"
             >
-                <div class="min-w-0">
+                <div class="min-w-0 lg:flex-1">
                     <div class="flex flex-wrap items-center gap-2">
                         <Badge variant="secondary">
                             {{ item.product.category }}
@@ -118,13 +132,16 @@ const availabilityCopy = computed(() => {
                         v-if="productIsBrowsable"
                         as-child
                         variant="link"
-                        class="h-auto justify-start p-0 text-lg font-bold"
+                        class="line-clamp-2 h-auto max-w-full justify-start p-0 text-left text-lg font-bold wrap-anywhere whitespace-normal"
                     >
                         <Link :href="productShow(item.product.id)">
                             {{ item.product.name }}
                         </Link>
                     </Button>
-                    <h2 v-else class="mt-1 text-lg font-bold">
+                    <h2
+                        v-else
+                        class="mt-1 line-clamp-2 text-lg font-bold wrap-anywhere"
+                    >
                         {{ item.product.name }}
                     </h2>
                     <ProductPrice
@@ -134,7 +151,7 @@ const availabilityCopy = computed(() => {
                     />
                 </div>
 
-                <div class="lg:text-right">
+                <div class="shrink-0 whitespace-nowrap lg:text-right">
                     <p
                         class="text-muted-foreground text-xs font-semibold tracking-wide uppercase"
                     >

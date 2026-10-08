@@ -7,6 +7,7 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
+use App\Enums\ShippingProfile;
 use App\Enums\UserRole;
 use Database\Factories\OrderFactory;
 use DomainException;
@@ -28,6 +29,15 @@ use Illuminate\Support\Carbon;
  * @property string $contact_number
  * @property FulfillmentMethod $fulfillment_method
  * @property string|null $delivery_address
+ * @property string|null $delivery_destination
+ * @property string|null $delivery_base_fee
+ * @property ShippingProfile|null $shipping_profile
+ * @property string|null $handling_surcharge
+ * @property string $delivery_fee
+ * @property string|null $product_subtotal
+ * @property string|null $delivery_origin_city
+ * @property bool|null $delivery_is_demo
+ * @property string|null $delivery_assumption_label
  * @property string $total_amount
  * @property OrderStatus $status
  * @property PaymentStatus $payment_status
@@ -40,6 +50,7 @@ use Illuminate\Support\Carbon;
  * @property-read User $user
  * @property-read Collection<int, OrderItem> $items
  * @property-read Sale|null $sale
+ * @property-read Shipment|null $shipment
  */
 #[Fillable([
     'user_id',
@@ -47,6 +58,15 @@ use Illuminate\Support\Carbon;
     'contact_number',
     'fulfillment_method',
     'delivery_address',
+    'delivery_destination',
+    'delivery_base_fee',
+    'shipping_profile',
+    'handling_surcharge',
+    'delivery_fee',
+    'product_subtotal',
+    'delivery_origin_city',
+    'delivery_is_demo',
+    'delivery_assumption_label',
     'total_amount',
     'status',
     'payment_status',
@@ -74,6 +94,7 @@ class Order extends Model
      * @var array<string, mixed>
      */
     protected $attributes = [
+        'delivery_fee' => '0.00',
         'status' => 'pending',
         'payment_status' => 'pending',
     ];
@@ -108,6 +129,12 @@ class Order extends Model
         return $this->hasOne(Sale::class);
     }
 
+    /** @return HasOne<Shipment, $this> */
+    public function shipment(): HasOne
+    {
+        return $this->hasOne(Shipment::class);
+    }
+
     /**
      * Get the customer-facing global order reference.
      *
@@ -125,6 +152,17 @@ class Order extends Model
      */
     protected static function booted(): void
     {
+        static::updating(function (Order $order): void {
+            if ($order->getRawOriginal('product_subtotal') !== null && $order->isDirty([
+                'user_id', 'fulfillment_method', 'delivery_address',
+                'product_subtotal', 'total_amount', 'delivery_destination', 'delivery_base_fee',
+                'shipping_profile', 'handling_surcharge', 'delivery_fee',
+                'delivery_origin_city', 'delivery_is_demo', 'delivery_assumption_label',
+            ])) {
+                throw new DomainException('Placed order commercial snapshots cannot be changed.');
+            }
+        });
+
         static::saving(function (Order $order): void {
             $belongsToCustomer = User::query()
                 ->whereKey($order->user_id)
@@ -150,6 +188,12 @@ class Order extends Model
     {
         return [
             'fulfillment_method' => FulfillmentMethod::class,
+            'delivery_base_fee' => 'decimal:2',
+            'shipping_profile' => ShippingProfile::class,
+            'handling_surcharge' => 'decimal:2',
+            'delivery_fee' => 'decimal:2',
+            'product_subtotal' => 'decimal:2',
+            'delivery_is_demo' => 'boolean',
             'total_amount' => 'decimal:2',
             'status' => OrderStatus::class,
             'payment_status' => PaymentStatus::class,
