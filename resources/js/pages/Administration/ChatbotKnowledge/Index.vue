@@ -1,13 +1,6 @@
 <script setup>
 import { Form, Head, Link, useHttp } from '@inertiajs/vue3';
-import {
-    ChevronDown,
-    Eye,
-    MessageSquareText,
-    Pencil,
-    Plus,
-    RotateCcw,
-} from '@lucide/vue';
+import { ChevronDown, Eye, MessageSquareText, Pencil, Plus, RotateCcw } from '@lucide/vue';
 import { ref } from 'vue';
 import ChatbotKnowledgeActivationController from '@/actions/App/Http/Controllers/Administration/ChatbotKnowledgeActivationController';
 import ChatbotKnowledgeController from '@/actions/App/Http/Controllers/Administration/ChatbotKnowledgeController';
@@ -120,19 +113,14 @@ defineOptions({
             </div>
         </section>
 
-        <Collapsible
-            v-model:open="previewOpen"
-            class="border-border bg-card border"
-        >
+        <Collapsible v-model:open="previewOpen" class="border-border bg-card border">
             <h2>
                 <CollapsibleTrigger as-child>
                     <button
                         type="button"
                         class="focus-visible:ring-ring flex w-full items-center justify-between gap-4 p-6 text-left focus-visible:ring-2 focus-visible:outline-none"
                     >
-                        <span class="text-lg font-semibold"
-                            >Test chatbot routing</span
-                        >
+                        <span class="text-lg font-semibold">Test chatbot routing</span>
                         <ChevronDown
                             class="size-5 shrink-0"
                             :class="{ 'rotate-180': previewOpen }"
@@ -143,16 +131,11 @@ defineOptions({
             </h2>
             <CollapsibleContent class="px-6 pb-6">
                 <p class="text-muted-foreground max-w-3xl text-sm leading-6">
-                    Enter a customer question to see its category and matching
-                    active FAQ or Order knowledge across all records. This
-                    checks routing and saved knowledge only; it does not
-                    retrieve live product, branch, or customer order data, or
-                    generate a chatbot reply.
+                    Enter a customer question to see its category and matching active FAQ or Order knowledge across all records.
+                    This checks routing and saved knowledge only; it does not retrieve live product, branch, or customer order data, or generate a chatbot reply.
                 </p>
                 <form class="mt-5 space-y-3" @submit.prevent="testQuestion">
-                    <Label for="knowledge-preview-message"
-                        >Customer question</Label
-                    >
+                    <Label for="knowledge-preview-message">Customer question</Label>
                     <Input
                         id="knowledge-preview-message"
                         v-model="preview.message"
@@ -163,87 +146,45 @@ defineOptions({
                         aria-describedby="knowledge-preview-error"
                         required
                     />
-                    <InputError
-                        id="knowledge-preview-error"
-                        :message="preview.errors.message"
-                    />
+                    <InputError id="knowledge-preview-error" :message="preview.errors.message" />
                     <Button type="submit" :disabled="preview.processing">
                         <Spinner v-if="preview.processing" />
                         {{ preview.processing ? 'Testing…' : 'Test question' }}
                     </Button>
                 </form>
-                <p
-                    v-if="previewError"
-                    role="alert"
-                    class="text-destructive mt-4 text-sm"
-                >
+                <p v-if="previewError" role="alert" class="text-destructive mt-4 text-sm">
                     {{ previewError }}
                 </p>
-                <div
-                    class="mt-5 space-y-3 text-sm"
-                    aria-live="polite"
-                    :aria-busy="preview.processing"
-                >
+                <div class="mt-5 space-y-3 text-sm" aria-live="polite" :aria-busy="preview.processing">
                     <template v-if="previewResult">
-                        <p class="text-muted-foreground">
-                            Results for: {{ testedQuestion }}
-                        </p>
+                        <p class="text-muted-foreground">Results for: {{ testedQuestion }}</p>
                         <p v-if="previewResult.category">
-                            Selected category:
-                            <strong>{{
-                                categoryLabels[previewResult.category]
-                            }}</strong>
+                            Selected category: <strong>{{ categoryLabels[previewResult.category] }}</strong>
                         </p>
                         <p>{{ previewResult.explanation }}</p>
                         <template v-if="previewResult.matches.length">
-                            <h3 class="pt-2 font-semibold">
-                                Matched knowledge
-                            </h3>
+                            <h3 class="pt-2 font-semibold">Matched knowledge</h3>
                             <ol class="space-y-4">
                                 <li
                                     v-for="match in previewResult.matches"
                                     :key="match.id"
                                     class="border-border border-t pt-4"
                                 >
-                                    <div
-                                        class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"
-                                    >
+                                    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                         <div class="min-w-0">
-                                            <p class="font-semibold">
-                                                {{ match.question_pattern }}
-                                            </p>
-                                            <p
-                                                class="text-muted-foreground mt-1"
-                                            >
-                                                {{
-                                                    match.exact
-                                                        ? 'Exact wording'
-                                                        : 'Related wording'
-                                                }}
-                                                · Priority {{ match.priority }}
+                                            <p class="font-semibold">{{ match.question_pattern }}</p>
+                                            <p class="text-muted-foreground mt-1">
+                                                {{ match.exact ? 'Exact wording' : 'Related wording' }} · Priority {{ match.priority }}
                                             </p>
                                         </div>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            as-child
-                                            class="shrink-0 self-start"
-                                        >
-                                            <Link
-                                                :href="
-                                                    ChatbotKnowledgeController.show(
-                                                        match.id,
-                                                    )
-                                                "
-                                            >
+                                        <Button variant="outline" size="sm" as-child class="shrink-0 self-start">
+                                            <Link :href="ChatbotKnowledgeController.show(match.id)">
                                                 <Eye aria-hidden="true" />
                                                 View record
                                             </Link>
                                         </Button>
                                     </div>
-                                    <p class="mt-3 whitespace-pre-wrap">
-                                        {{ match.response_template }}
-                                    </p>
+                                    <p class="mt-3 whitespace-pre-wrap">{{ match.response_template }}</p>
                                 </li>
                             </ol>
                         </template>

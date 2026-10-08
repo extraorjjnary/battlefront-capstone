@@ -8,19 +8,19 @@ Baseline: [API handoff](MOBILE_API_HANDOFF.md), [Postman collection](Battlefront
 
 ### Backend preparation evidence
 
-| Check                          | Observed result                                                                              |
-| ------------------------------ | -------------------------------------------------------------------------------------------- |
-| Backend revision inspected     | `bc4ffb98de27a918ff7a5b34970adffeab5e09e8` (before these documentation changes)              |
-| Versioned routes               | 22 `/api/v1` endpoints; unchanged by EXT-63 preparation                                      |
-| Postman baseline               | 50 requests covering success/error/access scenarios; credentials remain local                |
-| Local Herd health              | `GET http://battlefront-capstone.test/api/v1/health` -> HTTP 200, `{"data":{"status":"ok"}}` |
-| Herd runtime                   | Running Nginx executable belongs to the Herd installation                                    |
-| HTTP listener inspection       | Port 80 listens on `127.0.0.1`; no port 443 listener returned by the inspection              |
-| Relevant Herd config           | `%USERPROFILE%\.config\herd\config\nginx\herd.conf`: `listen 127.0.0.1:80 default_server;`   |
-| Config inclusion               | Herd's `nginx.conf` includes `herd.conf` and the configured site `.conf` files               |
-| API regression run             | 275 passed, 1,732 assertions; command below                                                  |
-| Consumer build/device/evidence | Not supplied; group member runs the app                                                      |
-| Proven backend defects         | None established                                                                             |
+| Check | Observed result |
+|---|---|
+| Backend revision inspected | `bc4ffb98de27a918ff7a5b34970adffeab5e09e8` (before these documentation changes) |
+| Versioned routes | 22 `/api/v1` endpoints; unchanged by EXT-63 preparation |
+| Postman baseline | 50 requests covering success/error/access scenarios; credentials remain local |
+| Local Herd health | `GET http://battlefront-capstone.test/api/v1/health` -> HTTP 200, `{"data":{"status":"ok"}}` |
+| Herd runtime | Running Nginx executable belongs to the Herd installation |
+| HTTP listener inspection | Port 80 listens on `127.0.0.1`; no port 443 listener returned by the inspection |
+| Relevant Herd config | `%USERPROFILE%\.config\herd\config\nginx\herd.conf`: `listen 127.0.0.1:80 default_server;` |
+| Config inclusion | Herd's `nginx.conf` includes `herd.conf` and the configured site `.conf` files |
+| API regression run | 275 passed, 1,732 assertions; command below |
+| Consumer build/device/evidence | Not supplied; group member runs the app |
+| Proven backend defects | None established |
 
 The listener evidence proves the inspected HTTP listener is loopback-only. It does not prove firewall status, phone connectivity, or whether another LAN forwarding arrangement exists. No Herd, DNS, firewall, application environment, or system configuration was changed during preparation.
 
@@ -56,31 +56,31 @@ Herd also documents public sharing through Expose, but that uses a public tunnel
 
 All rows start **not run**. Record each variant independently; a partial run does not pass the whole row. Date/tester/evidence belongs in the run record, not an assumed result here.
 
-| ID    | Exercise in React Native                                              | Expected result / state                                                                             | Status  |
-| ----- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------- |
-| RN-01 | Device health and native client health; image/link reachability       | Correct Herd site; 200 health; resources reachable                                                  | Not run |
-| RN-02 | Register unique customer; invalid registration                        | 201 token/user; 422 field errors for invalid input                                                  | Not run |
-| RN-03 | Login; wrong credentials; administrator login                         | 200 customer token; 401 for wrong/admin credentials                                                 | Not run |
-| RN-04 | Own profile read/update                                               | Four approved fields; name/email required; address saved through profile update                     | Not run |
-| RN-05 | Public catalog/search/filter/page/detail                              | 200 data/links/meta, 12/page, correct nullable fields; inactive detail 404                          | Not run |
-| RN-06 | Public branches                                                       | Unpaginated static data; unconfirmed values remain null                                             | Not run |
-| RN-07 | Cart add/re-add/update/remove                                         | 200 refreshed cart; add accumulates, update replaces; correct decimal totals                        | Not run |
-| RN-08 | Quantity zero/excess stock/unavailable product                        | 422 field errors; no incorrect mutation/reservation                                                 | Not run |
-| RN-09 | Checkout preview with valid/empty/conflicting cart                    | 200 options/snapshot or 422 errors.cart                                                             | Not run |
-| RN-10 | Cash pickup and card-at-store pickup                                  | Each 201; pending order/payment, cart cleared, stock deducted once                                  | Not run |
-| RN-11 | GCash pickup and delivery                                             | Each 201 with proof; delivery address required, no nonempty pickup address                          | Not run |
-| RN-12 | Maya pickup and delivery                                              | Same shared wallet rules and state consistency                                                      | Not run |
-| RN-13 | Wallet proof type/size/missing file; cash proof/delivery cash invalid | Appropriate 422; no order/deduction on failed validation                                            | Not run |
-| RN-14 | Own order history/detail, second page                                 | 200; 10/page newest first; persisted price; safe payment status/rejection                           | Not run |
-| RN-15 | Replace rejected GCash and Maya proof                                 | 200 pending payment, rejection cleared, stock/order status unchanged; retry ineligible ->422        | Not run |
-| RN-16 | Guest chatbot product/store/FAQ, follow-up, order question            | 200 gemini/fallback; guest order asks for sign-in without private facts                             | Not run |
-| RN-17 | Customer chatbot public topics, own/foreign order, follow-up          | Owned facts only; foreign/missing order same safe fallback; context reset on identity change        | Not run |
-| RN-18 | Guest/customer recommendation options/results                         | 200; omitted/null preferences valid, real catalog options, deterministic order/reasons, no match [] | Not run |
-| RN-19 | Missing/invalid/revoked bearer; optionally expired fixture            | Protected requests 401; optional-auth invalid supplied token 401; client handles state              | Not run |
-| RN-20 | Customer A uses B's cart/order IDs and valid proof upload             | 404 with valid inputs; no foreign mutations/data exposure                                           | Not run |
-| RN-21 | Valid admin token on profile/cart/orders/chatbot/recommendations      | 403; no mobile administration capabilities; public reads stay public                                | Not run |
-| RN-22 | Chatbot guest/customer and global rate limits                         | 429/Retry-After; correct 5/10/60 scopes; client waits appropriately                                 | Not run |
-| RN-23 | Logout/current-token replay/second-device token                       | 204 empty; revoked token 401; other token valid; client clears state                                | Not run |
+| ID | Exercise in React Native | Expected result / state | Status |
+|---|---|---|---|
+| RN-01 | Device health and native client health; image/link reachability | Correct Herd site; 200 health; resources reachable | Not run |
+| RN-02 | Register unique customer; invalid registration | 201 token/user; 422 field errors for invalid input | Not run |
+| RN-03 | Login; wrong credentials; administrator login | 200 customer token; 401 for wrong/admin credentials | Not run |
+| RN-04 | Own profile read/update | Four approved fields; name/email required; address saved through profile update | Not run |
+| RN-05 | Public catalog/search/filter/page/detail | 200 data/links/meta, 12/page, correct nullable fields; inactive detail 404 | Not run |
+| RN-06 | Public branches | Unpaginated static data; unconfirmed values remain null | Not run |
+| RN-07 | Cart add/re-add/update/remove | 200 refreshed cart; add accumulates, update replaces; correct decimal totals | Not run |
+| RN-08 | Quantity zero/excess stock/unavailable product | 422 field errors; no incorrect mutation/reservation | Not run |
+| RN-09 | Checkout preview with valid/empty/conflicting cart | 200 options/snapshot or 422 errors.cart | Not run |
+| RN-10 | Cash pickup and card-at-store pickup | Each 201; pending order/payment, cart cleared, stock deducted once | Not run |
+| RN-11 | GCash pickup and delivery | Each 201 with proof; delivery address required, no nonempty pickup address | Not run |
+| RN-12 | Maya pickup and delivery | Same shared wallet rules and state consistency | Not run |
+| RN-13 | Wallet proof type/size/missing file; cash proof/delivery cash invalid | Appropriate 422; no order/deduction on failed validation | Not run |
+| RN-14 | Own order history/detail, second page | 200; 10/page newest first; persisted price; safe payment status/rejection | Not run |
+| RN-15 | Replace rejected GCash and Maya proof | 200 pending payment, rejection cleared, stock/order status unchanged; retry ineligible ->422 | Not run |
+| RN-16 | Guest chatbot product/store/FAQ, follow-up, order question | 200 gemini/fallback; guest order asks for sign-in without private facts | Not run |
+| RN-17 | Customer chatbot public topics, own/foreign order, follow-up | Owned facts only; foreign/missing order same safe fallback; context reset on identity change | Not run |
+| RN-18 | Guest/customer recommendation options/results | 200; omitted/null preferences valid, real catalog options, deterministic order/reasons, no match [] | Not run |
+| RN-19 | Missing/invalid/revoked bearer; optionally expired fixture | Protected requests 401; optional-auth invalid supplied token 401; client handles state | Not run |
+| RN-20 | Customer A uses B's cart/order IDs and valid proof upload | 404 with valid inputs; no foreign mutations/data exposure | Not run |
+| RN-21 | Valid admin token on profile/cart/orders/chatbot/recommendations | 403; no mobile administration capabilities; public reads stay public | Not run |
+| RN-22 | Chatbot guest/customer and global rate limits | 429/Retry-After; correct 5/10/60 scopes; client waits appropriately | Not run |
+| RN-23 | Logout/current-token replay/second-device token | 204 empty; revoked token 401; other token valid; client clears state | Not run |
 
 Provider failure/timeout paths have existing deterministic backend coverage. Consumer fallback rendering can be demonstrated with supported safe fallback questions; do not claim a provider outage was exercised unless one was actually observed or deliberately reproduced in an isolated environment.
 
@@ -118,10 +118,10 @@ Record complete returned JSON keys/types needed to diagnose a mismatch, not only
 
 ## 4. Mismatch register and triage
 
-| ID      | Expected                                                                             | Observed / evidence                                                                                                     | Classification / owner                               | Resolution / retest                                                                                     |
-| ------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| ENV-01  | Herd accepts device requests at the chosen laptop LAN address and routes Battlefront | Inspected HTTP listener and herd.conf bind 127.0.0.1:80; no device reachability result supplied                         | Environment / backend developer (local server setup) | Pending LAN routing/listener setup or confirmation of existing forwarding, firewall/device health check |
-| EVID-01 | Actual React Native + Expo evidence for approved journeys                            | Developer confirms real app LAN validation has not occurred; app build, Expo runtime, device details and traces pending | Evidence prerequisite / mobile group member          | RN-01 through RN-23 remain not run                                                                      |
+| ID | Expected | Observed / evidence | Classification / owner | Resolution / retest |
+|---|---|---|---|---|
+| ENV-01 | Herd accepts device requests at the chosen laptop LAN address and routes Battlefront | Inspected HTTP listener and herd.conf bind 127.0.0.1:80; no device reachability result supplied | Environment / backend developer (local server setup) | Pending LAN routing/listener setup or confirmation of existing forwarding, firewall/device health check |
+| EVID-01 | Actual React Native + Expo evidence for approved journeys | Developer confirms real app LAN validation has not occurred; app build, Expo runtime, device details and traces pending | Evidence prerequisite / mobile group member | RN-01 through RN-23 remain not run |
 
 **No API-contract mismatch or React Native defect has been established.** EVID-01 is an evidence gap, not a client bug. ENV-01 is not a Laravel business-rule defect. The registration address and other limitations already documented in EXT-62 remain the baseline; do not label them new defects without a demonstrated conflict.
 

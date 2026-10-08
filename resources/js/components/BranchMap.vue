@@ -1,8 +1,8 @@
 <script setup>
-import 'leaflet/dist/leaflet.css';
+import "leaflet/dist/leaflet.css";
 
-import { MapPinned } from '@lucide/vue';
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { MapPinned } from "@lucide/vue";
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
 const props = defineProps({
     branches: {
@@ -12,7 +12,7 @@ const props = defineProps({
 });
 
 const mapContainer = ref(null);
-const mapState = ref('loading');
+const mapState = ref("loading");
 let mapInstance = null;
 let isUnmounted = false;
 
@@ -39,12 +39,12 @@ const mappedBranches = computed(() =>
 );
 
 const createPopupContent = (branch) => {
-    const container = document.createElement('div');
-    const city = document.createElement('strong');
-    const address = document.createElement('p');
+    const container = document.createElement("div");
+    const city = document.createElement("strong");
+    const address = document.createElement("p");
 
     city.textContent = branch.city;
-    address.textContent = branch.address ?? 'Address not currently available';
+    address.textContent = branch.address ?? "Address not currently available";
 
     container.append(city, address);
 
@@ -52,7 +52,7 @@ const createPopupContent = (branch) => {
 };
 
 const createTooltipContent = (branch) => {
-    const content = document.createElement('span');
+    const content = document.createElement("span");
 
     content.textContent = branch.city;
 
@@ -61,13 +61,13 @@ const createTooltipContent = (branch) => {
 
 onMounted(async () => {
     if (!mapContainer.value || mappedBranches.value.length === 0) {
-        mapState.value = 'unavailable';
+        mapState.value = "unavailable";
 
         return;
     }
 
     try {
-        const { default: leaflet } = await import('leaflet');
+        const { default: leaflet } = await import("leaflet");
 
         if (isUnmounted || !mapContainer.value) {
             return;
@@ -78,7 +78,7 @@ onMounted(async () => {
         });
 
         leaflet
-            .tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            .tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
                 attribution:
                     '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
                 maxZoom: 19,
@@ -94,15 +94,15 @@ onMounted(async () => {
             ];
             const markerOptions = branch.is_operational
                 ? {
-                      color: '#B91C1C',
-                      fillColor: '#B91C1C',
+                      color: "#B91C1C",
+                      fillColor: "#B91C1C",
                       fillOpacity: 0.9,
                       radius: 10,
                       weight: 3,
                   }
                 : {
-                      color: '#2A2E36',
-                      fillColor: '#F8FAFC',
+                      color: "#2A2E36",
+                      fillColor: "#F8FAFC",
                       fillOpacity: 0.9,
                       radius: 8,
                       weight: 3,
@@ -121,9 +121,9 @@ onMounted(async () => {
             maxZoom: 11,
             padding: [32, 32],
         });
-        mapState.value = 'ready';
+        mapState.value = "ready";
     } catch {
-        mapState.value = 'unavailable';
+        mapState.value = "unavailable";
     }
 });
 
@@ -156,9 +156,7 @@ onBeforeUnmount(() => {
             </p>
         </div>
 
-        <figure
-            class="border-border bg-card isolate overflow-hidden border shadow-sm"
-        >
+        <figure class="border-border bg-card isolate overflow-hidden border shadow-sm">
             <div class="relative min-h-96">
                 <div
                     ref="mapContainer"

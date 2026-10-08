@@ -232,13 +232,7 @@ function returnToCatalog() {
                 <RecommendationSection
                     :recommendations="recommendations"
                     placement="product"
-                    :title="
-                        is_personalized
-                            ? 'More to explore'
-                            : has_featured_fallback
-                              ? 'Popular and featured products'
-                              : 'Popular products'
-                    "
+                    :title="is_personalized ? 'More to explore' : has_featured_fallback ? 'Popular and featured products' : 'Popular products'"
                     :description="
                         is_personalized
                             ? 'Suggestions based on completed orders, your cart, and search or product activity you chose to share.'

@@ -1,5 +1,5 @@
 <script setup>
-import { Form, Head, Link, router } from '@inertiajs/vue3';
+import { Form, Head, Link, router } from "@inertiajs/vue3";
 import {
     Eye,
     Pencil,
@@ -10,26 +10,26 @@ import {
     SlidersHorizontal,
     Star,
     X,
-} from '@lucide/vue';
-import { computed, ref, watch } from 'vue';
-import ProductActivationController from '@/actions/App/Http/Controllers/Administration/ProductActivationController';
-import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
-import CatalogNavigation from '@/components/CatalogNavigation.vue';
-import CatalogPagination from '@/components/CatalogPagination.vue';
-import DeactivationDialog from '@/components/DeactivationDialog.vue';
-import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from "@lucide/vue";
+import { computed, ref, watch } from "vue";
+import ProductActivationController from "@/actions/App/Http/Controllers/Administration/ProductActivationController";
+import ProductController from "@/actions/App/Http/Controllers/Administration/ProductController";
+import CatalogNavigation from "@/components/CatalogNavigation.vue";
+import CatalogPagination from "@/components/CatalogPagination.vue";
+import DeactivationDialog from "@/components/DeactivationDialog.vue";
+import { useDebouncedSearch } from "@/composables/useDebouncedSearch";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from '@/components/ui/select';
-import { Spinner } from '@/components/ui/spinner';
+} from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 
 const props = defineProps({
     products: { type: Object, required: true },
@@ -37,10 +37,10 @@ const props = defineProps({
     filter_options: { type: Object, required: true },
 });
 
-const categoryId = ref(String(props.filters.category_id ?? 'all'));
-const brand = ref(props.filters.brand ?? 'all');
-const tagId = ref(String(props.filters.tag_id ?? 'all'));
-const status = ref(props.filters.status ?? 'all');
+const categoryId = ref(String(props.filters.category_id ?? "all"));
+const brand = ref(props.filters.brand ?? "all");
+const tagId = ref(String(props.filters.tag_id ?? "all"));
+const status = ref(props.filters.status ?? "all");
 
 const { search, isSearching, clearSearch, cancelPendingSearch } =
     useDebouncedSearch({
@@ -52,7 +52,7 @@ const { search, isSearching, clearSearch, cancelPendingSearch } =
 
 const hasSearchInput = computed(() => Boolean(search.value.trim()));
 const hasAppliedFilters = computed(() =>
-    ['category_id', 'brand', 'tag_id', 'status'].some(
+    ["category_id", "brand", "tag_id", "status"].some(
         (filter) => props.filters[filter] !== null,
     ),
 );
@@ -60,9 +60,9 @@ const hasActiveQuery = computed(
     () => Boolean(props.filters.q) || hasAppliedFilters.value,
 );
 
-const currencyFormatter = new Intl.NumberFormat('en-PH', {
-    style: 'currency',
-    currency: 'PHP',
+const currencyFormatter = new Intl.NumberFormat("en-PH", {
+    style: "currency",
+    currency: "PHP",
 });
 
 function formatPrice(value) {
@@ -74,7 +74,7 @@ function hideBrokenImage(event) {
 }
 
 function selectedValue(value) {
-    return value === 'all' ? undefined : value;
+    return value === "all" ? undefined : value;
 }
 
 function appliedFilters() {
@@ -110,7 +110,7 @@ function filtersAreCurrent() {
 
     return Object.keys(selected).every(
         (filter) =>
-            String(selected[filter] ?? '') === String(applied[filter] ?? ''),
+            String(selected[filter] ?? "") === String(applied[filter] ?? ""),
     );
 }
 
@@ -138,10 +138,10 @@ function updateFilters() {
 
 function clearFilters() {
     cancelPendingSearch();
-    categoryId.value = 'all';
-    brand.value = 'all';
-    tagId.value = 'all';
-    status.value = 'all';
+    categoryId.value = "all";
+    brand.value = "all";
+    tagId.value = "all";
+    status.value = "all";
 }
 
 watch([categoryId, brand, tagId, status], updateFilters);
@@ -150,7 +150,7 @@ defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: 'Products',
+                title: "Products",
                 href: ProductController.index(),
             },
         ],
@@ -246,8 +246,8 @@ defineOptions({
                     <p class="text-muted-foreground text-xs" aria-live="polite">
                         {{
                             isSearching
-                                ? 'Updating results...'
-                                : 'Results update automatically as you type.'
+                                ? "Updating results..."
+                                : "Results update automatically as you type."
                         }}
                     </p>
                 </div>
@@ -283,7 +283,7 @@ defineOptions({
                                 :value="String(category.id)"
                             >
                                 {{ category.name }}
-                                {{ category.is_active ? '' : '(Inactive)' }}
+                                {{ category.is_active ? "" : "(Inactive)" }}
                             </SelectItem>
                         </SelectContent>
                     </Select>
@@ -374,15 +374,15 @@ defineOptions({
                     <p class="mt-3 font-medium">
                         {{
                             hasActiveQuery
-                                ? 'No products match this query'
-                                : 'No products available'
+                                ? "No products match this query"
+                                : "No products available"
                         }}
                     </p>
                     <p class="text-muted-foreground mt-1 text-sm">
                         {{
                             hasActiveQuery
-                                ? 'Try another search term or clear the applied filters.'
-                                : 'Add the first Battlefront catalog product to get started.'
+                                ? "Try another search term or clear the applied filters."
+                                : "Add the first Battlefront catalog product to get started."
                         }}
                     </p>
                     <Button v-if="!hasActiveQuery" as-child class="mt-5">
@@ -424,7 +424,7 @@ defineOptions({
                                     product.is_active ? 'secondary' : 'outline'
                                 "
                             >
-                                {{ product.is_active ? 'Active' : 'Inactive' }}
+                                {{ product.is_active ? "Active" : "Inactive" }}
                             </Badge>
                             <Badge v-if="product.is_featured" variant="outline">
                                 <Star />
@@ -466,8 +466,8 @@ defineOptions({
                         <p class="text-muted-foreground text-xs">
                             {{
                                 product.discount_price
-                                    ? 'Discount price'
-                                    : 'Regular price'
+                                    ? "Discount price"
+                                    : "Regular price"
                             }}
                         </p>
                         <p class="mt-1 font-semibold tabular-nums">

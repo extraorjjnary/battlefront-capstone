@@ -1,6 +1,6 @@
 ---
 paths:
-    - 'app/**,database/**,resources/js/**'
+    - "app/**,database/**,resources/js/**"
 ---
 
 # App Js

@@ -84,7 +84,7 @@ All five seeded branches use the configured customer-facing operating-hours valu
 | Escalante City  | Not yet confirmed                                | Not yet confirmed                    | Not yet confirmed; no official branch page is currently available                                                    |
 | San Carlos City | Not listed on the available official branch page | Not yet confirmed                    | Carmona St., Brgy. V, San Carlos City, Negros Occidental, San Carlos City, Philippines 6127                          |
 | Guihulngan City | 0947 946 5723                                    | battlefrontcomputertrading@gmail.com | L&E Arcade, Larena St., Brgy. Poblacion, Guihulngan City, Guihulngan, Philippines 6214                               |
-| Bacolod City    | 0961 176 4608                                    | battlefrontbacolod@gmail.com         | Downtown, Along SKG Shopping Center, Beside Ukay-Ukayan 58 Lizares St. Brgy. 13, Bacolod CIty, Philippines, 6100     |
+| Bacolod City | 0961 176 4608 | battlefrontbacolod@gmail.com | Downtown, Along SKG Shopping Center, Beside Ukay-Ukayan 58 Lizares St. Brgy. 13, Bacolod CIty, Philippines, 6100 |
 
 These reference values come from `database/seeders/BranchSeeder.php` and `config/battlefront.php`. Sagay City and Guihulngan City share the configured email address; Bacolod has a separate configured email. Unconfirmed values must remain null or undisplayed instead of being copied to other branches as verified facts.
 
@@ -415,6 +415,7 @@ Search and view personalization are enabled by default for signed-in customers, 
 
 Every response rechecks active product/category eligibility and positive live Sagay stock. Recommendations use current effective prices, exclude items already purchased or in the cart from personalized candidates, avoid duplicate products, mix categories when enough relevant candidates exist, and include a reason tied to the signal used. The engine does not claim technical PC-part compatibility.
 
+
 The web page and home/product/cart sections use the behavior-driven engine. The mobile API has an additive public GET feed and an authenticated personalized feed with the same product/reason shape. The released v1 criteria/options endpoints remain during the mobile client transition; removing them requires confirmed mobile cutover. React Native client integration and refresh validation remain pending.
 
 The module operates using Battlefront's internal catalog, completed orders, cart, and signed-in customer search/view activity unless the customer disables either activity signal in profile settings. The chatbot does not receive recommendation history or make recommendation decisions.
@@ -456,12 +457,12 @@ EXT-40 owns this contract; EXT-42 consumes it. The development manifest moves fr
 
 Coverage is a setup/import/data-preparation declaration that records are complete for the named product, interval, and sales scope. It does not prove full-store coverage if the declared scope is only captured system transactions. Never infer completeness from earliest Sale, Product.created_at, or generated zero buckets. Setup/import/quarter-close preparation explicitly advances coverage; the clock alone does not.
 
-| Condition for the required window                                                                                               | Outcome                            |
-| ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| Trusted complete 36-month history satisfying model eligibility                                                                  | ready                              |
-| Valid complete gap-free declaration reaching T, with only 0–35 required months covered                                          | insufficient_history; save nothing |
-| Missing/malformed/uncertain metadata, stale end before T, or an unavailable month in the covered portion of the required window | history_unavailable; save nothing  |
-| Complete non-all-zero history failing the sparse-demand policy below                                                            | history_unsuitable; save nothing   |
+| Condition for the required window | Outcome |
+| --- | --- |
+| Trusted complete 36-month history satisfying model eligibility | ready |
+| Valid complete gap-free declaration reaching T, with only 0–35 required months covered | insufficient_history; save nothing |
+| Missing/malformed/uncertain metadata, stale end before T, or an unavailable month in the covered portion of the required window | history_unavailable; save nothing |
+| Complete non-all-zero history failing the sparse-demand policy below | history_unsuitable; save nothing |
 
 Coverage failures take precedence over short-history/model eligibility checks. Ignore unavailable months outside the selected source window. For missing/unavailable/short coverage, do not construct a supposedly forecast-ready zero series. After coverage is established, empty covered months are valid zero observations.
 
@@ -565,15 +566,15 @@ The completed forward migration extends the MySQL forecasts_method_valid check a
 
 ## Issue Ownership and Current Implementation
 
-| Issue  | Approved responsibility                                                         | Implementation           |
-| ------ | ------------------------------------------------------------------------------- | ------------------------ |
-| EXT-36 | Parent tracking and final acceptance                                            | Pending human acceptance |
-| EXT-40 | 48-month development history and monthly trusted coverage                       | Implemented              |
-| EXT-42 | Trusted 36-month preparation, monthly aggregation and sparse eligibility        | Implemented              |
-| EXT-43 | Additive Holt–Winters calculation, bounded parameter fitting and evaluation     | Implemented              |
-| EXT-45 | New production output validation and compatible method-constraint migration     | Implemented              |
-| EXT-46 | Existing simple workflow adapted to monthly history and three estimates         | Implemented              |
-| EXT-44 | Final retirement of obsolete production paths; retain used evaluation baselines | Cleanup in review        |
+| Issue | Approved responsibility | Implementation |
+| --- | --- | --- |
+| EXT-36 | Parent tracking and final acceptance | Pending human acceptance |
+| EXT-40 | 48-month development history and monthly trusted coverage | Implemented |
+| EXT-42 | Trusted 36-month preparation, monthly aggregation and sparse eligibility | Implemented |
+| EXT-43 | Additive Holt–Winters calculation, bounded parameter fitting and evaluation | Implemented |
+| EXT-45 | New production output validation and compatible method-constraint migration | Implemented |
+| EXT-46 | Existing simple workflow adapted to monthly history and three estimates | Implemented |
+| EXT-44 | Final retirement of obsolete production paths; retain used evaluation baselines | Cleanup in review |
 
 The implementation order was **EXT-40 → EXT-42 → EXT-43 → EXT-45 → EXT-46 → EXT-44**. EXT-44 removes unused trend calculation and quarterly production preparation while retaining the Moving Average evaluation baseline. Existing parent external dependencies are preserved.
 
@@ -844,19 +845,19 @@ Documentation-only updates require source/diff review rather than invented featu
 
 General status snapshot verified against Linear on **2026-10-01**; the forecasting row reflects the implemented EXT-40/42/43/45/46 migration and EXT-44 cleanup:
 
-| Area                                                                             | State                                                                 | Evidence / remaining boundary                                                                                                       |
-| -------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Core catalog, inventory, roles, and branch reference                             | Complete                                                              | Implemented routes/models/services and completed core issues                                                                        |
-| Cart, checkout, orders, manual payments, cancellation restoration, sales/reports | Complete                                                              | EXT-22–27, EXT-28–34, EXT-80–83 Done                                                                                                |
-| Criteria-based recommendations                                                   | Historically complete                                                 | EXT-35, EXT-37-39, EXT-41, EXT-64 Done; approved manuscript baseline and released mobile contract                                   |
-| Behavior-driven recommendation replacement                                       | In progress                                                           | Product direction implemented in the current workspace; adviser amendment, mobile cutover, and evaluation approval are not recorded |
-| Integrated chatbot                                                               | Complete                                                              | EXT-47–55 and EXT-61 Done                                                                                                           |
-| Mobile API foundation/customer endpoints                                         | Complete                                                              | EXT-56–61 and EXT-64 Done                                                                                                           |
-| Mobile handoff and Postman collection                                            | Complete                                                              | EXT-62 Done; developer-reported successful manual Postman Desktop verification                                                      |
-| Actual React Native + Expo integration                                           | Pending                                                               | EXT-63 Backlog; preparation complete, real LAN consumer journeys not run                                                            |
-| Predictive analytics and historical development data                             | Monthly Holt–Winters production implemented; final acceptance pending | EXT-40/42/43/45/46 are implemented; EXT-44 retires obsolete production paths, and EXT-36 awaits human acceptance                    |
-| Cross-module integration and release-quality checks                              | Pending                                                               | EXT-65–72 Backlog                                                                                                                   |
-| Deployment, pilot evaluation, and release candidate                              | Pending                                                               | EXT-73–79 Backlog                                                                                                                   |
+| Area | State | Evidence / remaining boundary |
+| --- | --- | --- |
+| Core catalog, inventory, roles, and branch reference | Complete | Implemented routes/models/services and completed core issues |
+| Cart, checkout, orders, manual payments, cancellation restoration, sales/reports | Complete | EXT-22–27, EXT-28–34, EXT-80–83 Done |
+| Criteria-based recommendations | Historically complete | EXT-35, EXT-37-39, EXT-41, EXT-64 Done; approved manuscript baseline and released mobile contract |
+| Behavior-driven recommendation replacement | In progress | Product direction implemented in the current workspace; adviser amendment, mobile cutover, and evaluation approval are not recorded |
+| Integrated chatbot | Complete | EXT-47–55 and EXT-61 Done |
+| Mobile API foundation/customer endpoints | Complete | EXT-56–61 and EXT-64 Done |
+| Mobile handoff and Postman collection | Complete | EXT-62 Done; developer-reported successful manual Postman Desktop verification |
+| Actual React Native + Expo integration | Pending | EXT-63 Backlog; preparation complete, real LAN consumer journeys not run |
+| Predictive analytics and historical development data | Monthly Holt–Winters production implemented; final acceptance pending | EXT-40/42/43/45/46 are implemented; EXT-44 retires obsolete production paths, and EXT-36 awaits human acceptance |
+| Cross-module integration and release-quality checks | Pending | EXT-65–72 Backlog |
+| Deployment, pilot evaluation, and release candidate | Pending | EXT-73–79 Backlog |
 
 ## Completed Mobile API Scope
 

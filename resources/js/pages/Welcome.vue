@@ -176,13 +176,7 @@ const customerHighlights = [
                 <RecommendationSection
                     :recommendations="recommendations"
                     placement="home"
-                    :title="
-                        is_personalized
-                            ? 'Picked from your activity'
-                            : has_featured_fallback
-                              ? 'Popular and featured products'
-                              : 'Popular with customers'
-                    "
+                    :title="is_personalized ? 'Picked from your activity' : has_featured_fallback ? 'Popular and featured products' : 'Popular with customers'"
                     :description="
                         is_personalized
                             ? 'Suggestions from your catalog searches, viewed products, cart, and completed purchases.'
