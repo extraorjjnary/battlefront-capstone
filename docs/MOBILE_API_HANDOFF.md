@@ -472,9 +472,9 @@ Checkout cart lines omit the ordinary cart's availability and category/price fie
   "handling_surcharge": "0.00",
   "delivery_fee": "80.00",
   "preparation_days": 1,
-  "transit_min_days": 1,
+  "transit_min_days": 0,
   "transit_max_days": 1,
-  "eta_min_days": 2,
+  "eta_min_days": 1,
   "eta_max_days": 2,
   "carrier": "lbc",
   "packing_expectation": "Standard packing",
@@ -490,7 +490,7 @@ Checkout cart lines omit the ordinary cart's availability and category/price fie
 
 Display the selected entry's monetary values; `total` is product subtotal plus delivery fee. Mixed carts use their highest persisted shipping profile (`standard < fragile < bulky`) once, regardless of quantities/line count. Fees and dates are Battlefront-configured demo estimates, not live LBC quotations or tracking. Display carrier `lbc` as **LBC**, the packing expectation, estimate notice and demo assumption label.
 
-Calendar dates are checkout-only presentation. One server quote-generation date in `config('app.timezone')` (currently UTC) anchors all 12 windows in a response. Minimum/maximum total days are added as calendar days, without weekend/holiday adjustment. Treat date strings as civil dates in the returned timezone; do not shift them through the device timezone. Arrival is provisional and subject to payment verification. Refresh checkout after cart changes and before paying; placement independently recalculates current prices, profiles and configured fees/relative ETA. Neither preview quotes nor calendar windows are trusted placement inputs.
+Calendar dates are checkout-only presentation. One server quote-generation date in `config('app.timezone')` (currently UTC) anchors all 12 windows in a response. Minimum/maximum total days are preparation plus transit, added as calendar days without weekend/holiday adjustment. Zero transit days means same-day transit once preparation is ready; persisted historical snapshots keep their original ranges. Treat date strings as civil dates in the returned timezone; do not shift them through the device timezone. Arrival is provisional and subject to payment verification. Refresh checkout after cart changes and before paying; placement independently recalculates current prices, profiles and configured fees/relative ETA. Neither preview quotes nor calendar windows are trusted placement inputs.
 
 ### POST /orders
 
@@ -546,7 +546,8 @@ Client fee/base fee/surcharge/profile/preparation/transit/ETA/subtotal/total val
     "fulfillment": {
       "value": "pickup",
       "label": "Pickup",
-      "delivery_address": null
+      "delivery_address": null,
+      "delivery_destination": null
     },
     "payment": {
       "method": {
@@ -581,6 +582,7 @@ Client fee/base fee/surcharge/profile/preparation/transit/ETA/subtotal/total val
     "product_subtotal": "200.00",
     "delivery_fee": "0.00",
     "delivery_quote": null,
+    "shipment": null,
     "total": "200.00"
   }
 }
@@ -588,7 +590,42 @@ Client fee/base fee/surcharge/profile/preparation/transit/ETA/subtotal/total val
 
 Order item prices/quantities are persisted snapshots; displayed product names/brand/image come from current related product records. `payment.rejection` is null or `{"reason":"customer-facing explanation","note":null}` (note may be string). Use returned `can_resubmit_proof`; no proof path or download URL is exposed.
 
-Detail responses add saved `product_subtotal`, `delivery_fee` and `delivery_quote`; existing `total` remains the final total. Quoted delivery `delivery_quote` contains the quote-entry fields above **except** `eta_anchor_date`, `eta_timezone`, `estimated_delivery_start`, and `estimated_delivery_end`. Its fees, destination, profile, carrier, assumptions and relative ETA come from saved Order/Shipment snapshots, never current configuration. Pickup/legacy unquoted delivery has `delivery_quote: null`; unknown legacy `product_subtotal` stays null and original totals remain unchanged. History summaries retain their existing shape. Shipment lifecycle/tracking and notifications belong to EXT-89/90.
+Detail `fulfillment.delivery_destination` contains the separately selected canonical city/municipality saved on the order. Display it alongside `fulfillment.delivery_address` in submitted details. It remains null for pickup and legacy orders without a saved destination; never infer it from the free-text address or current configuration. Web and API expose the same value, including when shipment data is unavailable. History summaries retain their existing shape.
+
+Detail responses add saved `product_subtotal`, `delivery_fee`, `delivery_quote` and nullable `shipment`; existing `total` remains the final total. Quoted delivery `delivery_quote` contains the quote-entry fields above **except** `eta_anchor_date`, `eta_timezone`, `estimated_delivery_start`, and `estimated_delivery_end`. Its fees, destination, profile, carrier, assumptions and relative ETA come from saved Order/Shipment snapshots, never current configuration. Pickup/legacy unquoted delivery has `delivery_quote: null` and `shipment: null`; unknown legacy `product_subtotal` stays null and original totals remain unchanged. History summaries retain their existing shape. EXT-89's shipment detail contract follows; notifications remain deferred to EXT-90.
+
+### Manual shipment detail — EXT-89
+
+GET order detail, successful placement and payment-proof replacement share the same nullable `shipment` object. For example, a standard-profile Bacolod shipment whose preparation started on October 8, 2026 in UTC:
+
+```json
+{
+  "carrier": "lbc",
+  "status": {"value": "preparing", "label": "Preparing for shipment"},
+  "tracking_reference": null,
+  "eta": {
+    "anchor_date": "2026-10-08",
+    "timezone": "UTC",
+    "estimated_delivery_start": "2026-10-10",
+    "estimated_delivery_end": "2026-10-11",
+    "notice": "Battlefront estimate from the start of preparation; arrival is not guaranteed."
+  },
+  "timeline": [
+    {"status": "awaiting_preparation", "label": "Awaiting preparation", "occurred_at": "2026-10-08T08:00:00+00:00"},
+    {"status": "preparing", "label": "Preparing for shipment", "occurred_at": "2026-10-08T09:00:00+00:00"}
+  ],
+  "notice": "Shipment status is manually maintained by Battlefront. This is not live LBC or GPS tracking.",
+  "history_notice": null
+}
+```
+
+Forward values are `awaiting_preparation`, `preparing`, `ready_for_dispatch`, `handed_to_lbc`, `in_transit`, `out_for_delivery`, `delivered`. `cancelled` is a separate terminal outcome from eligible administrator order cancellation. Shipment status is independent of order/payment status: awaiting preparation means only a record exists. Progression starts only after payment verification and explicit order processing. Delivered atomically completes the order and records one sale; cancellation terminates shipment progression and restores eligible order quantities once.
+
+Render the returned status label and `notice`. Read destination/fee components from `delivery_quote`, the detailed address from `fulfillment.delivery_address`, and operational dates from `shipment.eta`. These dates are persisted once at preparation using saved total ETA days; they do not drift when configuration changes or the client refreshes. Before preparation, all four ETA date/timezone fields are null: show the saved relative day range without inventing calendar dates. Treat civil dates in the supplied timezone without converting them through the device timezone. For cancelled shipments, label retained dates as the original estimate.
+
+`tracking_reference` is null until a real value is manually supplied at handoff or later. Display it only when nonempty; Battlefront may correct or clear it without advancing status. Render `timeline` in its returned chronological order, containing only recorded timestamps. Creation is the awaiting-preparation milestone, never proof that packing began. Historical unavailable timestamps remain absent. Previously completed orders may include `history_notice` explaining that delivery milestones were not recorded; show this notice instead of reconstructing dates. Pickup and legacy orders without shipments expose no tracking section.
+
+Only the owning customer can read shipment detail; foreign/missing orders remain 404. Customer bearer tokens cannot mutate shipment milestones, tracking references or payment verification. No shipment mutation endpoint exists under `/api/v1`. Updates occur in the existing web administration workflow. Do not fabricate references, carrier locations, maps or GPS data; there is no live LBC integration, courier booking or notification delivery in EXT-89. The React Native UI remains the separate mobile project's responsibility.
 
 Order status values: pending, processing, completed, cancelled. Labels reflect fulfillment (e.g. Preparing for pickup / Preparing for delivery). Payment statuses: pending, verified, rejected. They are separate state machines; proof submission is not payment verification.
 
@@ -850,6 +887,8 @@ Use a disposable development database/account with an active product, live Sagay
 4. **Cart:** Add stock-eligible product (200), verify captured cart_item_id; update quantity and totals; remove (200). Add again before checkout. Try quantity zero, quantity above stock, and an unavailable product (422); failed operations must not corrupt the cart.
 5. **Checkout/orders:** Preview checkout (200), verify all 12 server quotes and select a destination. Check standard/fragile/bulky and mixed carts, subtotal/fee/final total, LBC/demo wording and provisional calendar windows. Submit cash/card pickup (201, zero fee/no Shipment); omit address and destination. Refill before each wallet placement, select an image, and include canonical destination plus detailed address for delivery. Try missing/unsupported/wrong-case/array destinations, pickup destination/address, and forged quote fields. Verify recalculated saved fees/relative ETA, pending order/payment, cart consumption and inventory deduction through existing web administration.
 6. **Replacement proof:** Reject the test wallet payment through existing web administration. Set rejected_order_id, select a replacement image, submit (200). Verify pending payment, cleared rejection, unchanged order status/stock. Retry while payment is pending (422). Test unsupported file type and >5 MB (422 when Laravel handles it).
+
+   **Shipment tracking:** Using a delivery test order, verify that pending payment/order offers no shipment progression. Manually verify payment, move the order to Processing, and advance each shipment milestone separately through web administration. After each action compare customer web detail and GET /orders/{order}: status, saved ETA/fees/destination and chronological timestamps must agree. Leave reference blank unless a real value is available. Confirm Delivered completes the order with one sale; use a second eligible order to verify cancellation terminates shipment and restores stock once. Verify pickup/legacy orders have no shipment UI and a second customer's token receives 404. No notification, map or live carrier data is expected.
 7. **Customer chatbot/recommendations:** Ask about the captured own order reference. Check customer follow-up. Exercise recommendation preferences, omitted/null brand, a budget with no matches, ranking/reasons, and available stock. Compare with web using the same current data.
 8. **Ownership/roles:** Prepare a second customer's cart/order and use their IDs under the first token: 404. Foreign order chatbot: safe 200 fallback. With an out-of-band valid administrator test token: profile/chatbot/recommendations 403. Invalid/expired/revoked credentials: 401. Web session alone is insufficient for personal API data.
 9. **Rate limits:** After the window resets, send five guest unsupported chatbot questions (e.g. Tell me a joke.), then the dedicated sixth-request check expects 429/Retry-After. Customer limit is ten across web/devices. Registration/login have five-request limits; global limit is 60/IP. Perform these separately to avoid unrelated limits masking results.
@@ -868,10 +907,10 @@ The developer subsequently reported completing manual tests in Postman Desktop w
 
 - Routing/access: `routes/api.php`, `AuthorizeApiChatbot`, `AuthorizeApiRecommendations`, `AppServiceProvider`, `FortifyServiceProvider`, `config/sanctum.php`, `bootstrap/app.php`.
 - Fields/validation: `app/Http/Requests`, shared profile/password concerns, API AuthController.
-- Response shapes: `app/Http/Resources/Api/V1`, `CatalogProductPresenter`, `CustomerOrderPresenter`, `BuildCartViewData`, `PrepareCheckout`.
-- Domain rules: `CartService`, `OrderPlacementService`, `ResubmitPaymentProof`, `ProductCatalogRepository`, `RecommendationEngine`, shared chatbot services.
+- Response shapes: `app/Http/Resources/Api/V1`, `CatalogProductPresenter`, `CustomerOrderPresenter`, `ShipmentPresenter`, `BuildCartViewData`, `PrepareCheckout`.
+- Domain rules: `CartService`, `OrderPlacementService`, `OrderProcessingService`, `ResubmitPaymentProof`, `ProductCatalogRepository`, `RecommendationEngine`, shared chatbot services.
 - Contract tests: `tests/Feature/ApiFoundationTest.php`, `MobileAuthenticationTest.php`, `MobileProfileTest.php`, `MobileCatalogTest.php`, `MobileBranchTest.php`, and `tests/Feature/Api/V1`.
 
 Known implementation details are documented, not changed: registration's validated-but-unsaved address; different page validation between products/orders; stateless guest context is not per-device identity; private proof has no mobile download endpoint.
 
-No mobile password reset/change, token refresh, customer order cancellation, admin operations, payment gateways, courier tracking, compatibility checking, or new endpoints are introduced by this handoff.
+No mobile password reset/change, token refresh, customer order cancellation, admin operations, payment gateways, live courier/GPS tracking, compatibility checking, or new API endpoints are introduced by this handoff. EXT-89 exposes manual shipment facts through the existing order detail endpoints.

@@ -25,6 +25,15 @@ use Illuminate\Support\Carbon;
  * @property string|null $tracking_reference
  * @property Carbon|null $handed_to_carrier_at
  * @property Carbon|null $delivered_at
+ * @property Carbon|null $preparing_at
+ * @property Carbon|null $ready_for_dispatch_at
+ * @property Carbon|null $in_transit_at
+ * @property Carbon|null $out_for_delivery_at
+ * @property Carbon|null $cancelled_at
+ * @property Carbon|null $eta_anchor_date
+ * @property string|null $eta_timezone
+ * @property Carbon|null $estimated_delivery_start
+ * @property Carbon|null $estimated_delivery_end
  * @property Carbon $created_at
  * @property Carbon $updated_at
  * @property-read Order $order
@@ -32,6 +41,8 @@ use Illuminate\Support\Carbon;
 #[Fillable([
     'order_id', 'carrier', 'status', 'preparation_days', 'transit_min_days', 'transit_max_days',
     'eta_min_days', 'eta_max_days', 'tracking_reference', 'handed_to_carrier_at', 'delivered_at',
+    'preparing_at', 'ready_for_dispatch_at', 'in_transit_at', 'out_for_delivery_at', 'cancelled_at',
+    'eta_anchor_date', 'eta_timezone', 'estimated_delivery_start', 'estimated_delivery_end',
 ])]
 class Shipment extends Model
 {
@@ -69,6 +80,12 @@ class Shipment extends Model
             if (! $hasQuotedDeliveryOrder) {
                 throw new DomainException('Shipments require a quoted delivery order.');
             }
+
+            if ($shipment->exists && $shipment->getRawOriginal('eta_anchor_date') !== null && $shipment->isDirty([
+                'eta_anchor_date', 'eta_timezone', 'estimated_delivery_start', 'estimated_delivery_end',
+            ])) {
+                throw new DomainException('The operational shipment estimate cannot be changed.');
+            }
         });
     }
 
@@ -84,6 +101,14 @@ class Shipment extends Model
             'eta_max_days' => 'integer',
             'handed_to_carrier_at' => 'datetime',
             'delivered_at' => 'datetime',
+            'preparing_at' => 'datetime',
+            'ready_for_dispatch_at' => 'datetime',
+            'in_transit_at' => 'datetime',
+            'out_for_delivery_at' => 'datetime',
+            'cancelled_at' => 'datetime',
+            'eta_anchor_date' => 'date',
+            'estimated_delivery_start' => 'date',
+            'estimated_delivery_end' => 'date',
         ];
     }
 }

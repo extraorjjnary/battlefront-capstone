@@ -30,6 +30,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | config/**,app/Models/Branch.php,resources/js/** | .ai/rules/js.md |
 | app/Models/{Order,Shipment}.php,app/Services/Order/**,database/factories/{Order,Shipment}Factory.php,database/migrations/*delivery_snapshots*,database/migrations/*shipments* | .ai/rules/migrations-migrations.md |
 | database/migrations/** | .ai/rules/migrations.md |
+| app/Services/Order/**,app/Models/Shipment.php,resources/js/pages/**/Orders/** | .ai/rules/models-js-pages-orders.md |
 | config/**,database/seeders/**,app/Models/Branch.php,resources/js/** | .ai/rules/models-js.md |
 | app/Models/**,database/migrations/**, app/Models/{Order,OrderItem}.php,database/migrations/*_create_order*_table.php | .ai/rules/models-migrations.md |
 | database/migrations/**,app/Models/** | .ai/rules/models.md |

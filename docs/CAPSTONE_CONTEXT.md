@@ -678,7 +678,7 @@ Current migrations/models implement the following core entities:
 - Cart Items
 - Orders
 - Order Items
-- Shipments (EXT-87 persistence; shipment workflow is deferred)
+- Shipments (EXT-87 persistence and EXT-89 manual workflow)
 - Sales
 - Forecasts
 - Chatbot Knowledge
@@ -786,18 +786,18 @@ The reusable Laravel `DeliveryRules` service reads `battlefront.delivery` config
 
 | Destination | Base fee (PHP) | Transit days |
 | --- | --- | --- |
-| Sagay City | 80.00 | 1 |
-| Escalante City | 100.00 | 1–2 |
-| Cadiz City | 120.00 | 1–2 |
-| Toboso | 140.00 | 2–3 |
-| Manapla | 160.00 | 2–3 |
-| Calatrava | 180.00 | 2–3 |
-| Victorias City | 180.00 | 2–3 |
-| E.B. Magalona | 200.00 | 2–4 |
-| San Carlos City | 220.00 | 2–4 |
-| Silay City | 220.00 | 2–4 |
-| Talisay City | 240.00 | 2–4 |
-| Bacolod City | 250.00 | 2–4 |
+| Sagay City | 80.00 | 0–1 |
+| Escalante City | 100.00 | 1 |
+| Cadiz City | 120.00 | 1 |
+| Toboso | 140.00 | 1 |
+| Manapla | 160.00 | 1 |
+| Calatrava | 180.00 | 1 |
+| Victorias City | 180.00 | 1 |
+| E.B. Magalona | 200.00 | 1–2 |
+| San Carlos City | 220.00 | 1–2 |
+| Silay City | 220.00 | 1–2 |
+| Talisay City | 240.00 | 1–2 |
+| Bacolod City | 250.00 | 1–2 |
 
 | Shipping profile | Handling surcharge (PHP) | Preparation days |
 | --- | --- | --- |
@@ -805,11 +805,11 @@ The reusable Laravel `DeliveryRules` service reads `battlefront.delivery` config
 | fragile | 50.00 | 2 |
 | bulky | 100.00 | 3 |
 
-Priority is explicitly `standard < fragile < bulky`. Delivery fee is the destination base fee plus the highest applicable surcharge **once**, regardless of cart line count or quantity. Money remains two-decimal strings, added with BCMath at scale 2. Relative ETA minimum/maximum is the selected profile's preparation days plus the destination transit minimum/maximum; no date anchor, holiday policy, or guaranteed courier arrival is implied.
+Priority is explicitly `standard < fragile < bulky`. Delivery fee is the destination base fee plus the highest applicable surcharge **once**, regardless of cart line count or quantity. Money remains two-decimal strings, added with BCMath at scale 2. Relative ETA minimum/maximum is the selected profile's preparation days plus the destination transit minimum/maximum; no date anchor, holiday policy, or guaranteed courier arrival is implied. Zero transit days means same-day transit once preparation is ready. Revised transit assumptions apply to new quotes only; persisted order/shipment snapshots retain their original values. A forward compatibility migration allows non-negative transit minima while preserving the other shipment snapshot constraints and existing rows.
 
 `DeliveryRules::destinations()` lists canonical names and rules; `destination()` rejects unsupported names with `DomainException`. `handling()` accepts a `ShippingProfile`, and `highestProfile()` reads an iterable of server-loaded Products. `quote()` accepts a `FulfillmentMethod`, optional canonical destination name, and those Products; callers cannot supply fee, preparation, surcharge, or ETA values. Quotes include origin, demo identification, selected profile, fee components, and day ranges. Destination lookup is exact and never parses a free-text address. Empty delivery product lists or products lacking a loaded profile raise `InvalidArgumentException`. Pickup returns no delivery quote before destination or product evaluation.
 
-EXT-86 implements the rule layer and product assignment field only. EXT-87 supplies quote snapshot/shipment persistence, and EXT-88 now applies the rules through shared web/mobile checkout and strict delivery placement. Shipment workflow, notifications, and live tracking remain later work.
+EXT-86 implements the rule layer and product assignment field only. EXT-87 supplies quote snapshot/shipment persistence, and EXT-88 applies the rules through shared web/mobile checkout and strict delivery placement. EXT-89 adds manual shipment progression and customer tracking. Notifications remain EXT-90 work; live courier/GPS tracking is outside scope.
 
 ### Delivery Snapshot and Shipment Persistence — EXT-87
 
@@ -819,15 +819,15 @@ Order owns `delivery_destination`, `delivery_base_fee`, `shipping_profile`, `han
 
 Shipment owns the configured manual carrier (`battlefront.delivery.carrier`, initially `lbc`), its separate enum-cast status, and `preparation_days`, `transit_min_days`, `transit_max_days`, `eta_min_days`, and `eta_max_days`. It reads the immutable handling profile through its Order relationship rather than copying that profile into a second column. The unique order foreign key permits one Shipment per quoted delivery order and restricts deletion of its owning order. Shipment model persistence rejects pickup and unquoted legacy orders and protects ownership, carrier, and relative ETA context from subsequent edits.
 
-Initial status is **`awaiting_preparation`** while order/payment are pending. It means only that the shipment record exists; it does not imply packing or dispatch. Order payment/status updates, proof resubmission, cancellation restoration, and completed-order sales recording retain their existing behavior and do not change Shipment status. Sales continue using the persisted final `Order.total_amount`. EXT-89 must extend the allowed shipment statuses and implement the payment/order-processing conditions for `awaiting_preparation → preparing` and later transitions.
+Initial status is **`awaiting_preparation`** while order/payment are pending. It means only that the shipment record exists; it does not imply packing or dispatch. Payment decisions, order processing and proof resubmission do not advance shipments. EXT-89 now coordinates shipment delivery/order completion and cancellation through the existing service workflow. Sales continue using the persisted final `Order.total_amount`.
 
-`tracking_reference`, `handed_to_carrier_at`, and `delivered_at` remain nullable until actual manually supplied data is recorded by later workflow. No reference or calendar estimate is persisted, and no GPS/location, status-note, timeline, or notification feature is introduced. Shipment has ordinary creation/update timestamps; those do not establish an ETA date anchor. EXT-88's checkout-only calendar presentation is described below.
+`tracking_reference`, `handed_to_carrier_at`, and `delivered_at` remain nullable until the manual workflow records the relevant data. EXT-87 itself introduced no calendar anchor or timeline; EXT-89's operational estimates and milestones are described below. Shipment creation/update timestamps never substitute for preparation or delivery dates. There are no GPS/location, status-note, or notification fields.
 
 Pickup placement saves its product subtotal and zero delivery fee and creates no Shipment. EXT-88 now routes all web/mobile delivery submissions through `OrderPlacementService::executeWithDeliveryQuote()` using the validated canonical destination. The original `execute()` compatibility entrypoint remains available internally and serves pickup; it is no longer the customer delivery HTTP path. A free-text address is never parsed or treated as a configured zone. Existing pre-revision orders remain readable with their original totals and nullable unknown snapshot fields.
 
 Eloquent update guards protect placed commercial snapshots; database constraints validate quote completeness, non-negative amounts, monetary consistency, allowed profile/status values, and relative ETA consistency. Snapshot mutation must not bypass model guards through query-builder updates. Migration rollback refuses to discard saved delivery quotes or shipments; preserve historical data and use a forward migration instead. Opt-in order snapshot and shipment factories use DeliveryRules without changing existing fixture defaults or seeding operational shipments.
 
-EXT-88 implements shared checkout/API quoting and wiring; EXT-89 owns shipment controls, transitions, operational shipment date anchoring, and customer tracking views; EXT-90 owns notifications. None of those behaviors is implemented by EXT-87 itself.
+EXT-88 implements shared checkout/API quoting and wiring; EXT-89 implements shipment controls, transitions, operational shipment date anchoring, and customer tracking views; EXT-90 owns notifications. None of those behaviors is implemented by EXT-87 itself.
 
 ### Shared Delivery Checkout — EXT-88
 
@@ -839,7 +839,21 @@ Delivery quotes include origin/destination, profile, base fee, handling surcharg
 
 `ValidateCheckoutRequest` requires a scalar configured `delivery_destination` for delivery and prohibits nonempty destination/address values for pickup. Missing, unsupported, noncanonical/wrong-case and array inputs fail with destination validation errors. The explicit checkout input allowlist ignores supplied prices, surcharge, profile, relative ETA, calendar dates, subtotal/final total and nested quotes. `PlaceCustomerOrder` calls EXT-87's strict entrypoint for delivery and its existing pickup entrypoint otherwise. Placement recalculates fees and relative ETA from locked current products/configuration and retains atomic order/items/Shipment/stock/cart behavior and private proof cleanup. Quote previews never reserve stock or persist shipments.
 
-Shared customer order detail adds saved `product_subtotal`, `delivery_fee` and nullable `delivery_quote`; existing `total` remains the final total and history summaries retain their contract. The detail quote reads immutable Order/Shipment commercial/carrier/relative-ETA facts rather than current rules. It omits checkout calendar windows; legacy unknown subtotal/quote remains null. Web confirmation/detail shows the stored breakdown and relative estimate without introducing a tracking timeline. Payment verification/rejection, proof replacement, cancellation restoration and completed-order sales boundaries remain unchanged. Shipment status stays `awaiting_preparation`; EXT-89/90 own later workflow/tracking/notifications.
+Shared customer order detail adds saved `product_subtotal`, `delivery_fee` and nullable `delivery_quote`; existing `total` remains the final total and history summaries retain their contract. The detail quote reads immutable Order/Shipment commercial/carrier/relative-ETA facts rather than current rules. It omits checkout calendar windows; legacy unknown subtotal/quote remains null. EXT-89 adds a separate nullable shipment payload and tracking panel; its persisted operational dates are distinct from EXT-88's provisional checkout windows.
+
+### Manual Shipment Workflow and Customer Tracking — EXT-89
+
+The dedicated shipment lifecycle is `awaiting_preparation → preparing → ready_for_dispatch → handed_to_lbc → in_transit → out_for_delivery → delivered`. Every transition requires a quoted delivery shipment, verified payment and an order explicitly in `processing`. Each administrator request advances exactly one milestone; skips, reversals, repeats and terminal transitions fail with validation errors. Payment verification and moving the order to Processing never advance a shipment implicitly.
+
+`OrderProcessingService` locks the Order before its Shipment in a retried transaction. The shipment Delivered action atomically records `delivered_at`, completes the order and invokes the existing sale action once, using the saved final total and completion date. Direct order completion is blocked for orders with shipments. Pickup and legacy delivery orders without shipments keep their existing order workflow. Eligible order cancellation retains stock restoration and atomically marks the Shipment `cancelled`; this terminal status is available only through order cancellation, including after handoff. Repeated cancellation cannot restore stock twice. Payment rejection/proof replacement remain stock-neutral and do not advance milestones.
+
+Shipment adds nullable `preparing_at`, `ready_for_dispatch_at`, `in_transit_at`, `out_for_delivery_at` and `cancelled_at`, retaining the handoff/delivery fields. At Preparing, one application-timezone calendar date anchors the saved `eta_min_days`/`eta_max_days`; `eta_anchor_date`, `eta_timezone`, `estimated_delivery_start` and `estimated_delivery_end` are persisted together and cannot subsequently change. Apply calendar days without weekend/holiday adjustments. Arrival remains an estimate, not a courier guarantee. Before preparation, expose the saved relative range and null calendar dates. Cancelling retains the original estimate as historical context.
+
+Administrator-only web PATCH routes are `administration/orders/{order}/shipment/status` and `/shipment/reference`, protected by session authentication and `access-administration`. Status accepts the approved next status and an optional real reference at handoff; reference updates accept a nullable string of at most 255 characters. References can first be supplied at handoff, then corrected or cleared during transit or after delivery. Cancelled shipments are read-only. Submitted carrier, fees, dates or other operational fields are ignored. No customer/mobile shipment mutation endpoint exists, and no customer-safe shipment note is added.
+
+Shared customer web/API order detail adds nullable `shipment`: saved carrier, labeled manual status, nullable real reference, persisted operational ETA, chronologically sorted recorded milestones, manual-tracking notice and nullable historical notice. Existing `delivery_quote`, fees and fulfillment address retain their contracts. Owning-customer queries conceal foreign orders with 404. The administrator detail reuses those facts and supplies only eligible shipment actions. Wording explicitly states that Battlefront maintains status manually and this is not live LBC/GPS tracking. No maps, invented references, external carrier calls or automatic booking are introduced.
+
+The forward migration expands existing MySQL checks/SQLite triggers without changing quote constraints or historical commercial values. Existing shipments attached to cancelled orders become `cancelled` without invented cancellation dates. Previously completed orders remain readable and read-only without reconstructing delivered milestones. Orders without shipments retain null shipment data; no historical shipments are created. Rollback refuses to discard recorded workflow or ETA data. Notifications—including database/in-app, browser and Expo push—remain deferred to EXT-90.
 
 Outside scope:
 

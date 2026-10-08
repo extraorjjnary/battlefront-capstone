@@ -42,6 +42,7 @@ class AdministratorOrderRepository
     public function loadDetails(Order $order): Order
     {
         return $order->load([
+            'shipment',
             'user:id,name,email',
             'items' => fn ($query) => $query
                 ->select(['id', 'order_id', 'product_id', 'quantity', 'price_at_time'])

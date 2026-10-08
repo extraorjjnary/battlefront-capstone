@@ -26,11 +26,13 @@ test('the snapshot migration preserves pre-revision orders without reconstructin
     $this->assertDatabaseCount('shipments', 0);
 })->with(['pickup', 'delivery']);
 
-test('shipment persistence has no copied handling profile calendar estimate or location columns', function () {
+test('shipment persistence stores manual milestones and ETA without copied handling profile or location columns', function () {
     expect(Schema::getColumnListing('shipments'))->toEqualCanonicalizing([
         'id', 'order_id', 'carrier', 'status', 'preparation_days',
         'transit_min_days', 'transit_max_days', 'eta_min_days', 'eta_max_days',
         'tracking_reference', 'handed_to_carrier_at', 'delivered_at', 'created_at', 'updated_at',
+        'preparing_at', 'ready_for_dispatch_at', 'in_transit_at', 'out_for_delivery_at', 'cancelled_at',
+        'eta_anchor_date', 'eta_timezone', 'estimated_delivery_start', 'estimated_delivery_end',
     ]);
 });
 

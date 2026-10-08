@@ -11,6 +11,8 @@ use App\Http\Controllers\Administration\InventoryController;
 use App\Http\Controllers\Administration\OrderController as AdministrationOrderController;
 use App\Http\Controllers\Administration\OrderPaymentProofController;
 use App\Http\Controllers\Administration\OrderPaymentStatusController;
+use App\Http\Controllers\Administration\OrderShipmentReferenceController;
+use App\Http\Controllers\Administration\OrderShipmentStatusController;
 use App\Http\Controllers\Administration\OrderStatusController;
 use App\Http\Controllers\Administration\ProductActivationController;
 use App\Http\Controllers\Administration\ProductController;
@@ -141,6 +143,10 @@ Route::middleware(['auth', 'can:access-administration'])
             ->only(['index', 'show']);
         Route::patch('orders/{order}/status', [OrderStatusController::class, 'update'])
             ->name('orders.status.update');
+        Route::patch('orders/{order}/shipment/status', [OrderShipmentStatusController::class, 'update'])
+            ->name('orders.shipment.status.update');
+        Route::patch('orders/{order}/shipment/reference', [OrderShipmentReferenceController::class, 'update'])
+            ->name('orders.shipment.reference.update');
         Route::patch('orders/{order}/payment-status', [OrderPaymentStatusController::class, 'update'])
             ->name('orders.payment-status.update');
         Route::get('orders/{order}/payment-proof', OrderPaymentProofController::class)

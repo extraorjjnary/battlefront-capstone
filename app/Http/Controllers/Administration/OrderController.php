@@ -12,6 +12,9 @@ use App\Http\Requests\Administration\OrderIndexRequest;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Repositories\Order\AdministratorOrderRepository;
+use App\Services\DeliveryQuotePresenter;
+use App\Services\Order\OrderProcessingService;
+use App\Services\ShipmentPresenter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -118,9 +121,10 @@ class OrderController extends Controller
     /**
      * Display complete processing details for an order.
      */
-    public function show(Order $order): Response
+    public function show(Order $order, OrderProcessingService $processing, ShipmentPresenter $shipments, DeliveryQuotePresenter $quotes): Response
     {
         $order = $this->orderRepository->loadDetails($order);
+        $nextShipmentStatus = $processing->nextShipmentStatus($order);
 
         return Inertia::render('Administration/Orders/Show', [
             'order' => [
@@ -140,9 +144,19 @@ class OrderController extends Controller
                     'value' => $order->fulfillment_method->value,
                     'label' => $order->fulfillment_method->label(),
                     'delivery_address' => $order->delivery_address,
+                    'delivery_destination' => $order->delivery_destination,
                 ],
                 'status' => $this->statusData($order->status),
-                'allowed_status_transitions' => collect($order->status->allowedTransitions())
+                'delivery_quote' => $quotes->stored($order),
+                'shipment' => $shipments->detail($order),
+                'shipment_actions' => $order->shipment === null ? null : [
+                    'next_status' => $nextShipmentStatus === null ? null : [
+                        'value' => $nextShipmentStatus->value,
+                        'label' => $nextShipmentStatus->label(),
+                    ],
+                    'can_update_reference' => $processing->canUpdateShipmentReference($order),
+                ],
+                'allowed_status_transitions' => collect($processing->allowedOrderTransitions($order))
                     ->map(fn (OrderStatus $status): array => $this->statusData($status))
                     ->all(),
                 'payment' => [

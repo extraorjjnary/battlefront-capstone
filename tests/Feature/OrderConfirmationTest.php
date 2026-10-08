@@ -13,6 +13,28 @@ use App\Models\User;
 use App\Services\Cart\CartService;
 use Inertia\Testing\AssertableInertia as Assert;
 
+test('customer submitted details expose the saved destination consistently on web and API', function (string $scenario, ?string $destination, ?string $address) {
+    $factory = match ($scenario) {
+        'quoted delivery' => Order::factory()->withDeliverySnapshot('Calatrava'),
+        'legacy delivery' => Order::factory()->delivery(),
+        default => Order::factory(),
+    };
+    $order = $factory->create(['delivery_address' => 'Amihan 1, Bridge Area']);
+    config(['battlefront.delivery.destinations' => []]);
+    $this->actingAs($order->user)->withToken($order->user->createToken('Phone')->plainTextToken);
+
+    $this->get(route('orders.show', $order))->assertInertia(fn (Assert $page) => $page
+        ->where('order.fulfillment.delivery_address', $address)
+        ->where('order.fulfillment.delivery_destination', $destination));
+    $this->get('/api/v1/orders/'.$order->id)->assertOk()
+        ->assertJsonPath('data.fulfillment.delivery_address', $address)
+        ->assertJsonPath('data.fulfillment.delivery_destination', $destination);
+})->with([
+    'quoted delivery' => ['quoted delivery', 'Calatrava', 'Amihan 1, Bridge Area'],
+    'legacy delivery' => ['legacy delivery', null, 'Amihan 1, Bridge Area'],
+    'pickup' => ['pickup', null, null],
+]);
+
 test('guests are redirected from order confirmation', function () {
     $order = Order::factory()->create();
 
@@ -70,6 +92,7 @@ test('customers see authoritative persisted order confirmation details', functio
             'value' => FulfillmentMethod::Delivery->value,
             'label' => 'Delivery',
             'delivery_address' => 'Sagay City, Negros Occidental',
+            'delivery_destination' => null,
         ])
         ->where('order.payment', [
             'method' => [

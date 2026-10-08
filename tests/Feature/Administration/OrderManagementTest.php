@@ -104,10 +104,10 @@ test('administrators can review authoritative order processing details', functio
             'value' => FulfillmentMethod::Delivery->value,
             'label' => 'Delivery',
             'delivery_address' => 'Sagay City, Negros Occidental',
+            'delivery_destination' => null,
         ])
         ->where('order.status', ['value' => 'pending', 'label' => 'Pending'])
         ->where('order.allowed_status_transitions', [
-            ['value' => 'processing', 'label' => 'Processing'],
             ['value' => 'cancelled', 'label' => 'Cancelled'],
         ])
         ->where('order.payment.method', [
@@ -133,6 +133,26 @@ test('administrators can review authoritative order processing details', functio
         ->where('order.total', '2500.00')
         ->missing('order.payment_proof_path'));
 });
+
+test('administrator processing details expose the saved delivery destination without inferring legacy or pickup destinations', function (string $scenario, ?string $destination, ?string $address) {
+    $factory = match ($scenario) {
+        'quoted delivery' => Order::factory()->withDeliverySnapshot('Calatrava'),
+        'legacy delivery' => Order::factory()->delivery(),
+        default => Order::factory(),
+    };
+    $order = $factory->create(['delivery_address' => 'Amihan 1, Bridge Area']);
+    config(['battlefront.delivery.destinations' => []]);
+
+    $this->actingAs(User::factory()->administrator()->create())
+        ->get(route('administration.orders.show', $order))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('order.fulfillment.delivery_address', $address)
+            ->where('order.fulfillment.delivery_destination', $destination));
+})->with([
+    'quoted delivery' => ['quoted delivery', 'Calatrava', 'Amihan 1, Bridge Area'],
+    'legacy delivery' => ['legacy delivery', null, 'Amihan 1, Bridge Area'],
+    'pickup' => ['pickup', null, null],
+]);
 
 test('administrator item ledger exposes saved product subtotal delivery fee and final total', function (bool $delivery, string $fee, string $total) {
     $administrator = User::factory()->administrator()->create();
