@@ -30,7 +30,7 @@ class MergeGuestRecommendationHistory
 
             $now = now();
 
-            if (! $customer->personalized_recommendations_enabled) {
+            if ($lockedProfile->expires_at->lte($now) || ! $customer->personalized_recommendations_enabled) {
                 $lockedProfile->searches()->delete();
                 $lockedProfile->productViews()->delete();
                 $lockedProfile->delete();
@@ -38,15 +38,15 @@ class MergeGuestRecommendationHistory
                 return;
             }
 
-            $searches = $lockedProfile->searches()->where('expires_at', '>', $now)->get();
-
             if (! $customer->search_recommendations_enabled) {
                 $lockedProfile->searches()->delete();
             } else {
-                foreach ($searches as $search) {
-                    $recentSearches = $customer->searches()
-                        ->where('created_at', '>=', $now->copy()->subMinutes(10))
-                        ->get(['query']);
+                $recentSearches = $customer->searches()
+                    ->where('expires_at', '>', $now)
+                    ->where('created_at', '>=', $now->copy()->subMinutes(10))
+                    ->get(['query']);
+
+                foreach ($lockedProfile->searches()->where('expires_at', '>', $now)->lazyById(100) as $search) {
                     $duplicate = $recentSearches->contains(
                         fn (CustomerSearch $recentSearch): bool => $this->isNearlyIdentical(
                             $recentSearch->query,
@@ -63,23 +63,32 @@ class MergeGuestRecommendationHistory
                     $search->user_id = $customer->getKey();
                     $search->guest_recommendation_profile_id = null;
                     $search->save();
+
+                    if ($search->created_at->gte($now->copy()->subMinutes(10))) {
+                        $recentSearches->push($search);
+                    }
                 }
 
                 $lockedProfile->searches()->where('expires_at', '<=', $now)->delete();
             }
 
-            $views = $lockedProfile->productViews()->where('expires_at', '>', $now)->get();
-
             if (! $customer->product_view_recommendations_enabled) {
                 $lockedProfile->productViews()->delete();
             } else {
-                foreach ($views as $view) {
-                    $duplicate = $customer->productViews()
-                        ->where('product_id', $view->product_id)
-                        ->where('created_at', '>=', $now->copy()->subMinutes(30))
-                        ->exists();
+                $recentViews = $customer->productViews()
+                    ->where('expires_at', '>', $now)
+                    ->where('created_at', '>=', $now->copy()->subMinutes(30))
+                    ->orderBy('id')
+                    ->get()->keyBy('product_id');
+
+                foreach ($lockedProfile->productViews()->where('expires_at', '>', $now)->lazyById(100) as $view) {
+                    $duplicate = $recentViews->get($view->product_id);
 
                     if ($duplicate) {
+                        if ($view->dwell_seconds > $duplicate->dwell_seconds) {
+                            $duplicate->dwell_seconds = $view->dwell_seconds;
+                            $duplicate->save();
+                        }
                         $view->delete();
 
                         continue;
@@ -88,6 +97,10 @@ class MergeGuestRecommendationHistory
                     $view->user_id = $customer->getKey();
                     $view->guest_recommendation_profile_id = null;
                     $view->save();
+
+                    if ($view->created_at->gte($now->copy()->subMinutes(30))) {
+                        $recentViews->put($view->product_id, $view);
+                    }
                 }
 
                 $lockedProfile->productViews()->where('expires_at', '<=', $now)->delete();

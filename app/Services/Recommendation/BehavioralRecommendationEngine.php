@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Repositories\Catalog\ProductCatalogRepository;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use UnexpectedValueException;
 
 class BehavioralRecommendationEngine
 {
@@ -29,14 +30,15 @@ class BehavioralRecommendationEngine
      *
      * Score weights are intentionally simple: a fresh search starts at 55 points, a
      * cart companion at 38, a viewed-product match at up to 48 plus dwell time, purchase
-     * relationships at 15, and popularity contributes at most 5 points as a tie-breaker.
+     * co-purchases at 18, overlapping customers at 24, and popularity adds at most 5 points.
      *
+     * @param  list<int>  $excludedProductIds
      * @return Collection<int, BehavioralRecommendedProduct>
      */
-    public function recommendFor(User|GuestRecommendationProfile $customer, int $limit = 12): Collection
+    public function recommendFor(User|GuestRecommendationProfile $customer, int $limit = 12, array $excludedProductIds = []): Collection
     {
         if ($customer instanceof User && ! $customer->personalized_recommendations_enabled) {
-            return $this->popular($limit);
+            return $this->popular($limit, $excludedProductIds);
         }
 
         $purchasedProductIds = $customer instanceof User ? OrderItem::query()
@@ -57,6 +59,7 @@ class BehavioralRecommendationEngine
         $viewedProductCounts = $this->recentlyViewedProductCounts($customer);
         $viewedProductIds = array_keys($viewedProductCounts);
         $excludedProductIds = array_values(array_unique([
+            ...$excludedProductIds,
             ...$purchasedProductIds,
             ...$cartProductIds,
             ...$viewedProductIds,
@@ -104,15 +107,13 @@ class BehavioralRecommendationEngine
                 reason: ['code' => 'bought_with_purchase_history', 'value' => 'Often purchased with products you bought'],
             );
 
-            if ($customer instanceof User) {
-                $this->addSimilarCustomerCandidates(
-                    $customer->getKey(),
-                    $purchasedProductIds,
-                    $excludedProductIds,
-                    $scores,
-                    $reasons,
-                );
-            }
+            $this->addSimilarCustomerCandidates(
+                $customer->getKey(),
+                $purchasedProductIds,
+                $excludedProductIds,
+                $scores,
+                $reasons,
+            );
         }
 
         $this->addPopularityCandidates($excludedProductIds, $scores, $reasons);
@@ -133,16 +134,17 @@ class BehavioralRecommendationEngine
     /**
      * Recommend popular products to visitors without a customer account.
      *
+     * @param  list<int>  $excludedProductIds
      * @return Collection<int, BehavioralRecommendedProduct>
      */
-    public function popular(int $limit = 12): Collection
+    public function popular(int $limit = 12, array $excludedProductIds = []): Collection
     {
         $scores = [];
         $reasons = [];
-        $this->addPopularityCandidates([], $scores, $reasons);
+        $this->addPopularityCandidates($excludedProductIds, $scores, $reasons);
 
         if (count($scores) < $limit) {
-            foreach ($this->productCatalogRepository->featuredFallback([], self::CANDIDATE_LIMIT) as $product) {
+            foreach ($this->productCatalogRepository->featuredFallback($excludedProductIds, self::CANDIDATE_LIMIT) as $product) {
                 $scores[$product->id] ??= 0.1;
                 $reasons[$product->id] ??= [[
                     'code' => 'featured_fallback',
@@ -164,6 +166,7 @@ class BehavioralRecommendationEngine
         $searches = $customer->searches()
             ->where('expires_at', '>', now())
             ->latest('created_at')
+            ->orderByDesc('id')
             ->limit(self::SEARCH_HISTORY_LIMIT)
             ->get(['query', 'created_at']);
 
@@ -182,12 +185,12 @@ class BehavioralRecommendationEngine
             $ageHours = max(0, $search->created_at->diffInHours(now()));
             $recencyScore = 55 / (1 + ($ageHours / 24)) / (1 + ($index * 0.1));
 
-            foreach ($this->productCatalogRepository->contextMatches($terms, self::SEARCH_MATCH_LIMIT) as $product) {
+            foreach ($this->productCatalogRepository->contextMatches($terms, self::SEARCH_MATCH_LIMIT, availableOnly: true, excludedProductIds: $excludedProductIds) as $product) {
                 if (in_array($product->id, $excludedProductIds, true)) {
                     continue;
                 }
 
-                $scores[$product->id] = ($scores[$product->id] ?? 0) + $recencyScore;
+                $scores[$product->id] = ($scores[$product->id] ?? 0.0) + $recencyScore;
                 $this->appendReason($reasons, $product->id, [
                     'code' => 'matched_recent_searches',
                     'value' => 'Matches a recent catalog search',
@@ -212,8 +215,10 @@ class BehavioralRecommendationEngine
             ->get()
             ->keyBy('id');
 
-        foreach ($this->productCatalogRepository->similarProducts($viewedProductIds, $excludedProductIds) as $candidate) {
-            $bestSimilarityScore = 0;
+        $similarityCandidates = [];
+
+        foreach ($this->productCatalogRepository->similarProducts($anchors, $excludedProductIds)->lazyById(100) as $candidate) {
+            $bestSimilarityScore = 0.0;
             $hasDwellBasedMatch = false;
 
             foreach ($anchors as $anchor) {
@@ -254,14 +259,22 @@ class BehavioralRecommendationEngine
                 continue;
             }
 
-            $scores[$candidate->id] = ($scores[$candidate->id] ?? 0) + $bestSimilarityScore;
-            $this->appendReason($reasons, $candidate->id, [
+            $similarityCandidates[] = ['product_id' => $candidate->id, 'score' => $bestSimilarityScore, 'has_dwell' => $hasDwellBasedMatch];
+            $similarityCandidates = collect($similarityCandidates)
+                ->sortBy([['score', 'desc'], ['product_id', 'asc']])
+                ->take(40)->values()->all();
+        }
+
+        foreach ($similarityCandidates as $candidate) {
+            $productId = $candidate['product_id'];
+            $scores[$productId] = ($scores[$productId] ?? 0.0) + $candidate['score'];
+            $this->appendReason($reasons, $productId, [
                 'code' => 'similar_to_viewed_product',
                 'value' => 'Similar to a product you viewed',
             ]);
 
-            if ($hasDwellBasedMatch) {
-                $this->appendReason($reasons, $candidate->id, [
+            if ($candidate['has_dwell']) {
+                $this->appendReason($reasons, $productId, [
                     'code' => 'spent_time_viewing_product',
                     'value' => 'You spent time viewing a similar product',
                 ]);
@@ -285,7 +298,7 @@ class BehavioralRecommendationEngine
         array $reason,
     ): void {
         foreach ($counts as $productId => $count) {
-            $scores[$productId] = ($scores[$productId] ?? 0) + $baseScore + min($count * $countWeight, $countCap);
+            $scores[$productId] = ($scores[$productId] ?? 0.0) + $baseScore + min($count * $countWeight, $countCap);
             $this->appendReason($reasons, (int) $productId, $reason);
         }
     }
@@ -298,7 +311,7 @@ class BehavioralRecommendationEngine
     private function addPopularityCandidates(array $excludedProductIds, array &$scores, array &$reasons): void
     {
         foreach ($this->popularCounts($excludedProductIds) as $productId => $count) {
-            $scores[$productId] = ($scores[$productId] ?? 0) + min(log($count + 1, 2) * 2, 5);
+            $scores[$productId] = ($scores[$productId] ?? 0.0) + min(log($count + 1, 2) * 2, 5);
             $this->appendReason($reasons, (int) $productId, [
                 'code' => 'popular_with_customers',
                 'value' => 'Popular with Battlefront customers',
@@ -334,6 +347,7 @@ class BehavioralRecommendationEngine
             ->selectRaw('COUNT(DISTINCT order_items.product_id) as shared_product_count')
             ->groupBy('similar_orders.user_id')
             ->orderByDesc('shared_product_count')
+            ->orderBy('similar_orders.user_id')
             ->limit(20)
             ->pluck('similar_orders.user_id')
             ->map(static fn (int|string $id): int => (int) $id)
@@ -359,7 +373,7 @@ class BehavioralRecommendationEngine
 
         foreach ($candidateCounts as $productId => $similarCustomerCount) {
             $productId = (int) $productId;
-            $scores[$productId] = ($scores[$productId] ?? 0) + 24 + min((int) $similarCustomerCount * 3, 15);
+            $scores[$productId] = ($scores[$productId] ?? 0.0) + 24 + min((int) $similarCustomerCount * 3, 15);
             $this->appendReason($reasons, $productId, [
                 'code' => 'bought_by_similar_customers',
                 'value' => 'Bought by customers with overlapping purchase histories',
@@ -385,6 +399,7 @@ class BehavioralRecommendationEngine
             ->filter(static fn (Product $product): bool => $product->getAttribute('is_available') === true)
             ->keyBy('id');
 
+        $productIds = $products->modelKeys();
         usort($productIds, static fn (int $left, int $right): int => ($scores[$right] <=> $scores[$left]) ?: ($left <=> $right));
         $productIds = array_slice($productIds, 0, self::CANDIDATE_LIMIT);
 
@@ -400,13 +415,13 @@ class BehavioralRecommendationEngine
 
             $categoryId = $products->get($productId)->category_id;
 
-            if (($categoryCounts[$categoryId] ?? 0) >= $categoryLimit) {
+            if (($categoryCounts[$categoryId] ?? 0.0) >= $categoryLimit) {
                 $deferredProductIds[] = $productId;
 
                 continue;
             }
 
-            $categoryCounts[$categoryId] = ($categoryCounts[$categoryId] ?? 0) + 1;
+            $categoryCounts[$categoryId] = ($categoryCounts[$categoryId] ?? 0.0) + 1;
             $diverseProductIds[] = $productId;
         }
 
@@ -418,10 +433,14 @@ class BehavioralRecommendationEngine
             ->map(function (int $productId) use ($products, $reasons): BehavioralRecommendedProduct {
                 /** @var Product $product */
                 $product = $products->get($productId);
+                $price = $product->discount_price ?? $product->price;
+                if (! is_numeric($price)) {
+                    throw new UnexpectedValueException('Catalog product price must be numeric.');
+                }
 
                 return new BehavioralRecommendedProduct(
                     product: $product,
-                    effectivePrice: bcadd($product->discount_price ?? $product->price, '0', 2),
+                    effectivePrice: bcadd($price, '0', 2),
                     reasons: $reasons[$productId] ?? [[
                         'code' => 'popular_with_customers',
                         'value' => 'Popular with Battlefront customers',
@@ -458,6 +477,7 @@ class BehavioralRecommendationEngine
         $recentViews = $customer->productViews()
             ->where('expires_at', '>', now())
             ->latest('created_at')
+            ->orderByDesc('id')
             ->limit(self::PRODUCT_VIEW_HISTORY_LIMIT * 4)
             ->get(['product_id', 'dwell_seconds']);
         $counts = [];

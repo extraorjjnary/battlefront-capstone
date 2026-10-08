@@ -24,6 +24,7 @@ class RecordCustomerProductView
         $recentlyRecorded = $owner->productViews()
             ->whereBelongsTo($product)
             ->where('created_at', '>=', now()->subMinutes(30))
+            ->where('expires_at', '>', now())
             ->exists();
 
         if ($recentlyRecorded) {

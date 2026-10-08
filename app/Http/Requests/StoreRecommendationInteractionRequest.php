@@ -29,7 +29,11 @@ class StoreRecommendationInteractionRequest extends FormRequest
             'event_type' => ['required', Rule::in(['impression', 'click', 'dismiss', 'report_wrong'])],
             'placement' => ['required', Rule::in(['home', 'product', 'cart', 'recommendations'])],
             'position' => ['required', 'integer', 'min:1', 'max:12'],
-            'reason_code' => ['nullable', 'string', 'max:64', 'regex:/^[a-z][a-z0-9_]*$/'],
+            'reason_code' => ['nullable', Rule::in([
+                'matched_recent_searches', 'similar_to_viewed_product', 'spent_time_viewing_product',
+                'bought_with_cart_products', 'bought_with_viewed_products', 'bought_with_purchase_history',
+                'bought_by_similar_customers', 'popular_with_customers', 'featured_fallback',
+            ])],
         ];
     }
 

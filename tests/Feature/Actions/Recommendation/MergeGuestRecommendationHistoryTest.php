@@ -7,7 +7,7 @@ use App\Models\GuestRecommendationProfile;
 use App\Models\Product;
 use App\Models\User;
 
-test('sign-in merge transfers current guest signals to the customer and consumes the profile', function () {
+test('registration merge transfers current guest signals to the customer and consumes the profile', function () {
     $customer = User::factory()->customer()->create();
     $profile = GuestRecommendationProfile::factory()->create();
     $product = Product::factory()->create();
@@ -29,7 +29,7 @@ test('sign-in merge transfers current guest signals to the customer and consumes
     $this->assertModelMissing($profile);
 });
 
-test('sign-in merge discards activity disabled in customer preferences', function () {
+test('registration merge discards activity disabled in customer preferences', function () {
     $customer = User::factory()->customer()->create([
         'search_recommendations_enabled' => false,
         'product_view_recommendations_enabled' => false,
@@ -48,7 +48,7 @@ test('sign-in merge discards activity disabled in customer preferences', functio
     $this->assertModelMissing($profile);
 });
 
-test('sign-in merge removes near-duplicate activity and safely ignores a repeated attempt', function () {
+test('registration merge removes near-duplicate activity and safely ignores a repeated attempt', function () {
     $customer = User::factory()->customer()->create();
     $profile = GuestRecommendationProfile::factory()->create();
     $product = Product::factory()->create();
@@ -93,8 +93,23 @@ test('customer activity cannot be saved with zero or two owners', function () {
     expect(fn () => $multiplyOwnedSearch->save())->toThrow(LogicException::class);
 });
 
-test('example', function () {
-    $response = $this->get('/');
+test('registration merge discards expired signals and preserves longer duplicate dwell', function () {
+    $customer = User::factory()->customer()->create();
+    $profile = GuestRecommendationProfile::factory()->create();
+    $product = Product::factory()->create();
+    $current = CustomerProductView::factory()->for($customer)->for($product)->create(['dwell_seconds' => 5]);
+    $profile->productViews()->create(['product_id' => $product->id, 'dwell_seconds' => 120, 'expires_at' => now()->addDay()]);
+    $profile->searches()->create(['query' => 'expired', 'expires_at' => now()->subSecond()]);
+    app(MergeGuestRecommendationHistory::class)($profile, $customer);
+    expect($current->refresh()->dwell_seconds)->toBe(120);
+    $this->assertDatabaseCount('customer_product_views', 1);
+    $this->assertDatabaseCount('customer_searches', 0);
+});
 
-    $response->assertStatus(200);
+test('expired guest profiles cannot transfer still-unexpired signals', function () {
+    $profile = GuestRecommendationProfile::factory()->create(['expires_at' => now()->subSecond()]);
+    $profile->searches()->create(['query' => 'private search', 'expires_at' => now()->addDay()]);
+    app(MergeGuestRecommendationHistory::class)($profile, User::factory()->customer()->create());
+    $this->assertModelMissing($profile);
+    $this->assertDatabaseCount('customer_searches', 0);
 });

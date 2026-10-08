@@ -30,7 +30,7 @@ class ProductCatalogController extends Controller
     {
         $filters = $request->filters();
 
-        if ($request->integer('page', 1) === 1) {
+        if (! $request->prefetch() && $request->integer('page', 1) === 1) {
             $recordCustomerSearch->record(
                 $request->user(),
                 $filters['q'],
@@ -58,11 +58,13 @@ class ProductCatalogController extends Controller
         BuildRecommendationViewData $buildRecommendationViewData,
     ): Response {
         $catalogProduct = $this->productCatalogRepository->findEligibleOrFail($product);
-        $recordCustomerProductView(
-            $request->user(),
-            $catalogProduct,
-            $request->attributes->get('guest_recommendation_profile'),
-        );
+        if (! $request->prefetch()) {
+            $recordCustomerProductView(
+                $request->user(),
+                $catalogProduct,
+                $request->attributes->get('guest_recommendation_profile'),
+            );
+        }
         $user = $request->user();
         $customer = $user instanceof User ? $user : null;
         $guestProfile = $request->attributes->get('guest_recommendation_profile');

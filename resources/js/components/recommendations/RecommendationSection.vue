@@ -27,6 +27,8 @@ const visibleRecommendations = computed(() => props.recommendations.filter(
 const visibleCards = new Set();
 const impressionTimers = new Map();
 let observer;
+let isMounted = false;
+let observationVersion = 0;
 
 function createEventId() {
     if (!globalThis.crypto?.getRandomValues) {
@@ -93,35 +95,48 @@ function dismissRecommendation(recommendation, eventType) {
     dismissedProductIds.value = nextDismissedIds;
 
     try {
-        const productIds = [...nextDismissedIds].slice(-100);
-        localStorage.setItem(dismissalStorageKey(), JSON.stringify(productIds));
+        const storage = page.props.auth?.user ? localStorage : sessionStorage;
+        const saved = readDismissals();
+        saved[recommendation.product.id] = Date.now();
+        const entries = Object.entries(saved).slice(-100);
+        storage.setItem(dismissalStorageKey.value, JSON.stringify(Object.fromEntries(entries)));
     } catch {
         // Recommendation feedback should never interrupt shopping.
     }
 }
 
-function dismissalStorageKey() {
+const dismissalStorageKey = computed(() => {
     const customerId = page.props.auth?.user?.id;
 
     return customerId
-        ? `battlefront:dismissed-recommendations:v1:customer:${customerId}`
-        : 'battlefront:dismissed-recommendations:v1:guest';
+        ? `battlefront:dismissed-recommendations:v2:customer:${customerId}`
+        : `battlefront:dismissed-recommendations:v2:guest:${page.props.guest_recommendation_scope ?? 'session'}`;
+});
+
+function readDismissals() {
+    const storage = page.props.auth?.user ? localStorage : sessionStorage;
+    const saved = JSON.parse(storage.getItem(dismissalStorageKey.value) ?? '{}');
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) return {};
+    return Object.fromEntries(Object.entries(saved).filter(([id, time]) =>
+        Number.isInteger(Number(id)) && Number(id) > 0 && Number.isFinite(time)
+        && time > Date.now() - 90 * 24 * 60 * 60 * 1000 && time <= Date.now(),
+    ));
 }
 
 function loadDismissedRecommendations() {
     try {
-        const storedProductIds = JSON.parse(localStorage.getItem(dismissalStorageKey()) ?? '[]');
-        dismissedProductIds.value = new Set(
-            Array.isArray(storedProductIds)
-                ? storedProductIds.filter((id) => Number.isInteger(id))
-                : [],
-        );
+        localStorage.removeItem('battlefront:dismissed-recommendations:v1:guest');
+        const storage = page.props.auth?.user ? localStorage : sessionStorage;
+        const saved = readDismissals();
+        storage.setItem(dismissalStorageKey.value, JSON.stringify(saved));
+        dismissedProductIds.value = new Set(Object.keys(saved).map(Number));
     } catch {
         dismissedProductIds.value = new Set();
     }
 }
 
 function clearImpressionObservation() {
+    observationVersion++;
     observer?.disconnect();
     observer = undefined;
     visibleCards.clear();
@@ -130,7 +145,7 @@ function clearImpressionObservation() {
 }
 
 function observeRecommendationCards() {
-    if (!('IntersectionObserver' in window)) {
+    if (document.visibilityState !== 'visible' || !('IntersectionObserver' in window)) {
         return;
     }
 
@@ -150,7 +165,7 @@ function observeRecommendationCards() {
                                 (item) => item.product.id === productId,
                             );
 
-                            if (visibleCards.has(card) && recommendation && card.dataset.impressionTracked !== 'true') {
+                            if (document.visibilityState === 'visible' && visibleCards.has(card) && recommendation && card.dataset.impressionTracked !== 'true') {
                                 card.dataset.impressionTracked = 'true';
                                 recordInteraction(recommendation, 'impression', index);
                             }
@@ -183,25 +198,33 @@ function observeRecommendationCards() {
     });
 }
 
+async function refreshObservation() {
+    clearImpressionObservation();
+    const version = observationVersion;
+    await nextTick();
+    if (isMounted && version === observationVersion) observeRecommendationCards();
+}
+
 onMounted(() => {
+    isMounted = true;
     loadDismissedRecommendations();
-    observeRecommendationCards();
+    refreshObservation();
+    document.addEventListener('visibilitychange', refreshObservation);
 });
 
-watch(visibleRecommendations, async () => {
-    clearImpressionObservation();
-    await nextTick();
-    observeRecommendationCards();
-});
+watch(visibleRecommendations, refreshObservation);
+watch(dismissalStorageKey, loadDismissedRecommendations);
 
 onBeforeUnmount(() => {
+    isMounted = false;
+    document.removeEventListener('visibilitychange', refreshObservation);
     clearImpressionObservation();
 });
 </script>
 
 <template>
     <section
-        v-if="visibleRecommendations.length > 0"
+        v-if="recommendations.length > 0"
         class="border-border border-t pt-10"
         aria-labelledby="recommendation-section-heading"
     >
@@ -229,7 +252,10 @@ onBeforeUnmount(() => {
             </Button>
         </div>
 
-        <div class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <p v-if="visibleRecommendations.length === 0" class="text-muted-foreground mt-5 text-sm" role="status">
+            You have hidden these suggestions. Browse the catalog for more products.
+        </p>
+        <div v-else class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <article
                 v-for="(recommendation, index) in visibleRecommendations"
                 :key="recommendation.product.id"

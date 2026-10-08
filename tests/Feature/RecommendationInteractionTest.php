@@ -146,3 +146,25 @@ test('expired recommendation interaction events are pruned while active events a
     $this->assertDatabaseMissing('recommendation_interactions', ['id' => $expired->id]);
     $this->assertDatabaseHas('recommendation_interactions', ['id' => $current->id]);
 });
+
+test('unknown reason codes and inactive categories cannot pollute engagement reports', function () {
+    $product = createInteractionEligibleProduct();
+    $payload = ['event_id' => (string) Str::uuid(), 'product_id' => $product->id, 'event_type' => 'click', 'placement' => 'home', 'position' => 1];
+    $this->postJson(route('recommendations.interactions.store'), [...$payload, 'reason_code' => 'invented_signal'])
+        ->assertUnprocessable()->assertJsonValidationErrors('reason_code');
+    $product->category->update(['is_active' => false]);
+    $this->postJson(route('recommendations.interactions.store'), $payload)->assertNotFound();
+    $this->assertDatabaseCount('recommendation_interactions', 0);
+});
+
+test('mobile interaction requests retain optional bearer authorization', function (string $access, int $status) {
+    $product = createInteractionEligibleProduct();
+    if ($access === 'administrator') {
+        $this->withToken(User::factory()->administrator()->create()->createToken('Phone')->plainTextToken);
+    } elseif ($access === 'invalid') {
+        $this->withToken('invalid-token');
+    }
+    $this->postJson('/api/v1/recommendations/interactions', ['event_id' => (string) Str::uuid(), 'product_id' => $product->id, 'event_type' => 'click', 'placement' => 'home', 'position' => 1])
+        ->assertStatus($status);
+    $this->assertDatabaseCount('recommendation_interactions', $status === 204 ? 1 : 0);
+})->with([['guest', 204], ['administrator', 403], ['invalid', 401]]);

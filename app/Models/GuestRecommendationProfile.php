@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonImmutable;
 use Database\Factories\GuestRecommendationProfileFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,7 +13,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property string $token_hash
- * @property Carbon $expires_at
+ * @property Carbon|CarbonImmutable $expires_at
  */
 #[Fillable(['token_hash', 'expires_at'])]
 class GuestRecommendationProfile extends Model

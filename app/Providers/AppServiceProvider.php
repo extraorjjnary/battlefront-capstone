@@ -87,8 +87,9 @@ class AppServiceProvider extends ServiceProvider
                 'cart.index',
                 'recommendations.index',
                 'recommendations.interactions.store',
-                'api.v1.recommendations.results',
+                'api.v1.recommendations.feed',
                 'api.v1.recommendations.personalized',
+                'api.v1.recommendations.interactions.store',
             ], true)) {
                 return;
             }

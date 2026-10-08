@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\CarbonImmutable;
 use Database\Factories\CustomerSearchFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,9 +16,9 @@ use LogicException;
  * @property int|null $user_id
  * @property int|null $guest_recommendation_profile_id
  * @property string $query
- * @property Carbon $expires_at
- * @property Carbon|null $created_at
- * @property Carbon|null $updated_at
+ * @property Carbon|CarbonImmutable $expires_at
+ * @property Carbon|CarbonImmutable|null $created_at
+ * @property Carbon|CarbonImmutable|null $updated_at
  */
 #[Fillable(['query', 'expires_at', 'guest_recommendation_profile_id'])]
 class CustomerSearch extends Model

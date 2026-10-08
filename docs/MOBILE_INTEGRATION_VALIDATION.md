@@ -93,7 +93,7 @@ All rows start **not run**. Record each variant independently; a partial run doe
 | RN-15 | Replace rejected GCash and Maya proof | 200 pending payment, rejection cleared, stock/order status unchanged; retry ineligible ->422 | Not run |
 | RN-16 | Guest chatbot product/store/FAQ, follow-up, order question | 200 gemini/fallback; guest order asks for sign-in without private facts | Not run |
 | RN-17 | Customer chatbot public topics, own/foreign order, follow-up | Owned facts only; foreign/missing order same safe fallback; context reset on identity change | Not run |
-| RN-18 | Guest/customer recommendation options/results | 200; omitted/null preferences valid, real catalog options, deterministic order/reasons, no match [] | Not run |
+| RN-18 | Guest/customer behavioral feeds and interactions | Guest/popular and owned personalized feeds; pause/re-enable retention; current stock/reasons; prefetch suppression; anonymous feedback | Mobile migration developer-confirmed; fresh device-run evidence not supplied |
 | RN-19 | Missing/invalid/revoked bearer; optionally expired fixture | Protected requests 401; optional-auth invalid supplied token 401; client handles state | Not run |
 | RN-20 | Customer A uses B's cart/order/notification/device IDs with otherwise valid input | Cart mutation/order/proof/notification/device ownership failures 404; checkout selection failures 422 errors.cart; no foreign mutations/data exposure | Not run |
 | RN-21 | Valid admin token on profile/cart/orders/chatbot/recommendations | 403; no mobile administration capabilities; public reads stay public | Not run |

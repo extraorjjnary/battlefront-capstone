@@ -922,7 +922,7 @@ defineOptions({
             <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                     <p class="text-primary text-xs font-semibold tracking-widest uppercase">
-                        Anonymous web events
+                        Anonymous web and mobile events
                     </p>
                     <h2
                         id="recommendation-engagement-heading"
@@ -945,7 +945,7 @@ defineOptions({
                         {{ numberFormatter.format(recommendation_engagement.summary.impressions) }}
                     </p>
                     <p class="text-muted-foreground mt-1 text-xs">
-                        Cards at least half visible for one second
+                        Client-reported cards at least half visible for one second
                     </p>
                 </div>
                 <div class="border-border bg-card border p-5">
@@ -984,7 +984,7 @@ defineOptions({
             >
                 <p class="font-medium">No recommendation activity in this range</p>
                 <p class="text-muted-foreground mt-1 text-sm">
-                    Anonymous web event counts will appear here as customers
+                    Anonymous web and mobile event counts will appear here as customers
                     view, select, hide, or report recommendations.
                 </p>
             </div>
@@ -1034,7 +1034,7 @@ defineOptions({
                     <div class="border-border border-b p-5">
                         <h3 class="font-semibold">By recommendation reason</h3>
                         <p class="text-muted-foreground mt-1 text-xs">
-                            Which recommendation signals were attached to the cards.
+                            The primary displayed reason submitted with each event.
                         </p>
                     </div>
                     <table class="w-full min-w-2xl text-left text-sm">

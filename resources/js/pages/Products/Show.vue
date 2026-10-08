@@ -14,6 +14,7 @@ import { consumeCatalogVisit } from '@/lib/catalogReturn';
 import { login } from '@/routes';
 import { index as productIndex } from '@/routes/products';
 import { store as storeProductDwell } from '@/routes/products/dwell';
+import { store as storeProductView } from '@/routes/products/view';
 
 const props = defineProps({
     product: { type: Object, required: true },
@@ -35,29 +36,13 @@ const canReturnToCatalog = consumeCatalogVisit(props.product.id);
 let visibleSince = null;
 let accumulatedVisibleMilliseconds = 0;
 let trackedProductId = props.product.id;
+let viewRequest = null;
 
-function recordVisibleTime() {
-    if (!props.can_record_product_dwell) {
-        return;
-    }
-
-    const visibleMilliseconds = accumulatedVisibleMilliseconds
-        + (visibleSince === null ? 0 : performance.now() - visibleSince);
-    const seconds = Math.floor(visibleMilliseconds / 1000);
-
-    if (seconds < 5) {
-        return;
-    }
-
-    const route = storeProductDwell.post(trackedProductId);
+function postActivity(route, payload = {}) {
     const xsrfToken = decodeURIComponent(
-        document.cookie
-            .split('; ')
-            .find((cookie) => cookie.startsWith('XSRF-TOKEN='))
-            ?.split('=')[1] ?? '',
+        document.cookie.split('; ').find((cookie) => cookie.startsWith('XSRF-TOKEN='))?.split('=')[1] ?? '',
     );
-
-    fetch(route.url, {
+    return fetch(route.url, {
         method: route.method.toUpperCase(),
         credentials: 'same-origin',
         keepalive: true,
@@ -67,8 +52,33 @@ function recordVisibleTime() {
             'X-Requested-With': 'XMLHttpRequest',
             'X-XSRF-TOKEN': xsrfToken,
         },
-        body: JSON.stringify({ seconds }),
-    }).catch(() => {});
+        body: JSON.stringify(payload),
+    }).then((response) => response.ok).catch(() => false);
+}
+
+function startViewing() {
+    if (!props.can_record_product_dwell || document.visibilityState !== 'visible') return;
+    viewRequest ??= postActivity(storeProductView.post(trackedProductId));
+    visibleSince ??= performance.now();
+}
+
+function recordVisibleTime() {
+    if (!props.can_record_product_dwell) {
+        return;
+    }
+
+    const visibleMilliseconds = accumulatedVisibleMilliseconds
+        + (visibleSince === null ? 0 : performance.now() - visibleSince);
+    const seconds = Math.min(3600, Math.floor(visibleMilliseconds / 1000));
+
+    if (seconds < 5) {
+        return;
+    }
+
+    const route = storeProductDwell.post(trackedProductId);
+    viewRequest?.then((recorded) => {
+        if (recorded) postActivity(route, { seconds });
+    });
 }
 
 watch(() => props.product.id, (productId) => {
@@ -80,10 +90,8 @@ watch(() => props.product.id, (productId) => {
     recordVisibleTime();
     accumulatedVisibleMilliseconds = 0;
     trackedProductId = productId;
-
-    if (document.visibilityState === 'visible') {
-        visibleSince = performance.now();
-    }
+    viewRequest = null;
+    startViewing();
 });
 
 function handleVisibilityChange() {
@@ -98,9 +106,7 @@ function handleVisibilityChange() {
         return;
     }
 
-    if (visibleSince === null) {
-        visibleSince = performance.now();
-    }
+    startViewing();
 }
 
 onMounted(() => {
@@ -108,10 +114,7 @@ onMounted(() => {
         return;
     }
 
-    if (document.visibilityState === 'visible') {
-        visibleSince = performance.now();
-    }
-
+    startViewing();
     document.addEventListener('visibilitychange', handleVisibilityChange);
 });
 

@@ -10,7 +10,7 @@ For current implementation facts, use the repository first, then Linear issue st
 
 This is a development reference. `docs/capstone_manuscript.docx` remains academically sensitive: the developer explicitly authorized narrow forecasting/predictive-analytics text synchronization for the **2026-10-05** approved revision, preserving formatting and unrelated content. Other manuscript revisions remain developer-owned. This authorization does not extend to implementation changes or unrelated academic edits.
 
-**Recommendation scope approval recorded:** on **2026-10-08**, the developer confirmed adviser approval for replacing explicit budget/intended-use recommendation criteria with behavior-driven recommendations based on search, product-view, cart, and purchase signals, including temporary guest browsing history. Guest history transfers only when the visitor creates a new account; it is discarded when an existing account signs in. This approved amendment governs current implementation and evaluation planning; synchronization of the formal manuscript remains a developer follow-up.
+**Recommendation scope approval recorded:** on **2026-10-08**, the developer confirmed adviser approval for behavioral recommendations based on search, product-view, cart, and purchase signals, including temporary guest browsing history. The developer also confirms migration of the mobile consumer. Guest history transfers only when the visitor creates a new account; it is discarded when an existing account signs in. This approved amendment governs current implementation and evaluation planning; synchronization of the formal manuscript remains a developer follow-up.
 
 ---
 
@@ -46,7 +46,7 @@ The system supports:
 
 The intelligent features are intended to support customer and managerial decisions, not replace human judgment.
 
-Core catalog/inventory, customer commerce, administrator order/payment processing, sales reports, chatbot, and the released criteria-based recommendation baseline are implemented. The behavior-driven recommendation implementation is complete for the current web/backend paths; real React Native + Expo consumer validation, final predictive-analytics acceptance, and remaining integration/release work are pending; see Section 14.
+Core catalog/inventory, customer commerce, administrator order/payment processing, sales reports, chatbot, and behavioral recommendations are implemented. The behavior-driven recommendation implementation is complete for the current web/backend paths; real React Native + Expo consumer validation, final predictive-analytics acceptance, and remaining integration/release work are pending; see Section 14.
 
 ---
 
@@ -405,18 +405,22 @@ Shared actions/services implement these rules for both Inertia and mobile API co
 
 # 8. Product Recommendation Module
 
-The original manuscript specifies recommendations from explicit customer criteria, including budget, intended use, brand/category/tags, and Sagay inventory. An adviser-approved amendment, confirmed by the developer on 2026-10-08, replaces that module direction with behavior-driven recommendations. The manuscript has not yet been synchronized, so its current text still reflects the original baseline.
+Behavioral recommendations are authoritative for both web and mobile under the adviser-approved amendment confirmed by the developer on 2026-10-08. The formal manuscript has not yet been synchronized; that academic update remains a developer follow-up.
 
-**Current approved product direction:** replace the customer questionnaire with behavior-driven suggestions. Signed-in customers' catalog searches and product views are recorded by default unless disabled in their profile; the engine also considers current cart items and completed purchases. Guests receive a temporary browser profile through an opaque, hashed-token cookie; their searches and product views use the same recommendation engine and expire after 90 days of inactivity. When a guest creates a new account, eligible guest history is merged transactionally into that account, respecting each recommendation preference. When an existing customer signs in, the guest profile is discarded and recommendations use only that account's saved activity and shopping history. Guests and customers without usable personal signals receive clearly labeled popular or featured products.
+**Current approved architecture for web and mobile:** behavior-driven suggestions. Signed-in customers' catalog searches and product views are recorded by default unless disabled in their profile; the engine also considers current cart items and completed purchases. Guests receive a temporary browser profile through an opaque, hashed-token cookie; their searches and product views use the same recommendation engine and expire after 90 days of inactivity. When a guest creates a new account, eligible guest history is merged transactionally into that account, respecting each recommendation preference. When an existing customer signs in, the guest profile is discarded and recommendations use only that account's saved activity and shopping history. Guests and customers without usable personal signals receive clearly labeled popular or featured products.
 
-The deterministic first pass combines candidate scores: fresh searches start at 55 points and fade by age; cart co-purchases start at 38; viewed-product similarity contributes up to 48 and works without order history; purchase relationships start at 15; popularity adds at most 5 as a tie-breaker. Similarity uses shared category, brand, or tags and requires an effective-price ratio between 0.5 and 2.
+The deterministic engine combines scores from the five latest unexpired searches, five recent viewed products, current cart, completed purchases, overlapping customer purchases, and popularity. Fresh search contributions start at 55 and decay with age. Cart co-purchases start at 38; viewed/purchased co-purchases start at 18; similar-customer contributions start at 24. Category, brand and tag similarity uses an effective-price ratio of 0.5?2, with repeated-view and dwell boosts producing at most 56 points. Popularity adds at most five points; available featured fallback contributes 0.1. Stable IDs break scoring/history/cohort ties. Category diversity is a soft cap with backfill. This is rule-based scoring with purchase-overlap heuristics and no learned model.
 
 Search and view personalization are enabled by default for signed-in customers, so recommendations respond without a profile setup step. Turning off personalized recommendations pauses all behavioral ranking and new search/view recording; turning it back on restores eligible recommendations from retained history. Customers can also independently pause either signal. Unexpired search and view history is retained for up to 90 days and becomes usable again when its setting is re-enabled. Recommendation feedback is reported in aggregate; no individual search text is exposed in administrator reports.
+
+Prefetch requests never record search/view/dwell activity. Mounted web detail navigation records an explicit view, including cached prefetch consumption; mobile detail GETs record views only without prefetch headers. Views deduplicate for 30 minutes. Dwell records the longest visible duration for the latest owned view, capped at 3,600 seconds. Browser feedback hides suggestions locally for at most 90 days, scoped to the customer or temporary guest profile. Anonymous interaction events are client-reported and carry only the primary displayed reason; they do not change backend scores or establish sales conversion.
+
+A forward migration enforces exactly one customer/guest activity owner and adds chronological view indexes without changing valid history. It refuses rollback so operational deployments use forward fixes. Daily expiry pruning and registration transfer use bounded batches.
 
 Every response rechecks active product/category eligibility and positive live Sagay stock. Recommendations use current effective prices, exclude items already purchased or in the cart from personalized candidates, avoid duplicate products, mix categories when enough relevant candidates exist, and include a reason tied to the signal used. The engine does not claim technical PC-part compatibility.
 
 
-The web page and home/product/cart sections use the behavior-driven engine. The mobile API has an additive public GET feed and an authenticated personalized feed with the same product/reason shape; mobile guests continue to receive popular/featured results. The released v1 criteria/options endpoints remain during the mobile client transition; removing them requires confirmed mobile cutover. React Native client integration and refresh validation remain pending.
+The web page and home/product/cart sections and both mobile GET feeds use the behavioral engine. The developer confirms the React Native consumer has migrated to these endpoints; the superseded input/options endpoints are retired. Mobile guests continue to receive popular/featured products. This confirmation establishes consumer migration, not a new device-validation run.
 
 The module operates using Battlefront's internal catalog, completed orders, cart, signed-in customer search/view activity, and temporary browser guest search/view activity. Signed-in customers can disable either personal activity signal in profile settings; disabled guest signals are discarded during account-creation merge. Guest history is never merged into an existing account at login. The chatbot does not receive recommendation history or make recommendation decisions.
 
@@ -702,7 +706,7 @@ EXT-6 is Done. Its recorded baseline decisions remain useful historical context,
 - keep branch email reference data in application configuration; the current schema has no `branches.email` column.
 - keep deactivated categories, products, and chatbot knowledge in the database for historical and administrative reference, allow administrators to reactivate them, and prohibit physical deletion when historically referenced;
 - exclude inactive products from the customer catalog, cart eligibility, and recommendation results; exclude inactive categories and their products from customer browsing; and exclude inactive chatbot knowledge from chatbot retrieval;
-- keep recommendation behavior rule-based using budget, intended use, preferred brand, category, product preferences or tags, and Sagay inventory; do not implement a `product_compatibilities` table, product-to-product compatibility relationship, or dedicated compatibility-checking/configurator feature.
+- keep recommendations behavioral and rule-based using retained searches/views/dwell, cart context and completed purchases; preserve current active catalog/Sagay stock eligibility and exclude explicit PC-part compatibility/configurator behavior.
 
 Subsequent implemented schema/commerce decisions include:
 
@@ -852,7 +856,7 @@ Outside scope:
 
 ## Recommendation Data
 
-The recommendation engine uses internal Battlefront catalog and inventory information.
+The recommendation engine uses internal catalog/inventory, completed-order aggregates and the owner's eligible search/view/dwell/cart history.
 
 Outside scope:
 
@@ -954,8 +958,7 @@ General status snapshot verified against Linear on **2026-10-01**; the forecasti
 | --- | --- | --- |
 | Core catalog, inventory, roles, and branch reference | Complete | Implemented routes/models/services and completed core issues |
 | Cart, checkout, orders, manual payments, cancellation restoration, sales/reports | Complete | EXT-22–27, EXT-28–34, EXT-80–83 Done |
-| Criteria-based recommendations | Historically complete | EXT-35, EXT-37-39, EXT-41, EXT-64 Done; approved manuscript baseline and released mobile contract |
-| Behavior-driven recommendation implementation | Complete for current web/backend paths | Adviser approval confirmed by the developer on 2026-10-08; guest profiles, tracking, recommendations, and registration-only history merge implemented; mobile cutover, consumer validation, and evaluation evidence remain pending |
+| Behavior-driven recommendation implementation | Complete for current web/backend paths | Adviser approval confirmed by the developer on 2026-10-08; guest profiles, tracking, recommendations, and registration-only history merge implemented; mobile migration is developer-confirmed; device validation and evaluation evidence remain separate |
 | Integrated chatbot | Complete | EXT-47–55 and EXT-61 Done |
 | Mobile API foundation/customer endpoints | Complete | EXT-56–61 and EXT-64 Done |
 | Mobile handoff and Postman collection | Complete | EXT-62 Done; developer-reported successful manual Postman Desktop verification |
@@ -966,7 +969,7 @@ General status snapshot verified against Linear on **2026-10-01**; the forecasti
 
 ## Completed Mobile API Scope
 
-`routes/api.php` defines 31 `/api/v1` endpoints covering health, customer registration/login/logout, profile read/update, catalog search/filter/detail, branch information, cart operations, checkout preview, order placement/history/detail, rejected-proof replacement, chatbot, behavior-driven recommendation feeds/interactions, retained criteria options/results, shared notification history/read state, and Expo device registration/revocation.
+`routes/api.php` defines 29 `/api/v1` endpoints covering health, customer registration/login/logout, profile read/update, catalog search/filter/detail, branch information, cart operations, checkout preview, order placement/history/detail, rejected-proof replacement, chatbot, behavioral recommendation feeds/interactions, shared notification history/read state, and Expo device registration/revocation.
 
 The mobile product list additionally supports multiple active categories (`category_ids`), inclusive effective-price bounds (`min_price`, `max_price`), and `featured`/`price_asc`/`price_desc` sorting. These parameters are enabled only for the named API product-list route; the existing Inertia web catalog keeps its singular category/brand/tag filters, search, default ordering, and scroll behavior. Both clients retain shared catalog eligibility and presentation. This extension adds no endpoints or schema changes; see the handoff for validation and pagination details. React Native consumer validation of the additions remains pending.
 

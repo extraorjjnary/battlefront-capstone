@@ -25,7 +25,7 @@ class ProductController extends Controller
     {
         $filters = $request->filters();
 
-        if ($request->integer('page', 1) === 1) {
+        if (! $request->prefetch() && $request->integer('page', 1) === 1) {
             $recordCustomerSearch->record($request->user('sanctum'), $filters['q']);
         }
 
@@ -43,7 +43,9 @@ class ProductController extends Controller
     public function show(Request $request, int $product, RecordCustomerProductView $recordCustomerProductView): ProductResource
     {
         $catalogProduct = $this->productCatalogRepository->findEligibleOrFail($product);
-        $recordCustomerProductView($request->user('sanctum'), $catalogProduct);
+        if (! $request->prefetch()) {
+            $recordCustomerProductView($request->user('sanctum'), $catalogProduct);
+        }
 
         return new ProductResource($this->catalogProductPresenter->present($catalogProduct));
     }

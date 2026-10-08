@@ -135,8 +135,8 @@ test('home page shows popular recommendations to guests', function () {
 
 test('product page recommendations exclude the product currently being viewed', function () {
     $category = Category::factory()->create();
-    $popularProduct = createWorkflowProduct($category);
-    $currentProduct = createWorkflowProduct($category);
+    $popularProduct = createWorkflowProduct($category, ['price' => '100.00']);
+    $currentProduct = createWorkflowProduct($category, ['price' => '100.00']);
     $customer = User::factory()->customer()->create();
     $order = Order::factory()->for($customer)->create([
         'status' => OrderStatus::Completed,
@@ -148,12 +148,21 @@ test('product page recommendations exclude the product currently being viewed', 
     $this->get(route('products.show', $currentProduct))
         ->assertInertia(fn (Assert $page) => $page
             ->component('Products/Show')
-            ->where('is_personalized', false)
+            ->where('is_personalized', true)
             ->has('recommendations', 1)
             ->where('recommendations.0.product.id', $popularProduct->id));
 });
 
-test('criteria-based web results route is no longer available', function () {
-    $this->get('/recommendations/results?budget=500.00&intended_use=gaming')
+test('retired web results route is no longer available', function () {
+    $this->get('/recommendations/results')
         ->assertNotFound();
+});
+
+test('only customers can resume personalization without changing independent signal preferences', function () {
+    $this->post(route('recommendations.personalization.enable'))->assertRedirect(route('login'));
+    $customer = User::factory()->customer()->create(['personalized_recommendations_enabled' => false, 'search_recommendations_enabled' => false]);
+    $this->actingAs($customer)->post(route('recommendations.personalization.enable'))->assertRedirect(route('recommendations.index'));
+    expect($customer->refresh()->personalized_recommendations_enabled)->toBeTrue()
+        ->and($customer->search_recommendations_enabled)->toBeFalse();
+    $this->actingAs(User::factory()->administrator()->create())->post(route('recommendations.personalization.enable'))->assertForbidden();
 });

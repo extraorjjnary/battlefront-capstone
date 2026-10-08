@@ -30,6 +30,7 @@ use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderPaymentProofController as CustomerOrderPaymentProofController;
 use App\Http\Controllers\ProductCatalogController;
 use App\Http\Controllers\ProductDwellController;
+use App\Http\Controllers\ProductViewController;
 use App\Http\Controllers\RecommendationController;
 use App\Http\Controllers\RecommendationInteractionController;
 use App\Http\Controllers\RecommendationPreferenceController;
@@ -49,6 +50,10 @@ Route::post('products/{product}/dwell', [ProductDwellController::class, 'store']
     ->whereNumber('product')
     ->middleware('throttle:60,1')
     ->name('products.dwell.store');
+Route::post('products/{product}/view', [ProductViewController::class, 'store'])
+    ->whereNumber('product')
+    ->middleware('throttle:60,1')
+    ->name('products.view.store');
 
 // public/customer recommendations
 Route::middleware('can:use-recommendations')->group(function () {

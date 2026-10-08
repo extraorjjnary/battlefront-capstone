@@ -115,6 +115,13 @@ test('product detail returns only the mobile catalog fields', function () {
     ]]);
 });
 
+test('configured image hosts are preserved on product lists as well as details', function () {
+    config(['filesystems.disks.public.url' => 'https://assets.example.test/catalog']);
+    $product = Product::factory()->create(['image_path' => 'products/example.webp']);
+    $this->getJson(route('api.v1.products.index'))->assertOk()
+        ->assertJsonPath('data.0.image_url', 'https://assets.example.test/catalog/products/example.webp');
+});
+
 test('list and detail expose stock status without exact quantities', function (?int $quantity, int $reorderLevel, string $status) {
     $product = Product::factory()->create(['image_path' => null, 'brand' => null]);
     if ($quantity !== null) {

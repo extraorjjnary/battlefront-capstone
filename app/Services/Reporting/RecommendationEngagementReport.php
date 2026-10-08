@@ -23,6 +23,8 @@ class RecommendationEngagementReport
         'bought_with_purchase_history' => 'Often bought with past purchases',
         'bought_with_viewed_products' => 'Often bought with viewed products',
         'similar_to_viewed_product' => 'Similar to viewed products',
+        'spent_time_viewing_product' => 'Time spent viewing similar products',
+        'bought_by_similar_customers' => 'Customers with overlapping purchases',
         'featured_fallback' => 'Featured fallback',
         'matched_recent_searches' => 'Matched recent searches',
         'popular_with_customers' => 'Popular with customers',

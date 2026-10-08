@@ -26,11 +26,11 @@ class ResolveGuestRecommendationProfile
         $authenticatedUserAtStart = $request->user();
         $wasAuthenticated = $authenticatedUserAtStart !== null;
         $profile = null;
-        $token = null;
-        $token = $request->cookie('battlefront_recommendation_profile');
+        $cookie = $request->cookie('battlefront_recommendation_profile');
+        $token = is_string($cookie) ? $cookie : null;
         $routeName = $request->route()?->getName();
         $profileRoutes = ['home', 'products.index', 'products.show', 'recommendations.index'];
-        $profileLookupRoutes = [...$profileRoutes, 'products.dwell.store'];
+        $profileLookupRoutes = [...$profileRoutes, 'products.dwell.store', 'products.view.store'];
         $authenticationRoutes = ['login.store', 'register.store'];
         $shouldResolveProfile = in_array($routeName, $profileLookupRoutes, true)
             || (is_string($token) && $token !== '' && in_array($routeName, $authenticationRoutes, true));
@@ -90,12 +90,16 @@ class ResolveGuestRecommendationProfile
             }
 
             if (! $isLoggingOut) {
-                return $response->withCookie(Cookie::forget('battlefront_recommendation_profile'));
+                $response->headers->setCookie(Cookie::forget('battlefront_recommendation_profile'));
+
+                return $response;
             }
         }
 
         if ($user instanceof User && in_array($routeName, $authenticationRoutes, true)) {
-            return $response->withCookie(Cookie::forget('battlefront_recommendation_profile'));
+            $response->headers->setCookie(Cookie::forget('battlefront_recommendation_profile'));
+
+            return $response;
         }
 
         if ($isLoggingOut) {
@@ -107,13 +111,15 @@ class ResolveGuestRecommendationProfile
         }
 
         if ($wasAuthenticated && $profile === null && $token !== null && ! $isLoggingOut) {
-            return $response->withCookie(Cookie::forget('battlefront_recommendation_profile'));
+            $response->headers->setCookie(Cookie::forget('battlefront_recommendation_profile'));
+
+            return $response;
         }
 
         if ($profile !== null && $token !== null) {
             $minutes = 90 * 24 * 60;
 
-            return $response->withCookie(Cookie::make(
+            $response->headers->setCookie(Cookie::make(
                 'battlefront_recommendation_profile',
                 $token,
                 $minutes,
@@ -124,6 +130,8 @@ class ResolveGuestRecommendationProfile
                 false,
                 'lax',
             ));
+
+            return $response;
         }
 
         return $response;

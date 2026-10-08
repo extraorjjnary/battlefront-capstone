@@ -47,8 +47,6 @@ Route::prefix('v1')
             Route::get('recommendations', [RecommendationController::class, 'feed'])->name('recommendations.feed');
             Route::post('recommendations/interactions', RecommendationInteractionController::class)
                 ->name('recommendations.interactions.store');
-            Route::get('recommendations/options', [RecommendationController::class, 'options'])->name('recommendations.options');
-            Route::post('recommendations', [RecommendationController::class, 'results'])->name('recommendations.results');
         });
 
         // chatbot

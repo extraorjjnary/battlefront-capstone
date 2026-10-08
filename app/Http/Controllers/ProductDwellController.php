@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\User\RecordCustomerProductDwell;
+use App\Enums\UserRole;
 use App\Http\Requests\StoreProductDwellRequest;
 use App\Models\GuestRecommendationProfile;
 use App\Models\User;
@@ -18,14 +19,17 @@ class ProductDwellController extends Controller
         RecordCustomerProductDwell $recordCustomerProductDwell,
     ): Response {
         $customer = $request->user();
+        abort_if($customer instanceof User && $customer->role !== UserRole::Customer, 403);
         $guestProfile = $request->attributes->get('guest_recommendation_profile');
 
-        $recordCustomerProductDwell(
-            $customer instanceof User ? $customer : null,
-            $productCatalogRepository->findEligibleOrFail($product),
-            $guestProfile instanceof GuestRecommendationProfile ? $guestProfile : null,
-            $request->validatedSeconds(),
-        );
+        if (! $request->prefetch()) {
+            $recordCustomerProductDwell(
+                $customer instanceof User ? $customer : null,
+                $productCatalogRepository->findEligibleOrFail($product),
+                $guestProfile instanceof GuestRecommendationProfile ? $guestProfile : null,
+                $request->validatedSeconds(),
+            );
+        }
 
         return response()->noContent();
     }

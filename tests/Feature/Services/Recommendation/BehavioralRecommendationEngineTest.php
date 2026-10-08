@@ -2,6 +2,7 @@
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
+use App\Http\Controllers\RecommendationController;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Category;
@@ -13,7 +14,19 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\User;
+use App\Repositories\Catalog\ProductCatalogRepository;
+use App\Services\CatalogProductPresenter;
 use App\Services\Recommendation\BehavioralRecommendationEngine;
+use Illuminate\Support\Facades\Http;
+
+arch('behavioral recommendations remain independent of chatbot and AI services')
+    ->expect([
+        'App\Services\Recommendation',
+        RecommendationController::class,
+        ProductCatalogRepository::class,
+        CatalogProductPresenter::class,
+    ])
+    ->not->toUse(['App\Actions\Chatbot', 'App\Services\Chatbot', 'App\Ai', 'Laravel\Ai', Http::class]);
 
 function createBehavioralRecommendationTestProduct(array $attributes = []): Product
 {
@@ -22,6 +35,84 @@ function createBehavioralRecommendationTestProduct(array $attributes = []): Prod
 
     return $product;
 }
+
+test('unavailable search matches do not consume limits or suppress available featured fallback', function () {
+    $customer = User::factory()->customer()->create();
+    CustomerSearch::factory()->for($customer)->create(['query' => 'monitor']);
+    for ($index = 0; $index < 15; $index++) {
+        $product = createBehavioralRecommendationTestProduct(['name' => 'Monitor '.$index]);
+        $product->inventory()->update(['quantity' => 0]);
+    }
+    $available = createBehavioralRecommendationTestProduct(['name' => 'Z monitor']);
+    $featured = createBehavioralRecommendationTestProduct(['name' => 'Featured keyboard', 'is_featured' => true]);
+    $inactiveCategory = Category::factory()->inactive()->create();
+    createBehavioralRecommendationTestProduct(['category_id' => $inactiveCategory->id, 'is_featured' => true]);
+    Product::factory()->create(['is_featured' => true]);
+
+    $results = app(BehavioralRecommendationEngine::class)->recommendFor($customer, 4);
+    expect($results->pluck('product.id')->all())->toBe([$available->id, $featured->id]);
+});
+
+test('similarity evaluates eligible prices and relevance before choosing forty candidates', function () {
+    $customer = User::factory()->customer()->create();
+    $category = Category::factory()->create();
+    $anchor = createBehavioralRecommendationTestProduct(['category_id' => $category->id, 'brand' => 'Atlas', 'price' => '100.00']);
+    CustomerProductView::factory()->for($customer)->for($anchor)->create();
+    for ($index = 0; $index < 41; $index++) {
+        createBehavioralRecommendationTestProduct(['category_id' => $category->id, 'name' => 'A '.$index, 'brand' => null, 'price' => '100.00']);
+    }
+    $best = createBehavioralRecommendationTestProduct(['category_id' => $category->id, 'name' => 'Z strongest match', 'brand' => 'ATLAS', 'price' => '200.00']);
+    createBehavioralRecommendationTestProduct(['category_id' => $category->id, 'brand' => 'Atlas', 'price' => '201.00']);
+    expect(app(BehavioralRecommendationEngine::class)->recommendFor($customer, 1)->first()->product->id)->toBe($best->id);
+});
+
+test('longer dwell increases a matching product rank without exposing personal durations', function () {
+    $customer = User::factory()->customer()->create();
+    $firstCategory = Category::factory()->create();
+    $secondCategory = Category::factory()->create();
+    $firstAnchor = createBehavioralRecommendationTestProduct(['category_id' => $firstCategory->id, 'brand' => null, 'price' => '100.00']);
+    $first = createBehavioralRecommendationTestProduct(['category_id' => $firstCategory->id, 'brand' => null, 'price' => '100.00']);
+    $secondAnchor = createBehavioralRecommendationTestProduct(['category_id' => $secondCategory->id, 'brand' => null, 'price' => '100.00']);
+    $second = createBehavioralRecommendationTestProduct(['category_id' => $secondCategory->id, 'brand' => null, 'price' => '100.00']);
+    CustomerProductView::factory()->for($customer)->for($firstAnchor)->create(['dwell_seconds' => 0]);
+    CustomerProductView::factory()->for($customer)->for($secondAnchor)->create(['dwell_seconds' => 120]);
+    $results = app(BehavioralRecommendationEngine::class)->recommendFor($customer);
+    expect($results->pluck('product.id')->all())->toBe([$second->id, $first->id])
+        ->and(array_column($results->first()->reasons, 'code'))->toContain('spent_time_viewing_product');
+});
+
+test('overlapping customers contribute purchases from separate completed orders', function () {
+    $customer = User::factory()->customer()->create();
+    $other = User::factory()->customer()->create();
+    $anchor = createBehavioralRecommendationTestProduct();
+    $candidate = createBehavioralRecommendationTestProduct();
+    foreach ([[$customer, $anchor], [$other, $anchor], [$other, $candidate]] as [$buyer, $product]) {
+        $order = Order::factory()->for($buyer)->create(['status' => OrderStatus::Completed, 'payment_status' => PaymentStatus::Verified]);
+        OrderItem::factory()->for($order)->for($product)->create();
+    }
+    $results = app(BehavioralRecommendationEngine::class)->recommendFor($customer);
+    expect($results->pluck('product.id')->all())->toBe([$candidate->id])
+        ->and(array_column($results->first()->reasons, 'code'))->toContain('bought_by_similar_customers')
+        ->and(array_column($results->first()->reasons, 'code'))->not->toContain('bought_with_purchase_history');
+});
+
+test('current product exclusion happens before selection even when personalization is paused', function () {
+    $customer = User::factory()->customer()->create(['personalized_recommendations_enabled' => false]);
+    $excluded = createBehavioralRecommendationTestProduct(['is_featured' => true, 'name' => 'A']);
+    $remaining = createBehavioralRecommendationTestProduct(['is_featured' => true, 'name' => 'Z']);
+    expect(app(BehavioralRecommendationEngine::class)->recommendFor($customer, 1, [$excluded->id])->pluck('product.id')->all())
+        ->toBe([$remaining->id]);
+});
+
+test('frozen-time behavioral ranking is repeatable and returns each candidate once', function () {
+    $this->freezeTime();
+    $customer = User::factory()->customer()->create();
+    $product = createBehavioralRecommendationTestProduct(['name' => 'Keyboard', 'is_featured' => true]);
+    CustomerSearch::factory()->count(2)->for($customer)->create(['query' => 'keyboard']);
+    $engine = app(BehavioralRecommendationEngine::class);
+    expect($engine->recommendFor($customer)->pluck('product.id')->all())->toBe([$product->id])
+        ->and($engine->recommendFor($customer)->pluck('product.id')->all())->toBe([$product->id]);
+});
 
 test('personalized recommendations use recent opted-in catalog searches and rank newer matches first', function () {
     $customer = User::factory()->customer()->create([

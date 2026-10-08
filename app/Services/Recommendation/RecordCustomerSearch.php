@@ -28,6 +28,7 @@ class RecordCustomerSearch
         $recentSearch = $owner->searches()
             ->where('created_at', '>=', now()->subMinutes(10))
             ->latest('created_at')
+            ->orderByDesc('id')
             ->first();
 
         if ($recentSearch !== null && $this->isNearlyIdentical($recentSearch->query, $normalizedQuery)) {

@@ -3,6 +3,7 @@
 use App\Models\CustomerProductView;
 use App\Models\CustomerSearch;
 use App\Models\GuestRecommendationProfile;
+use App\Models\Product;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -135,4 +136,16 @@ test('the scheduled cleanup command removes expired searches and retains current
     $this->assertModelExists($current);
     $this->assertModelMissing($expiredProductView);
     $this->assertModelExists($currentProductView);
+});
+
+test('global personalization pause stops both signals while retaining existing activity', function () {
+    $customer = User::factory()->customer()->create(['personalized_recommendations_enabled' => false]);
+    $search = CustomerSearch::factory()->for($customer)->create();
+    $view = CustomerProductView::factory()->for($customer)->create();
+    $this->actingAs($customer)->get(route('products.index', ['q' => 'new private query']))->assertOk();
+    $this->get(route('products.show', Product::factory()->create()))->assertOk();
+    $this->assertDatabaseCount('customer_searches', 1);
+    $this->assertDatabaseCount('customer_product_views', 1);
+    $this->assertModelExists($search);
+    $this->assertModelExists($view);
 });

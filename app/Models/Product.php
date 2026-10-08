@@ -27,9 +27,9 @@ use Illuminate\Support\Facades\Storage;
  * @property string|null $description
  * @property int $category_id
  * @property string|null $brand
- * @property numeric-string $price
+ * @property string $price
  * @property bool $is_featured
- * @property numeric-string|null $discount_price
+ * @property string|null $discount_price
  * @property string|null $image_path
  * @property-read string|null $image_url
  * @property bool $is_active
@@ -95,11 +95,7 @@ class Product extends Model
             }
 
             if (str_starts_with($this->image_path, 'images/demo-products/')) {
-                return url('/'.ltrim($this->image_path, '/'));
-            }
-
-            if (config('filesystems.disks.public.driver') === 'local') {
-                return url('/storage/'.ltrim($this->image_path, '/'));
+                return asset($this->image_path);
             }
 
             return Storage::disk('public')->url($this->image_path);

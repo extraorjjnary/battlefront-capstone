@@ -3,6 +3,8 @@
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Category;
+use App\Models\CustomerProductView;
+use App\Models\CustomerSearch;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
@@ -191,6 +193,15 @@ test('administrators see anonymous recommendation engagement by date placement r
         ->toMatchArray(['impressions' => 0, 'clicks' => 1, 'dismissals' => 0, 'wrong_reports' => 0])
         ->and($reasons->get('matched_recent_searches'))
         ->toMatchArray(['impressions' => 0, 'clicks' => 1]);
+});
+
+test('recommendation engagement reporting never exposes raw customer browsing history', function () {
+    CustomerSearch::factory()->create(['query' => 'private customer search phrase']);
+    CustomerProductView::factory()->create(['dwell_seconds' => 1234]);
+    $this->actingAs(User::factory()->administrator()->create())
+        ->get(route('administration.reports.sales'))->assertOk()
+        ->assertDontSee('private customer search phrase')->assertDontSee('dwell_seconds')
+        ->assertDontSee('guest_recommendation_profile_id');
 });
 
 test('sales KPIs and product and category reports use sale-backed order records', function () {
