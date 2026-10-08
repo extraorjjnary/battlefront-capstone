@@ -31,25 +31,23 @@ Send `Accept: application/json`. JSON bodies use `Content-Type: application/json
 
 ### Errors
 
-| HTTP | Meaning / shape |
-|---|---|
-| 401 | Missing/invalid required bearer auth: `{"message":"Unauthenticated."}`; invalid login (including administrators): `{"message":"Invalid credentials."}` |
-| 403 | Valid authenticated identity is not allowed; JSON `message` |
-| 404 | Unknown route/product or missing/foreign cart item/order; JSON `message`; do not rely on exact message text |
-| 422 | Request validation or business conflict; `message` plus `errors` mapping field names to arrays of messages |
-| 429 | Rate limit reached; JSON `message`, `Retry-After` header |
-| 500 | With `APP_DEBUG=false`: `{"message":"Server Error"}`. Debug deployments can include diagnostic fields; these are not a client contract. |
+| HTTP | Meaning / shape                                                                                                                                        |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 401  | Missing/invalid required bearer auth: `{"message":"Unauthenticated."}`; invalid login (including administrators): `{"message":"Invalid credentials."}` |
+| 403  | Valid authenticated identity is not allowed; JSON `message`                                                                                            |
+| 404  | Unknown route/product or missing/foreign cart item/order; JSON `message`; do not rely on exact message text                                            |
+| 422  | Request validation or business conflict; `message` plus `errors` mapping field names to arrays of messages                                             |
+| 429  | Rate limit reached; JSON `message`, `Retry-After` header                                                                                               |
+| 500  | With `APP_DEBUG=false`: `{"message":"Server Error"}`. Debug deployments can include diagnostic fields; these are not a client contract.                |
 
 Representative quantity error:
 
 ```json
 {
-  "message": "Quantity must be at least 1.",
-  "errors": {
-    "quantity": [
-      "Quantity must be at least 1."
-    ]
-  }
+    "message": "Quantity must be at least 1.",
+    "errors": {
+        "quantity": ["Quantity must be at least 1."]
+    }
 }
 ```
 
@@ -67,13 +65,13 @@ Catalog validates `page` as an integer >=1; order history uses Laravel's paginat
 
 ### Rate limits
 
-| Scope | Limit |
-|---|---|
-| API v1 | 60 requests/minute/IP across the version group |
-| Registration | Additional 5/minute/IP |
-| Login | Additional 5/minute/lowercased email + IP, shared named login limiter |
-| Chatbot guest | Additional 5/minute/IP, shared with web guests |
-| Chatbot customer | Additional 10/minute/customer, shared across tokens/devices and web |
+| Scope            | Limit                                                                 |
+| ---------------- | --------------------------------------------------------------------- |
+| API v1           | 60 requests/minute/IP across the version group                        |
+| Registration     | Additional 5/minute/IP                                                |
+| Login            | Additional 5/minute/lowercased email + IP, shared named login limiter |
+| Chatbot guest    | Additional 5/minute/IP, shared with web guests                        |
+| Chatbot customer | Additional 10/minute/customer, shared across tokens/devices and web   |
 
 The chatbot-specific 429 message is `Too many questions. Please wait a minute and try again.` The general API limit can be reached first. Respect `Retry-After`. Limits count requests, not only failed attempts. Users behind one LAN can share the IP allowance.
 
@@ -87,40 +85,41 @@ Registration/login create a new Sanctum personal access token with a **30-day pe
 
 All paths below are relative to `base_url`. GET routes also support HEAD through Laravel.
 
-| Method | Path | Access | Success |
-|---|---|---|---|
-| GET | /health | Public | 200 |
-| POST | /auth/register | Public | 201 |
-| POST | /auth/login | Public | 200 |
-| POST | /auth/logout | Customer | 204 |
-| GET | /profile | Customer | 200 |
-| PATCH | /profile | Customer | 200 |
-| GET | /products | Public | 200 |
-| GET | /products/filters | Public | 200 |
-| GET | /products/{product} | Public | 200 |
-| GET | /branches | Public | 200 |
-| GET | /cart | Customer | 200 |
-| POST | /cart/items | Customer | 200 |
-| PATCH | /cart/items/{cartItem} | Customer | 200 |
-| DELETE | /cart/items/{cartItem} | Customer | 200 |
-| GET | /checkout | Customer | 200 |
-| POST | /orders | Customer | 201 |
-| GET | /orders | Customer | 200 |
-| GET | /orders/{order} | Customer | 200 |
-| POST | /orders/{order}/payment-proof | Customer | 200 |
-| GET | /notifications | Customer | 200 |
-| GET | /notifications/unread-count | Customer | 200 |
-| PATCH | /notifications/{notification}/read | Customer | 200 |
-| PATCH | /notifications/read-all | Customer | 200 |
-| PUT | /push-devices/{device} | Customer | 200 |
-| DELETE | /push-devices/{device} | Customer | 204 |
-| POST | /chatbot | Guest/customer | 200 |
-| GET | /recommendations/options | Guest/customer | 200 |
-| POST | /recommendations | Guest/customer | 200 |
+| Method | Path                               | Access         | Success |
+| ------ | ---------------------------------- | -------------- | ------- |
+| GET    | /health                            | Public         | 200     |
+| POST   | /auth/register                     | Public         | 201     |
+| POST   | /auth/login                        | Public         | 200     |
+| POST   | /auth/logout                       | Customer       | 204     |
+| GET    | /profile                           | Customer       | 200     |
+| PATCH  | /profile                           | Customer       | 200     |
+| GET    | /products                          | Public         | 200     |
+| GET    | /products/filters                  | Public         | 200     |
+| GET    | /products/{product}                | Public         | 200     |
+| GET    | /branches                          | Public         | 200     |
+| GET    | /cart                              | Customer       | 200     |
+| POST   | /cart/items                        | Customer       | 200     |
+| PATCH  | /cart/items/{cartItem}             | Customer       | 200     |
+| DELETE | /cart/items/{cartItem}             | Customer       | 200     |
+| GET    | /checkout                          | Customer       | 200     |
+| POST   | /orders                            | Customer       | 201     |
+| GET    | /orders                            | Customer       | 200     |
+| GET    | /orders/{order}                    | Customer       | 200     |
+| POST   | /orders/{order}/payment-proof      | Customer       | 200     |
+| GET    | /notifications                     | Customer       | 200     |
+| GET    | /notifications/unread-count        | Customer       | 200     |
+| PATCH  | /notifications/{notification}/read | Customer       | 200     |
+| PATCH  | /notifications/read-all            | Customer       | 200     |
+| PUT    | /push-devices/{device}             | Customer       | 200     |
+| DELETE | /push-devices/{device}             | Customer       | 204     |
+| POST   | /chatbot                           | Guest/customer | 200     |
+| GET    | /recommendations                   | Guest/customer | 200     |
+| GET    | /recommendations/personalized      | Customer       | 200     |
+| POST   | /recommendations/interactions      | Guest/customer | 204     |
 
 Public health/catalog/branches do not authenticate supplied credentials. Registration/login authenticate their submitted fields, not a bearer header.
 
-For **chatbot and both recommendation routes**: omit Authorization entirely for guests; valid customer tokens are accepted; valid administrator tokens get 403; invalid/expired/revoked/malformed supplied Authorization gets 401. An empty bearer header is not a guest request. Web sessions do not authenticate these API requests.
+For **chatbot and the public recommendation feed/interaction routes**: omit Authorization entirely for guests; valid customer tokens are accepted; valid administrator tokens get 403; invalid/expired/revoked/malformed supplied Authorization gets 401. An empty bearer header is not a guest request. Web sessions do not authenticate these API requests.
 
 Customer-only routes require Sanctum plus the customer role gate: missing/invalid/expired/revoked token gets 401; administrator token gets 403. Foreign cart/order IDs are concealed with 404. Chatbot order ownership failures instead use the safe conversational fallback described below. Validation may run before resource lookup, so use otherwise valid input when testing ownership.
 
@@ -130,13 +129,13 @@ Customer-only routes require Sanctum plus the customer role gate: missing/invali
 
 Required fields:
 
-| Field | Validation |
-|---|---|
-| name | String, max 255 |
-| email | Valid email string, max 255, unique; lowercased by current Fortify setting |
-| password | String, confirmed by password_confirmation |
-| password_confirmation | Must match password |
-| device_name | String, max 255 |
+| Field                 | Validation                                                                 |
+| --------------------- | -------------------------------------------------------------------------- |
+| name                  | String, max 255                                                            |
+| email                 | Valid email string, max 255, unique; lowercased by current Fortify setting |
+| password              | String, confirmed by password_confirmation                                 |
+| password_confirmation | Must match password                                                        |
+| device_name           | String, max 255                                                            |
 
 The password default outside production is minimum 8 characters. Production config requires at least 12, upper/lowercase, letters, numbers, symbols, and uncompromised-password validation. Use a suitable local test password rather than a committed example.
 
@@ -150,17 +149,17 @@ Both authentication success responses use:
 
 ```json
 {
-  "data": {
-    "user": {
-      "id": 1,
-      "name": "Example Customer",
-      "email": "customer@example.test",
-      "default_delivery_address": null
-    },
-    "token": "<issued-only-at-runtime>",
-    "token_type": "Bearer",
-    "expires_at": "2026-10-31T08:00:00+00:00"
-  }
+    "data": {
+        "user": {
+            "id": 1,
+            "name": "Example Customer",
+            "email": "customer@example.test",
+            "default_delivery_address": null
+        },
+        "token": "<issued-only-at-runtime>",
+        "token_type": "Bearer",
+        "expires_at": "2026-10-31T08:00:00+00:00"
+    }
 }
 ```
 
@@ -174,26 +173,32 @@ GET returns:
 
 ```json
 {
-  "data": {
-    "id": 1,
-    "name": "Example Customer",
-    "email": "customer@example.test",
-    "default_delivery_address": null
-  }
+    "data": {
+        "id": 1,
+        "name": "Example Customer",
+        "email": "customer@example.test",
+        "default_delivery_address": null,
+        "search_recommendations_enabled": true,
+        "product_view_recommendations_enabled": true,
+        "personalized_recommendations_enabled": true
+    }
 }
 ```
 
-PATCH requires `name` and `email` (same length/email/uniqueness rules, excluding the current user). Optional `default_delivery_address` is nullable/max 255: omit to preserve, send null/blank to clear. Email changes clear the stored email verification timestamp; verification is currently optional/disabled.
+PATCH requires `name` and `email` (same length/email/uniqueness rules, excluding the current user). Optional `default_delivery_address` is nullable/max 255: omit to preserve, send null/blank to clear. New customers have `search_recommendations_enabled` and `product_view_recommendations_enabled` enabled by default, so no profile setup is needed. PATCH can independently disable either preference; turning one off pauses its recording/ranking and retains unexpired history. The global `personalized_recommendations_enabled` switch pauses all personal ranking and new search/view recording; all three preferences default to true. Re-enabling uses retained unexpired history. Retained activity expires after 90 days. Email changes clear the stored email verification timestamp; verification is currently optional/disabled.
 
 ```json
 {
-  "name": "Example Customer",
-  "email": "customer@example.test",
-  "default_delivery_address": "Example delivery address"
+    "name": "Example Customer",
+    "email": "customer@example.test",
+    "default_delivery_address": "Example delivery address",
+    "search_recommendations_enabled": true,
+    "product_view_recommendations_enabled": true,
+    "personalized_recommendations_enabled": true
 }
 ```
 
-Successful PATCH returns the same four-field profile shape. No user ID is accepted to select a profile. No password, role, remember token, recovery code, or two-factor data is exposed.
+Successful PATCH returns the same profile shape with all three recommendation preferences. No user ID is accepted to select a profile. No password, role, remember token, recovery code, or two-factor data is exposed.
 
 ## 4. Catalog and branches
 
@@ -201,17 +206,17 @@ Successful PATCH returns the same four-field profile shape. No user ID is accept
 
 Optional query parameters:
 
-| Parameter | Meaning |
-|---|---|
-| q | Nullable string <=255; substring search across product name, brand, description |
-| category_id | Nullable integer; existing active category |
-| category_ids | Nullable array of up to 50 distinct existing active category IDs; matches any selected category |
-| brand | Nullable string <=255; catalog brand equality filter |
-| tag_id | Nullable integer; existing tag (single tag filter) |
-| min_price | Nullable numeric peso amount, 0..9999999999.99, at most 2 decimal places; inclusive effective-price minimum |
-| max_price | Same amount rules; inclusive effective-price maximum; must be >= min_price when both are supplied |
-| sort | Nullable featured, price_asc, or price_desc; omitted/null/blank defaults to featured |
-| page | Nullable integer >=1 |
+| Parameter    | Meaning                                                                                                     |
+| ------------ | ----------------------------------------------------------------------------------------------------------- |
+| q            | Nullable string <=255; substring search across product name, brand, description                             |
+| category_id  | Nullable integer; existing active category                                                                  |
+| category_ids | Nullable array of up to 50 distinct existing active category IDs; matches any selected category             |
+| brand        | Nullable string <=255; catalog brand equality filter                                                        |
+| tag_id       | Nullable integer; existing tag (single tag filter)                                                          |
+| min_price    | Nullable numeric peso amount, 0..9999999999.99, at most 2 decimal places; inclusive effective-price minimum |
+| max_price    | Same amount rules; inclusive effective-price maximum; must be >= min_price when both are supplied           |
+| sort         | Nullable featured, price_asc, or price_desc; omitted/null/blank defaults to featured                        |
+| page         | Nullable integer >=1                                                                                        |
 
 Filters combine. Send multiple categories as indexed query parameters such as `category_ids[0]=1&category_ids[1]=2`, using real IDs from filter options; comma-separated values are not supported. Array keys are normalized to a list. A null or empty category list imposes no additional restriction. Do not send populated `category_id` and `category_ids` together: the API returns 422 with `errors.category_ids`. Invalid elements use dotted error keys such as `category_ids.0`.
 
@@ -219,23 +224,25 @@ Price filtering and ordering use `discount_price ?? price`, including a zero dis
 
 These additions apply only to `/api/v1/products`. The Inertia web catalog retains its existing search, singular category/brand/tag filters and default ordering; it ignores these mobile-only parameters. Product response fields and filter-option responses are unchanged. There is no stock, budget, or multi-tag catalog filter. Use `GET /products/filters` to populate selectors:
 
+When a customer sends a valid Sanctum bearer token, page-one searches are retained unless `search_recommendations_enabled` is false. Guests and customers who disabled search tracking are not tracked. `GET /products/{product}` remains public; a valid customer bearer token records an eligible product view unless `product_view_recommendations_enabled` is false. Repeated views of the same product within 30 minutes are deduplicated. Both activity types expire after 90 days; pausing retains unexpired history. Global personalization must also be enabled. Requests carrying Purpose/Sec-Purpose/X-Moz prefetch headers do not record searches or views. Mobile callers must identify speculative requests as prefetch and issue a normal detail GET when the product is actually consumed. Dwell tracking currently belongs to the web detail page; no mobile dwell endpoint is added.
+
 ```json
 {
-  "data": {
-    "categories": [
-      {
-        "id": 1,
-        "name": "Peripherals"
-      }
-    ],
-    "brands": [],
-    "tags": [
-      {
-        "id": 1,
-        "name": "Gaming"
-      }
-    ]
-  }
+    "data": {
+        "categories": [
+            {
+                "id": 1,
+                "name": "Peripherals"
+            }
+        ],
+        "brands": [],
+        "tags": [
+            {
+                "id": 1,
+                "name": "Gaming"
+            }
+        ]
+    }
 }
 ```
 
@@ -243,29 +250,29 @@ List entries and `GET /products/{product}` share this product shape (detail wrap
 
 ```json
 {
-  "data": {
-    "id": 1,
-    "name": "Example Mouse",
-    "description": null,
-    "brand": null,
-    "price": "100.00",
-    "discount_price": null,
-    "image_url": null,
-    "is_featured": false,
-    "category": {
-      "id": 1,
-      "name": "Peripherals"
-    },
-    "tags": [
-      {
+    "data": {
         "id": 1,
-        "name": "Gaming"
-      }
-    ],
-    "inventory": {
-      "status": "in_stock"
+        "name": "Example Mouse",
+        "description": null,
+        "brand": null,
+        "price": "100.00",
+        "discount_price": null,
+        "image_url": null,
+        "is_featured": false,
+        "category": {
+            "id": 1,
+            "name": "Peripherals"
+        },
+        "tags": [
+            {
+                "id": 1,
+                "name": "Gaming"
+            }
+        ],
+        "inventory": {
+            "status": "in_stock"
+        }
     }
-  }
 }
 ```
 
@@ -281,20 +288,20 @@ Unpaginated `data` array. Returns current static directory rows, operational Sag
 
 ```json
 {
-  "data": [
-    {
-      "id": 1,
-      "name": "Example Store",
-      "address": null,
-      "city": "Sagay City",
-      "contact_number": null,
-      "latitude": null,
-      "longitude": null,
-      "email": null,
-      "operating_hours": "8:00 AM–6:00 PM",
-      "is_operational": true
-    }
-  ]
+    "data": [
+        {
+            "id": 1,
+            "name": "Example Store",
+            "address": null,
+            "city": "Sagay City",
+            "contact_number": null,
+            "latitude": null,
+            "longitude": null,
+            "email": null,
+            "operating_hours": "8:00 AM–6:00 PM",
+            "is_operational": true
+        }
+    ]
 }
 ```
 
@@ -313,33 +320,33 @@ All successful operations return **200 with the full refreshed cart**:
 
 ```json
 {
-  "data": {
-    "items": [
-      {
-        "id": 1,
-        "quantity": 2,
-        "product": {
-          "id": 1,
-          "name": "Example Mouse",
-          "brand": null,
-          "image_url": null,
-          "category": "Peripherals",
-          "price": "100.00",
-          "discount_price": null
-        },
-        "unit_price": "100.00",
-        "line_total": "200.00",
-        "availability": {
-          "status": "available",
-          "available_quantity": 5
-        }
-      }
-    ],
-    "item_count": 1,
-    "total_quantity": 2,
-    "total": "200.00",
-    "conflict_count": 0
-  }
+    "data": {
+        "items": [
+            {
+                "id": 1,
+                "quantity": 2,
+                "product": {
+                    "id": 1,
+                    "name": "Example Mouse",
+                    "brand": null,
+                    "image_url": null,
+                    "category": "Peripherals",
+                    "price": "100.00",
+                    "discount_price": null
+                },
+                "unit_price": "100.00",
+                "line_total": "200.00",
+                "availability": {
+                    "status": "available",
+                    "available_quantity": 5
+                }
+            }
+        ],
+        "item_count": 1,
+        "total_quantity": 2,
+        "total": "200.00",
+        "conflict_count": 0
+    }
 }
 ```
 
@@ -353,13 +360,13 @@ Empty cart:
 
 ```json
 {
-  "data": {
-    "items": [],
-    "item_count": 0,
-    "total_quantity": 0,
-    "total": "0.00",
-    "conflict_count": 0
-  }
+    "data": {
+        "items": [],
+        "item_count": 0,
+        "total_quantity": 0,
+        "total": "0.00",
+        "conflict_count": 0
+    }
 }
 ```
 
@@ -371,95 +378,85 @@ Requires an explicit nonempty `cart_item_ids` list of distinct positive integer 
 
 ```json
 {
-  "data": {
-    "cart": {
-      "items": [
-        {
-          "id": 1,
-          "quantity": 2,
-          "product": {
-            "id": 1,
-            "name": "Example Mouse",
-            "brand": null,
-            "image_url": null
-          },
-          "unit_price": "100.00",
-          "line_total": "200.00"
-        }
-      ],
-      "item_count": 1,
-      "total_quantity": 2,
-      "total": "200.00"
-    },
-    "customer": {
-      "name": "Example Customer",
-      "default_delivery_address": null
-    },
-    "pickup_location": {
-      "name": "Example Store — Sagay City",
-      "address": null,
-      "contact_number": null,
-      "operating_hours": "8:00 AM–6:00 PM"
-    },
-    "fulfillment_methods": [
-      {
-        "value": "pickup",
-        "label": "Pickup"
-      },
-      {
-        "value": "delivery",
-        "label": "Delivery"
-      }
-    ],
-    "payment_methods": [
-      {
-        "value": "cash",
-        "label": "Cash",
-        "requires_proof": false,
-        "payment_account": null,
-        "available_for": [
-          "pickup"
-        ]
-      },
-      {
-        "value": "card_at_store",
-        "label": "Card at store",
-        "requires_proof": false,
-        "payment_account": null,
-        "available_for": [
-          "pickup"
-        ]
-      },
-      {
-        "value": "gcash",
-        "label": "GCash",
-        "requires_proof": true,
-        "payment_account": {
-          "account_name": "Example demo account",
-          "account_number": "EXAMPLE",
-          "is_demo": true
+    "data": {
+        "cart": {
+            "items": [
+                {
+                    "id": 1,
+                    "quantity": 2,
+                    "product": {
+                        "id": 1,
+                        "name": "Example Mouse",
+                        "brand": null,
+                        "image_url": null
+                    },
+                    "unit_price": "100.00",
+                    "line_total": "200.00"
+                }
+            ],
+            "item_count": 1,
+            "total_quantity": 2,
+            "total": "200.00"
         },
-        "available_for": [
-          "pickup",
-          "delivery"
-        ]
-      },
-      {
-        "value": "maya",
-        "label": "Maya",
-        "requires_proof": true,
-        "payment_account": {
-          "account_name": "Example demo account",
-          "account_number": "EXAMPLE",
-          "is_demo": true
+        "customer": {
+            "name": "Example Customer",
+            "default_delivery_address": null
         },
-        "available_for": [
-          "pickup",
-          "delivery"
+        "pickup_location": {
+            "name": "Example Store — Sagay City",
+            "address": null,
+            "contact_number": null,
+            "operating_hours": "8:00 AM–6:00 PM"
+        },
+        "fulfillment_methods": [
+            {
+                "value": "pickup",
+                "label": "Pickup"
+            },
+            {
+                "value": "delivery",
+                "label": "Delivery"
+            }
+        ],
+        "payment_methods": [
+            {
+                "value": "cash",
+                "label": "Cash",
+                "requires_proof": false,
+                "payment_account": null,
+                "available_for": ["pickup"]
+            },
+            {
+                "value": "card_at_store",
+                "label": "Card at store",
+                "requires_proof": false,
+                "payment_account": null,
+                "available_for": ["pickup"]
+            },
+            {
+                "value": "gcash",
+                "label": "GCash",
+                "requires_proof": true,
+                "payment_account": {
+                    "account_name": "Example demo account",
+                    "account_number": "EXAMPLE",
+                    "is_demo": true
+                },
+                "available_for": ["pickup", "delivery"]
+            },
+            {
+                "value": "maya",
+                "label": "Maya",
+                "requires_proof": true,
+                "payment_account": {
+                    "account_name": "Example demo account",
+                    "account_number": "EXAMPLE",
+                    "is_demo": true
+                },
+                "available_for": ["pickup", "delivery"]
+            }
         ]
-      }
-    ]
-  }
+    }
 }
 ```
 
@@ -469,28 +466,28 @@ Checkout cart lines omit the ordinary cart's availability and category/price fie
 
 ```json
 {
-  "origin_city": "Sagay City",
-  "destination": "Sagay City",
-  "is_demo": true,
-  "assumption_label": "Battlefront-configured demo delivery assumptions; not official LBC rates.",
-  "shipping_profile": "standard",
-  "base_fee": "80.00",
-  "handling_surcharge": "0.00",
-  "delivery_fee": "80.00",
-  "preparation_days": 1,
-  "transit_min_days": 0,
-  "transit_max_days": 1,
-  "eta_min_days": 1,
-  "eta_max_days": 2,
-  "carrier": "lbc",
-  "packing_expectation": "Standard packing",
-  "product_subtotal": "200.00",
-  "total": "280.00",
-  "eta_anchor_date": "2026-10-08",
-  "eta_timezone": "UTC",
-  "estimated_delivery_start": "2026-10-09",
-  "estimated_delivery_end": "2026-10-10",
-  "notice": "Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification."
+    "origin_city": "Sagay City",
+    "destination": "Sagay City",
+    "is_demo": true,
+    "assumption_label": "Battlefront-configured demo delivery assumptions; not official LBC rates.",
+    "shipping_profile": "standard",
+    "base_fee": "80.00",
+    "handling_surcharge": "0.00",
+    "delivery_fee": "80.00",
+    "preparation_days": 1,
+    "transit_min_days": 0,
+    "transit_max_days": 1,
+    "eta_min_days": 1,
+    "eta_max_days": 2,
+    "carrier": "lbc",
+    "packing_expectation": "Standard packing",
+    "product_subtotal": "200.00",
+    "total": "280.00",
+    "eta_anchor_date": "2026-10-08",
+    "eta_timezone": "UTC",
+    "estimated_delivery_start": "2026-10-09",
+    "estimated_delivery_end": "2026-10-10",
+    "notice": "Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification."
 }
 ```
 
@@ -502,26 +499,26 @@ Calendar dates are checkout-only presentation. One server quote-generation date 
 
 Required fields:
 
-| Field | Rule |
-|---|---|
-| cart_item_ids | Required nonempty list of distinct positive integer cart-item IDs owned by the customer |
-| recipient_name | String <=255 |
-| contact_number | String <=20; preserve formatting as text |
-| fulfillment_method | pickup or delivery |
-| payment_method | cash, card_at_store, gcash, maya |
-| delivery_address | String <=255, required for delivery; prohibited when nonempty for pickup |
+| Field                | Rule                                                                                                                 |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| cart_item_ids        | Required nonempty list of distinct positive integer cart-item IDs owned by the customer                              |
+| recipient_name       | String <=255                                                                                                         |
+| contact_number       | String <=20; preserve formatting as text                                                                             |
+| fulfillment_method   | pickup or delivery                                                                                                   |
+| payment_method       | cash, card_at_store, gcash, maya                                                                                     |
+| delivery_address     | String <=255, required for delivery; prohibited when nonempty for pickup                                             |
 | delivery_destination | Exactly one canonical destination from `delivery_quotes`, required for delivery; prohibited when nonempty for pickup |
-| payment_proof | Required for gcash/maya; prohibited for cash/card_at_store |
+| payment_proof        | Required for gcash/maya; prohibited for cash/card_at_store                                                           |
 
 Pickup accepts all four payment methods. Delivery accepts only gcash/maya. Submit JSON for cash/card pickup:
 
 ```json
 {
-  "cart_item_ids": [12, 15],
-  "recipient_name": "Example Customer",
-  "contact_number": "EXAMPLE",
-  "fulfillment_method": "pickup",
-  "payment_method": "cash"
+    "cart_item_ids": [12, 15],
+    "recipient_name": "Example Customer",
+    "contact_number": "EXAMPLE",
+    "fulfillment_method": "pickup",
+    "payment_method": "cash"
 }
 ```
 
@@ -539,60 +536,60 @@ Client fee/base fee/surcharge/profile/preparation/transit/ETA/subtotal/total val
 
 ```json
 {
-  "data": {
-    "id": 1,
-    "reference": "BF-000001",
-    "created_at": "2026-10-01T08:00:00+00:00",
-    "status": {
-      "value": "pending",
-      "label": "Pending"
-    },
-    "recipient": {
-      "name": "Example Customer",
-      "contact_number": "EXAMPLE"
-    },
-    "fulfillment": {
-      "value": "pickup",
-      "label": "Pickup",
-      "delivery_address": null,
-      "delivery_destination": null
-    },
-    "payment": {
-      "method": {
-        "value": "cash",
-        "label": "Cash"
-      },
-      "status": {
-        "value": "pending",
-        "label": "Pending"
-      },
-      "proof_submitted": false,
-      "notice": "Payment will be handled when you collect your order.",
-      "rejection": null,
-      "can_resubmit_proof": false
-    },
-    "items": [
-      {
+    "data": {
         "id": 1,
-        "product": {
-          "id": 1,
-          "name": "Example Mouse",
-          "brand": null,
-          "image_url": null
+        "reference": "BF-000001",
+        "created_at": "2026-10-01T08:00:00+00:00",
+        "status": {
+            "value": "pending",
+            "label": "Pending"
         },
-        "quantity": 2,
-        "unit_price": "100.00",
-        "line_total": "200.00"
-      }
-    ],
-    "item_count": 1,
-    "total_quantity": 2,
-    "product_subtotal": "200.00",
-    "delivery_fee": "0.00",
-    "delivery_quote": null,
-    "shipment": null,
-    "total": "200.00"
-  }
+        "recipient": {
+            "name": "Example Customer",
+            "contact_number": "EXAMPLE"
+        },
+        "fulfillment": {
+            "value": "pickup",
+            "label": "Pickup",
+            "delivery_address": null,
+            "delivery_destination": null
+        },
+        "payment": {
+            "method": {
+                "value": "cash",
+                "label": "Cash"
+            },
+            "status": {
+                "value": "pending",
+                "label": "Pending"
+            },
+            "proof_submitted": false,
+            "notice": "Payment will be handled when you collect your order.",
+            "rejection": null,
+            "can_resubmit_proof": false
+        },
+        "items": [
+            {
+                "id": 1,
+                "product": {
+                    "id": 1,
+                    "name": "Example Mouse",
+                    "brand": null,
+                    "image_url": null
+                },
+                "quantity": 2,
+                "unit_price": "100.00",
+                "line_total": "200.00"
+            }
+        ],
+        "item_count": 1,
+        "total_quantity": 2,
+        "product_subtotal": "200.00",
+        "delivery_fee": "0.00",
+        "delivery_quote": null,
+        "shipment": null,
+        "total": "200.00"
+    }
 }
 ```
 
@@ -608,22 +605,30 @@ GET order detail, successful placement and payment-proof replacement share the s
 
 ```json
 {
-  "carrier": "lbc",
-  "status": {"value": "preparing", "label": "Preparing for shipment"},
-  "tracking_reference": null,
-  "eta": {
-    "anchor_date": "2026-10-08",
-    "timezone": "UTC",
-    "estimated_delivery_start": "2026-10-10",
-    "estimated_delivery_end": "2026-10-11",
-    "notice": "Battlefront estimate from the start of preparation; arrival is not guaranteed."
-  },
-  "timeline": [
-    {"status": "awaiting_preparation", "label": "Awaiting preparation", "occurred_at": "2026-10-08T08:00:00+00:00"},
-    {"status": "preparing", "label": "Preparing for shipment", "occurred_at": "2026-10-08T09:00:00+00:00"}
-  ],
-  "notice": "Shipment status is manually maintained by Battlefront. This is not live LBC or GPS tracking.",
-  "history_notice": null
+    "carrier": "lbc",
+    "status": { "value": "preparing", "label": "Preparing for shipment" },
+    "tracking_reference": null,
+    "eta": {
+        "anchor_date": "2026-10-08",
+        "timezone": "UTC",
+        "estimated_delivery_start": "2026-10-10",
+        "estimated_delivery_end": "2026-10-11",
+        "notice": "Battlefront estimate from the start of preparation; arrival is not guaranteed."
+    },
+    "timeline": [
+        {
+            "status": "awaiting_preparation",
+            "label": "Awaiting preparation",
+            "occurred_at": "2026-10-08T08:00:00+00:00"
+        },
+        {
+            "status": "preparing",
+            "label": "Preparing for shipment",
+            "occurred_at": "2026-10-08T09:00:00+00:00"
+        }
+    ],
+    "notice": "Shipment status is manually maintained by Battlefront. This is not live LBC or GPS tracking.",
+    "history_notice": null
 }
 ```
 
@@ -643,30 +648,30 @@ History is customer-owned, paginated at 10. Each `data` entry is:
 
 ```json
 {
-  "id": 1,
-  "reference": "BF-000001",
-  "created_at": "2026-10-01T08:00:00+00:00",
-  "status": {
-    "value": "pending",
-    "label": "Pending"
-  },
-  "fulfillment": {
-    "value": "pickup",
-    "label": "Pickup"
-  },
-  "payment": {
-    "method": {
-      "value": "cash",
-      "label": "Cash"
-    },
+    "id": 1,
+    "reference": "BF-000001",
+    "created_at": "2026-10-01T08:00:00+00:00",
     "status": {
-      "value": "pending",
-      "label": "Pending"
-    }
-  },
-  "item_count": 1,
-  "total_quantity": 2,
-  "total": "200.00"
+        "value": "pending",
+        "label": "Pending"
+    },
+    "fulfillment": {
+        "value": "pickup",
+        "label": "Pickup"
+    },
+    "payment": {
+        "method": {
+            "value": "cash",
+            "label": "Cash"
+        },
+        "status": {
+            "value": "pending",
+            "label": "Pending"
+        }
+    },
+    "item_count": 1,
+    "total_quantity": 2,
+    "total": "200.00"
 }
 ```
 
@@ -692,21 +697,21 @@ The web bell separately refreshes its summary every 30 seconds while its tab is 
 
 ```json
 {
-  "id": "12345678-1234-4234-8234-123456789abc",
-  "event": "shipment.in_transit",
-  "title": "Shipment in transit",
-  "body": "There is an update for order BF-000001. Open your order for details.",
-  "occurred_at": "2026-10-08T10:00:00+00:00",
-  "created_at": "2026-10-08T10:00:00+00:00",
-  "read_at": null,
-  "is_read": false,
-  "order": {
-    "id": 1,
-    "reference": "BF-000001",
-    "web_url": "<backend-origin>/orders/1",
-    "api_url": "<backend-origin>/api/v1/orders/1",
-    "deep_link": {"screen": "order_detail", "order_id": 1}
-  }
+    "id": "12345678-1234-4234-8234-123456789abc",
+    "event": "shipment.in_transit",
+    "title": "Shipment in transit",
+    "body": "There is an update for order BF-000001. Open your order for details.",
+    "occurred_at": "2026-10-08T10:00:00+00:00",
+    "created_at": "2026-10-08T10:00:00+00:00",
+    "read_at": null,
+    "is_read": false,
+    "order": {
+        "id": 1,
+        "reference": "BF-000001",
+        "web_url": "<backend-origin>/orders/1",
+        "api_url": "<backend-origin>/api/v1/orders/1",
+        "deep_link": { "screen": "order_detail", "order_id": 1 }
+    }
 }
 ```
 
@@ -723,7 +728,10 @@ Customer events: `payment.verified`, `payment.rejected`, `order.cancelled`, and 
 Generate and retain a device-installation UUID in the mobile app; use it as `{device}`. `PUT /push-devices/{device}` accepts:
 
 ```json
-{"expo_push_token":"ExpoPushToken[client_obtained_token]","platform":"android"}
+{
+    "expo_push_token": "ExpoPushToken[client_obtained_token]",
+    "platform": "android"
+}
 ```
 
 `platform` is required and is `android` or `ios`. Tokens must use a nonempty `ExpoPushToken[...]` or `ExponentPushToken[...]` format and be at most 255 characters. Use Expo's actual project/device token; do not substitute an FCM/APNs token or bearer token. No provider credentials are passed by the client. Invalid fields return 422; malformed device UUID routes return 404.
@@ -761,8 +769,8 @@ POST /chatbot JSON:
 
 ```json
 {
-  "message": "Where is the Sagay store?",
-  "context_token": null
+    "message": "Where is the Sagay store?",
+    "context_token": null
 }
 ```
 
@@ -770,11 +778,11 @@ POST /chatbot JSON:
 
 ```json
 {
-  "data": {
-    "message": "Please sign in with a customer account to check order status.",
-    "source": "fallback",
-    "context_token": "<opaque-context-returned-at-runtime>"
-  }
+    "data": {
+        "message": "Please sign in with a customer account to check order status.",
+        "source": "fallback",
+        "context_token": "<opaque-context-returned-at-runtime>"
+    }
 }
 ```
 
@@ -791,137 +799,50 @@ The example response illustrates a guest order question. Actual text depends on 
 
 ## 8. Recommendations
 
-GET /recommendations/options returns:
+### Behavioral feeds (current web/mobile architecture)
+
+`GET /recommendations` is the shared feed for guests and signed-in customers. With no bearer token it returns currently available popular or featured products. With a valid customer bearer token it returns that customer's behavior-driven feed. Invalid supplied credentials return 401; administrator tokens return 403; a browser session does not authenticate an API request.
+
+`GET /recommendations/personalized` is the authenticated-customer form of the same feed. It requires `auth:sanctum` and the customer role. Both endpoints use the same `data` item shape:
 
 ```json
 {
-  "data": {
-    "intended_uses": [
-      {
-        "value": "general_use",
-        "label": "General use"
-      },
-      {
-        "value": "office_work",
-        "label": "Office / work"
-      },
-      {
-        "value": "gaming",
-        "label": "Gaming"
-      },
-      {
-        "value": "networking_piso_wifi",
-        "label": "Networking / Piso WiFi"
-      },
-      {
-        "value": "content_creation",
-        "label": "Content creation"
-      },
-      {
-        "value": "streaming",
-        "label": "Streaming"
-      },
-      {
-        "value": "home_security",
-        "label": "Home security"
-      },
-      {
-        "value": "business_enterprise",
-        "label": "Business / enterprise"
-      }
-    ],
-    "filter_options": {
-      "categories": [
+    "data": [
         {
-          "id": 1,
-          "name": "Peripherals"
+            "product": {
+                "id": 1,
+                "name": "Example Graphics Card",
+                "description": null,
+                "brand": "Example",
+                "price": "10000.00",
+                "discount_price": null,
+                "image_url": null,
+                "is_featured": false,
+                "category": { "id": 1, "name": "Graphics Cards" },
+                "tags": [],
+                "inventory": { "status": "in_stock" }
+            },
+            "effective_price": "10000.00",
+            "reasons": [
+                {
+                    "code": "matched_recent_searches",
+                    "value": "Matches a recent catalog search"
+                }
+            ]
         }
-      ],
-      "brands": [],
-      "tags": [
-        {
-          "id": 1,
-          "name": "Gaming"
-        }
-      ]
-    }
-  }
+    ]
 }
 ```
 
-The example filter lists are illustrative; the real lists come from current eligible catalog data. Intended-use values are fixed by the shared enum.
+Reason codes identify the signal actually used: `matched_recent_searches`, `similar_to_viewed_product`, `bought_with_cart_products`, `bought_with_viewed_products`, `bought_with_purchase_history`, `bought_by_similar_customers`, `spent_time_viewing_product`, `popular_with_customers`, and `featured_fallback`. Reasons are explanatory labels, not a compatibility guarantee. The response checks active product/category state and current positive Sagay inventory each time it is requested.
 
-POST /recommendations:
+Search and product-view personalization are enabled by default for authenticated customers. Customers may independently disable these signals through `PATCH /profile`; disabling a signal pauses recording/ranking and retains unexpired history. The global personalization switch pauses all behavioral ranking and recording; re-enabling restores eligible retained signals. Search and view events expire after 90 days. Guests receive only general popular/featured suggestions in the first release.
 
-```json
-{
-  "budget": "1000.00",
-  "intended_use": "gaming"
-}
-```
+Catalog search is recorded when the customer requests the first results page; product detail requests record a view; the next feed request uses the current cart and completed purchases. Request the feed again after search, product detail, or cart changes to get fresh results. No batch recomputation is required. Mobile impressions, clicks, dismissals, and wrong reports may use `POST /recommendations/interactions`; events are anonymous and expire after 90 days.
 
-| Field | Rule |
-|---|---|
-| budget | Required numeric positive peso value, 0.01..9999999999.99, at most 2 decimal places |
-| intended_use | Required one of the values in options |
-| preferred_brand | Optional nullable string <=255; trimmed; null/blank/omitted means no preference |
-| category_id | Optional nullable integer, existing active category |
-| tag_ids | Optional nullable array of distinct existing integer tag IDs |
+The developer confirms the React Native consumer has already migrated to these behavioral endpoints. Preserve the server order and refresh feeds after deliberate browsing/cart changes. The feeds are unpaginated and return at most twelve unique products; an empty result is `data: []`. Disabling personalization returns general popular/featured suggestions. Completed purchases, cart products and recent view anchors are excluded from personalized results.
 
-`tag_ids` is a list, not catalog's singular `tag_id`. Missing optional inputs are valid.
-
-```json
-{
-  "data": [
-    {
-      "product": {
-        "id": 1,
-        "name": "Example Mouse",
-        "description": null,
-        "brand": null,
-        "price": "100.00",
-        "discount_price": null,
-        "image_url": null,
-        "is_featured": false,
-        "category": {
-          "id": 1,
-          "name": "Peripherals"
-        },
-        "tags": [
-          {
-            "id": 1,
-            "name": "Gaming"
-          }
-        ],
-        "inventory": {
-          "status": "in_stock"
-        }
-      },
-      "effective_price": "100.00",
-      "reasons": [
-        {
-          "code": "within_budget",
-          "value": "100.00"
-        },
-        {
-          "code": "sagay_stock",
-          "value": "available"
-        },
-        {
-          "code": "intended_use_tag",
-          "value": "Gaming"
-        }
-      ]
-    }
-  ]
-}
-```
-
-Results are unpaginated; no match is 200 with `data: []`. The deterministic engine requires active catalog eligibility, positive current Sagay stock, within-budget effective price, intended-use signals, and any explicit category/brand restrictions. Preferred brand matching is case-insensitive and trimmed; null-brand products remain eligible when no brand preference is given and are excluded by explicit brand preference.
-
-Order is intended-use match count descending, preferred-tag match count descending, effective price ascending, ID ascending. Preferred tags influence ranking rather than requiring every tag. Preserve the server order.
-
-Reason entries have `code` and string `value`. Codes: within_budget, sagay_stock, intended_use_category, intended_use_tag, selected_category, preferred_brand, preferred_tag. Product shape matches catalog; exact inventory quantity is omitted. No AI, compatibility checking, configurator, or recommendation persistence is involved.
+`POST /recommendations/interactions` accepts `event_id` (UUID), `product_id`, `event_type` (`impression`, `click`, `dismiss`, `report_wrong`), `placement` (`home`, `product`, `cart`, `recommendations`), `position` (1?12) and nullable supported `reason_code`. A successful submission returns 204; invalid fields return 422, inactive-category/missing catalog identities return 404, invalid credentials return 401 and administrators receive 403. Reusing a UUID does not alter the original event. These are anonymous client-reported events, grouped in administrator reports by primary displayed reason; they do not identify customers, train the engine or prove sales conversion. The shared 60/minute/IP API limiter applies.
 
 ## 9. Postman setup and manual acceptance run
 
@@ -934,27 +855,27 @@ The collection uses the [Postman v2.1 JSON format](https://schema.postman.com/) 
 3. Set local values. Do not export/commit populated secrets or personal data. Sensitive variables are marked secret, but that is not a substitute for keeping exports clean.
 4. Select individual requests or a prepared subset. **Do not blindly run every folder**: registration, login, logout, alternative order placements, uploads and negative checks have different prerequisites.
 
-| Variables | Configuration |
-|---|---|
-| base_url | Reachable API root, ending /api/v1; blank in export |
-| email, password, name, device_name | Your disposable local customer; credentials blank in export |
-| token | Automatically captured after successful register/login; protected requests inherit it |
-| product_id, category_id, tag_id, brand | Select actual values from catalog/detail/filter responses |
-| category_id_2 | Another real active category ID for the optional category_ids[1] query entry; leave singular category_id disabled when enabling category_ids entries |
-| min_price, max_price, sort | Optional catalog bounds and featured/price_asc/price_desc ordering; bounds start blank and query entries are disabled |
-| cart_item_id | Captured after Add product; manually selectable from own cart |
-| order_id, order_reference | Captured after placement; manually selectable from history |
-| rejected_order_id | Owned wallet order prepared with rejected payment in web administration |
-| quantity, page, budget, intended_use, search | Representative nonsecret defaults where useful; optional catalog filters initially disabled |
-| recipient_name, contact_number, delivery_address | Locally supplied test checkout/profile values |
-| delivery_destination | Canonical configured destination; defaults to Sagay City for disposable delivery tests |
-| chatbot_message, follow_up_message | Representative public questions provided |
-| context_token, guest_context_token | Separate customer/guest continuation values captured by chatbot scripts |
-| other_cart_item_id, other_order_id, other_order_reference | Another disposable customer's resources, for ownership checks |
-| admin_token | Local administrator test token supplied out of band; mobile login cannot issue it |
-| invalid_token | Enter any deliberately invalid string locally |
-| revoked_token | Captured locally at successful logout for a revocation check |
-| expired_token | A genuinely expired local test token supplied out of band |
+| Variables                                                 | Configuration                                                                                                                                        |
+| --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| base_url                                                  | Reachable API root, ending /api/v1; blank in export                                                                                                  |
+| email, password, name, device_name                        | Your disposable local customer; credentials blank in export                                                                                          |
+| token                                                     | Automatically captured after successful register/login; protected requests inherit it                                                                |
+| product_id, category_id, tag_id, brand                    | Select actual values from catalog/detail/filter responses                                                                                            |
+| category_id_2                                             | Another real active category ID for the optional category_ids[1] query entry; leave singular category_id disabled when enabling category_ids entries |
+| min_price, max_price, sort                                | Optional catalog bounds and featured/price_asc/price_desc ordering; bounds start blank and query entries are disabled                                |
+| cart_item_id                                              | Captured after Add product; manually selectable from own cart                                                                                        |
+| order_id, order_reference                                 | Captured after placement; manually selectable from history                                                                                           |
+| rejected_order_id                                         | Owned wallet order prepared with rejected payment in web administration                                                                              |
+| quantity, page, search                                    | Representative nonsecret defaults where useful; optional catalog filters initially disabled                                                          |
+| recipient_name, contact_number, delivery_address          | Locally supplied test checkout/profile values                                                                                                        |
+| delivery_destination                                      | Canonical configured destination; defaults to Sagay City for disposable delivery tests                                                               |
+| chatbot_message, follow_up_message                        | Representative public questions provided                                                                                                             |
+| context_token, guest_context_token                        | Separate customer/guest continuation values captured by chatbot scripts                                                                              |
+| other_cart_item_id, other_order_id, other_order_reference | Another disposable customer's resources, for ownership checks                                                                                        |
+| admin_token                                               | Local administrator test token supplied out of band; mobile login cannot issue it                                                                    |
+| invalid_token                                             | Enter any deliberately invalid string locally                                                                                                        |
+| revoked_token                                             | Captured locally at successful logout for a revocation check                                                                                         |
+| expired_token                                             | A genuinely expired local test token supplied out of band                                                                                            |
 
 No file path is committed. Select a file in each multipart request after import. IDs start blank so the collection cannot silently assume database IDs. Raw JSON scripts serialize environment values to preserve quotes/backslashes in names/passwords; edit the script template if changing the represented body. Requests never log tokens.
 
@@ -964,15 +885,14 @@ Successful login/registration replace `token`, clear conversation state and clea
 
 Use a disposable development database/account with an active product, live Sagay stock, and seeded branch/reference data.
 
-1. **Connectivity/public reads:** Health (200), product filters/list/detail and branches (200). Enable catalog filters individually, then combine search/brand/tag with multiple categories and price bounds. Disable singular category_id when using category_ids entries. Check discount-aware price sorting in both directions and follow links.next to confirm filters persist. Try conflicting category inputs, invalid category IDs, reversed bounds and an invalid sort (422); restore valid Params afterward. Check nullable fields and compare the existing web catalog behavior separately.
-2. **Access:** Profile without token (401). Guest recommendations/options (200). Guest chatbot public question/follow-up (200). Guest order question returns sign-in fallback. Pace calls under guest limits.
+1. **Connectivity/public reads:** Health (200), product filters/list/detail and branches (200). Enable catalog filters individually, then combine search/brand/tag with multiple categories and price bounds. Disable singular `category_id` when using `category_ids` entries. Check discount-aware price sorting in both directions and follow `links.next` to confirm filters persist. Try conflicting category inputs, invalid category IDs, reversed bounds, and an invalid sort (422); restore valid params afterward. Check nullable fields and compare the existing web catalog behavior separately.
+2. **Access:** Profile without token (401). Guest behavioral feed (200); authenticated personalized feed without a token (401). Guest chatbot public question/follow-up (200). Guest order question returns sign-in fallback. Pace calls under guest limits.
 3. **Authentication/profile:** Register a unique customer (201) OR log in (200); confirm token capture. Read/update profile (200), verify only approved fields. Invalid login gives 401; duplicate/invalid registration gives 422.
 4. **Cart:** Add stock-eligible product (200), verify captured cart_item_id; update quantity and totals; remove (200). Add again before checkout. Try quantity zero, quantity above stock, and an unavailable product (422); failed operations must not corrupt the cart.
 5. **Checkout/orders:** Select one, multiple, or all owned cart-item IDs and include them in both preview and placement. Preview checkout (200), verify all 12 server quotes and select a destination. Check standard/fragile/bulky and mixed carts, subtotal/fee/final total, LBC/demo wording and provisional calendar windows. Submit cash/card pickup (201, zero fee/no Shipment); omit address and destination. Refill before each wallet placement, select an image, and include canonical destination plus detailed address for delivery. Try missing/unsupported/wrong-case/array destinations, pickup destination/address, and forged quote fields. Verify recalculated saved fees/relative ETA, pending order/payment, selected-item removal, unselected-item retention and selected inventory deduction through existing web administration. Confirm no selection, duplicates, foreign/missing/removed IDs and stale selected stock fail without changes. Leave bulky/fragile products unselected and verify their handling/ETA do not affect the order.
 6. **Replacement proof:** Reject the test wallet payment through existing web administration. Set rejected_order_id, select a replacement image, submit (200). Verify pending payment, cleared rejection, unchanged order status/stock. Retry while payment is pending (422). Test unsupported file type and >5 MB (422 when Laravel handles it).
-
    **Shipment tracking:** Using a delivery test order, verify that pending payment/order offers no shipment progression. Manually verify payment, move the order to Processing, and advance each shipment milestone separately through web administration. After each action compare customer web detail and GET /orders/{order}: status, saved ETA/fees/destination and chronological timestamps must agree. Leave reference blank unless a real value is available. Confirm Delivered completes the order with one sale; use a second eligible order to verify cancellation terminates shipment and restores stock once. Verify pickup/legacy orders have no shipment UI and a second customer's token receives 404. EXT-90 now supplies customer milestone notifications; no map or live carrier data is expected.
-7. **Customer chatbot/recommendations:** Ask about the captured own order reference. Check customer follow-up. Exercise recommendation preferences, omitted/null brand, a budget with no matches, ranking/reasons, and available stock. Compare with web using the same current data.
+7. **Customer chatbot/recommendations:** Ask about the captured own order reference. Check customer follow-up. Search the catalog, view a product, change the cart, and request the new feed after each action. Confirm personal reason codes, pause/history retention and re-enabling through `PATCH /profile`, current stock, and the shared response shape. Verify current reason codes, anonymous feedback, expired-history exclusion and prefetch suppression.
 8. **Ownership/roles:** Prepare a second customer's cart/order and use their IDs under the first token: 404. Foreign order chatbot: safe 200 fallback. With an out-of-band valid administrator test token: profile/chatbot/recommendations 403. Invalid/expired/revoked credentials: 401. Web session alone is insufficient for personal API data.
 9. **Rate limits:** After the window resets, send five guest unsupported chatbot questions (e.g. Tell me a joke.), then the dedicated sixth-request check expects 429/Retry-After. Customer limit is ten across web/devices. Registration/login have five-request limits; global limit is 60/IP. Perform these separately to avoid unrelated limits masking results.
 10. **Logout last:** 204 empty body; confirm environment token cleared. Run Profile with revoked token (401). A separate device token remains valid.
@@ -984,7 +904,7 @@ Provider fallback and expiration scenarios are deterministically covered by exis
 
 Historical EXT-62 verification: 275 existing API tests passed (1,732 assertions). At that time, both JSON files parsed, all 22 then-registered endpoints had collection coverage, all 33 environment references resolved, and request scripts compiled with JSON body scripts handling quotes/backslashes. Twelve local HTTP smoke checks passed, covering public reads, guest recommendations/chatbot, missing/invalid authentication, and catalog validation. No live customer/order data was mutated by those HTTP checks.
 
-The 2026-10-08 EXT-63 backend audit covers the current 28 endpoints and 61 Postman requests. Saved order examples now include `fulfillment.delivery_destination` and nullable `shipment`, matching Laravel. Current checks and pending native/device scenarios are recorded in [integration validation](MOBILE_INTEGRATION_VALIDATION.md); historical results above are not current test counts. Laravel feature upload tests exercise parsed files/form data, not the actual React Native FormData boundary/URI transport. No actual consumer run is claimed.
+Historical PR verification reported 126 focused tests (1,051 assertions); it does not establish the corrected head's results. The 2026-10-08 EXT-63 backend audit inspected Laravel revision `75d920dd39123827e91c0eac2bf39fea14cce78b` and its working-tree tests/documentation: that audit snapshot had 28 endpoints and 61 Postman requests. Its saved order examples include `fulfillment.delivery_destination` and nullable `shipment`, matching Laravel. The corrected API registers 29 routes, including behavior-driven recommendation feeds/interactions and EXT-90 notification/device routes. Current checks and pending native/device scenarios are recorded in [integration validation](MOBILE_INTEGRATION_VALIDATION.md); historical test results above are not current test counts. Laravel feature upload tests exercise parsed files/form data, not the actual React Native FormData boundary/URI transport. No actual consumer run is claimed.
 
 The developer subsequently reported completing manual tests in Postman Desktop with no API issues and approved EXT-62. The execution date, individual run results, and screenshots were not supplied to the coding agent. This is developer-reported manual verification, not an agent-executed Postman run. Keep the sequence above for repeat runs. JSON/structural checks are not full external-schema validation. No generator or validator dependency was installed. Actual React Native consumer validation is tracked separately in [EXT-63](MOBILE_INTEGRATION_VALIDATION.md).
 
@@ -993,9 +913,9 @@ The developer subsequently reported completing manual tests in Postman Desktop w
 - Routing/access: `routes/api.php`, `AuthorizeApiChatbot`, `AuthorizeApiRecommendations`, `AppServiceProvider`, `FortifyServiceProvider`, `config/sanctum.php`, `bootstrap/app.php`.
 - Fields/validation: `app/Http/Requests`, shared profile/password concerns, API AuthController.
 - Response shapes: `app/Http/Resources/Api/V1`, `CatalogProductPresenter`, `CustomerOrderPresenter`, `ShipmentPresenter`, `BuildCartViewData`, `PrepareCheckout`.
-- Domain rules: `CartService`, `OrderPlacementService`, `OrderProcessingService`, `ResubmitPaymentProof`, `ProductCatalogRepository`, `RecommendationEngine`, shared chatbot services.
+- Domain rules: `CartService`, `OrderPlacementService`, `OrderProcessingService`, `ResubmitPaymentProof`, `ProductCatalogRepository`, `BehavioralRecommendationEngine`, shared chatbot services.
 - Contract tests: `tests/Feature/ApiFoundationTest.php`, `MobileAuthenticationTest.php`, `MobileProfileTest.php`, `MobileCatalogTest.php`, `MobileBranchTest.php`, and `tests/Feature/Api/V1`.
 
 Known implementation details are documented, not changed: registration's validated-but-unsaved address; different page validation between products/orders; stateless guest context is not per-device identity; private proof has no mobile download endpoint.
 
-No mobile password reset/change, token refresh, customer order cancellation, admin operations, payment gateways, live courier/GPS tracking, compatibility checking, or new API endpoints are introduced by this handoff. EXT-89 exposes manual shipment facts through the existing order detail endpoints.
+The behavior-driven recommendation update adds the public recommendation feed and anonymous aggregate interaction endpoint and retires the superseded input/options endpoints after developer-confirmed mobile migration. EXT-89 exposes manual shipment facts through existing order detail endpoints; EXT-90 adds notification history/read-state and Expo device registration/revocation endpoints. No mobile password reset/change, token refresh, customer order cancellation, admin operations, payment gateways, live courier/GPS tracking, or compatibility checking are introduced.

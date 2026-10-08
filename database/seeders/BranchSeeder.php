@@ -54,7 +54,7 @@ class BranchSeeder extends Seeder
                 'city' => 'Bacolod City',
                 'contact_number' => '0961 176 4608',
                 'latitude' => 10.671754246079693,
-                'longitude' => 122.9470409276533
+                'longitude' => 122.9470409276533,
             ],
 
         ];

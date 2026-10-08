@@ -67,7 +67,7 @@ class Branch extends Model
     protected function email(): Attribute
     {
         return Attribute::get(function (mixed $value, array $attributes): ?string {
-            $email = config('battlefront.branch_emails.' . $this->city);
+            $email = config('battlefront.branch_emails.'.$this->city);
 
             return is_string($email) ? $email : null;
         });
@@ -95,7 +95,7 @@ class Branch extends Model
     protected function isOperational(): Attribute
     {
         return Attribute::get(
-            fn(): bool => $this->city === config('battlefront.operational_branch_city'),
+            fn (): bool => $this->city === config('battlefront.operational_branch_city'),
         );
     }
 }

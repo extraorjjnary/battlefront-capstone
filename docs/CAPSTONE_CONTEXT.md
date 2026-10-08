@@ -4,11 +4,13 @@
 
 **Integrated Web and Mobile Business Management System with Product Recommendation, Predictive Analytics, and Integrated Chatbot for Battlefront Computer Trading**
 
-This document records the current Battlefront Computer Trading repository implementation, completed work, pending work, and development boundaries. The general snapshot was verified on **2026-10-01**; forecasting architecture, implementation boundaries, and Linear migration status were reconciled on **2026-10-05** following the latest developer-authorized monthly Holt–Winters revision. Unrelated areas retain their earlier snapshot.
+This document records the current Battlefront Computer Trading repository implementation, completed work, pending work, and development boundaries. The repository snapshot was reviewed on **2026-10-08**; Linear status references below remain the historical **2026-10-01** snapshot unless explicitly rechecked.
 
 For current implementation facts, use the repository first, then Linear issue state and approved scope, existing handoff/context documents, and existing Postman/mobile API documentation. Planned capabilities are explicitly distinguished from implemented behavior.
 
 This is a development reference. `docs/capstone_manuscript.docx` remains academically sensitive: the developer explicitly authorized narrow forecasting/predictive-analytics text synchronization for the **2026-10-05** approved revision, preserving formatting and unrelated content. Other manuscript revisions remain developer-owned. This authorization does not extend to implementation changes or unrelated academic edits.
+
+**Recommendation scope approval recorded:** on **2026-10-08**, the developer confirmed adviser approval for behavioral recommendations based on search, product-view, cart, and purchase signals, including temporary guest browsing history. The developer also confirms migration of the mobile consumer. Guest history transfers only when the visitor creates a new account; it is discarded when an existing account signs in. This approved amendment governs current implementation and evaluation planning; synchronization of the formal manuscript remains a developer follow-up.
 
 ---
 
@@ -44,7 +46,7 @@ The system supports:
 
 The intelligent features are intended to support customer and managerial decisions, not replace human judgment.
 
-Core catalog/inventory, customer commerce, administrator order/payment processing, sales reports, deterministic recommendations, chatbot, and mobile API implementation are complete. Real React Native + Expo consumer validation, predictive analytics, and the remaining integration/release work are pending; see Section 14.
+Core catalog/inventory, customer commerce, administrator order/payment processing, sales reports, chatbot, and behavioral recommendations are implemented. The behavior-driven recommendation implementation is complete for the current web/backend paths; real React Native + Expo consumer validation, final predictive-analytics acceptance, and remaining integration/release work are pending; see Section 14.
 
 ---
 
@@ -82,7 +84,7 @@ All five seeded branches use the configured customer-facing operating-hours valu
 | Escalante City  | Not yet confirmed                                | Not yet confirmed                    | Not yet confirmed; no official branch page is currently available                                                    |
 | San Carlos City | Not listed on the available official branch page | Not yet confirmed                    | Carmona St., Brgy. V, San Carlos City, Negros Occidental, San Carlos City, Philippines 6127                          |
 | Guihulngan City | 0947 946 5723                                    | battlefrontcomputertrading@gmail.com | L&E Arcade, Larena St., Brgy. Poblacion, Guihulngan City, Guihulngan, Philippines 6214                               |
-| Bacolod City | 0961 176 4608 | battlefrontbacolod@gmail.com | Downtown, Along SKG Shopping Center, Beside Ukay-Ukayan 58 Lizares St. Brgy. 13, Bacolod CIty, Philippines, 6100 |
+| Bacolod City    | 0961 176 4608                                    | battlefrontbacolod@gmail.com         | Downtown, Along SKG Shopping Center, Beside Ukay-Ukayan 58 Lizares St. Brgy. 13, Bacolod CIty, Philippines, 6100     |
 
 These reference values come from `database/seeders/BranchSeeder.php` and `config/battlefront.php`. Sagay City and Guihulngan City share the configured email address; Bacolod has a separate configured email. Unconfirmed values must remain null or undisplayed instead of being copied to other branches as verified facts.
 
@@ -300,7 +302,7 @@ Customers can:
 
 - register, authenticate, and manage their profile;
 - browse, search, filter, and view product details;
-- receive rule-based product recommendations;
+- receive behavior-driven product recommendations in the current product direction;
 - manage a shopping cart;
 - place orders and select an available payment method;
 - monitor order status and view order history;
@@ -328,7 +330,7 @@ The product-only monthly Holt–Winters forecasting controller/service/requests/
 - Public registration creates customers; request input cannot grant administrator privileges.
 - Fortify handles web session authentication. Mandatory email verification is disabled; the retained `email_verified_at` field does not imply a verification gate.
 - Administrator web routes require authentication and `access-administration`. Customer cart, checkout, and order routes require the customer role and enforce resource ownership.
-- Guests can browse products/branches and use public recommendations/chatbot. Administrators cannot use customer commerce, recommendations, or the storefront chatbot.
+- Guests can browse products/branches and use browser recommendations personalized from temporary search and product-view history, plus the storefront chatbot. The mobile guest recommendation feed remains popular/featured. Administrators cannot use customer commerce, recommendations, or the storefront chatbot.
 - The mobile API is customer-facing only. Protected operations require Sanctum bearer authentication plus the customer gate; browser sessions do not authenticate these API calls. Tokens expire after 30 days, and logout revokes only the presented token.
 - Optional-auth chatbot/recommendation endpoints accept guests and customers, reject invalid supplied credentials with 401, and reject valid administrator tokens with 403. Foreign customer cart/order resources are not exposed.
 - Administrative inventory, payment verification, reports, and knowledge management remain web-only; there are no mobile administrator endpoints.
@@ -367,7 +369,7 @@ The product-only monthly Holt–Winters forecasting controller/service/requests/
 
 ## Intelligent Modules
 
-- Product Recommendation — complete
+- Product Recommendation — adviser-approved behavioral scope implemented for the web/backend; mobile consumer validation and evaluation evidence pending
 - Predictive Analytics — monthly additive Holt–Winters production workflow implemented; evaluation uses Moving Average and Seasonal Naive baselines
 - Integrated Chatbot — complete
 
@@ -403,42 +405,23 @@ Shared actions/services implement these rules for both Inertia and mobile API co
 
 # 8. Product Recommendation Module
 
-The Product Recommendation Module uses **deterministic rule-based filtering**.
+Behavioral recommendations are authoritative for both web and mobile under the adviser-approved amendment confirmed by the developer on 2026-10-08. The formal manuscript has not yet been synchronized; that academic update remains a developer follow-up.
 
-**Status: complete.** EXT-35 and its criteria, engine, customer workflow, and test issues are Done; EXT-64 adds the completed mobile endpoints. Web and mobile use the same `RecommendationEngine` and eligible catalog query.
+**Current approved architecture for web and mobile:** behavior-driven suggestions. Signed-in customers' catalog searches and product views are recorded by default unless disabled in their profile; the engine also considers current cart items and completed purchases. Guests receive a temporary browser profile through an opaque, hashed-token cookie; their searches and product views use the same recommendation engine and expire after 90 days of inactivity. When a guest creates a new account, eligible guest history is merged transactionally into that account, respecting each recommendation preference. When an existing customer signs in, the guest profile is discarded and recommendations use only that account's saved activity and shopping history. Guests and customers without usable personal signals receive clearly labeled popular or featured products.
 
-It is intentionally **not** collaborative filtering, machine learning, deep learning, or generative-AI recommendation.
+The deterministic engine combines scores from the five latest unexpired searches, five recent viewed products, current cart, completed purchases, overlapping customer purchases, and popularity. Fresh search contributions start at 55 and decay with age. Cart co-purchases start at 38; viewed/purchased co-purchases start at 18; similar-customer contributions start at 24. Category, brand and tag similarity uses an effective-price ratio of 0.5?2, with repeated-view and dwell boosts producing at most 56 points. Popularity adds at most five points; available featured fallback contributes 0.1. Stable IDs break scoring/history/cohort ties. Category diversity is a soft cap with backfill. This is rule-based scoring with purchase-overlap heuristics and no learned model.
 
-The design works without historical user-item interaction data and does not depend on a learned recommendation model.
+Search and view personalization are enabled by default for signed-in customers, so recommendations respond without a profile setup step. Turning off personalized recommendations pauses all behavioral ranking and new search/view recording; turning it back on restores eligible recommendations from retained history. Customers can also independently pause either signal. Unexpired search and view history is retained for up to 90 days and becomes usable again when its setting is re-enabled. Recommendation feedback is reported in aggregate; no individual search text is exposed in administrator reports.
 
-## Recommendation Inputs
+Prefetch requests never record search/view/dwell activity. Mounted web detail navigation records an explicit view, including cached prefetch consumption; mobile detail GETs record views only without prefetch headers. Views deduplicate for 30 minutes. Dwell records the longest visible duration for the latest owned view, capped at 3,600 seconds. Browser feedback hides suggestions locally for at most 90 days, scoped to the customer or temporary guest profile. Anonymous interaction events are client-reported and carry only the primary displayed reason; they do not change backend scores or establish sales conversion.
 
-- customer budget;
-- intended use;
-- preferred brand;
-- selected product category;
-- preferred product tags;
-- available Sagay inventory.
+A forward migration enforces exactly one customer/guest activity owner and adds chronological view indexes without changing valid history. It refuses rollback so operational deployments use forward fixes. Daily expiry pruning and registration transfer use bounded batches.
 
-```text
-Customer Requirements
-        ↓
-Rule-Based Criteria
-        ↓
-Match Against Product Attributes
-        ↓
-Consider Available Catalog / Inventory
-        ↓
-Suitable Product Results
-```
+Every response rechecks active product/category eligibility and positive live Sagay stock. Recommendations use current effective prices, exclude items already purchased or in the cart from personalized candidates, avoid duplicate products, mix categories when enough relevant candidates exist, and include a reason tied to the signal used. The engine does not claim technical PC-part compatibility.
 
-Explicit PC-part compatibility checking and configurator behavior are outside the current capstone scope. The recommendation module does not use a dedicated product-to-product compatibility relationship or a `product_compatibilities` table.
+The web page and home/product/cart sections and both mobile GET feeds use the behavioral engine. The developer confirms the React Native consumer has migrated to these endpoints; the superseded input/options endpoints are retired. Mobile guests continue to receive popular/featured products. This confirmation establishes consumer migration, not a new device-validation run.
 
-Budget and intended use are required. Category, brand, and preferred tags are optional. Eligibility requires an active product/category, positive Sagay stock, an effective price within budget, an intended-use category/tag signal, and any explicit category/brand restrictions. Effective price is the discount price when present, otherwise the regular price. Brand matching is trimmed and case-insensitive; null-brand products remain eligible when no brand preference is supplied.
-
-Results rank by intended-use match count descending, preferred-tag match count descending, effective price ascending, then product ID ascending. Preferred tags affect ranking rather than requiring every selected tag. Results include match reasons; no match is an explicit empty result, not a fabricated recommendation. Recommendations are not persisted.
-
-The module operates using Battlefront's internal product catalog and inventory data.
+The module operates using Battlefront's internal catalog, completed orders, cart, signed-in customer search/view activity, and temporary browser guest search/view activity. Signed-in customers can disable either personal activity signal in profile settings; disabled guest signals are discarded during account-creation merge. Guest history is never merged into an existing account at login. The chatbot does not receive recommendation history or make recommendation decisions.
 
 The **Product Recommendation Module**, not the chatbot, owns recommendation logic.
 
@@ -477,12 +460,12 @@ EXT-40 owns this contract; EXT-42 consumes it. The development manifest moves fr
 
 Coverage is a setup/import/data-preparation declaration that records are complete for the named product, interval, and sales scope. It does not prove full-store coverage if the declared scope is only captured system transactions. Never infer completeness from earliest Sale, Product.created_at, or generated zero buckets. Setup/import/quarter-close preparation explicitly advances coverage; the clock alone does not.
 
-| Condition for the required window | Outcome |
-| --- | --- |
-| Trusted complete 36-month history satisfying model eligibility | ready |
-| Valid complete gap-free declaration reaching T, with only 0–35 required months covered | insufficient_history; save nothing |
-| Missing/malformed/uncertain metadata, stale end before T, or an unavailable month in the covered portion of the required window | history_unavailable; save nothing |
-| Complete non-all-zero history failing the sparse-demand policy below | history_unsuitable; save nothing |
+| Condition for the required window                                                                                               | Outcome                            |
+| ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| Trusted complete 36-month history satisfying model eligibility                                                                  | ready                              |
+| Valid complete gap-free declaration reaching T, with only 0–35 required months covered                                          | insufficient_history; save nothing |
+| Missing/malformed/uncertain metadata, stale end before T, or an unavailable month in the covered portion of the required window | history_unavailable; save nothing  |
+| Complete non-all-zero history failing the sparse-demand policy below                                                            | history_unsuitable; save nothing   |
 
 Coverage failures take precedence over short-history/model eligibility checks. Ignore unavailable months outside the selected source window. For missing/unavailable/short coverage, do not construct a supposedly forecast-ready zero series. After coverage is established, empty covered months are valid zero observations.
 
@@ -586,15 +569,15 @@ The completed forward migration extends the MySQL forecasts_method_valid check a
 
 ## Issue Ownership and Current Implementation
 
-| Issue | Approved responsibility | Implementation |
-| --- | --- | --- |
-| EXT-36 | Parent tracking and final acceptance | Pending human acceptance |
-| EXT-40 | 48-month development history and monthly trusted coverage | Implemented |
-| EXT-42 | Trusted 36-month preparation, monthly aggregation and sparse eligibility | Implemented |
-| EXT-43 | Additive Holt–Winters calculation, bounded parameter fitting and evaluation | Implemented |
-| EXT-45 | New production output validation and compatible method-constraint migration | Implemented |
-| EXT-46 | Existing simple workflow adapted to monthly history and three estimates | Implemented |
-| EXT-44 | Final retirement of obsolete production paths; retain used evaluation baselines | Cleanup in review |
+| Issue  | Approved responsibility                                                         | Implementation           |
+| ------ | ------------------------------------------------------------------------------- | ------------------------ |
+| EXT-36 | Parent tracking and final acceptance                                            | Pending human acceptance |
+| EXT-40 | 48-month development history and monthly trusted coverage                       | Implemented              |
+| EXT-42 | Trusted 36-month preparation, monthly aggregation and sparse eligibility        | Implemented              |
+| EXT-43 | Additive Holt–Winters calculation, bounded parameter fitting and evaluation     | Implemented              |
+| EXT-45 | New production output validation and compatible method-constraint migration     | Implemented              |
+| EXT-46 | Existing simple workflow adapted to monthly history and three estimates         | Implemented              |
+| EXT-44 | Final retirement of obsolete production paths; retain used evaluation baselines | Cleanup in review        |
 
 The implementation order was **EXT-40 → EXT-42 → EXT-43 → EXT-45 → EXT-46 → EXT-44**. EXT-44 removes unused trend calculation and quarterly production preparation while retaining the Moving Average evaluation baseline. Existing parent external dependencies are preserved.
 
@@ -722,7 +705,7 @@ EXT-6 is Done. Its recorded baseline decisions remain useful historical context,
 - keep branch email reference data in application configuration; the current schema has no `branches.email` column.
 - keep deactivated categories, products, and chatbot knowledge in the database for historical and administrative reference, allow administrators to reactivate them, and prohibit physical deletion when historically referenced;
 - exclude inactive products from the customer catalog, cart eligibility, and recommendation results; exclude inactive categories and their products from customer browsing; and exclude inactive chatbot knowledge from chatbot retrieval;
-- keep recommendation behavior rule-based using budget, intended use, preferred brand, category, product preferences or tags, and Sagay inventory; do not implement a `product_compatibilities` table, product-to-product compatibility relationship, or dedicated compatibility-checking/configurator feature.
+- keep recommendations behavioral and rule-based using retained searches/views/dwell, cart context and completed purchases; preserve current active catalog/Sagay stock eligibility and exclude explicit PC-part compatibility/configurator behavior.
 
 Subsequent implemented schema/commerce decisions include:
 
@@ -784,26 +767,26 @@ Actual delivery continues through Battlefront's existing business processes.
 
 The reusable Laravel `DeliveryRules` service reads `battlefront.delivery` configuration. These are **Battlefront-configured capstone/demo assumptions, not official LBC rates**. Sagay City is the fixed operational origin for the approved table; runtime does not calculate distance or use coordinates, Google Maps, geocoding, routing, or courier APIs.
 
-| Destination | Base fee (PHP) | Transit days |
-| --- | --- | --- |
-| Sagay City | 80.00 | 0–1 |
-| Escalante City | 100.00 | 1 |
-| Cadiz City | 120.00 | 1 |
-| Toboso | 140.00 | 1 |
-| Manapla | 160.00 | 1 |
-| Calatrava | 180.00 | 1 |
-| Victorias City | 180.00 | 1 |
-| E.B. Magalona | 200.00 | 1–2 |
-| San Carlos City | 220.00 | 1–2 |
-| Silay City | 220.00 | 1–2 |
-| Talisay City | 240.00 | 1–2 |
-| Bacolod City | 250.00 | 1–2 |
+| Destination     | Base fee (PHP) | Transit days |
+| --------------- | -------------- | ------------ |
+| Sagay City      | 80.00          | 0–1          |
+| Escalante City  | 100.00         | 1            |
+| Cadiz City      | 120.00         | 1            |
+| Toboso          | 140.00         | 1            |
+| Manapla         | 160.00         | 1            |
+| Calatrava       | 180.00         | 1            |
+| Victorias City  | 180.00         | 1            |
+| E.B. Magalona   | 200.00         | 1–2          |
+| San Carlos City | 220.00         | 1–2          |
+| Silay City      | 220.00         | 1–2          |
+| Talisay City    | 240.00         | 1–2          |
+| Bacolod City    | 250.00         | 1–2          |
 
 | Shipping profile | Handling surcharge (PHP) | Preparation days |
-| --- | --- | --- |
-| standard | 0.00 | 1 |
-| fragile | 50.00 | 2 |
-| bulky | 100.00 | 3 |
+| ---------------- | ------------------------ | ---------------- |
+| standard         | 0.00                     | 1                |
+| fragile          | 50.00                    | 2                |
+| bulky            | 100.00                   | 3                |
 
 Priority is explicitly `standard < fragile < bulky`. Delivery fee is the destination base fee plus the highest applicable surcharge **once**, regardless of cart line count or quantity. Money remains two-decimal strings, added with BCMath at scale 2. Relative ETA minimum/maximum is the selected profile's preparation days plus the destination transit minimum/maximum; no date anchor, holiday policy, or guaranteed courier arrival is implied. Zero transit days means same-day transit once preparation is ready. Revised transit assumptions apply to new quotes only; persisted order/shipment snapshots retain their original values. A forward compatibility migration allows non-negative transit minima while preserving the other shipment snapshot constraints and existing rows.
 
@@ -872,7 +855,7 @@ Outside scope:
 
 ## Recommendation Data
 
-The recommendation engine uses internal Battlefront catalog and inventory information.
+The recommendation engine uses internal catalog/inventory, completed-order aggregates and the owner's eligible search/view/dwell/cart history.
 
 Outside scope:
 
@@ -970,22 +953,22 @@ Documentation-only updates require source/diff review rather than invented featu
 
 General status snapshot verified against Linear on **2026-10-01**; the forecasting row reflects the implemented EXT-40/42/43/45/46 migration and EXT-44 cleanup:
 
-| Area | State | Evidence / remaining boundary |
-| --- | --- | --- |
-| Core catalog, inventory, roles, and branch reference | Complete | Implemented routes/models/services and completed core issues |
-| Cart, checkout, orders, manual payments, cancellation restoration, sales/reports | Complete | EXT-22–27, EXT-28–34, EXT-80–83 Done |
-| Deterministic recommendations | Complete | EXT-35, EXT-37–39, EXT-41, EXT-64 Done |
-| Integrated chatbot | Complete | EXT-47–55 and EXT-61 Done |
-| Mobile API foundation/customer endpoints | Complete | EXT-56–61 and EXT-64 Done |
-| Mobile handoff and Postman collection | Complete | EXT-62 Done; developer-reported successful manual Postman Desktop verification |
-| Actual React Native + Expo integration | Pending | EXT-63 Backlog; preparation complete, real LAN consumer journeys not run |
-| Predictive analytics and historical development data | Monthly Holt–Winters production implemented; final acceptance pending | EXT-40/42/43/45/46 are implemented; EXT-44 retires obsolete production paths, and EXT-36 awaits human acceptance |
-| Cross-module integration and release-quality checks | Pending | EXT-65–72 Backlog |
-| Deployment, pilot evaluation, and release candidate | Pending | EXT-73–79 Backlog |
+| Area                                                                             | State                                                                 | Evidence / remaining boundary                                                                                                                                                                                                                             |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Core catalog, inventory, roles, and branch reference                             | Complete                                                              | Implemented routes/models/services and completed core issues                                                                                                                                                                                              |
+| Cart, checkout, orders, manual payments, cancellation restoration, sales/reports | Complete                                                              | EXT-22–27, EXT-28–34, EXT-80–83 Done                                                                                                                                                                                                                      |
+| Behavior-driven recommendation implementation                                    | Complete for current web/backend paths                                | Adviser approval confirmed by the developer on 2026-10-08; guest profiles, tracking, recommendations, and registration-only history merge implemented; mobile migration is developer-confirmed; device validation and evaluation evidence remain separate |
+| Integrated chatbot                                                               | Complete                                                              | EXT-47–55 and EXT-61 Done                                                                                                                                                                                                                                 |
+| Mobile API foundation/customer endpoints                                         | Complete                                                              | EXT-56–61 and EXT-64 Done                                                                                                                                                                                                                                 |
+| Mobile handoff and Postman collection                                            | Complete                                                              | EXT-62 Done; developer-reported successful manual Postman Desktop verification                                                                                                                                                                            |
+| Actual React Native + Expo integration                                           | Pending                                                               | EXT-63 Backlog; preparation complete, real LAN consumer journeys not run                                                                                                                                                                                  |
+| Predictive analytics and historical development data                             | Monthly Holt–Winters production implemented; final acceptance pending | EXT-40/42/43/45/46 are implemented; EXT-44 retires obsolete production paths, and EXT-36 awaits human acceptance                                                                                                                                          |
+| Cross-module integration and release-quality checks                              | Pending                                                               | EXT-65–72 Backlog                                                                                                                                                                                                                                         |
+| Deployment, pilot evaluation, and release candidate                              | Pending                                                               | EXT-73–79 Backlog                                                                                                                                                                                                                                         |
 
 ## Completed Mobile API Scope
 
-`routes/api.php` defines 28 `/api/v1` endpoints covering health, customer registration/login/logout, profile read/update, catalog search/filter/detail, branch information, cart operations, checkout preview, order placement/history/detail, rejected-proof replacement, chatbot, recommendation options/results, shared notification history/read state, and Expo device registration/revocation.
+`routes/api.php` defines 29 `/api/v1` endpoints covering health, customer registration/login/logout, profile read/update, catalog search/filter/detail, branch information, cart operations, checkout preview, order placement/history/detail, rejected-proof replacement, chatbot, behavioral recommendation feeds/interactions, shared notification history/read state, and Expo device registration/revocation.
 
 The mobile product list additionally supports multiple active categories (`category_ids`), inclusive effective-price bounds (`min_price`, `max_price`), and `featured`/`price_asc`/`price_desc` sorting. These parameters are enabled only for the named API product-list route; the existing Inertia web catalog keeps its singular category/brand/tag filters, search, default ordering, and scroll behavior. Both clients retain shared catalog eligibility and presentation. This extension adds no endpoints or schema changes; see the handoff for validation and pagination details. React Native consumer validation of the additions remains pending.
 

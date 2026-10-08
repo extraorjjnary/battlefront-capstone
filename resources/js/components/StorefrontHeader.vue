@@ -1,13 +1,13 @@
 <script setup>
-import { Link, usePage } from "@inertiajs/vue3";
-import { computed } from "vue";
-import AppLogo from "@/components/AppLogo.vue";
-import CustomerChatAssistant from "@/components/chatbot/CustomerChatAssistant.vue";
-import { Button } from "@/components/ui/button";
-import { dashboard, home, login, register } from "@/routes";
-import { index as branchIndex } from "@/routes/branches";
-import { index as productIndex } from "@/routes/products";
-import { index as recommendationIndex } from "@/routes/recommendations";
+import { Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import AppLogo from '@/components/AppLogo.vue';
+import CustomerChatAssistant from '@/components/chatbot/CustomerChatAssistant.vue';
+import { Button } from '@/components/ui/button';
+import { dashboard, home, login, register } from '@/routes';
+import { index as branchIndex } from '@/routes/branches';
+import { index as productIndex } from '@/routes/products';
+import { index as recommendationIndex } from '@/routes/recommendations';
 
 const props = defineProps({
     activeSection: { type: String, default: null },
@@ -16,9 +16,24 @@ const props = defineProps({
 const page = usePage();
 const isAuthenticated = computed(() => Boolean(page.props.auth?.user));
 const storefrontLinks = [
-    { title: "Products", mobileTitle: "Shop", section: "products", href: productIndex() },
-    { title: "Recommendations", mobileTitle: "Find", section: "recommendations", href: recommendationIndex() },
-    { title: "Branches", mobileTitle: "Stores", section: "branches", href: branchIndex() },
+    {
+        title: 'Products',
+        mobileTitle: 'Shop',
+        section: 'products',
+        href: productIndex(),
+    },
+    {
+        title: 'Recommendations',
+        mobileTitle: 'For you',
+        section: 'recommendations',
+        href: recommendationIndex(),
+    },
+    {
+        title: 'Branches',
+        mobileTitle: 'Stores',
+        section: 'branches',
+        href: branchIndex(),
+    },
 ];
 </script>
 

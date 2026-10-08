@@ -2,7 +2,6 @@
 
 use App\Models\Branch;
 use App\Models\User;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Schema;
 
 test('the branch schema follows the current application design', function () {
@@ -16,7 +15,6 @@ test('the branch schema follows the current application design', function () {
         'longitude',
     ])->and(Schema::hasColumn('users', 'branch_id'))->toBeFalse();
 });
-
 
 test('branch reference data can be seeded repeatedly', function () {
     $this->seed();

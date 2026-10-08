@@ -1,25 +1,27 @@
 <script setup>
-import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import { ArrowLeft, LogIn, PackageOpen, Tag } from '@lucide/vue';
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, watch } from 'vue';
 import AddToCartForm from '@/components/cart/AddToCartForm.vue';
 import ProductImage from '@/components/catalog/ProductImage.vue';
 import ProductPrice from '@/components/catalog/ProductPrice.vue';
+import RecommendationSection from '@/components/recommendations/RecommendationSection.vue';
 import StockAvailability from '@/components/catalog/StockAvailability.vue';
 import StorefrontHeader from '@/components/StorefrontHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { consumeCatalogVisit } from '@/lib/catalogReturn';
-import {
-    consumeRecommendationVisit,
-    recommendationReturnUrl,
-} from '@/lib/recommendationReturn';
 import { login } from '@/routes';
 import { index as productIndex } from '@/routes/products';
-import { results as recommendationResults } from '@/routes/recommendations';
+import { store as storeProductDwell } from '@/routes/products/dwell';
+import { store as storeProductView } from '@/routes/products/view';
 
 const props = defineProps({
     product: { type: Object, required: true },
+    can_record_product_dwell: { type: Boolean, default: false },
+    is_personalized: { type: Boolean, default: false },
+    has_featured_fallback: { type: Boolean, default: false },
+    recommendations: { type: Array, default: () => [] },
 });
 
 const page = usePage();
@@ -30,23 +32,115 @@ const canUseCustomerCart = computed(
 const hasAvailableStock = computed(
     () => Number(props.product.inventory.quantity) > 0,
 );
-const recommendationReturnHref = computed(() =>
-    recommendationReturnUrl(page.url, recommendationResults.url()),
-);
-const canReturnToRecommendationHistory = consumeRecommendationVisit(
-    props.product.id,
-);
 const canReturnToCatalog = consumeCatalogVisit(props.product.id);
+let visibleSince = null;
+let accumulatedVisibleMilliseconds = 0;
+let trackedProductId = props.product.id;
+let viewRequest = null;
 
-function returnToRecommendations() {
-    if (canReturnToRecommendationHistory) {
-        window.history.back();
+function postActivity(route, payload = {}) {
+    const xsrfToken = decodeURIComponent(
+        document.cookie
+            .split('; ')
+            .find((cookie) => cookie.startsWith('XSRF-TOKEN='))
+            ?.split('=')[1] ?? '',
+    );
+    return fetch(route.url, {
+        method: route.method.toUpperCase(),
+        credentials: 'same-origin',
+        keepalive: true,
+        headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-XSRF-TOKEN': xsrfToken,
+        },
+        body: JSON.stringify(payload),
+    })
+        .then((response) => response.ok)
+        .catch(() => false);
+}
+
+function startViewing() {
+    if (
+        !props.can_record_product_dwell ||
+        document.visibilityState !== 'visible'
+    )
+        return;
+    viewRequest ??= postActivity(storeProductView.post(trackedProductId));
+    visibleSince ??= performance.now();
+}
+
+function recordVisibleTime() {
+    if (!props.can_record_product_dwell) {
+        return;
+    }
+
+    const visibleMilliseconds =
+        accumulatedVisibleMilliseconds +
+        (visibleSince === null ? 0 : performance.now() - visibleSince);
+    const seconds = Math.min(3600, Math.floor(visibleMilliseconds / 1000));
+
+    if (seconds < 5) {
+        return;
+    }
+
+    const route = storeProductDwell.post(trackedProductId);
+    viewRequest?.then((recorded) => {
+        if (recorded) postActivity(route, { seconds });
+    });
+}
+
+watch(
+    () => props.product.id,
+    (productId) => {
+        if (visibleSince !== null) {
+            accumulatedVisibleMilliseconds += performance.now() - visibleSince;
+            visibleSince = null;
+        }
+
+        recordVisibleTime();
+        accumulatedVisibleMilliseconds = 0;
+        trackedProductId = productId;
+        viewRequest = null;
+        startViewing();
+    },
+);
+
+function handleVisibilityChange() {
+    if (document.visibilityState === 'hidden') {
+        if (visibleSince !== null) {
+            accumulatedVisibleMilliseconds += performance.now() - visibleSince;
+            visibleSince = null;
+        }
+
+        recordVisibleTime();
 
         return;
     }
 
-    router.visit(recommendationReturnHref.value);
+    startViewing();
 }
+
+onMounted(() => {
+    if (!props.can_record_product_dwell) {
+        return;
+    }
+
+    startViewing();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+});
+
+onBeforeUnmount(() => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+
+    if (visibleSince !== null) {
+        accumulatedVisibleMilliseconds += performance.now() - visibleSince;
+        visibleSince = null;
+    }
+
+    recordVisibleTime();
+});
 
 function returnToCatalog() {
     window.history.back();
@@ -66,25 +160,11 @@ function returnToCatalog() {
             />
         </Head>
 
-        <StorefrontHeader
-            :active-section="
-                recommendationReturnHref ? 'recommendations' : 'products'
-            "
-        />
+        <StorefrontHeader active-section="products" />
 
         <main class="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-12">
             <Button
-                v-if="recommendationReturnHref"
-                type="button"
-                variant="ghost"
-                class="-ml-3"
-                @click="returnToRecommendations"
-            >
-                <ArrowLeft aria-hidden="true" />
-                Back to recommendations
-            </Button>
-            <Button
-                v-else-if="canReturnToCatalog"
+                v-if="canReturnToCatalog"
                 type="button"
                 variant="ghost"
                 class="-ml-3"
@@ -258,6 +338,27 @@ function returnToCatalog() {
                     </section>
                 </div>
             </article>
+
+            <div class="mt-12">
+                <RecommendationSection
+                    :recommendations="recommendations"
+                    placement="product"
+                    :title="
+                        is_personalized
+                            ? 'More to explore'
+                            : has_featured_fallback
+                              ? 'Popular and featured products'
+                              : 'Popular products'
+                    "
+                    :description="
+                        is_personalized
+                            ? 'Suggestions based on completed orders, your cart, and search or product activity you chose to share.'
+                            : has_featured_fallback
+                              ? 'Popular products and featured picks with current Sagay stock.'
+                              : 'Products that appear often in completed Battlefront orders.'
+                    "
+                />
+            </div>
         </main>
     </div>
 </template>

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use UnexpectedValueException;
 
 class ProductCatalogRepository
 {
@@ -48,7 +49,7 @@ class ProductCatalogRepository
         $sort = $filters['sort'] ?? 'featured';
 
         if ($sort === 'price_asc' || $sort === 'price_desc') {
-            $query->orderByRaw('COALESCE(discount_price, price) '.($sort === 'price_asc' ? 'asc' : 'desc'));
+            $query->orderByRaw('CAST(COALESCE(discount_price, price) AS DECIMAL(12, 2)) '.($sort === 'price_asc' ? 'asc' : 'desc'));
         } else {
             $query->orderByDesc('is_featured');
         }
@@ -57,7 +58,12 @@ class ProductCatalogRepository
             ->orderBy('name')
             ->orderBy('id')
             ->paginate(12)
-            ->appends(array_filter($filters, fn (mixed $value): bool => $value !== null));
+            ->appends(array_filter(
+                $filters,
+                fn (mixed $value): bool => $value !== null
+                    && $value !== ''
+                    && ! (is_array($value) && $value === []),
+            ));
     }
 
     public function findEligibleOrFail(int $productId): Product
@@ -69,9 +75,10 @@ class ProductCatalogRepository
      * Find customer-eligible products whose catalog attributes match every search term.
      *
      * @param  list<string>  $terms
+     * @param  array<int, int>  $excludedProductIds
      * @return EloquentCollection<int, Product>
      */
-    public function contextMatches(array $terms, int $limit = 5): EloquentCollection
+    public function contextMatches(array $terms, int $limit = 5, bool $availableOnly = false, array $excludedProductIds = []): EloquentCollection
     {
         $matches = (new Product)->newCollection();
 
@@ -97,6 +104,9 @@ class ProductCatalogRepository
             }
 
             $query = $this->contextQuery()
+                ->without(['category', 'inventory', 'tags'])
+                ->when($availableOnly, fn (Builder $query): Builder => $query->cartEligible())
+                ->whereNotIn('products.id', $excludedProductIds)
                 ->where(fn (Builder $query): Builder => $tier($query))
                 ->orderBy('name')
                 ->orderBy('id')
@@ -111,7 +121,69 @@ class ProductCatalogRepository
             }
         }
 
-        return $matches;
+        return $matches->load(['category:id,name', 'inventory:id,product_id,quantity,reorder_level', 'tags:id,name']);
+    }
+
+    /**
+     * Find products with related category, brand, or tag attributes for a viewed product.
+     *
+     * @param  EloquentCollection<int, Product>  $anchors
+     * @param  array<int, int>  $excludedProductIds
+     * @return Builder<Product>
+     */
+    public function similarProducts(EloquentCollection $anchors, array $excludedProductIds = []): Builder
+    {
+        return $this->contextQuery()
+            ->cartEligible()
+            ->whereNotIn('products.id', array_values(array_unique([...$excludedProductIds, ...$anchors->modelKeys()])))
+            ->where(function (Builder $query) use ($anchors): void {
+                $query->whereRaw('1 = 0');
+
+                foreach ($anchors as $anchor) {
+                    $price = $anchor->discount_price ?? $anchor->price;
+                    if (! is_numeric($price)) {
+                        throw new UnexpectedValueException('Catalog product price must be numeric.');
+                    }
+
+                    if (bccomp($price, '0', 2) <= 0) {
+                        continue;
+                    }
+
+                    $query->orWhere(function (Builder $match) use ($anchor, $price): void {
+                        $match->whereRaw('COALESCE(discount_price, price) >= CAST(? AS DECIMAL(12, 2))', [bcmul($price, '0.5', 2)])
+                            ->whereRaw('COALESCE(discount_price, price) <= CAST(? AS DECIMAL(12, 2))', [bcmul($price, '2', 2)])
+                            ->where(function (Builder $attributes) use ($anchor): void {
+                                $attributes->where('category_id', $anchor->category_id);
+
+                                if ($anchor->brand !== null) {
+                                    $attributes->orWhereRaw('LOWER(brand) = ?', [mb_strtolower($anchor->brand)]);
+                                }
+
+                                if ($anchor->tags->isNotEmpty()) {
+                                    $attributes->orWhereHas('tags', fn (Builder $tags): Builder => $tags->whereIn('tags.id', $anchor->tags->modelKeys()));
+                                }
+                            });
+                    });
+                }
+            });
+    }
+
+    /**
+     * Provide a small catalog fallback when there is not enough purchase history.
+     *
+     * @param  array<int, int>  $excludedProductIds
+     * @return EloquentCollection<int, Product>
+     */
+    public function featuredFallback(array $excludedProductIds = [], int $limit = 40): EloquentCollection
+    {
+        return $this->contextQuery()
+            ->cartEligible()
+            ->whereNotIn('products.id', $excludedProductIds)
+            ->where('is_featured', true)
+            ->orderBy('name')
+            ->orderBy('id')
+            ->limit($limit)
+            ->get();
     }
 
     /**
@@ -255,11 +327,11 @@ class ProductCatalogRepository
                 fn (Builder $query, array $categoryIds): Builder => $query->whereIn('category_id', $categoryIds),
             )
             ->where(function (Builder $query) use ($filters): void {
-                if (isset($filters['min_price'])) {
+                if (isset($filters['min_price']) && $filters['min_price'] !== '') {
                     $query->whereRaw('COALESCE(discount_price, price) >= CAST(? AS DECIMAL(12, 2))', [$filters['min_price']]);
                 }
 
-                if (isset($filters['max_price'])) {
+                if (isset($filters['max_price']) && $filters['max_price'] !== '') {
                     $query->whereRaw('COALESCE(discount_price, price) <= CAST(? AS DECIMAL(12, 2))', [$filters['max_price']]);
                 }
             })

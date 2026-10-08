@@ -24,15 +24,20 @@ use App\Http\Controllers\CartItemController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\HomeController;
 use App\Http\Controllers\NotificationController as CustomerNotificationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderPaymentProofController as CustomerOrderPaymentProofController;
 use App\Http\Controllers\ProductCatalogController;
+use App\Http\Controllers\ProductDwellController;
+use App\Http\Controllers\ProductViewController;
 use App\Http\Controllers\RecommendationController;
+use App\Http\Controllers\RecommendationInteractionController;
+use App\Http\Controllers\RecommendationPreferenceController;
 use Illuminate\Support\Facades\Route;
 
 // guest landing page
-Route::inertia('/', 'Welcome')->name('home');
+Route::get('/', [HomeController::class, 'index'])->name('home');
 
 // public/customer branches
 Route::get('branches', [BranchController::class, 'index'])->name('branches.index');
@@ -41,12 +46,26 @@ Route::get('branches', [BranchController::class, 'index'])->name('branches.index
 Route::resource('products', ProductCatalogController::class)
     ->only(['index', 'show'])
     ->where(['product' => '[0-9]+']);
+Route::post('products/{product}/dwell', [ProductDwellController::class, 'store'])
+    ->whereNumber('product')
+    ->middleware('throttle:60,1')
+    ->name('products.dwell.store');
+Route::post('products/{product}/view', [ProductViewController::class, 'store'])
+    ->whereNumber('product')
+    ->middleware('throttle:60,1')
+    ->name('products.view.store');
 
 // public/customer recommendations
 Route::middleware('can:use-recommendations')->group(function () {
     Route::get('recommendations', [RecommendationController::class, 'index'])->name('recommendations.index');
-    Route::get('recommendations/results', [RecommendationController::class, 'results'])->name('recommendations.results');
+    Route::post('recommendations/interactions', RecommendationInteractionController::class)
+        ->middleware('throttle:60,1')
+        ->name('recommendations.interactions.store');
 });
+
+Route::post('recommendations/personalization', [RecommendationPreferenceController::class, 'enable'])
+    ->middleware(['auth', 'can:use-customer-cart'])
+    ->name('recommendations.personalization.enable');
 
 // dynamic dashboard for customer and admin
 Route::middleware('auth')->group(function () {

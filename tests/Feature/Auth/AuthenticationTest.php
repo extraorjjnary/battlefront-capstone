@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\GuestRecommendationProfile;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
@@ -23,6 +24,29 @@ test('users can authenticate without a verified email', function () {
     $response->assertRedirect(route('dashboard', absolute: false));
 
     $this->get(route('dashboard'))->assertOk();
+});
+
+test('successful sign-in discards guest recommendation history and expires its browser cookie', function () {
+    $user = User::factory()->customer()->create();
+    $token = 'opaque-test-guest-profile-token';
+    $profile = GuestRecommendationProfile::factory()->create([
+        'token_hash' => hash('sha256', $token),
+    ]);
+    $search = $profile->searches()->create([
+        'query' => 'graphics card',
+        'expires_at' => now()->addDays(90),
+    ]);
+
+    $response = $this->withCookie('battlefront_recommendation_profile', $token)
+        ->post(route('login.store'), [
+            'email' => $user->email,
+            'password' => 'password',
+        ]);
+
+    $response->assertRedirect(route('dashboard', absolute: false));
+    $response->assertCookieExpired('battlefront_recommendation_profile');
+    $this->assertDatabaseMissing('customer_searches', ['id' => $search->id]);
+    $this->assertModelMissing($profile);
 });
 
 test('database sessions retain nullable unconstrained user references', function () {
@@ -77,8 +101,42 @@ test('users can logout', function () {
     $response = $this->actingAs($user)->post(route('logout'));
 
     $response->assertRedirect(route('home'));
+    $response->assertCookieNotExpired('battlefront_recommendation_profile');
 
     $this->assertGuest();
+    $this->assertDatabaseCount('guest_recommendation_profiles', 1);
+});
+
+test('logging out discards guest history before a later account sign-in', function () {
+    $firstCustomer = User::factory()->customer()->create();
+    $secondCustomer = User::factory()->customer()->create();
+    $oldToken = 'first-account-guest-profile-token';
+    $oldProfile = GuestRecommendationProfile::factory()->create([
+        'token_hash' => hash('sha256', $oldToken),
+    ]);
+    $search = $oldProfile->searches()->create([
+        'query' => 'gaming laptop',
+        'expires_at' => now()->addDays(90),
+    ]);
+
+    $logoutResponse = $this->actingAs($firstCustomer)
+        ->withCookie('battlefront_recommendation_profile', $oldToken)
+        ->post(route('logout'));
+    $newGuestCookie = $logoutResponse->getCookie('battlefront_recommendation_profile', decrypt: false);
+
+    $this->assertDatabaseMissing('customer_searches', ['id' => $search->id]);
+    $this->assertModelMissing($oldProfile);
+
+    $response = $this->withUnencryptedCookie('battlefront_recommendation_profile', $newGuestCookie->getValue())
+        ->post(route('login.store'), [
+            'email' => $secondCustomer->email,
+            'password' => 'password',
+        ]);
+
+    $response->assertRedirect(route('dashboard', absolute: false));
+    $this->assertDatabaseMissing('customer_searches', ['id' => $search->id]);
+    $this->assertDatabaseMissing('customer_searches', ['user_id' => $secondCustomer->id]);
+    $this->assertDatabaseCount('guest_recommendation_profiles', 0);
 });
 
 test('users are rate limited', function () {

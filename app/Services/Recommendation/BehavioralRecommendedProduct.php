@@ -4,7 +4,7 @@ namespace App\Services\Recommendation;
 
 use App\Models\Product;
 
-readonly class RecommendedProduct
+readonly class BehavioralRecommendedProduct
 {
     /** @var numeric-string */
     public string $effectivePrice;
@@ -16,8 +16,6 @@ readonly class RecommendedProduct
     public function __construct(
         public Product $product,
         string $effectivePrice,
-        public int $intendedUseMatchCount,
-        public int $preferredTagMatchCount,
         public array $reasons,
     ) {
         $this->effectivePrice = $effectivePrice;

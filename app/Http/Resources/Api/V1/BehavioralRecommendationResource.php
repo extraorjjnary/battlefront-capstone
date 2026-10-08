@@ -3,12 +3,12 @@
 namespace App\Http\Resources\Api\V1;
 
 use App\Services\CatalogProductPresenter;
-use App\Services\Recommendation\RecommendedProduct;
+use App\Services\Recommendation\BehavioralRecommendedProduct;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/** @mixin RecommendedProduct */
-class RecommendationResource extends JsonResource
+/** @mixin BehavioralRecommendedProduct */
+class BehavioralRecommendationResource extends JsonResource
 {
     /**
      * Transform the resource into an array.

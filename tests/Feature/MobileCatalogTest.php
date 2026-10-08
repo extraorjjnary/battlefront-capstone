@@ -115,6 +115,13 @@ test('product detail returns only the mobile catalog fields', function () {
     ]]);
 });
 
+test('configured image hosts are preserved on product lists as well as details', function () {
+    config(['filesystems.disks.public.url' => 'https://assets.example.test/catalog']);
+    $product = Product::factory()->create(['image_path' => 'products/example.webp']);
+    $this->getJson(route('api.v1.products.index'))->assertOk()
+        ->assertJsonPath('data.0.image_url', 'https://assets.example.test/catalog/products/example.webp');
+});
+
 test('list and detail expose stock status without exact quantities', function (?int $quantity, int $reorderLevel, string $status) {
     $product = Product::factory()->create(['image_path' => null, 'brand' => null]);
     if ($quantity !== null) {
@@ -200,6 +207,47 @@ test('unsupported stock filtering does not hide eligible products', function () 
     $this->get(route('api.v1.products.index', ['stock' => 'out_of_stock']))
         ->assertOk()->assertJsonCount(2, 'data');
 });
+
+test('mobile categories combine multiple categories with effective price and search filters', function () {
+    $categories = Category::factory()->count(2)->create();
+    foreach ($categories as $category) {
+        Product::factory()->for($category)->create(['name' => 'Selected GPU', 'brand' => 'Atlas', 'price' => '9000.00', 'discount_price' => '4999.99']);
+        Product::factory()->for($category)->create(['name' => 'Selected GPU', 'brand' => 'Atlas', 'price' => '5000.00', 'discount_price' => null]);
+        Product::factory()->for($category)->create(['name' => 'Selected GPU', 'brand' => 'Other', 'price' => '100.00']);
+    }
+    Product::factory()->create(['name' => 'Selected GPU', 'brand' => 'Atlas', 'price' => '100.00']);
+
+    $this->getJson(route('api.v1.products.index', ['category_ids' => $categories->modelKeys(), 'brand' => 'Atlas', 'q' => 'GPU', 'max_price' => '4999.99']))
+        ->assertOk()->assertJsonCount(2, 'data')->assertJsonPath('meta.total', 2);
+    $this->getJson(route('api.v1.products.index', ['category_ids' => $categories->modelKeys(), 'brand' => 'Atlas', 'min_price' => '5000']))
+        ->assertOk()->assertJsonCount(2, 'data');
+});
+
+test('price ordering uses discounts and stays stable across pages', function () {
+    $products = Product::factory()->count(13)->sequence(fn ($sequence): array => [
+        'name' => sprintf('Part %02d', $sequence->index), 'price' => '20000.00', 'discount_price' => '15000.00',
+    ])->create();
+    $cheapest = Product::factory()->create(['name' => 'Discounted', 'price' => '30000.00', 'discount_price' => '14999.99']);
+    $this->getJson(route('api.v1.products.index', ['sort' => 'price_asc']))
+        ->assertOk()->assertJsonPath('data.0.id', $cheapest->id)->assertJsonPath('meta.total', 14);
+    $this->getJson(route('api.v1.products.index', ['sort' => 'price_asc', 'page' => 2]))
+        ->assertOk()->assertJsonCount(2, 'data')->assertJsonPath('data.0.id', $products[11]->id);
+    $this->getJson(route('api.v1.products.index', ['sort' => 'price_desc', 'min_price' => '15000']))
+        ->assertOk()->assertJsonPath('data.0.id', $products[0]->id)->assertJsonPath('meta.total', 13);
+    $this->getJson(route('api.v1.products.index', ['max_price' => '14999.99']))
+        ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $cheapest->id);
+});
+
+test('invalid category price and sort inputs are rejected', function (array $filters, string $field) {
+    $this->getJson(route('api.v1.products.index', $filters))->assertUnprocessable()->assertJsonValidationErrors($field);
+})->with([
+    [['category_ids' => 'one'], 'category_ids'],
+    [['category_ids' => [999999]], 'category_ids.0'],
+    [['min_price' => '-1'], 'min_price'],
+    [['min_price' => '20', 'max_price' => '10'], 'max_price'],
+    [['max_price' => '1.001'], 'max_price'],
+    [['sort' => 'price desc; DROP TABLE products'], 'sort'],
+]);
 
 test('mobile category lists combine with search brand tag and inclusive effective price bounds', function () {
     $categories = Category::factory()->count(2)->create();

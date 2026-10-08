@@ -3,9 +3,12 @@
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Category;
+use App\Models\CustomerProductView;
+use App\Models\CustomerSearch;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\RecommendationInteraction;
 use App\Models\Sale;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -93,7 +96,112 @@ test('administrators receive zero values and empty reports when no sales exist',
         ])
         ->where('top_products.labels', [])
         ->where('categories.rows', [])
-        ->where('products.data', []));
+        ->where('products.data', [])
+        ->where('recommendation_engagement.summary', [
+            'impressions' => 0,
+            'clicks' => 0,
+            'dismissals' => 0,
+            'wrong_reports' => 0,
+        ])
+        ->where('recommendation_engagement.placements', [])
+        ->where('recommendation_engagement.reasons', [])
+        ->where('recommendation_engagement.top_clicked_products', []));
+});
+
+test('administrators see anonymous recommendation engagement by date placement reason and product', function () {
+    $administrator = User::factory()->administrator()->create();
+    $graphicsCard = Product::factory()->create(['name' => 'Atlas Graphics Card']);
+    $keyboard = Product::factory()->create(['name' => 'Mechanical Keyboard']);
+
+    RecommendationInteraction::factory()->for($graphicsCard)->create([
+        'event_type' => 'impression',
+        'placement' => 'home',
+        'reason_code' => 'popular_with_customers',
+        'created_at' => '2026-09-10 10:00:00',
+    ]);
+    RecommendationInteraction::factory()->for($graphicsCard)->create([
+        'event_type' => 'click',
+        'placement' => 'home',
+        'reason_code' => 'popular_with_customers',
+        'created_at' => '2026-09-10 10:01:00',
+    ]);
+    RecommendationInteraction::factory()->for($keyboard)->create([
+        'event_type' => 'impression',
+        'placement' => 'cart',
+        'reason_code' => 'bought_with_cart_products',
+        'created_at' => '2026-09-11 10:00:00',
+    ]);
+    RecommendationInteraction::factory()->for($keyboard)->create([
+        'event_type' => 'click',
+        'placement' => 'product',
+        'reason_code' => 'matched_recent_searches',
+        'created_at' => '2026-09-11 10:01:00',
+    ]);
+    RecommendationInteraction::factory()->for($graphicsCard)->create([
+        'event_type' => 'dismiss',
+        'placement' => 'home',
+        'reason_code' => 'popular_with_customers',
+        'created_at' => '2026-09-11 10:02:00',
+    ]);
+    RecommendationInteraction::factory()->for($keyboard)->create([
+        'event_type' => 'report_wrong',
+        'placement' => 'cart',
+        'reason_code' => 'bought_with_cart_products',
+        'created_at' => '2026-09-11 10:02:00',
+    ]);
+    RecommendationInteraction::factory()->for($keyboard)->create([
+        'event_type' => 'click',
+        'placement' => 'home',
+        'created_at' => '2026-08-31 10:00:00',
+    ]);
+    RecommendationInteraction::factory()->for($keyboard)->create([
+        'event_type' => 'click',
+        'placement' => 'home',
+        'created_at' => '2026-09-12 10:00:00',
+        'expires_at' => now()->subSecond(),
+    ]);
+
+    $response = $this->actingAs($administrator)
+        ->get(route('administration.reports.sales', [
+            'from' => '2026-09-01',
+            'to' => '2026-09-30',
+        ]));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->component('Administration/Reports/Sales')
+        ->where('recommendation_engagement.summary', [
+            'impressions' => 2,
+            'clicks' => 2,
+            'dismissals' => 1,
+            'wrong_reports' => 1,
+        ])
+        ->has('recommendation_engagement.placements', 3)
+        ->has('recommendation_engagement.reasons', 3)
+        ->has('recommendation_engagement.top_clicked_products', 2)
+        ->where('recommendation_engagement.top_clicked_products.0.product_name', 'Atlas Graphics Card'));
+
+    $placements = collect($response->inertiaProps('recommendation_engagement.placements'))
+        ->keyBy('placement');
+    $reasons = collect($response->inertiaProps('recommendation_engagement.reasons'))
+        ->keyBy('reason_code');
+
+    expect($placements->get('home'))
+        ->toMatchArray(['impressions' => 1, 'clicks' => 1, 'dismissals' => 1, 'wrong_reports' => 0])
+        ->and($placements->get('cart'))
+        ->toMatchArray(['impressions' => 1, 'clicks' => 0, 'dismissals' => 0, 'wrong_reports' => 1])
+        ->and($placements->get('product'))
+        ->toMatchArray(['impressions' => 0, 'clicks' => 1, 'dismissals' => 0, 'wrong_reports' => 0])
+        ->and($reasons->get('matched_recent_searches'))
+        ->toMatchArray(['impressions' => 0, 'clicks' => 1]);
+});
+
+test('recommendation engagement reporting never exposes raw customer browsing history', function () {
+    CustomerSearch::factory()->create(['query' => 'private customer search phrase']);
+    CustomerProductView::factory()->create(['dwell_seconds' => 1234]);
+    $this->actingAs(User::factory()->administrator()->create())
+        ->get(route('administration.reports.sales'))->assertOk()
+        ->assertDontSee('private customer search phrase')->assertDontSee('dwell_seconds')
+        ->assertDontSee('guest_recommendation_profile_id');
 });
 
 test('sales KPIs and product and category reports use sale-backed order records', function () {
