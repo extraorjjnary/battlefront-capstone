@@ -32,6 +32,11 @@ class ProfileUpdateRequest extends FormRequest
             'sometimes',
             'boolean',
         ];
+        $rules['personalized_recommendations_enabled'] = [
+            Rule::excludeIf(! $this->user()->can('use-customer-cart')),
+            'sometimes',
+            'boolean',
+        ];
 
         return $rules;
     }

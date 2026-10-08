@@ -1,17 +1,23 @@
 <script setup>
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import { ArrowRight, PackageSearch } from '@lucide/vue';
+import { computed } from 'vue';
 import RecommendationSection from '@/components/recommendations/RecommendationSection.vue';
 import StorefrontHeader from '@/components/StorefrontHeader.vue';
 import { Button } from '@/components/ui/button';
+import RecommendationPreferenceController from '@/actions/App/Http/Controllers/RecommendationPreferenceController';
 import { login } from '@/routes';
 import { index as productIndex } from '@/routes/products';
 
 defineProps({
     is_personalized: { type: Boolean, default: false },
     has_featured_fallback: { type: Boolean, default: false },
+    can_enable_personalization: { type: Boolean, default: false },
     recommendations: { type: Array, default: () => [] },
 });
+
+const page = usePage();
+const isAuthenticated = computed(() => Boolean(page.props.auth?.user));
 </script>
 
 <template>
@@ -47,12 +53,34 @@ defineProps({
                     </h1>
                     <p class="text-muted-foreground mt-4 max-w-2xl leading-7">
                         {{ is_personalized
-                            ? 'Suggestions reflect recent searches, products you viewed, items in your cart, and completed orders. Search and view history are used only when you opt in.'
+                            ? 'Suggestions reflect recent searches, products you viewed, items in your cart, completed orders, and products bought by customers with overlapping purchase histories.'
                             : has_featured_fallback
                               ? 'Browse popular products and currently available featured picks from Battlefront.'
                               : 'These products appear often in completed Battlefront orders and are currently available in Sagay.' }}
                     </p>
                 </div>
+            </section>
+
+            <section
+                v-if="can_enable_personalization"
+                class="border-border bg-card mt-6 flex flex-col gap-4 border p-5 sm:flex-row sm:items-center sm:justify-between"
+                role="status"
+            >
+                <div>
+                    <h2 class="font-semibold">Personalized recommendations are off</h2>
+                    <p class="text-muted-foreground mt-1 max-w-2xl text-sm leading-6">
+                        These suggestions use popular and featured products. Turn personalization on to use your eligible browsing and shopping activity. You can also change this in Profile settings.
+                    </p>
+                </div>
+                <Button as-child class="shrink-0">
+                    <Link
+                        :href="RecommendationPreferenceController.enable.url()"
+                        method="post"
+                        as="button"
+                    >
+                        Turn on personalization
+                    </Link>
+                </Button>
             </section>
 
             <section v-if="recommendations.length === 0" class="border-border bg-card mt-8 border p-8 text-center sm:p-12" aria-live="polite">
@@ -67,7 +95,7 @@ defineProps({
                     <Button as-child variant="outline">
                         <Link :href="productIndex()">Browse products</Link>
                     </Button>
-                    <Button v-if="!is_personalized" as-child>
+                    <Button v-if="!isAuthenticated" as-child>
                         <Link :href="login()">Sign in</Link>
                     </Button>
                 </div>

@@ -27,10 +27,15 @@ class ResolveGuestRecommendationProfile
         $wasAuthenticated = $authenticatedUserAtStart !== null;
         $profile = null;
         $token = null;
+        $token = $request->cookie('battlefront_recommendation_profile');
+        $routeName = $request->route()?->getName();
+        $profileRoutes = ['home', 'products.index', 'products.show', 'recommendations.index'];
+        $profileLookupRoutes = [...$profileRoutes, 'products.dwell.store'];
+        $authenticationRoutes = ['login.store', 'register.store'];
+        $shouldResolveProfile = in_array($routeName, $profileLookupRoutes, true)
+            || (is_string($token) && $token !== '' && in_array($routeName, $authenticationRoutes, true));
 
-        if (! $wasAuthenticated) {
-            $token = $request->cookie('battlefront_recommendation_profile');
-
+        if (! $wasAuthenticated && $shouldResolveProfile) {
             if (is_string($token) && $token !== '') {
                 $profile = GuestRecommendationProfile::query()
                     ->where('token_hash', hash('sha256', $token))
@@ -42,22 +47,22 @@ class ResolveGuestRecommendationProfile
                 }
             }
 
-            if ($profile === null) {
+            if ($profile === null && in_array($routeName, $profileRoutes, true)) {
                 $token = Str::random(64);
                 $profile = GuestRecommendationProfile::query()->create([
                     'token_hash' => hash('sha256', $token),
                     'expires_at' => now()->addDays(90),
                 ]);
-            } else {
+            } elseif ($profile !== null && ($profile->updated_at === null || $profile->updated_at->lte(now()->subMinutes(15)))) {
                 $profile->expires_at = now()->addDays(90);
                 $profile->save();
             }
 
-            $request->attributes->set('guest_recommendation_profile', $profile);
-            $request->attributes->set('guest_recommendation_token', $token);
-        } else {
-            $token = $request->cookie('battlefront_recommendation_profile');
-
+            if ($profile !== null) {
+                $request->attributes->set('guest_recommendation_profile', $profile);
+                $request->attributes->set('guest_recommendation_token', $token);
+            }
+        } elseif ($wasAuthenticated) {
             if (is_string($token) && $token !== '') {
                 $profile = GuestRecommendationProfile::query()
                     ->where('token_hash', hash('sha256', $token))
@@ -73,24 +78,24 @@ class ResolveGuestRecommendationProfile
         $response = $next($request);
         $user = $request->user();
         $isLoggingOut = $wasAuthenticated && $user === null && $request->routeIs('logout');
-        $profileOwner = $user instanceof User
-            ? $user
-            : ($isLoggingOut && $authenticatedUserAtStart instanceof User ? $authenticatedUserAtStart : null);
+        $isSuccessfulRegistration = ! $wasAuthenticated
+            && $request->routeIs('register.store')
+            && $user instanceof User;
 
-        if ($profile !== null && $profileOwner instanceof User) {
-            if ($profileOwner->role === UserRole::Customer) {
-                ($this->mergeHistory)($profile, $profileOwner);
+        if ($profile !== null && ($user instanceof User || $isLoggingOut)) {
+            if ($isSuccessfulRegistration && $user->role === UserRole::Customer) {
+                ($this->mergeHistory)($profile, $user);
             } else {
                 $profile->delete();
-
-                if (! $isLoggingOut) {
-                    return $response->withCookie(Cookie::forget('battlefront_recommendation_profile'));
-                }
             }
 
             if (! $isLoggingOut) {
                 return $response->withCookie(Cookie::forget('battlefront_recommendation_profile'));
             }
+        }
+
+        if ($user instanceof User && in_array($routeName, $authenticationRoutes, true)) {
+            return $response->withCookie(Cookie::forget('battlefront_recommendation_profile'));
         }
 
         if ($isLoggingOut) {

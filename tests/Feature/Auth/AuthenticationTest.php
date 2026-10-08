@@ -26,7 +26,7 @@ test('users can authenticate without a verified email', function () {
     $this->get(route('dashboard'))->assertOk();
 });
 
-test('successful sign-in merges guest recommendation history and expires its browser cookie', function () {
+test('successful sign-in discards guest recommendation history and expires its browser cookie', function () {
     $user = User::factory()->customer()->create();
     $token = 'opaque-test-guest-profile-token';
     $profile = GuestRecommendationProfile::factory()->create([
@@ -45,8 +45,7 @@ test('successful sign-in merges guest recommendation history and expires its bro
 
     $response->assertRedirect(route('dashboard', absolute: false));
     $response->assertCookieExpired('battlefront_recommendation_profile');
-    expect($search->refresh()->user_id)->toBe($user->id)
-        ->and($search->guest_recommendation_profile_id)->toBeNull();
+    $this->assertDatabaseMissing('customer_searches', ['id' => $search->id]);
     $this->assertModelMissing($profile);
 });
 
@@ -108,7 +107,7 @@ test('users can logout', function () {
     $this->assertDatabaseCount('guest_recommendation_profiles', 1);
 });
 
-test('logging out and signing into another account keeps the first account history isolated', function () {
+test('logging out discards guest history before a later account sign-in', function () {
     $firstCustomer = User::factory()->customer()->create();
     $secondCustomer = User::factory()->customer()->create();
     $oldToken = 'first-account-guest-profile-token';
@@ -125,6 +124,9 @@ test('logging out and signing into another account keeps the first account histo
         ->post(route('logout'));
     $newGuestCookie = $logoutResponse->getCookie('battlefront_recommendation_profile', decrypt: false);
 
+    $this->assertDatabaseMissing('customer_searches', ['id' => $search->id]);
+    $this->assertModelMissing($oldProfile);
+
     $response = $this->withUnencryptedCookie('battlefront_recommendation_profile', $newGuestCookie->getValue())
         ->post(route('login.store'), [
             'email' => $secondCustomer->email,
@@ -132,12 +134,8 @@ test('logging out and signing into another account keeps the first account histo
         ]);
 
     $response->assertRedirect(route('dashboard', absolute: false));
-    expect($search->refresh()->user_id)->toBe($firstCustomer->id);
-    $this->assertDatabaseMissing('customer_searches', [
-        'user_id' => $secondCustomer->id,
-        'query' => 'gaming laptop',
-    ]);
-    $this->assertModelMissing($oldProfile);
+    $this->assertDatabaseMissing('customer_searches', ['id' => $search->id]);
+    $this->assertDatabaseMissing('customer_searches', ['user_id' => $secondCustomer->id]);
     $this->assertDatabaseCount('guest_recommendation_profiles', 0);
 });
 

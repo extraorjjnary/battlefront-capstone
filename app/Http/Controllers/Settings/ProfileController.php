@@ -30,6 +30,9 @@ class ProfileController extends Controller
             'productViewRecommendationsEnabled' => $canManageDefaultDeliveryAddress
                 ? $request->user()->product_view_recommendations_enabled
                 : false,
+            'personalizedRecommendationsEnabled' => $canManageDefaultDeliveryAddress
+                ? $request->user()->personalized_recommendations_enabled
+                : false,
         ]);
     }
 

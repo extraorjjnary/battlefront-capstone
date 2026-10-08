@@ -15,11 +15,12 @@ use LogicException;
  * @property int|null $user_id
  * @property int|null $guest_recommendation_profile_id
  * @property int $product_id
+ * @property int $dwell_seconds
  * @property Carbon $expires_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['product_id', 'expires_at', 'guest_recommendation_profile_id'])]
+#[Fillable(['product_id', 'expires_at', 'dwell_seconds', 'guest_recommendation_profile_id'])]
 class CustomerProductView extends Model
 {
     /** @use HasFactory<CustomerProductViewFactory> */
@@ -69,6 +70,7 @@ class CustomerProductView extends Model
     {
         return [
             'expires_at' => 'datetime',
+            'dwell_seconds' => 'integer',
         ];
     }
 }

@@ -21,6 +21,7 @@ class BuildRecommendationViewData
      * @return array{
      *     is_personalized: bool,
      *     has_featured_fallback: bool,
+     *     can_enable_personalization: bool,
      *     recommendations: array<int, array{
      *         product: array<string, mixed>,
      *         effective_price: string,
@@ -65,6 +66,8 @@ class BuildRecommendationViewData
         return [
             'is_personalized' => $isPersonalized,
             'has_featured_fallback' => $hasFeaturedFallback,
+            'can_enable_personalization' => $customer !== null
+                && ! $customer->personalized_recommendations_enabled,
             'recommendations' => $recommendations
                 ->map(fn (BehavioralRecommendedProduct $recommendation): array => [
                     'product' => $this->catalogProductPresenter->present($recommendation->product),

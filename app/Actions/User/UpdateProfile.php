@@ -22,6 +22,14 @@ class UpdateProfile
         $user->save();
 
         if (
+            array_key_exists('personalized_recommendations_enabled', $validated)
+            && ! (bool) $validated['personalized_recommendations_enabled']
+        ) {
+            $user->searches()->delete();
+            $user->productViews()->delete();
+        }
+
+        if (
             array_key_exists('search_recommendations_enabled', $validated)
             && ! (bool) $validated['search_recommendations_enabled']
         ) {

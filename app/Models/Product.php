@@ -91,7 +91,11 @@ class Product extends Model
             }
 
             if (str_starts_with($this->image_path, 'images/demo-products/')) {
-                return asset($this->image_path);
+                return url('/'.ltrim($this->image_path, '/'));
+            }
+
+            if (config('filesystems.disks.public.driver') === 'local') {
+                return url('/storage/'.ltrim($this->image_path, '/'));
             }
 
             return Storage::disk('public')->url($this->image_path);

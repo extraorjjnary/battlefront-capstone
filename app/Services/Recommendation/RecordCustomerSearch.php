@@ -17,6 +17,7 @@ class RecordCustomerSearch
         if (
             ($user === null && $guestProfile === null)
             || ($user !== null && $user->role !== UserRole::Customer)
+            || ($user !== null && ! $user->personalized_recommendations_enabled)
             || ($user !== null && ! $user->search_recommendations_enabled)
             || $normalizedQuery === ''
         ) {

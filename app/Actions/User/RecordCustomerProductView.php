@@ -14,6 +14,7 @@ class RecordCustomerProductView
         if (
             ($user === null && $guestProfile === null)
             || ($user !== null && $user->role !== UserRole::Customer)
+            || ($user !== null && ! $user->personalized_recommendations_enabled)
             || ($user !== null && ! $user->product_view_recommendations_enabled)
         ) {
             return false;

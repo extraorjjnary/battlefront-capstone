@@ -28,13 +28,17 @@ class BehavioralRecommendationEngine
      * Recommend available products using recent customer activity and completed orders.
      *
      * Score weights are intentionally simple: a fresh search starts at 55 points, a
-     * cart companion at 38, a viewed-product match at up to 48, purchase relationships
-     * at 15, and popularity contributes at most 5 points as a tie-breaker.
+     * cart companion at 38, a viewed-product match at up to 48 plus dwell time, purchase
+     * relationships at 15, and popularity contributes at most 5 points as a tie-breaker.
      *
      * @return Collection<int, BehavioralRecommendedProduct>
      */
     public function recommendFor(User|GuestRecommendationProfile $customer, int $limit = 12): Collection
     {
+        if ($customer instanceof User && ! $customer->personalized_recommendations_enabled) {
+            return $this->popular($limit);
+        }
+
         $purchasedProductIds = $customer instanceof User ? OrderItem::query()
             ->whereHas('order', fn (Builder $query): Builder => $query
                 ->whereBelongsTo($customer)
@@ -99,6 +103,16 @@ class BehavioralRecommendationEngine
                 countCap: 8,
                 reason: ['code' => 'bought_with_purchase_history', 'value' => 'Often purchased with products you bought'],
             );
+
+            if ($customer instanceof User) {
+                $this->addSimilarCustomerCandidates(
+                    $customer->getKey(),
+                    $purchasedProductIds,
+                    $excludedProductIds,
+                    $scores,
+                    $reasons,
+                );
+            }
         }
 
         $this->addPopularityCandidates($excludedProductIds, $scores, $reasons);
@@ -185,7 +199,7 @@ class BehavioralRecommendationEngine
     /**
      * Add candidates similar to viewed products based on shared catalog attributes and price.
      *
-     * @param  array<int, int>  $viewedProductCounts
+     * @param  array<int, array{count: int, dwell_seconds: int}>  $viewedProductCounts
      * @param  array<int, int>  $excludedProductIds
      * @param  array<int, float>  $scores
      * @param  array<int, list<array{code: string, value: string}>>  $reasons
@@ -200,6 +214,7 @@ class BehavioralRecommendationEngine
 
         foreach ($this->productCatalogRepository->similarProducts($viewedProductIds, $excludedProductIds) as $candidate) {
             $bestSimilarityScore = 0;
+            $hasDwellBasedMatch = false;
 
             foreach ($anchors as $anchor) {
                 $categoryMatch = $candidate->category_id === $anchor->category_id;
@@ -225,8 +240,14 @@ class BehavioralRecommendationEngine
                 $attributeScore = ($categoryMatch ? 14 : 0)
                     + ($brandMatch ? 6 : 0)
                     + min(count($sharedTags) * 4, 8);
-                $deliberateViewBoost = 1 + min(log(max($viewedProductCounts[$anchor->id] ?? 1, 1), 2) * 0.25, 0.5);
-                $bestSimilarityScore = max($bestSimilarityScore, ($attributeScore + 4) * $deliberateViewBoost);
+                $viewSignal = $viewedProductCounts[$anchor->id] ?? ['count' => 1, 'dwell_seconds' => 0];
+                $deliberateViewBoost = 1 + min(log(max($viewSignal['count'], 1), 2) * 0.25, 0.5);
+                $dwellBoost = $viewSignal['dwell_seconds'] >= 5
+                    ? min(log(($viewSignal['dwell_seconds'] / 5) + 1, 2) * 3, 8)
+                    : 0;
+                $similarityScore = ($attributeScore + 4) * $deliberateViewBoost + $dwellBoost;
+                $bestSimilarityScore = max($bestSimilarityScore, $similarityScore);
+                $hasDwellBasedMatch = $hasDwellBasedMatch || $dwellBoost > 0;
             }
 
             if ($bestSimilarityScore < 1) {
@@ -238,6 +259,13 @@ class BehavioralRecommendationEngine
                 'code' => 'similar_to_viewed_product',
                 'value' => 'Similar to a product you viewed',
             ]);
+
+            if ($hasDwellBasedMatch) {
+                $this->appendReason($reasons, $candidate->id, [
+                    'code' => 'spent_time_viewing_product',
+                    'value' => 'You spent time viewing a similar product',
+                ]);
+            }
         }
     }
 
@@ -274,6 +302,67 @@ class BehavioralRecommendationEngine
             $this->appendReason($reasons, (int) $productId, [
                 'code' => 'popular_with_customers',
                 'value' => 'Popular with Battlefront customers',
+            ]);
+        }
+    }
+
+    /**
+     * Add products bought by customers whose completed orders overlap with this customer's history.
+     *
+     * @param  array<int, int>  $purchasedProductIds
+     * @param  array<int, int>  $excludedProductIds
+     * @param  array<int, float>  $scores
+     * @param  array<int, list<array{code: string, value: string}>>  $reasons
+     */
+    private function addSimilarCustomerCandidates(
+        int $customerId,
+        array $purchasedProductIds,
+        array $excludedProductIds,
+        array &$scores,
+        array &$reasons,
+    ): void {
+        $similarCustomerIds = OrderItem::query()
+            ->join('orders as anchor_orders', 'anchor_orders.id', '=', 'order_items.order_id')
+            ->join('order_items as similar_items', 'similar_items.product_id', '=', 'order_items.product_id')
+            ->join('orders as similar_orders', 'similar_orders.id', '=', 'similar_items.order_id')
+            ->where('anchor_orders.user_id', $customerId)
+            ->where('anchor_orders.status', OrderStatus::Completed->value)
+            ->where('similar_orders.user_id', '!=', $customerId)
+            ->where('similar_orders.status', OrderStatus::Completed->value)
+            ->whereIn('order_items.product_id', $purchasedProductIds)
+            ->select('similar_orders.user_id')
+            ->selectRaw('COUNT(DISTINCT order_items.product_id) as shared_product_count')
+            ->groupBy('similar_orders.user_id')
+            ->orderByDesc('shared_product_count')
+            ->limit(20)
+            ->pluck('similar_orders.user_id')
+            ->map(static fn (int|string $id): int => (int) $id)
+            ->all();
+
+        if ($similarCustomerIds === []) {
+            return;
+        }
+
+        $candidateCounts = OrderItem::query()
+            ->join('orders as buyer_orders', 'buyer_orders.id', '=', 'order_items.order_id')
+            ->whereIn('buyer_orders.user_id', $similarCustomerIds)
+            ->where('buyer_orders.status', OrderStatus::Completed->value)
+            ->whereNotIn('order_items.product_id', $excludedProductIds)
+            ->whereIn('order_items.product_id', Product::query()->cartEligible()->select('id'))
+            ->select('order_items.product_id')
+            ->selectRaw('COUNT(DISTINCT buyer_orders.user_id) as similar_customer_count')
+            ->groupBy('order_items.product_id')
+            ->orderByDesc('similar_customer_count')
+            ->orderBy('order_items.product_id')
+            ->limit(self::CANDIDATE_LIMIT)
+            ->pluck('similar_customer_count', 'order_items.product_id');
+
+        foreach ($candidateCounts as $productId => $similarCustomerCount) {
+            $productId = (int) $productId;
+            $scores[$productId] = ($scores[$productId] ?? 0) + 24 + min((int) $similarCustomerCount * 3, 15);
+            $this->appendReason($reasons, $productId, [
+                'code' => 'bought_by_similar_customers',
+                'value' => 'Bought by customers with overlapping purchase histories',
             ]);
         }
     }
@@ -358,7 +447,7 @@ class BehavioralRecommendationEngine
     /**
      * Get the customer's five most recently viewed products and their deliberate view counts.
      *
-     * @return array<int, int> product ID to recent view count
+     * @return array<int, array{count: int, dwell_seconds: int}> product ID to recent view count and dwell time
      */
     private function recentlyViewedProductCounts(User|GuestRecommendationProfile $customer): array
     {
@@ -370,12 +459,14 @@ class BehavioralRecommendationEngine
             ->where('expires_at', '>', now())
             ->latest('created_at')
             ->limit(self::PRODUCT_VIEW_HISTORY_LIMIT * 4)
-            ->get(['product_id']);
+            ->get(['product_id', 'dwell_seconds']);
         $counts = [];
 
         foreach ($recentViews as $view) {
             $productId = (int) $view->product_id;
-            $counts[$productId] = ($counts[$productId] ?? 0) + 1;
+            $counts[$productId] ??= ['count' => 0, 'dwell_seconds' => 0];
+            $counts[$productId]['count']++;
+            $counts[$productId]['dwell_seconds'] += (int) $view->dwell_seconds;
         }
 
         return array_slice($counts, 0, self::PRODUCT_VIEW_HISTORY_LIMIT, true);

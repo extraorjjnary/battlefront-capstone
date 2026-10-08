@@ -1,6 +1,6 @@
 <script setup>
 import { Form, Head, usePage } from "@inertiajs/vue3";
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import ProfileController from "@/actions/App/Http/Controllers/Settings/ProfileController";
 import Heading from "@/components/Heading.vue";
 import InputError from "@/components/InputError.vue";
@@ -15,6 +15,7 @@ const props = defineProps({
     defaultDeliveryAddress: { type: String, default: "" },
     searchRecommendationsEnabled: { type: Boolean, default: true },
     productViewRecommendationsEnabled: { type: Boolean, default: true },
+    personalizedRecommendationsEnabled: { type: Boolean, default: true },
 });
 
 defineOptions({
@@ -29,6 +30,9 @@ defineOptions({
 });
 const page = usePage();
 const user = computed(() => page.props.auth.user);
+const personalizedRecommendationsEnabled = ref(props.personalizedRecommendationsEnabled);
+const searchRecommendationsEnabled = ref(props.searchRecommendationsEnabled);
+const productViewRecommendationsEnabled = ref(props.productViewRecommendationsEnabled);
 </script>
 
 <template>
@@ -104,31 +108,64 @@ const user = computed(() => page.props.auth.user);
             </div>
 
             <div v-if="props.canManageDefaultDeliveryAddress" class="grid gap-2">
-                <Label for="search-recommendations-enabled">Search-based recommendations</Label>
-                <input type="hidden" name="search_recommendations_enabled" value="0" />
-                <input type="hidden" name="product_view_recommendations_enabled" value="0" />
+                <Label for="personalized-recommendations-enabled">Personalized recommendations</Label>
+                <input type="hidden" name="personalized_recommendations_enabled" value="0" />
                 <label class="text-muted-foreground flex items-start gap-3 text-sm">
                     <input
-                        id="search-recommendations-enabled"
+                        id="personalized-recommendations-enabled"
                         type="checkbox"
+                        name="personalized_recommendations_enabled"
+                        value="1"
+                        v-model="personalizedRecommendationsEnabled"
+                        class="border-input accent-primary mt-0.5 size-4"
+                    />
+                    <span>Use your activity and shopping history for personalized product recommendations. Turning this off stops personalization from searches, views, cart, and completed purchases, and deletes saved search and view history. Your cart and order records remain available for store services.</span>
+                </label>
+                <div class="grid gap-3 border-l border-border pl-4">
+                    <p class="text-muted-foreground text-sm">
+                        {{ personalizedRecommendationsEnabled
+                            ? 'Choose which browsing signals to use while personalization is on.'
+                            : 'Turn on personalized recommendations to change which browsing signals may be used. These signals are currently off.' }}
+                    </p>
+                    <input
+                        type="hidden"
                         name="search_recommendations_enabled"
-                        value="1"
-                        :checked="props.searchRecommendationsEnabled"
-                        class="border-input accent-primary mt-0.5 size-4"
+                        value="0"
+                        :disabled="!personalizedRecommendationsEnabled"
                     />
-                    <span>Use your catalog searches to personalize product recommendations. Turn this off to stop recording searches and delete saved search history. Search history is kept for up to 90 days while enabled.</span>
-                </label>
-                <label class="text-muted-foreground flex items-start gap-3 text-sm">
+                    <label class="text-muted-foreground flex items-start gap-3 text-sm">
+                        <input
+                            id="search-recommendations-enabled"
+                            type="checkbox"
+                            name="search_recommendations_enabled"
+                            value="1"
+                            :checked="personalizedRecommendationsEnabled && searchRecommendationsEnabled"
+                            @change="searchRecommendationsEnabled = $event.target.checked"
+                            :disabled="!personalizedRecommendationsEnabled"
+                            class="border-input accent-primary mt-0.5 size-4"
+                        />
+                        <span>Use catalog searches. Turning this off stops recording searches and deletes saved search history.</span>
+                    </label>
                     <input
-                        id="product-view-recommendations-enabled"
-                        type="checkbox"
+                        type="hidden"
                         name="product_view_recommendations_enabled"
-                        value="1"
-                        :checked="props.productViewRecommendationsEnabled"
-                        class="border-input accent-primary mt-0.5 size-4"
+                        value="0"
+                        :disabled="!personalizedRecommendationsEnabled"
                     />
-                    <span>Use products you view to personalize recommendations. Turn this off to stop recording views and delete saved view history. View history is kept for up to 90 days while enabled.</span>
-                </label>
+                    <label class="text-muted-foreground flex items-start gap-3 text-sm">
+                        <input
+                            id="product-view-recommendations-enabled"
+                            type="checkbox"
+                            name="product_view_recommendations_enabled"
+                            value="1"
+                            :checked="personalizedRecommendationsEnabled && productViewRecommendationsEnabled"
+                            @change="productViewRecommendationsEnabled = $event.target.checked"
+                            :disabled="!personalizedRecommendationsEnabled"
+                            class="border-input accent-primary mt-0.5 size-4"
+                        />
+                        <span>Use products you view. Turning this off stops recording views and deletes saved view history.</span>
+                    </label>
+                </div>
             </div>
 
             <div class="flex items-center gap-4">

@@ -1,7 +1,7 @@
 <script setup>
 import { useHttp, usePage } from '@inertiajs/vue3';
 import { LoaderCircle, MessageSquareText, Send, X } from '@lucide/vue';
-import { nextTick, ref, watch } from 'vue';
+import { nextTick, onMounted, ref, watch } from 'vue';
 import ChatbotController from '@/actions/App/Http/Controllers/ChatbotController';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,8 +16,13 @@ const requestError = ref('');
 const conversation = ref(null);
 const composer = ref(null);
 const launcher = ref(null);
+const isMounted = ref(false);
 let nextMessageId = 1;
 let conversationVersion = 0;
+
+onMounted(() => {
+    isMounted.value = true;
+});
 
 function startNewChat() {
     conversationVersion++;
@@ -114,7 +119,7 @@ async function submitMessage() {
 </script>
 
 <template>
-    <Teleport to="body">
+    <Teleport v-if="isMounted" to="body">
         <div
             class="fixed right-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-50 sm:right-6 sm:bottom-6"
         >

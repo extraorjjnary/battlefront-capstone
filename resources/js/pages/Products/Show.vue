@@ -1,7 +1,7 @@
 <script setup>
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { ArrowLeft, LogIn, PackageOpen, Tag } from '@lucide/vue';
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, onMounted, watch } from 'vue';
 import AddToCartForm from '@/components/cart/AddToCartForm.vue';
 import ProductImage from '@/components/catalog/ProductImage.vue';
 import ProductPrice from '@/components/catalog/ProductPrice.vue';
@@ -13,9 +13,11 @@ import { Button } from '@/components/ui/button';
 import { consumeCatalogVisit } from '@/lib/catalogReturn';
 import { login } from '@/routes';
 import { index as productIndex } from '@/routes/products';
+import { store as storeProductDwell } from '@/routes/products/dwell';
 
 const props = defineProps({
     product: { type: Object, required: true },
+    can_record_product_dwell: { type: Boolean, default: false },
     is_personalized: { type: Boolean, default: false },
     has_featured_fallback: { type: Boolean, default: false },
     recommendations: { type: Array, default: () => [] },
@@ -30,6 +32,99 @@ const hasAvailableStock = computed(
     () => Number(props.product.inventory.quantity) > 0,
 );
 const canReturnToCatalog = consumeCatalogVisit(props.product.id);
+let visibleSince = null;
+let accumulatedVisibleMilliseconds = 0;
+let trackedProductId = props.product.id;
+
+function recordVisibleTime() {
+    if (!props.can_record_product_dwell) {
+        return;
+    }
+
+    const visibleMilliseconds = accumulatedVisibleMilliseconds
+        + (visibleSince === null ? 0 : performance.now() - visibleSince);
+    const seconds = Math.floor(visibleMilliseconds / 1000);
+
+    if (seconds < 5) {
+        return;
+    }
+
+    const route = storeProductDwell.post(trackedProductId);
+    const xsrfToken = decodeURIComponent(
+        document.cookie
+            .split('; ')
+            .find((cookie) => cookie.startsWith('XSRF-TOKEN='))
+            ?.split('=')[1] ?? '',
+    );
+
+    fetch(route.url, {
+        method: route.method.toUpperCase(),
+        credentials: 'same-origin',
+        keepalive: true,
+        headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-XSRF-TOKEN': xsrfToken,
+        },
+        body: JSON.stringify({ seconds }),
+    }).catch(() => {});
+}
+
+watch(() => props.product.id, (productId) => {
+    if (visibleSince !== null) {
+        accumulatedVisibleMilliseconds += performance.now() - visibleSince;
+        visibleSince = null;
+    }
+
+    recordVisibleTime();
+    accumulatedVisibleMilliseconds = 0;
+    trackedProductId = productId;
+
+    if (document.visibilityState === 'visible') {
+        visibleSince = performance.now();
+    }
+});
+
+function handleVisibilityChange() {
+    if (document.visibilityState === 'hidden') {
+        if (visibleSince !== null) {
+            accumulatedVisibleMilliseconds += performance.now() - visibleSince;
+            visibleSince = null;
+        }
+
+        recordVisibleTime();
+
+        return;
+    }
+
+    if (visibleSince === null) {
+        visibleSince = performance.now();
+    }
+}
+
+onMounted(() => {
+    if (!props.can_record_product_dwell) {
+        return;
+    }
+
+    if (document.visibilityState === 'visible') {
+        visibleSince = performance.now();
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+});
+
+onBeforeUnmount(() => {
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+
+    if (visibleSince !== null) {
+        accumulatedVisibleMilliseconds += performance.now() - visibleSince;
+        visibleSince = null;
+    }
+
+    recordVisibleTime();
+});
 
 function returnToCatalog() {
     window.history.back();

@@ -10,7 +10,7 @@ For current implementation facts, use the repository first, then Linear issue st
 
 This is a development reference. `docs/capstone_manuscript.docx` remains academically sensitive: the developer explicitly authorized narrow forecasting/predictive-analytics text synchronization for the **2026-10-05** approved revision, preserving formatting and unrelated content. Other manuscript revisions remain developer-owned. This authorization does not extend to implementation changes or unrelated academic edits.
 
-**Scope review required:** the current product direction replaces explicit budget/intended-use recommendation criteria with search, product-view, cart, and purchase signals. This is a scope extension from the approved manuscript/context baseline. No adviser-approved amendment was provided for this implementation, so it must not be presented as approved capstone evaluation scope until that amendment is recorded and the developer revises the manuscript.
+**Recommendation scope approval recorded:** on **2026-10-08**, the developer confirmed adviser approval for replacing explicit budget/intended-use recommendation criteria with behavior-driven recommendations based on search, product-view, cart, and purchase signals, including temporary guest browsing history. Guest history transfers only when the visitor creates a new account; it is discarded when an existing account signs in. This approved amendment governs current implementation and evaluation planning; synchronization of the formal manuscript remains a developer follow-up.
 
 ---
 
@@ -46,7 +46,7 @@ The system supports:
 
 The intelligent features are intended to support customer and managerial decisions, not replace human judgment.
 
-Core catalog/inventory, customer commerce, administrator order/payment processing, sales reports, chatbot, and the released criteria-based recommendation baseline are implemented. The behavior-driven recommendation replacement is in progress; real React Native + Expo consumer validation, predictive analytics, and the remaining integration/release work are pending; see Section 14.
+Core catalog/inventory, customer commerce, administrator order/payment processing, sales reports, chatbot, and the released criteria-based recommendation baseline are implemented. The behavior-driven recommendation implementation is complete for the current web/backend paths; real React Native + Expo consumer validation, final predictive-analytics acceptance, and remaining integration/release work are pending; see Section 14.
 
 ---
 
@@ -330,7 +330,7 @@ The product-only monthly Holt–Winters forecasting controller/service/requests/
 - Public registration creates customers; request input cannot grant administrator privileges.
 - Fortify handles web session authentication. Mandatory email verification is disabled; the retained `email_verified_at` field does not imply a verification gate.
 - Administrator web routes require authentication and `access-administration`. Customer cart, checkout, and order routes require the customer role and enforce resource ownership.
-- Guests can browse products/branches and use public recommendations/chatbot. Administrators cannot use customer commerce, recommendations, or the storefront chatbot.
+- Guests can browse products/branches and use browser recommendations personalized from temporary search and product-view history, plus the storefront chatbot. The mobile guest recommendation feed remains popular/featured. Administrators cannot use customer commerce, recommendations, or the storefront chatbot.
 - The mobile API is customer-facing only. Protected operations require Sanctum bearer authentication plus the customer gate; browser sessions do not authenticate these API calls. Tokens expire after 30 days, and logout revokes only the presented token.
 - Optional-auth chatbot/recommendation endpoints accept guests and customers, reject invalid supplied credentials with 401, and reject valid administrator tokens with 403. Foreign customer cart/order resources are not exposed.
 - Administrative inventory, payment verification, reports, and knowledge management remain web-only; there are no mobile administrator endpoints.
@@ -369,7 +369,7 @@ The product-only monthly Holt–Winters forecasting controller/service/requests/
 
 ## Intelligent Modules
 
-- Product Recommendation — behavioral replacement in progress; academic scope approval pending
+- Product Recommendation — adviser-approved behavioral scope implemented for the web/backend; mobile consumer validation and evaluation evidence pending
 - Predictive Analytics — monthly additive Holt–Winters production workflow implemented; evaluation uses Moving Average and Seasonal Naive baselines
 - Integrated Chatbot — complete
 
@@ -405,9 +405,9 @@ Shared actions/services implement these rules for both Inertia and mobile API co
 
 # 8. Product Recommendation Module
 
-The approved manuscript baseline specifies recommendations from explicit customer criteria, including budget, intended use, brand/category/tags, and Sagay inventory. That remains the academic source of truth until an adviser-approved amendment is recorded.
+The original manuscript specifies recommendations from explicit customer criteria, including budget, intended use, brand/category/tags, and Sagay inventory. An adviser-approved amendment, confirmed by the developer on 2026-10-08, replaces that module direction with behavior-driven recommendations. The manuscript has not yet been synchronized, so its current text still reflects the original baseline.
 
-**Current product direction (scope extension; approval pending):** replace the customer questionnaire with behavior-driven suggestions. Signed-in customers' catalog searches and product views are recorded by default unless disabled in their profile; the engine also considers current cart items and completed purchases. Guests and customers without usable personal signals receive clearly labeled popular or featured products.
+**Current approved product direction:** replace the customer questionnaire with behavior-driven suggestions. Signed-in customers' catalog searches and product views are recorded by default unless disabled in their profile; the engine also considers current cart items and completed purchases. Guests receive a temporary browser profile through an opaque, hashed-token cookie; their searches and product views use the same recommendation engine and expire after 90 days of inactivity. When a guest creates a new account, eligible guest history is merged transactionally into that account, respecting each recommendation preference. When an existing customer signs in, the guest profile is discarded and recommendations use only that account's saved activity and shopping history. Guests and customers without usable personal signals receive clearly labeled popular or featured products.
 
 The deterministic first pass combines candidate scores: fresh searches start at 55 points and fade by age; cart co-purchases start at 38; viewed-product similarity contributes up to 48 and works without order history; purchase relationships start at 15; popularity adds at most 5 as a tie-breaker. Similarity uses shared category, brand, or tags and requires an effective-price ratio between 0.5 and 2.
 
@@ -416,9 +416,9 @@ Search and view personalization are enabled by default for signed-in customers, 
 Every response rechecks active product/category eligibility and positive live Sagay stock. Recommendations use current effective prices, exclude items already purchased or in the cart from personalized candidates, avoid duplicate products, mix categories when enough relevant candidates exist, and include a reason tied to the signal used. The engine does not claim technical PC-part compatibility.
 
 
-The web page and home/product/cart sections use the behavior-driven engine. The mobile API has an additive public GET feed and an authenticated personalized feed with the same product/reason shape. The released v1 criteria/options endpoints remain during the mobile client transition; removing them requires confirmed mobile cutover. React Native client integration and refresh validation remain pending.
+The web page and home/product/cart sections use the behavior-driven engine. The mobile API has an additive public GET feed and an authenticated personalized feed with the same product/reason shape; mobile guests continue to receive popular/featured results. The released v1 criteria/options endpoints remain during the mobile client transition; removing them requires confirmed mobile cutover. React Native client integration and refresh validation remain pending.
 
-The module operates using Battlefront's internal catalog, completed orders, cart, and signed-in customer search/view activity unless the customer disables either activity signal in profile settings. The chatbot does not receive recommendation history or make recommendation decisions.
+The module operates using Battlefront's internal catalog, completed orders, cart, signed-in customer search/view activity, and temporary browser guest search/view activity. Signed-in customers can disable either personal activity signal in profile settings; disabled guest signals are discarded during account-creation merge. Guest history is never merged into an existing account at login. The chatbot does not receive recommendation history or make recommendation decisions.
 
 The **Product Recommendation Module**, not the chatbot, owns recommendation logic.
 
@@ -850,7 +850,7 @@ General status snapshot verified against Linear on **2026-10-01**; the forecasti
 | Core catalog, inventory, roles, and branch reference | Complete | Implemented routes/models/services and completed core issues |
 | Cart, checkout, orders, manual payments, cancellation restoration, sales/reports | Complete | EXT-22–27, EXT-28–34, EXT-80–83 Done |
 | Criteria-based recommendations | Historically complete | EXT-35, EXT-37-39, EXT-41, EXT-64 Done; approved manuscript baseline and released mobile contract |
-| Behavior-driven recommendation replacement | In progress | Product direction implemented in the current workspace; adviser amendment, mobile cutover, and evaluation approval are not recorded |
+| Behavior-driven recommendation implementation | Complete for current web/backend paths | Adviser approval confirmed by the developer on 2026-10-08; guest profiles, tracking, recommendations, and registration-only history merge implemented; mobile cutover, consumer validation, and evaluation evidence remain pending |
 | Integrated chatbot | Complete | EXT-47–55 and EXT-61 Done |
 | Mobile API foundation/customer endpoints | Complete | EXT-56–61 and EXT-64 Done |
 | Mobile handoff and Postman collection | Complete | EXT-62 Done; developer-reported successful manual Postman Desktop verification |

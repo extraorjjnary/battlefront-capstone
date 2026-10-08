@@ -23,6 +23,7 @@ class CustomerProfileResource extends JsonResource
             'default_delivery_address' => $this->default_delivery_address,
             'search_recommendations_enabled' => $this->search_recommendations_enabled,
             'product_view_recommendations_enabled' => $this->product_view_recommendations_enabled,
+            'personalized_recommendations_enabled' => $this->personalized_recommendations_enabled,
         ];
     }
 }

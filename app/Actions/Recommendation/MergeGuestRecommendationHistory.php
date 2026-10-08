@@ -30,6 +30,14 @@ class MergeGuestRecommendationHistory
 
             $now = now();
 
+            if (! $customer->personalized_recommendations_enabled) {
+                $lockedProfile->searches()->delete();
+                $lockedProfile->productViews()->delete();
+                $lockedProfile->delete();
+
+                return;
+            }
+
             $searches = $lockedProfile->searches()->where('expires_at', '>', $now)->get();
 
             if (! $customer->search_recommendations_enabled) {

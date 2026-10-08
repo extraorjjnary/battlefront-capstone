@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Actions\Recommendation\BuildRecommendationViewData;
 use App\Actions\User\RecordCustomerProductView;
+use App\Enums\UserRole;
 use App\Http\Requests\ProductCatalogIndexRequest;
+use App\Models\GuestRecommendationProfile;
 use App\Models\Product;
 use App\Models\User;
 use App\Repositories\Catalog\ProductCatalogRepository;
@@ -63,13 +65,19 @@ class ProductCatalogController extends Controller
         );
         $user = $request->user();
         $customer = $user instanceof User ? $user : null;
+        $guestProfile = $request->attributes->get('guest_recommendation_profile');
 
         return Inertia::render('Products/Show', [
             'product' => $this->catalogProductPresenter->present($catalogProduct),
+            'can_record_product_dwell' => $customer instanceof User
+                ? $customer->role === UserRole::Customer
+                    && $customer->personalized_recommendations_enabled
+                    && $customer->product_view_recommendations_enabled
+                : $guestProfile instanceof GuestRecommendationProfile,
             ...$buildRecommendationViewData(
                 $customer,
                 $catalogProduct->id,
-                guestProfile: $request->attributes->get('guest_recommendation_profile'),
+                guestProfile: $guestProfile instanceof GuestRecommendationProfile ? $guestProfile : null,
             ),
         ]);
     }

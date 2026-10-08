@@ -25,8 +25,10 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderPaymentProofController as CustomerOrderPaymentProofController;
 use App\Http\Controllers\ProductCatalogController;
+use App\Http\Controllers\ProductDwellController;
 use App\Http\Controllers\RecommendationController;
 use App\Http\Controllers\RecommendationInteractionController;
+use App\Http\Controllers\RecommendationPreferenceController;
 use Illuminate\Support\Facades\Route;
 
 // guest landing page
@@ -39,6 +41,10 @@ Route::get('branches', [BranchController::class, 'index'])->name('branches.index
 Route::resource('products', ProductCatalogController::class)
     ->only(['index', 'show'])
     ->where(['product' => '[0-9]+']);
+Route::post('products/{product}/dwell', [ProductDwellController::class, 'store'])
+    ->whereNumber('product')
+    ->middleware('throttle:60,1')
+    ->name('products.dwell.store');
 
 // public/customer recommendations
 Route::middleware('can:use-recommendations')->group(function () {
@@ -47,6 +53,10 @@ Route::middleware('can:use-recommendations')->group(function () {
         ->middleware('throttle:60,1')
         ->name('recommendations.interactions.store');
 });
+
+Route::post('recommendations/personalization', [RecommendationPreferenceController::class, 'enable'])
+    ->middleware(['auth', 'can:use-customer-cart'])
+    ->name('recommendations.personalization.enable');
 
 // dynamic dashboard for customer and admin
 Route::middleware('auth')->group(function () {
