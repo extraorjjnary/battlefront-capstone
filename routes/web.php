@@ -31,9 +31,7 @@ use App\Http\Controllers\OrderPaymentProofController as CustomerOrderPaymentProo
 use App\Http\Controllers\ProductCatalogController;
 use App\Http\Controllers\ProductDwellController;
 use App\Http\Controllers\ProductViewController;
-use App\Http\Controllers\RecommendationController;
 use App\Http\Controllers\RecommendationInteractionController;
-use App\Http\Controllers\RecommendationPreferenceController;
 use Illuminate\Support\Facades\Route;
 
 // guest landing page
@@ -57,15 +55,10 @@ Route::post('products/{product}/view', [ProductViewController::class, 'store'])
 
 // public/customer recommendations
 Route::middleware('can:use-recommendations')->group(function () {
-    Route::get('recommendations', [RecommendationController::class, 'index'])->name('recommendations.index');
     Route::post('recommendations/interactions', RecommendationInteractionController::class)
         ->middleware('throttle:60,1')
         ->name('recommendations.interactions.store');
 });
-
-Route::post('recommendations/personalization', [RecommendationPreferenceController::class, 'enable'])
-    ->middleware(['auth', 'can:use-customer-cart'])
-    ->name('recommendations.personalization.enable');
 
 // dynamic dashboard for customer and admin
 Route::middleware('auth')->group(function () {

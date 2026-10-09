@@ -67,6 +67,27 @@ test('mobile clients can record anonymous aggregate recommendation events throug
     ]);
 });
 
+test('shopping flow placements record every recommendation feedback event', function (string $placement, string $eventType) {
+    $product = createInteractionEligibleProduct();
+    $customer = User::factory()->customer()->create();
+    $eventId = (string) Str::uuid();
+
+    $this->actingAs($customer)->postJson(route('recommendations.interactions.store'), [
+        'event_id' => $eventId,
+        'product_id' => $product->id,
+        'event_type' => $eventType,
+        'placement' => $placement,
+        'position' => 1,
+        'reason_code' => 'matched_recent_searches',
+    ])->assertNoContent();
+
+    $this->assertDatabaseHas('recommendation_interactions', [
+        'event_id' => $eventId,
+        'placement' => $placement,
+        'event_type' => $eventType,
+    ]);
+})->with(['dashboard', 'catalog'])->with(['impression', 'click', 'dismiss', 'report_wrong']);
+
 test('retrying an interaction event does not create a duplicate or alter the original event', function () {
     $product = createInteractionEligibleProduct();
     $eventId = (string) Str::uuid();

@@ -1,8 +1,8 @@
 <?php
 
+use App\Actions\Recommendation\BuildRecommendationViewData;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
-use App\Http\Controllers\RecommendationController;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Category;
@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Http;
 arch('behavioral recommendations remain independent of chatbot and AI services')
     ->expect([
         'App\Services\Recommendation',
-        RecommendationController::class,
+        BuildRecommendationViewData::class,
         ProductCatalogRepository::class,
         CatalogProductPresenter::class,
     ])
