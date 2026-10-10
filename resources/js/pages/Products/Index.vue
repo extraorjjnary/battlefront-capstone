@@ -44,6 +44,25 @@ const isAuthenticated = computed(() => Boolean(page.props.auth?.user));
 const categoryId = ref(String(props.filters.category_id ?? 'all'));
 const brand = ref(props.filters.brand ?? 'all');
 const tagId = ref(String(props.filters.tag_id ?? 'all'));
+const categoryPlaceholder = computed(() =>
+    categoryId.value !== 'all' &&
+    !props.filter_options.categories.some(
+        (category) => String(category.id) === categoryId.value,
+    )
+        ? 'Selected category unavailable'
+        : 'All categories',
+);
+const brandPlaceholder = computed(() =>
+    brand.value !== 'all' && !props.filter_options.brands.includes(brand.value)
+        ? 'Selected brand unavailable'
+        : 'All brands',
+);
+const tagPlaceholder = computed(() =>
+    tagId.value !== 'all' &&
+    !props.filter_options.tags.some((tag) => String(tag.id) === tagId.value)
+        ? 'Selected tag unavailable'
+        : 'All tags',
+);
 const { prefetchProduct, cancelProductPrefetch } = useProductPrefetch();
 const catalogReloadProps = [
     'products',
@@ -320,7 +339,9 @@ watch([categoryId, brand, tagId], updateFilters);
                                     id="catalog-category"
                                     class="w-full"
                                 >
-                                    <SelectValue placeholder="All categories" />
+                                    <SelectValue
+                                        :placeholder="categoryPlaceholder"
+                                    />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">
@@ -344,7 +365,9 @@ watch([categoryId, brand, tagId], updateFilters);
                                     id="catalog-brand"
                                     class="w-full"
                                 >
-                                    <SelectValue placeholder="All brands" />
+                                    <SelectValue
+                                        :placeholder="brandPlaceholder"
+                                    />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">
@@ -365,7 +388,9 @@ watch([categoryId, brand, tagId], updateFilters);
                             <Label for="catalog-tag">Tag</Label>
                             <Select v-model="tagId">
                                 <SelectTrigger id="catalog-tag" class="w-full">
-                                    <SelectValue placeholder="All tags" />
+                                    <SelectValue
+                                        :placeholder="tagPlaceholder"
+                                    />
                                 </SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all"

@@ -88,7 +88,7 @@ class ProductCatalogController extends Controller
         RecordCustomerProductView $recordCustomerProductView,
         BuildRecommendationViewData $buildRecommendationViewData,
     ): Response {
-        $catalogProduct = $this->productCatalogRepository->findEligibleOrFail($product);
+        $catalogProduct = $this->productCatalogRepository->findAvailableOrFail($product);
         if (! $request->prefetch()) {
             $recordCustomerProductView(
                 $request->user(),

@@ -381,10 +381,10 @@ The product-only monthly Holt–Winters forecasting controller/service/requests/
 
 ## Current Catalog and Inventory Rules
 
-- Customer-visible products must be active and belong to an active category. Deactivation retains history and supports reactivation. Inactive products/categories are excluded from browsing, purchase eligibility, and recommendations.
+- Customer-visible products must be active, belong to an active category, and have an inventory record with positive quantity. Customer category, brand, and tag options require at least one available product. Deactivation retains history and supports reactivation; stock changes never alter product/category activation flags.
 - Products have required unique product codes, nullable brands, tags, regular/optional discount prices, and managed image paths. Existing catalog import/image tools support catalog preparation; they are not historical-sales import or forecasting features.
-- Live inventory is Sagay-only, with one inventory record per product rather than per-branch stock. Missing or zero stock prevents purchasing and recommendations; out-of-stock products can still appear in the active catalog.
-- Quantities cannot be negative. Low stock means positive quantity strictly below `reorder_level`; zero stock is a separate out-of-stock state. Customer API catalog responses expose availability status rather than exact quantities.
+- Live inventory is Sagay-only, with one inventory record per product rather than per-branch stock. Missing or zero stock hides customer catalog/search results and recommendations and returns 404 on web/mobile product details. Active products automatically reappear after restocking on the next request; administrators retain access to unavailable and inactive records. Explicit named-product chatbot inquiries and existing product follow-ups may still report unavailable stock, while broader chatbot discovery lists only available products.
+- Quantities cannot be negative. Low stock means `quantity > 0 && quantity <= reorder_level`; in stock means `quantity > reorder_level`. Zero stock is a separate out-of-stock state, including when `reorder_level=0`; missing inventory is unavailable. Customer API catalog responses expose availability status rather than exact quantities. Existing active filter selections with no available matches return empty results and remain clearable; option lists hide them until stock returns.
 - Cart operations use current server prices and stock eligibility. Adding to a cart does not reserve or deduct stock; checkout revalidates only explicitly selected owned cart items (EXT-91).
 
 ## Current Order, Payment, and Sales Rules

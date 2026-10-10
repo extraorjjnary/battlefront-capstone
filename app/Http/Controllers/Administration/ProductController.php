@@ -162,6 +162,7 @@ class ProductController extends Controller
     public function show(Product $product): Response
     {
         $product->load(['category:id,name,is_active', 'tags:id,name', 'inventory:id,product_id,quantity,reorder_level']);
+        $product->loadExists('lowStockInventory as is_low_stock');
 
         return Inertia::render('Administration/Products/Show', [
             'product' => [
@@ -182,7 +183,7 @@ class ProductController extends Controller
                 'stock_status' => match (true) {
                     $product->inventory === null => 'not_initialized',
                     $product->inventory->quantity === 0 => 'out_of_stock',
-                    $product->inventory->quantity < $product->inventory->reorder_level => 'low_stock',
+                    $product->is_low_stock => 'low_stock',
                     default => 'in_stock',
                 },
             ],

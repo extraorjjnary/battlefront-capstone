@@ -15,6 +15,20 @@ function createInteractionEligibleProduct(): Product
     return $product;
 }
 
+test('delayed recommendation feedback remains recordable after the displayed product sells out', function () {
+    $product = createInteractionEligibleProduct();
+    $product->inventory()->update(['quantity' => 0]);
+    $eventId = (string) Str::uuid();
+
+    $this->postJson(route('recommendations.interactions.store'), [
+        'event_id' => $eventId, 'product_id' => $product->id, 'event_type' => 'impression',
+        'placement' => 'catalog', 'position' => 1, 'reason_code' => 'popular_with_customers',
+    ])->assertNoContent();
+
+    $this->assertDatabaseHas('recommendation_interactions', ['event_id' => $eventId, 'product_id' => $product->id]);
+    $this->get(route('products.show', $product))->assertNotFound();
+});
+
 test('guests can record anonymous recommendation impressions and clicks', function (string $eventType) {
     $product = createInteractionEligibleProduct();
     $eventId = (string) Str::uuid();

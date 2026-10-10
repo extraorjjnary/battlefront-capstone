@@ -134,7 +134,7 @@ test('product detail uses the inventory thresholds and handles missing inventory
     }
 })->with([
     'out of stock' => [0, 'out_of_stock'],
-    'at reorder level' => [2, 'in_stock'],
+    'at reorder level' => [2, 'low_stock'],
     'above reorder level' => [3, 'in_stock'],
     'not initialized' => [null, 'not_initialized'],
 ]);

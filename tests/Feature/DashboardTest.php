@@ -117,7 +117,7 @@ test('administrators receive authoritative operational dashboard data', function
         'brand' => 'Battlefront Test',
     ]);
     Inventory::factory()->for($lowStockProduct)->create([
-        'quantity' => 2,
+        'quantity' => 5,
         'reorder_level' => 5,
     ]);
     Inventory::factory()->for(Product::factory())->create([
@@ -149,7 +149,7 @@ test('administrators receive authoritative operational dashboard data', function
         ->where('dashboard.needs_attention.payment_orders.0.total', '1250.00')
         ->has('dashboard.needs_attention.low_stock_products', 1)
         ->where('dashboard.needs_attention.low_stock_products.0.id', $lowStockProduct->id)
-        ->where('dashboard.needs_attention.low_stock_products.0.quantity', 2)
+        ->where('dashboard.needs_attention.low_stock_products.0.quantity', 5)
         ->has('dashboard.needs_attention.out_of_stock_products', 1)
         ->where('dashboard.needs_attention.out_of_stock_products.0.id', $outOfStockProduct->id)
         ->where('dashboard.needs_attention.out_of_stock_products.0.quantity', 0)

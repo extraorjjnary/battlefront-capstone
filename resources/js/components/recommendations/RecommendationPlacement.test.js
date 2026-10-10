@@ -212,6 +212,55 @@ function catalogProps(overrides = {}) {
     };
 }
 
+test('stale catalog selections remain clearable and labels recover when availability returns', async (t) => {
+    const requests = [];
+    const props = Vue.reactive(
+        catalogProps({
+            products: { data: [], total: 0 },
+            filters: { q: null, category_id: 7, brand: 'Atlas', tag_id: 8 },
+        }),
+    );
+    const scope = Vue.effectScope();
+    t.after(() => scope.stop());
+    const component = loadComponent('../../pages/Products/Index.vue', {
+        inlineTemplate: false,
+        router: {
+            visit: (route, options) => requests.push({ route, options }),
+        },
+    });
+    const state = scope.run(() => component.setup(props, { expose() {} }));
+
+    assert.equal(
+        state.categoryPlaceholder.value,
+        'Selected category unavailable',
+    );
+    assert.equal(state.brandPlaceholder.value, 'Selected brand unavailable');
+    assert.equal(state.tagPlaceholder.value, 'Selected tag unavailable');
+    assert.equal(state.hasAppliedFilters.value, true);
+    assert.deepEqual(state.selectedFilters(), {
+        category_id: '7',
+        brand: 'Atlas',
+        tag_id: '8',
+    });
+    assert.equal(state.showRecommendations.value, false);
+
+    props.filter_options = {
+        categories: [{ id: 7, name: 'Networking' }],
+        brands: ['Atlas'],
+        tags: [{ id: 8, name: 'Remote kit' }],
+    };
+    assert.equal(state.categoryPlaceholder.value, 'All categories');
+    assert.equal(state.brandPlaceholder.value, 'All brands');
+    assert.equal(state.tagPlaceholder.value, 'All tags');
+    assert.equal(requests.length, 0);
+
+    state.clearFilters();
+    await Vue.nextTick();
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].route.url, '/products');
+    assert.deepEqual(requests[0].options.reset, ['products']);
+});
+
 test('catalog renders recommendations above all products and outside ordinary results', async () => {
     const component = loadComponent('../../pages/Products/Index.vue');
     const html = await renderToString(Vue.h(component, catalogProps()));

@@ -123,7 +123,7 @@ class Product extends Model
     }
 
     /**
-     * Get the product's inventory record when it is below its reorder level.
+     * Get the product's positive inventory at or below its reorder level.
      *
      * @return HasOne<Inventory, $this>
      */
@@ -187,7 +187,7 @@ class Product extends Model
     }
 
     /**
-     * Scope a query to products eligible for customer browsing.
+     * Scope a query to products whose product and category are active.
      *
      * @param  Builder<Product>  $query
      */
@@ -203,12 +203,12 @@ class Product extends Model
     }
 
     /**
-     * Scope a query to products that may be persisted in a customer cart.
+     * Scope a query to active customer products with positive live inventory.
      *
      * @param  Builder<Product>  $query
      */
     #[Scope]
-    protected function cartEligible(Builder $query): void
+    protected function customerAvailable(Builder $query): void
     {
         $query
             ->customerEligible()
@@ -216,6 +216,17 @@ class Product extends Model
                 'inventory',
                 fn (Builder $inventoryQuery): Builder => $inventoryQuery->where('quantity', '>', 0),
             );
+    }
+
+    /**
+     * Scope a query to products that may be persisted in a customer cart.
+     *
+     * @param  Builder<Product>  $query
+     */
+    #[Scope]
+    protected function cartEligible(Builder $query): void
+    {
+        $query->customerAvailable();
     }
 
     /**
