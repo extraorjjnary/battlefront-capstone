@@ -49,3 +49,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Services/Chatbot/**                                                                                                                                                                                  | .ai/rules/services-chatbot.md             |
 | routes/settings.php,app/Http/Controllers/Settings/**,resources/js/pages/settings/**                                                                                                                      | .ai/rules/settings.md                     |
 | app/Services/Notifications/**,app/Services/Order/**,app/Actions/Order/**,app/Jobs/**,app/Http/Controllers/**/_Notification_,app/Http/Controllers/Api/V1/PushDeviceController.php                         | .ai/rules/v1.md                           |
+| app/Services/Dashboard/**,app/Repositories/Inventory/** | .ai/rules/inventory.md |
+| app/Console/Commands/**,app/Services/RealCatalogImportService.php,database/PrepareCatalogImageManifest.ps1 | .ai/rules/services.md |

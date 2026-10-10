@@ -82,6 +82,9 @@ class RealCatalogImportService
 
         foreach ($entries as $entry) {
             $code = $entry['product_code'];
+            if (($entry['quantity_source'] ?? null) === 'development_demo' && ! app()->environment(['local', 'testing'])) {
+                throw new RuntimeException('Demo catalog inventory is only allowed in local and testing environments.');
+            }
             if (! isset($mapping[$code])) {
                 throw new RuntimeException("Verified product details are missing for code $code.");
             }
