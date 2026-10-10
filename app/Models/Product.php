@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\HasCatalogNameKey;
 use App\Enums\ShippingProfile;
 use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -58,6 +59,8 @@ use Illuminate\Support\Facades\Storage;
 ])]
 class Product extends Model
 {
+    use HasCatalogNameKey;
+
     public const CODE_PATTERN = '/^[A-Za-z0-9]{1,64}$/D';
 
     /** @use HasFactory<ProductFactory> */

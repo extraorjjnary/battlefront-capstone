@@ -209,11 +209,11 @@ test('unsupported stock filtering does not expose unavailable products', functio
 test('mobile categories combine multiple categories with effective price and search filters', function () {
     $categories = Category::factory()->count(2)->create();
     foreach ($categories as $category) {
-        Product::factory()->available()->for($category)->create(['name' => 'Selected GPU', 'brand' => 'Atlas', 'price' => '9000.00', 'discount_price' => '4999.99']);
-        Product::factory()->available()->for($category)->create(['name' => 'Selected GPU', 'brand' => 'Atlas', 'price' => '5000.00', 'discount_price' => null]);
-        Product::factory()->available()->for($category)->create(['name' => 'Selected GPU', 'brand' => 'Other', 'price' => '100.00']);
+        Product::factory()->available()->for($category)->create(['name' => "Selected GPU {$category->id} Discounted", 'brand' => 'Atlas', 'price' => '9000.00', 'discount_price' => '4999.99']);
+        Product::factory()->available()->for($category)->create(['name' => "Selected GPU {$category->id} Regular", 'brand' => 'Atlas', 'price' => '5000.00', 'discount_price' => null]);
+        Product::factory()->available()->for($category)->create(['name' => "Selected GPU {$category->id} Other", 'brand' => 'Other', 'price' => '100.00']);
     }
-    Product::factory()->available()->create(['name' => 'Selected GPU', 'brand' => 'Atlas', 'price' => '100.00']);
+    Product::factory()->available()->create(['name' => 'Selected GPU Outside category', 'brand' => 'Atlas', 'price' => '100.00']);
 
     $this->getJson(route('api.v1.products.index', ['category_ids' => $categories->modelKeys(), 'brand' => 'Atlas', 'q' => 'GPU', 'max_price' => '4999.99']))
         ->assertOk()->assertJsonCount(2, 'data')->assertJsonPath('meta.total', 2);
@@ -255,7 +255,7 @@ test('mobile category lists combine with search brand tag and inclusive effectiv
     foreach ($categories as $category) {
         foreach ([['price' => '9000.00', 'discount_price' => '4999.99'], ['price' => '5000.00', 'discount_price' => null]] as $prices) {
             $product = Product::factory()->available()->for($category)->create([
-                'name' => 'Selected GPU', 'brand' => 'Atlas', ...$prices,
+                'name' => sprintf('Selected GPU %02d', count($matchingIds) + 1), 'brand' => 'Atlas', ...$prices,
             ]);
             $product->tags()->attach($tag);
             $matchingIds[] = $product->id;
@@ -263,15 +263,15 @@ test('mobile category lists combine with search brand tag and inclusive effectiv
     }
 
     $excluded = Product::factory()->available()->for($categories->first())->createMany([
-        ['name' => 'Selected GPU', 'brand' => 'Atlas', 'price' => '4999.98'],
-        ['name' => 'Selected GPU', 'brand' => 'Atlas', 'price' => '5000.01'],
-        ['name' => 'Selected GPU', 'brand' => 'Other', 'price' => '5000.00'],
+        ['name' => 'Selected GPU Below bound', 'brand' => 'Atlas', 'price' => '4999.98'],
+        ['name' => 'Selected GPU Above bound', 'brand' => 'Atlas', 'price' => '5000.01'],
+        ['name' => 'Selected GPU Other brand', 'brand' => 'Other', 'price' => '5000.00'],
         ['name' => 'Monitor', 'brand' => 'Atlas', 'price' => '5000.00'],
-        ['name' => 'Selected GPU', 'brand' => 'Atlas', 'price' => '5000.00', 'is_active' => false],
+        ['name' => 'Selected GPU Inactive', 'brand' => 'Atlas', 'price' => '5000.00', 'is_active' => false],
     ]);
     $excluded->each(fn (Product $product) => $product->tags()->attach($tag));
-    Product::factory()->available()->for($categories->first())->create(['name' => 'Selected GPU', 'brand' => 'Atlas', 'price' => '5000.00']);
-    $outsideCategory = Product::factory()->available()->create(['name' => 'Selected GPU', 'brand' => 'Atlas', 'price' => '5000.00']);
+    Product::factory()->available()->for($categories->first())->create(['name' => 'Selected GPU Without tag', 'brand' => 'Atlas', 'price' => '5000.00']);
+    $outsideCategory = Product::factory()->available()->create(['name' => 'Selected GPU Outside category', 'brand' => 'Atlas', 'price' => '5000.00']);
     $outsideCategory->tags()->attach($tag);
 
     $response = $this->get(route('api.v1.products.index', [
@@ -283,11 +283,13 @@ test('mobile category lists combine with search brand tag and inclusive effectiv
     expect(collect($response->json('data'))->pluck('id')->all())->toBe($matchingIds);
 });
 
-test('mobile price sorts use effective prices with name and id ties across complete pages', function (string $sort) {
+test('mobile price sorts use effective prices and name ordering across complete pages', function (string $sort) {
     $category = Category::factory()->create();
     $tag = Tag::factory()->create();
-    $products = Product::factory()->available()->count(13)->for($category)->create([
-        'name' => 'Same Part', 'brand' => 'Atlas', 'price' => '20000.00', 'discount_price' => '15000.00',
+    $products = Product::factory()->available()->count(13)->for($category)->sequence(
+        fn ($sequence): array => ['name' => sprintf('Same Part %02d', $sequence->index + 1)],
+    )->create([
+        'brand' => 'Atlas', 'price' => '20000.00', 'discount_price' => '15000.00',
     ]);
     $cheapest = Product::factory()->available()->for($category)->create([
         'name' => 'Zulu Discounted Part', 'brand' => 'Atlas', 'price' => '30000.00', 'discount_price' => '14999.99',

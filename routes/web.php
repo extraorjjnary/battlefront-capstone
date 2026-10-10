@@ -126,8 +126,7 @@ Route::middleware(['auth', 'can:access-administration'])
         Route::patch('notifications/{notification}/read', [AdministrationNotificationController::class, 'update'])->whereUuid('notification')->name('notifications.update');
 
         // products
-        Route::resource('products', ProductController::class)
-            ->except(['destroy']);
+        Route::resource('products', ProductController::class);
         Route::patch('products/{product}/activation', ProductActivationController::class)
             ->name('products.activation.update');
 
@@ -137,7 +136,7 @@ Route::middleware(['auth', 'can:access-administration'])
 
         // categories
         Route::resource('categories', CategoryController::class)
-            ->except(['show', 'destroy']);
+            ->except(['show']);
         Route::patch('categories/{category}/activation', CategoryActivationController::class)
             ->name('categories.activation.update');
 

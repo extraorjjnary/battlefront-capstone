@@ -231,7 +231,7 @@ test('inventory pagination preserves the active query', function () {
     Product::factory()
         ->count(26)
         ->for($category)
-        ->state(['name' => 'Matching inventory product'])
+        ->sequence(fn ($sequence): array => ['name' => sprintf('Matching inventory product %02d', $sequence->index + 1)])
         ->has(Inventory::factory()->state([
             'quantity' => 1,
             'reorder_level' => 2,

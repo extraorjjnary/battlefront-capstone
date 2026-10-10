@@ -41,14 +41,14 @@ test('guests can browse paginated customer eligible products in stable order', f
         ->not->toContain('Hidden category product');
 });
 
-test('available catalog products retain featured name and id ordering', function () {
+test('available catalog products retain featured and name ordering', function () {
     $inStockZulu = Product::factory()->create([
         'name' => 'Zulu in-stock product',
         'is_featured' => true,
     ]);
     $inStockAlpha = Product::factory()->create(['name' => 'Alpha in-stock product']);
-    $inStockDuplicateFirst = Product::factory()->create(['name' => 'Same in-stock product']);
-    $inStockDuplicateSecond = Product::factory()->create(['name' => 'Same in-stock product']);
+    $inStockVariantFirst = Product::factory()->create(['name' => 'Same in-stock product 01']);
+    $inStockVariantSecond = Product::factory()->create(['name' => 'Same in-stock product 02']);
     $lowStockZulu = Product::factory()->create([
         'name' => 'Zulu low-stock product',
         'is_featured' => true,
@@ -68,11 +68,11 @@ test('available catalog products retain featured name and id ordering', function
         'quantity' => 5,
         'reorder_level' => 5,
     ]);
-    Inventory::factory()->for($inStockDuplicateFirst)->create([
+    Inventory::factory()->for($inStockVariantFirst)->create([
         'quantity' => 2,
         'reorder_level' => 0,
     ]);
-    Inventory::factory()->for($inStockDuplicateSecond)->create([
+    Inventory::factory()->for($inStockVariantSecond)->create([
         'quantity' => 2,
         'reorder_level' => 0,
     ]);
@@ -97,8 +97,8 @@ test('available catalog products retain featured name and id ordering', function
             $lowStockZulu->id,
             $inStockAlpha->id,
             $lowStockAlpha->id,
-            $inStockDuplicateFirst->id,
-            $inStockDuplicateSecond->id,
+            $inStockVariantFirst->id,
+            $inStockVariantSecond->id,
         ]);
     expect(collect($response->inertiaProps('products.data'))->pluck('inventory.status')->all())
         ->toBe([

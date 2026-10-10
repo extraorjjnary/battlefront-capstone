@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Administration;
 
 use App\Actions\Product\CreateProduct;
+use App\Actions\Product\DeleteProduct;
 use App\Actions\Product\UpdateProduct;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\ProductIndexRequest;
@@ -35,6 +36,7 @@ class ProductController extends Controller
             ->select([
                 'id',
                 'product_code',
+                'is_catalog_imported',
                 'name',
                 'category_id',
                 'brand',
@@ -84,6 +86,7 @@ class ProductController extends Controller
             ->through(fn (Product $product): array => [
                 'id' => $product->id,
                 'product_code' => $product->product_code,
+                'is_catalog_imported' => $product->is_catalog_imported,
                 'name' => $product->name,
                 'brand' => $product->brand,
                 'price' => $product->price,
@@ -169,6 +172,7 @@ class ProductController extends Controller
                 ...$product->only([
                     'id',
                     'product_code',
+                    'is_catalog_imported',
                     'name',
                     'description',
                     'brand',
@@ -235,6 +239,18 @@ class ProductController extends Controller
         Inertia::flash('toast', [
             'type' => 'success',
             'message' => __('Product updated.'),
+        ]);
+
+        return to_route('administration.products.index');
+    }
+
+    public function destroy(Product $product, DeleteProduct $deleteProduct): RedirectResponse
+    {
+        $deleteProduct->execute($product);
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __('Product permanently deleted.'),
         ]);
 
         return to_route('administration.products.index');
