@@ -1,6 +1,6 @@
 <script setup>
 import { Head, Link, usePage } from '@inertiajs/vue3';
-import { ArrowLeft, LogIn, PackageOpen, Tag } from '@lucide/vue';
+import { ArrowLeft, PackageOpen, Tag } from '@lucide/vue';
 import { computed, onBeforeUnmount, onMounted, watch } from 'vue';
 import AddToCartForm from '@/components/cart/AddToCartForm.vue';
 import ProductImage from '@/components/catalog/ProductImage.vue';
@@ -11,7 +11,6 @@ import StorefrontHeader from '@/components/StorefrontHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { consumeCatalogVisit } from '@/lib/catalogReturn';
-import { login } from '@/routes';
 import { index as productIndex } from '@/routes/products';
 import { store as storeProductDwell } from '@/routes/products/dwell';
 import { store as storeProductView } from '@/routes/products/view';
@@ -267,14 +266,15 @@ function returnToCatalog() {
                             Ready to add this product?
                         </h2>
                         <p class="text-muted-foreground mt-1 text-sm leading-6">
-                            Log in with a customer account to use the cart.
+                            Choose a quantity, then log in or register to add it
+                            to your cart.
                         </p>
-                        <Button as-child class="mt-4">
-                            <Link :href="login()">
-                                <LogIn aria-hidden="true" />
-                                Log in to add to cart
-                            </Link>
-                        </Button>
+                        <AddToCartForm
+                            class="mt-4"
+                            :product-id="product.id"
+                            :available-quantity="product.inventory.quantity"
+                            guest
+                        />
                     </section>
                 </div>
 

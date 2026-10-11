@@ -28,6 +28,7 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\NotificationController as CustomerNotificationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderPaymentProofController as CustomerOrderPaymentProofController;
+use App\Http\Controllers\PendingCartIntentController;
 use App\Http\Controllers\ProductCatalogController;
 use App\Http\Controllers\ProductDwellController;
 use App\Http\Controllers\ProductViewController;
@@ -66,6 +67,10 @@ Route::middleware('auth')->group(function () {
 });
 
 // customer cart
+Route::post('cart/intent', [PendingCartIntentController::class, 'store'])
+    ->middleware(['guest', 'throttle:60,1'])
+    ->name('cart.intent.store');
+
 Route::middleware(['auth', 'can:use-customer-cart'])
     ->prefix('cart')
     ->name('cart.')

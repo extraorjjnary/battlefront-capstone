@@ -1,8 +1,9 @@
 <script setup>
 import { Form } from '@inertiajs/vue3';
-import { ShoppingCart } from '@lucide/vue';
+import { LogIn, ShoppingCart } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { store } from '@/actions/App/Http/Controllers/CartItemController';
+import { store as storePendingIntent } from '@/actions/App/Http/Controllers/PendingCartIntentController';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ import { Spinner } from '@/components/ui/spinner';
 const props = defineProps({
     productId: { type: Number, required: true },
     availableQuantity: { type: Number, required: true },
+    guest: { type: Boolean, default: false },
 });
 
 const enteredQuantity = ref(1);
@@ -26,10 +28,11 @@ function trackEnteredQuantity(event) {
 
 <template>
     <Form
-        v-bind="store.form()"
+        v-bind="guest ? storePendingIntent.form() : store.form()"
         :error-bag="`addCartItem${productId}`"
         :options="{ preserveScroll: true }"
-        class="border-border bg-secondary/40 grid gap-4 border p-4 sm:grid-cols-[minmax(8rem,0.45fr)_minmax(0,1fr)] sm:items-end"
+        class="grid gap-4 sm:grid-cols-[minmax(8rem,0.45fr)_minmax(0,1fr)] sm:items-end"
+        :class="{ 'border-border bg-secondary/40 border p-4': !guest }"
         v-slot="{ errors, processing }"
     >
         <input type="hidden" name="product_id" :value="productId" />
@@ -58,8 +61,17 @@ function trackEnteredQuantity(event) {
 
         <Button type="submit" :disabled="processing">
             <Spinner v-if="processing" />
+            <LogIn v-else-if="guest" aria-hidden="true" />
             <ShoppingCart v-else aria-hidden="true" />
-            {{ processing ? 'Adding...' : 'Add to cart' }}
+            {{
+                guest
+                    ? processing
+                        ? 'Continuing...'
+                        : 'Log in to add to cart'
+                    : processing
+                      ? 'Adding...'
+                      : 'Add to cart'
+            }}
         </Button>
 
         <div class="min-h-8 sm:col-span-2" aria-live="polite">
