@@ -42,6 +42,12 @@ class ResetDevCommand extends Command
             if (count($rows) !== 654) {
                 throw new RuntimeException('Expected exactly 654 verified catalog products; found '.count($rows).'.');
             }
+            if ($this->option('with-sales-history')) {
+                $missingCodes = array_diff(DevelopmentHistoricalSalesSeeder::PRODUCT_CODES, array_column($rows, 'product_code'));
+                if ($missingCodes !== []) {
+                    throw new RuntimeException('Historical sales requires selected catalog product codes: '.implode(', ', $missingCodes).'.');
+                }
+            }
             $this->info('Catalog audit passed: 654 products and image paths validated.');
 
             $connection = DB::connection();
@@ -78,7 +84,7 @@ class ResetDevCommand extends Command
                 if ($this->call('db:seed', ['--class' => DevelopmentHistoricalSalesSeeder::class, '--force' => true, '--no-interaction' => true]) !== self::SUCCESS) {
                     throw new RuntimeException('Historical sales seeding failed.');
                 }
-                $this->info('Synthetic development history seeded: 13 products, 96 completed orders and 96 sales across 48 completed months.');
+                $this->info('Synthetic development history seeded: 15 imported products, 4-7 completed orders per month across 48 completed months. Current inventory preserved; not verified client sales.');
             }
             $this->info('Development reset completed.');
 

@@ -16,6 +16,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
+use Tests\HistoricalSalesCatalogFixtures;
 
 test('deleting imported catalog records preserves sources and images for explicit restoration', function (bool $adminImage) {
     Storage::fake('public');
@@ -203,10 +204,11 @@ function realCatalogMapping(array $rows = [['00123', 'Exact Product™', 'Graphi
     return $path;
 }
 
-test('historical fixtures and verified catalog imports remain separate across reseeding and reimport', function () {
+test('historical transactions preserve imported products across reseeding and reimport', function () {
     Storage::fake('local');
     $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00'));
     Storage::fake('public');
+    HistoricalSalesCatalogFixtures::createProducts();
     $manifest = realCatalogManifest();
     $mapping = realCatalogMapping();
 
@@ -218,16 +220,16 @@ test('historical fixtures and verified catalog imports remain separate across re
 
         $this->seed(DevelopmentHistoricalSalesSeeder::class);
         expect($realProduct->fresh(['inventory', 'category', 'tags'])->toArray())->toBe($before);
-        $fixtureProducts = Product::with('inventory')->where('is_catalog_imported', false)->orderBy('id')->get()->toArray();
+        $selectedProducts = Product::with('inventory')->whereIn('product_code', DevelopmentHistoricalSalesSeeder::PRODUCT_CODES)->orderBy('id')->get()->toArray();
         $coverageBefore = Storage::disk('local')->get(config('forecasting.development_manifest'));
         $second = $importer->execute($mapping, $manifest);
 
         expect($second)->toBe(['created' => 0, 'updated' => 1]);
         expect(Storage::disk('local')->get(config('forecasting.development_manifest')))->toBe($coverageBefore);
         expect(app(SalesHistoryCoverageRepository::class)->forProductCode('00123'))->toBeNull();
-        expect(Product::with('inventory')->where('is_catalog_imported', false)->orderBy('id')->get()->toArray())->toBe($fixtureProducts);
-        $this->assertDatabaseCount('products', 14);
-        $this->assertDatabaseCount('sales', 96);
+        expect(Product::with('inventory')->whereIn('product_code', DevelopmentHistoricalSalesSeeder::PRODUCT_CODES)->orderBy('id')->get()->toArray())->toBe($selectedProducts);
+        $this->assertDatabaseCount('products', 16);
+        $this->assertDatabaseCount('sales', 259);
         $this->seed(DevelopmentHistoricalSalesSeeder::class);
         expect($realProduct->fresh(['inventory', 'category', 'tags'])->toArray())->toBe($before);
     } finally {

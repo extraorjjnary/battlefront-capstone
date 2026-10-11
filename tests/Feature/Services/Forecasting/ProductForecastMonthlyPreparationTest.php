@@ -10,6 +10,7 @@ use App\Services\Forecasting\ProductForecastPreparationService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Support\Facades\Storage;
+use Tests\HistoricalSalesCatalogFixtures;
 
 beforeEach(function () {
     config(['app.timezone' => 'UTC', 'forecasting.operational_coverage' => []]);
@@ -39,45 +40,50 @@ function monthlyForecastSale(Product $product, string $date, int $quantity): Sal
     return $sale;
 }
 
-test('prepares the latest thirty six fixture months with exact quantities and eligibility', function (string $code, array $quantities, array $positiveMonths, string $status) {
+test('prepares the latest thirty six imported product months with exact quantities and eligibility', function () {
+    $products = HistoricalSalesCatalogFixtures::createProducts();
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
-    $product = Product::where('product_code', 'DEVHIST40'.$code)->sole();
+    $product = $products['10003'];
+    $quantities = [1, 1, 2, 1, 1, 2, 1, 1, 2, 2, 1, 1, 2, 2, 3, 1, 1, 1, 2, 1, 1, 2, 2, 1, 2, 1, 2, 2, 1, 2, 1, 2, 2, 2, 1, 2];
     $this->expectsDatabaseQueryCount(1);
 
     $result = app(ProductForecastPreparationService::class)->prepareMonthly($product);
 
-    expect($result['status'])->toBe($status);
+    expect($result['status'])->toBe('ready');
     expect($result['covered_months'])->toBe(36);
-    expect($result['positive_sales_months'])->toBe($positiveMonths);
+    expect($result['positive_sales_months'])->toBe([12, 12, 12]);
     expect($result['source_period'])->toBe(['start' => '2023-10-01', 'end_exclusive' => '2026-10-01']);
     expect($result['target_quarter'])->toBe(['year' => 2026, 'quarter' => 4, 'start' => '2026-10-01', 'end_exclusive' => '2027-01-01']);
     expect($result['coverage'])->toBe(monthlyForecastCoverage([
         'start' => '2022-10-01', 'source_kind' => 'synthetic_development', 'sales_scope' => 'development_fixture_transactions',
     ]));
-    expect($product->is_active)->toBeFalse();
-    $history = $result['history'];
-    expect($history['product_id'])->toBe($product->id);
-    expect($history['timezone'])->toBe('UTC');
-    expect($history['start'])->toBe('2023-10-01');
-    expect($history['end_exclusive'])->toBe('2026-10-01');
-    expect($history['months'])->toHaveCount(36);
-    expect(array_column($history['months'], 'quantity_sold'))->toBe($quantities);
-    expect($history['months'][0])->toBe(['year' => 2023, 'month' => 10, 'start' => '2023-10-01', 'end_exclusive' => '2023-11-01', 'quantity_sold' => $quantities[0]]);
-    expect($history['months'][35])->toBe(['year' => 2026, 'month' => 9, 'start' => '2026-09-01', 'end_exclusive' => '2026-10-01', 'quantity_sold' => $quantities[35]]);
-    expect($result['message'])->not->toBeEmpty();
-})->with([
-    'stable' => ['STABLE', array_fill(0, 36, 10), [12, 12, 12], 'ready'],
-    'declining' => ['DECLINING', [96, 94, 92, 90, 88, 86, 84, 82, 80, 78, 76, 74, 72, 70, 68, 66, 64, 62, 60, 58, 56, 54, 52, 50, 48, 46, 44, 42, 40, 38, 36, 34, 32, 30, 28, 26], [12, 12, 12], 'ready'],
-    'calendar seasonality' => ['REPEATING', array_merge(...array_fill(0, 3, [18, 14, 12, 8, 10, 12, 16, 20, 24, 28, 26, 22])), [12, 12, 12], 'ready'],
-    'eligible mixed zeros' => ['MIXEDZERO', array_merge(...array_fill(0, 3, [18, 0, 20, 0, 10, 0, 12, 0, 14, 0, 16, 0])), [6, 6, 6], 'ready'],
-    'sparse' => ['SPARSE', array_merge(...array_fill(0, 3, [0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 9])), [2, 2, 2], 'history_unsuitable'],
-    'all zero' => ['NOHISTORY', array_fill(0, 36, 0), [0, 0, 0], 'ready'],
-    'purchase prices do not enter quantities' => ['PRICE', array_fill(0, 36, 4), [12, 12, 12], 'ready'],
-]);
+    expect($product->is_active)->toBeTrue();
+    expect($result['history']['months'])->toHaveCount(36);
+    expect(array_column($result['history']['months'], 'quantity_sold'))->toBe($quantities);
+    expect($result['history']['months'][0])->toBe(['year' => 2023, 'month' => 10, 'start' => '2023-10-01', 'end_exclusive' => '2023-11-01', 'quantity_sold' => 1]);
+    expect($result['history']['months'][35])->toBe(['year' => 2026, 'month' => 9, 'start' => '2026-09-01', 'end_exclusive' => '2026-10-01', 'quantity_sold' => 2]);
+});
+
+test('selected real products become ready while unselected products keep their coverage states', function () {
+    $products = HistoricalSalesCatalogFixtures::createProducts();
+    $unknown = HistoricalSalesCatalogFixtures::unreadyProduct('UNKNOWN');
+    $short = HistoricalSalesCatalogFixtures::unreadyProduct('SHORT');
+    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $service = app(ProductForecastPreparationService::class);
+
+    expect($products)->toHaveCount(15);
+    foreach ($products as $product) {
+        $result = $service->prepareMonthly($product);
+        expect($result['status'])->toBe('ready');
+        expect($result['coverage']['source_kind'])->toBe('synthetic_development');
+        expect($result['positive_sales_months'])->toBe([12, 12, 12]);
+    }
+    expect($service->prepareMonthly($unknown)['status'])->toBe('history_unavailable');
+    expect($service->prepareMonthly($short)['status'])->toBe('insufficient_history');
+});
 
 test('returns fixture coverage failures before querying sales', function (string $code, string $status, ?int $covered) {
-    $this->seed(DevelopmentHistoricalSalesSeeder::class);
-    $product = Product::where('product_code', 'DEVHIST40'.$code)->sole();
+    $product = HistoricalSalesCatalogFixtures::unreadyProduct($code);
     $this->expectsDatabaseQueryCount(0);
 
     $result = app(ProductForecastPreparationService::class)->prepareMonthly($product);
@@ -229,13 +235,14 @@ test('uses sale dates including leap day and excludes every target quarter obser
 });
 
 test('does not change observations with customer identity price stock or catalog eligibility', function () {
+    $products = HistoricalSalesCatalogFixtures::createProducts();
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
-    $product = Product::where('product_code', 'DEVHIST40STABLE')->sole();
+    $product = $products['10003'];
     $service = app(ProductForecastPreparationService::class);
     $before = $service->prepareMonthly($product);
-    $customer = User::factory()->create();
-    $product->orderItems()->with('order')->each(function (OrderItem $item) use ($customer) {
-        $item->order->update(['user_id' => $customer->id, 'created_at' => '2026-12-01']);
+    User::where('email', 'historical-sales@example.test')->sole()->update(['name' => 'Changed customer identity']);
+    $product->orderItems()->with('order')->each(function (OrderItem $item) {
+        $item->order->forceFill(['created_at' => '2026-12-01'])->save();
         $item->update(['price_at_time' => '9999.99']);
     });
     $product->update(['price' => '0.01', 'discount_price' => null]);
@@ -245,8 +252,9 @@ test('does not change observations with customer identity price stock or catalog
 });
 
 test('synthetic monthly history cannot establish readiness outside development', function (string $environment) {
+    $products = HistoricalSalesCatalogFixtures::createProducts();
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
-    $product = Product::where('product_code', 'DEVHIST40STABLE')->sole();
+    $product = $products['10003'];
     $this->app->instance('env', $environment);
     $this->expectsDatabaseQueryCount(0);
 
@@ -295,8 +303,9 @@ test('rejects a product which has not been persisted', function () {
 });
 
 test('batch preparation matches every single product fixture using one sales query', function () {
+    HistoricalSalesCatalogFixtures::createProducts();
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
-    $products = Product::where('product_code', 'like', 'DEVHIST40%')->orderBy('id')->get();
+    $products = Product::whereIn('product_code', DevelopmentHistoricalSalesSeeder::PRODUCT_CODES)->orderBy('id')->get();
     $preparation = app(ProductForecastPreparationService::class);
     $expected = [];
     foreach ($products as $product) {

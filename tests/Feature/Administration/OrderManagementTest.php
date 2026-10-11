@@ -13,9 +13,33 @@ use App\Models\Product;
 use App\Models\Sale;
 use App\Models\User;
 use App\Services\Order\OrderProcessingService;
+use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\HistoricalSalesCatalogFixtures;
+
+test('completed transaction history identifies demonstration orders and their dedicated customer', function () {
+    Storage::fake('local');
+    config(['app.timezone' => 'UTC']);
+    $this->travelTo('2026-10-15 12:00:00');
+    HistoricalSalesCatalogFixtures::createProducts();
+    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $lastOrder = Order::with('items')->where('recipient_name', 'Demonstration Historical Sales 2022-10 V3 04')->sole();
+
+    $this->actingAs(User::factory()->administrator()->create())
+        ->get(route('administration.orders.index', ['status' => 'completed', 'q' => 'Demonstration Historical Sales 2022-10']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('orders.total', 4)
+            ->where('orders.data.0.recipient_name', 'Demonstration Historical Sales 2022-10 V3 04')
+            ->where('orders.data.0.customer.name', 'Historical Sales Development Account')
+            ->where('orders.data.0.customer.email', 'historical-sales@example.test')
+            ->where('orders.data.0.status.value', 'completed')
+            ->where('orders.data.0.payment.status.value', 'verified')
+            ->where('orders.data.0.item_count', $lastOrder->items->count())
+            ->where('orders.data.0.total_quantity', $lastOrder->items->sum('quantity'))
+            ->where('orders.data.0.total', '6270.00'));
+});
 
 test('guests are redirected from administrator order workflows', function () {
     $order = Order::factory()->create();

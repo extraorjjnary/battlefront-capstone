@@ -60,7 +60,7 @@ class SalesHistoryCoverageRepository
      * Read a fresh declaration snapshot once for this batch, never cache eligibility.
      *
      * @param  list<string>  $productCodes
-     * @return array<string, Coverage|null>
+     * @return array<int|string, Coverage|null>
      */
     public function forProductCodes(array $productCodes): array
     {
@@ -81,7 +81,7 @@ class SalesHistoryCoverageRepository
         return $results;
     }
 
-    /** @param array<string, Coverage> $entries */
+    /** @param array<int|string, Coverage> $entries */
     public function writeDevelopment(array $entries): void
     {
         $this->ensureDevelopmentEnvironment();

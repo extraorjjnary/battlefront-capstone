@@ -15,6 +15,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\HistoricalSalesCatalogFixtures;
 use Tests\MonthlyForecastFixtures;
 
 beforeEach(function () {
@@ -361,9 +362,10 @@ test('readiness is rechecked during generation without overwriting saved demand'
     'history becomes unsuitable' => [[], [1], 'history_unsuitable'],
 ]);
 
-test('monthly development fixtures show synthetic scope and seasonal target estimates', function () {
+test('imported products with development history show synthetic scope and target estimates', function () {
+    $products = HistoricalSalesCatalogFixtures::createProducts();
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
-    $product = Product::where('product_code', 'DEVHIST40REPEATING')->sole();
+    $product = $products['10003'];
 
     $this->actingAs(User::factory()->administrator()->create())
         ->get(route('administration.forecasting.index', ['product_id' => $product->id]))
@@ -375,12 +377,12 @@ test('monthly development fixtures show synthetic scope and seasonal target esti
     $this->post(route('administration.forecasting.store'), forecastingInput($product))
         ->assertInertiaFlash('forecast_result.is_synthetic', true)
         ->assertInertiaFlash('forecast_result.sales_scope', 'development_fixture_transactions')
-        ->assertInertiaFlash('forecast_result.forecast_quantity', '44.00')
-        ->assertInertiaFlash('forecast_result.monthly_forecasts.0.forecast_quantity', '18.00')
-        ->assertInertiaFlash('forecast_result.monthly_forecasts.1.forecast_quantity', '14.00')
-        ->assertInertiaFlash('forecast_result.monthly_forecasts.2.forecast_quantity', '12.00');
+        ->assertInertiaFlash('forecast_result.forecast_quantity', '7.10')
+        ->assertInertiaFlash('forecast_result.monthly_forecasts.0.forecast_quantity', '2.03')
+        ->assertInertiaFlash('forecast_result.monthly_forecasts.1.forecast_quantity', '2.03')
+        ->assertInertiaFlash('forecast_result.monthly_forecasts.2.forecast_quantity', '3.03');
 
-    $this->assertDatabaseHas('forecasts', ['product_id' => $product->id, 'method' => 'additive_holt_winters', 'predicted_demand' => '44.00']);
+    $this->assertDatabaseHas('forecasts', ['product_id' => $product->id, 'method' => 'additive_holt_winters', 'predicted_demand' => '7.10']);
 });
 
 test('monthly display rounding never replaces the finalized quarterly total', function () {
@@ -533,7 +535,7 @@ test('refreshing saved review does not recover generation time monthly context',
 
 test('product search and saved review retain inactive selections across pages', function () {
     $product = Product::factory()->for(Category::factory()->state(['is_active' => false]))
-        ->create(['name' => 'ZZ Selected', 'product_code' => 'DEVHIST40STABLE', 'is_active' => false]);
+        ->create(['name' => 'ZZ Selected', 'product_code' => 'TESTSELECTED', 'is_active' => false]);
     forecastingCoverage($product);
     $searchable = Product::factory()->count(16)->sequence(
         fn ($sequence): array => ['name' => sprintf('Searchable %02d', $sequence->index + 1)],
@@ -561,13 +563,13 @@ test('product search and saved review retain inactive selections across pages', 
         ->where('products.data.0.id', $searchable->last()->id)
         ->where('selected_product.id', $product->id)
         ->where('selected_product.is_active', false)
-        ->where('selected_product.is_synthetic', true)
+        ->where('selected_product.is_synthetic', false)
         ->has('forecasts.data', 2)
         ->where('forecasts.data.0.method', 'moving_average')
         ->where('forecasts.data.1.method', 'linear_trend')
         ->missing('filters.method'));
 
-    $this->get(route('administration.forecasting.index', ['q' => 'DEVHIST40STABLE']))
+    $this->get(route('administration.forecasting.index', ['q' => 'TESTSELECTED']))
         ->assertInertia(fn (Assert $page) => $page->has('products.data', 1)->where('products.data.0.id', $product->id));
     $this->get(route('administration.forecasting.index', ['q' => "' OR 1=1 --"]))
         ->assertInertia(fn (Assert $page) => $page->has('products.data', 0));

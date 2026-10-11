@@ -1,12 +1,12 @@
 <?php
 
 use App\Models\Forecast;
-use App\Models\Product;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\HistoricalSalesCatalogFixtures;
 
 beforeEach(function () {
     Storage::fake('local');
@@ -19,8 +19,9 @@ afterEach(function () {
 });
 
 test('monthly generation preserves legacy forecasts without changing their saved values', function () {
+    $products = HistoricalSalesCatalogFixtures::createProducts();
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
-    $product = Product::where('product_code', 'DEVHIST40STABLE')->sole();
+    $product = $products['10003'];
     $legacy = Forecast::factory()->for($product)->create(['method' => 'moving_average', 'predicted_demand' => '12.00']);
     $snapshot = $legacy->fresh()->toArray();
     $this->actingAs(User::factory()->administrator()->create())
@@ -31,10 +32,10 @@ test('monthly generation preserves legacy forecasts without changing their saved
     $this->post(route('administration.forecasting.store'), ['product_id' => $product->id])
         ->assertInertiaFlash('forecast_result.status', 'ready')
         ->assertInertiaFlash('forecast_result.method', 'additive_holt_winters')
-        ->assertInertiaFlash('forecast_result.forecast_quantity', '30.00');
+        ->assertInertiaFlash('forecast_result.forecast_quantity', '7.10');
     $this->assertDatabaseHas('forecasts', [
         'product_id' => $product->id, 'method' => 'additive_holt_winters',
-        'forecast_quarter' => '2026-Q4', 'predicted_demand' => '30.00',
+        'forecast_quarter' => '2026-Q4', 'predicted_demand' => '7.10',
     ]);
     expect($legacy->fresh()->toArray())->toBe($snapshot);
     $this->assertDatabaseCount('forecasts', 2);

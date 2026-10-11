@@ -15,6 +15,7 @@ use App\Models\User;
 use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\HistoricalSalesCatalogFixtures;
 
 test('guests are redirected to the login page', function () {
     $response = $this->get(route('dashboard'));
@@ -226,21 +227,24 @@ test('dashboard stock warnings ignore inactive records while the inventory ledge
         ->where('products.total', 4));
 })->with(['inclusive low stock' => [5, 'low_stock'], 'out of stock' => [0, 'out_of_stock']]);
 
-test('historical forecasting fixtures do not generate operational dashboard restock warnings', function () {
+test('historical seeding preserves operational dashboard stock warnings', function () {
     Storage::fake('local');
     $this->travelTo('2026-10-15 12:00:00');
     $administrator = User::factory()->administrator()->create();
+    $products = HistoricalSalesCatalogFixtures::createProducts();
+    $products['10003']->inventory->update(['quantity' => 1]);
+    $products['10035']->inventory->update(['quantity' => 0]);
+    $stockBefore = Inventory::query()->orderBy('product_id')->get()->toArray();
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
-    $fixtureStock = Inventory::query()->orderBy('product_id')->get()->toArray();
 
     $this->actingAs($administrator)->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
-        ->where('dashboard.kpis.low_stock_products', 0)
-        ->where('dashboard.kpis.out_of_stock_products', 0)
-        ->has('dashboard.needs_attention.low_stock_products', 0)
-        ->has('dashboard.needs_attention.out_of_stock_products', 0));
+        ->where('dashboard.kpis.low_stock_products', 1)
+        ->where('dashboard.kpis.out_of_stock_products', 1)
+        ->has('dashboard.needs_attention.low_stock_products', 1)
+        ->has('dashboard.needs_attention.out_of_stock_products', 1));
     $this->get(route('administration.inventory.index'))->assertInertia(fn (Assert $page) => $page
-        ->where('products.total', 13)
-        ->where('low_stock_count', 5)
+        ->where('products.total', 15)
+        ->where('low_stock_count', 1)
         ->where('out_of_stock_count', 1));
-    expect(Inventory::query()->orderBy('product_id')->get()->toArray())->toBe($fixtureStock);
+    expect(Inventory::query()->orderBy('product_id')->get()->toArray())->toBe($stockBefore);
 });

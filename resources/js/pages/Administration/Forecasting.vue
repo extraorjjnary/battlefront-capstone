@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
+import { formatForecastUnits } from '@/lib/forecastUnits';
 
 ChartJS.register(
     CategoryScale,
@@ -43,6 +44,11 @@ const props = defineProps({
 
 const initialResult = usePage().flash?.forecast_result ?? null;
 const result = ref(initialResult);
+const resultMessage = computed(() =>
+    result.value?.status === 'ready'
+        ? `Estimated quarterly demand: ${formatForecastUnits(result.value.forecast_quantity)} units for ${result.value.target_label}, based on 36 completed months of recorded sales.`
+        : result.value?.message,
+);
 const isCheckingHistory = ref(false);
 const form = useForm({
     product_id: props.selected_product?.id ?? null,
@@ -171,6 +177,10 @@ const chartOptions = {
     plugins: {
         legend: { labels: { color: '#9CA3AF', usePointStyle: true } },
         tooltip: {
+            callbacks: {
+                label: (item) =>
+                    `${item.dataset.label}: ${formatForecastUnits(item.parsed.y)} units`,
+            },
             filter: (item) =>
                 item.datasetIndex === 0 ||
                 item.dataIndex >= item.chart.data.labels.length - 3,
@@ -184,7 +194,11 @@ const chartOptions = {
         y: {
             beginAtZero: true,
             title: { display: true, text: 'Units', color: '#9CA3AF' },
-            ticks: { color: '#9CA3AF' },
+            ticks: {
+                color: '#9CA3AF',
+                precision: 0,
+                callback: formatForecastUnits,
+            },
             grid: { color: 'rgba(42, 46, 54, 0.55)' },
         },
     },
@@ -413,7 +427,7 @@ const chartOptions = {
                         : 'Forecast unavailable'
                 }}
             </h2>
-            <p class="mt-2 text-sm">{{ result.message }}</p>
+            <p class="mt-2 text-sm">{{ resultMessage }}</p>
             <template v-if="result.status === 'ready'">
                 <p v-if="result.is_synthetic" class="mt-2 text-sm font-medium">
                     Synthetic development history
@@ -435,7 +449,7 @@ const chartOptions = {
                             Estimated quarterly demand
                         </dt>
                         <dd class="mt-1 text-2xl font-semibold tabular-nums">
-                            {{ result.forecast_quantity }}
+                            {{ formatForecastUnits(result.forecast_quantity) }}
                             <span class="text-sm font-normal">units</span>
                         </dd>
                     </div>
@@ -483,12 +497,15 @@ const chartOptions = {
                             {{ month.label }}
                         </dt>
                         <dd class="mt-1 font-semibold tabular-nums">
-                            {{ month.forecast_quantity }} units
+                            {{ formatForecastUnits(month.forecast_quantity) }}
+                            units
                         </dd>
                     </div>
                 </dl>
                 <p class="text-muted-foreground mt-3 text-xs">
-                    {{ result.rounding_note }}
+                    Demand estimates are rounded to whole units for display. The
+                    quarterly estimate is calculated before display rounding;
+                    rounded monthly estimates may not add up to it.
                 </p>
                 <div class="mt-6 h-80 min-w-0">
                     <Line
@@ -614,7 +631,11 @@ const chartOptions = {
                             <td
                                 class="p-3 text-right font-semibold tabular-nums"
                             >
-                                {{ forecast.forecast_quantity }}
+                                {{
+                                    formatForecastUnits(
+                                        forecast.forecast_quantity,
+                                    )
+                                }}
                             </td>
                             <td class="p-3 whitespace-nowrap">
                                 {{ forecast.target_label }}

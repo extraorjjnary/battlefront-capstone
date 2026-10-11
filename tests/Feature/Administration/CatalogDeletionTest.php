@@ -15,12 +15,15 @@ use App\Models\RecommendationInteraction;
 use App\Models\Sale;
 use App\Models\Tag;
 use App\Models\User;
+use App\Repositories\Reporting\SalesHistoryCoverageRepository;
+use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\HistoricalSalesCatalogFixtures;
 
 test('administrators can delete unused products and their disposable associations', function (bool $imported) {
     Storage::fake('local');
@@ -131,6 +134,28 @@ test('existing customer carts protect even inactive imported products', function
     $this->assertModelExists($product);
     $this->assertModelExists($item);
 });
+
+test('seeded historical transactions protect imported products and inventory from deletion', function (bool $keepCoverage) {
+    Storage::fake('local');
+    $this->travelTo('2026-10-15 12:00:00');
+    $products = HistoricalSalesCatalogFixtures::createProducts();
+    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    if (! $keepCoverage) {
+        app(SalesHistoryCoverageRepository::class)->clearDevelopment();
+    }
+    $product = $products['10003'];
+    $inventory = $product->inventory->toArray();
+    $items = $product->orderItems()->with('order.sale')->get()->toArray();
+
+    $this->actingAs(User::factory()->administrator()->create())->delete(route('administration.products.destroy', $product))
+        ->assertSessionHasErrors(['deletion' => DeleteProduct::PROTECTED_MESSAGE]);
+
+    $this->assertModelExists($product);
+    expect($product->inventory->refresh()->toArray())->toBe($inventory);
+    expect($product->orderItems()->with('order.sale')->get()->toArray())->toBe($items);
+    $this->assertDatabaseCount('products', 15);
+    $this->assertDatabaseCount('sales', 259);
+})->with(['orders and coverage' => true, 'orders without coverage' => false]);
 
 test('declared historical coverage protects products without sales or forecasts', function (bool $development) {
     Storage::fake('local');

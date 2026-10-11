@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\Sale;
 use App\Models\User;
 use App\Services\Dashboard\DashboardService;
+use App\Services\Forecasting\ProductForecastPreparationService;
 use App\Services\RealCatalogImportService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
@@ -178,6 +179,7 @@ test('reset restores the complete real catalog with historical sales only when r
         Sale::factory()->create();
         $filesBefore = collect(Storage::disk('public')->allFiles('products'))
             ->mapWithKeys(fn ($path) => [$path => hash_file('sha256', Storage::disk('public')->path($path))])->all();
+        $sourcesBefore = [hash_file('sha256', $manifestPath), hash_file('sha256', $mappingPath)];
 
         $coveragePath = config('forecasting.development_manifest');
         Storage::disk('local')->put($coveragePath, 'old declaration');
@@ -190,8 +192,8 @@ test('reset restores the complete real catalog with historical sales only when r
 
         $products = Product::with(['inventory', 'category', 'tags'])->where('is_catalog_imported', true)->get()->keyBy('product_code');
         expect($products)->toHaveCount(654);
-        $this->assertDatabaseCount('products', $withHistory ? 667 : 654);
-        $this->assertDatabaseCount('inventories', $withHistory ? 667 : 654);
+        $this->assertDatabaseCount('products', 654);
+        $this->assertDatabaseCount('inventories', 654);
         foreach ($expected as $row) {
             $product = $products->get($row['product_code']);
             expect($product)->not->toBeNull();
@@ -224,22 +226,31 @@ test('reset restores the complete real catalog with historical sales only when r
         $filesAfter = collect(Storage::disk('public')->allFiles('products'))
             ->mapWithKeys(fn ($path) => [$path => hash_file('sha256', Storage::disk('public')->path($path))])->all();
         expect($filesAfter)->toBe($filesBefore);
-        foreach (['orders' => 96, 'order_items' => 547, 'sales' => 96, 'carts' => 0, 'cart_items' => 0] as $table => $historicalCount) {
+        expect([hash_file('sha256', $manifestPath), hash_file('sha256', $mappingPath)])->toBe($sourcesBefore);
+        foreach (['orders' => 259, 'order_items' => 1505, 'sales' => 259, 'shipments' => 74, 'carts' => 0, 'cart_items' => 0] as $table => $historicalCount) {
             $this->assertDatabaseCount($table, $withHistory ? $historicalCount : 0);
         }
         if ($withHistory) {
             $sales = Sale::query()->orderBy('sale_date')->get();
-            expect($sales->first()->sale_date->toDateString())->toBe('2022-10-01');
-            expect($sales->last()->sale_date->toDateString())->toBe('2026-09-30');
+            expect($sales->first()->sale_date->format('Y-m'))->toBe('2022-10');
+            expect($sales->last()->sale_date->format('Y-m'))->toBe('2026-09');
             $manifest = json_decode(Storage::disk('local')->get($coveragePath), true, flags: JSON_THROW_ON_ERROR);
-            expect($manifest['products'])->toHaveCount(12);
-            expect($manifest['products']['DEVHIST40NOHISTORY']['end_exclusive'])->toBe('2026-10-01');
+            expect($manifest['products'])->toHaveCount(15);
+            expect($manifest['products']['10003']['end_exclusive'])->toBe('2026-10-01');
+            $selected = Product::whereIn('product_code', DevelopmentHistoricalSalesSeeder::PRODUCT_CODES)->get();
+            expect($selected)->toHaveCount(15);
+            foreach ($selected as $product) {
+                $readiness = app(ProductForecastPreparationService::class)->prepareMonthly($product);
+                expect($readiness['status'])->toBe('ready');
+                expect($readiness['positive_sales_months'])->toBe([12, 12, 12]);
+            }
         } else {
             Storage::disk('local')->assertMissing($coveragePath);
         }
         $this->assertDatabaseCount('users', $withHistory ? 3 : 2);
         expect(User::query()->where('email', 'historical-sales@example.test')->exists())->toBe($withHistory);
-        expect(Product::query()->where('is_catalog_imported', false)->count())->toBe($withHistory ? 13 : 0);
+        expect(Product::query()->where('is_catalog_imported', false)->count())->toBe(0);
+        expect(Product::where('product_code', 'like', 'DEVHIST40%')->exists())->toBeFalse();
         $this->assertDatabaseHas('users', ['email' => 'admin@example.com']);
         $this->assertDatabaseHas('users', ['email' => 'test@example.com']);
         $this->assertDatabaseHas('branches', ['city' => 'Sagay City']);
@@ -248,13 +259,16 @@ test('reset restores the complete real catalog with historical sales only when r
         expect(ChatbotKnowledge::query()->where('is_active', false)->exists())->toBeFalse();
 
         $stockBefore = $products->map(fn ($product) => [$product->inventory->quantity, $product->inventory->reorder_level])->all();
-        $fixtureBefore = Product::query()->where('is_catalog_imported', false)->with('inventory')->orderBy('product_code')
-            ->get()->mapWithKeys(fn ($product) => [$product->product_code => [$product->inventory->quantity, $product->inventory->reorder_level]])->all();
+        if ($withHistory) {
+            $inventoryBefore = DB::table('inventories')->orderBy('id')->get()->all();
+            $this->seed(DevelopmentHistoricalSalesSeeder::class);
+            expect(DB::table('inventories')->orderBy('id')->get()->all())->toEqual($inventoryBefore);
+        }
         $administrator = User::query()->where('email', 'admin@example.com')->sole();
         $this->actingAs($administrator)->get(route('administration.inventory.index', ['stock' => 'low_stock']))
-            ->assertInertia(fn (Assert $page) => $page->where('products.total', $withHistory ? 8 : 3));
+            ->assertInertia(fn (Assert $page) => $page->where('products.total', 3));
         $this->get(route('administration.inventory.index', ['stock' => 'out_of_stock']))
-            ->assertInertia(fn (Assert $page) => $page->where('products.total', $withHistory ? 2 : 1));
+            ->assertInertia(fn (Assert $page) => $page->where('products.total', 1));
         $this->patch(route('administration.inventory.update', $soldOut->inventory), ['quantity' => 6, 'reorder_level' => 5])
             ->assertRedirect()->assertSessionHasNoErrors();
         expect($soldOut->inventory->refresh()->quantity)->toBe(6);
@@ -267,9 +281,6 @@ test('reset restores the complete real catalog with historical sales only when r
         $stockAfter = Product::query()->where('is_catalog_imported', true)->with('inventory')->get()->keyBy('product_code')
             ->map(fn ($product) => [$product->inventory->quantity, $product->inventory->reorder_level])->all();
         expect($stockAfter)->toBe($stockBefore);
-        $fixtureAfter = Product::query()->where('is_catalog_imported', false)->with('inventory')->orderBy('product_code')
-            ->get()->mapWithKeys(fn ($product) => [$product->product_code => [$product->inventory->quantity, $product->inventory->reorder_level]])->all();
-        expect($fixtureAfter)->toBe($fixtureBefore);
     } finally {
         DB::setDefaultConnection($originalConnection);
         DB::purge('reset_test');
@@ -278,7 +289,7 @@ test('reset restores the complete real catalog with historical sales only when r
 
 test('reset reports optional historical seeding failure after a successful catalog import', function () {
     $this->mock(RealCatalogImportService::class, function ($mock) {
-        $mock->shouldReceive('inspectFiles')->once()->andReturn(array_fill(0, 654, []));
+        $mock->shouldReceive('inspectFiles')->once()->andReturn(array_pad(array_map(fn (string $code): array => ['product_code' => $code], DevelopmentHistoricalSalesSeeder::PRODUCT_CODES), 654, []));
         $mock->shouldReceive('execute')->once()->andReturn(['created' => 654, 'updated' => 0]);
     });
     $command = Mockery::mock(ResetDevCommand::class)->makePartial();
@@ -295,4 +306,21 @@ test('reset reports optional historical seeding failure after a successful catal
         ->expectsOutputToContain('Reset incomplete')
         ->doesntExpectOutput('Development reset completed.')
         ->assertFailed();
+});
+
+test('history product selection is validated before database recreation', function () {
+    $sentinel = User::factory()->create();
+    Storage::disk('local')->put(config('forecasting.development_manifest'), 'existing declaration');
+    $this->mock(RealCatalogImportService::class, function ($mock) {
+        $mock->shouldReceive('inspectFiles')->once()->andReturn(array_fill(0, 654, ['product_code' => 'UNSELECTED']));
+        $mock->shouldNotReceive('execute');
+    });
+
+    $this->artisan('battlefront:reset-dev', ['--force' => true, '--with-sales-history' => true])
+        ->expectsOutputToContain('Historical sales requires selected catalog product codes')
+        ->expectsOutputToContain('No database records were changed')
+        ->assertFailed();
+
+    $this->assertModelExists($sentinel);
+    expect(Storage::disk('local')->get(config('forecasting.development_manifest')))->toBe('existing declaration');
 });

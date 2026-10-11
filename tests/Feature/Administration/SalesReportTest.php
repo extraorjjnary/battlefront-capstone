@@ -11,8 +11,11 @@ use App\Models\Product;
 use App\Models\RecommendationInteraction;
 use App\Models\Sale;
 use App\Models\User;
+use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\HistoricalSalesCatalogFixtures;
 
 /**
  * @param  list<array{product: Product, quantity: int, price: string}>  $items
@@ -568,6 +571,50 @@ test('product reports are paginated and preserve active filters', function () {
         ->where('products.next_page_url', fn (string $url): bool => str_contains($url, 'from=2026-09-01')
             && str_contains($url, 'to=2026-09-30')
             && str_contains($url, 'period=month')));
+});
+
+test('demonstration historical transactions contribute exact sales and item revenue to existing reports', function (string $scope, int $transactions, string $revenue, int $quantity) {
+    Storage::fake('local');
+    config(['app.timezone' => 'UTC']);
+    $this->travelTo('2026-10-15 12:00:00');
+    $products = HistoricalSalesCatalogFixtures::createProducts();
+    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $filters = ['from' => '2022-10-01', 'to' => '2026-09-30', 'period' => 'month'];
+    if ($scope === 'product') {
+        $filters['product_id'] = $products['10003']->id;
+    } elseif ($scope === 'category') {
+        $filters['category_id'] = $products['10003']->category_id;
+    }
+
+    $this->actingAs(User::factory()->administrator()->create())
+        ->get(route('administration.reports.sales', $filters))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('kpis.total_sales', $transactions)
+            ->where('kpis.total_revenue', $revenue)
+            ->where('kpis.total_items_sold', $quantity)
+            ->has('timeline.labels', 48)
+            ->where('products.data.0.name', $products['10003']->name));
+})->with([
+    'all transactions' => ['all', 259, '838450.00', 1944],
+    'product snapshots' => ['product', 72, '201600.00', 72],
+    'actual catalog category' => ['category', 130, '373200.00', 150],
+]);
+
+test('demonstration monthly report counts and revenue reflect varied persisted transactions', function () {
+    Storage::fake('local');
+    config(['app.timezone' => 'UTC']);
+    $this->travelTo('2026-10-15 12:00:00');
+    HistoricalSalesCatalogFixtures::createProducts();
+    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+
+    $this->actingAs(User::factory()->administrator()->create())
+        ->get(route('administration.reports.sales', ['from' => '2022-10-01', 'to' => '2022-11-30', 'period' => 'month']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('timeline.labels', ['Oct 2022', 'Nov 2022'])
+            ->where('timeline.sales', [4, 5])
+            ->where('timeline.revenue', [17860, 19190])
+            ->where('kpis.total_sales', 9)
+            ->where('kpis.total_revenue', '37050.00'));
 });
 
 test('report query count does not grow with the number of sales rows', function () {

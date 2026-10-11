@@ -6,11 +6,11 @@ use App\Models\Forecast;
 use App\Models\Product;
 use App\Services\Forecasting\ProductForecastPreparationService;
 use Carbon\CarbonImmutable;
-use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Tests\HistoricalSalesCatalogFixtures;
 use Tests\MonthlyForecastFixtures;
 
 beforeEach(function () {
@@ -126,8 +126,7 @@ test('persists covered zero demand from monthly preparation and calculation', fu
 test('rejects actual unavailable insufficient and unsuitable calculation results without writes', function (string $code, string $status) {
     Storage::fake('local');
     $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00', 'UTC'));
-    $this->seed(DevelopmentHistoricalSalesSeeder::class);
-    $product = Product::where('product_code', 'DEVHIST40'.$code)->sole();
+    $product = HistoricalSalesCatalogFixtures::unreadyProduct($code);
     $result = app(CalculateAdditiveHoltWinters::class)->execute(app(ProductForecastPreparationService::class)->prepareMonthly($product));
     expect($result['status'])->toBe($status);
 

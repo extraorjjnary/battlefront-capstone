@@ -6,116 +6,153 @@ use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Enums\ShipmentStatus;
 use App\Enums\UserRole;
-use App\Models\Category;
-use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
 use App\Repositories\Reporting\SalesHistoryCoverageRepository;
+use App\Services\Order\DeliveryRules;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
+use Throwable;
 
 class DevelopmentHistoricalSalesSeeder extends Seeder
 {
-    private const DESCRIPTION = 'Development-only historical sales fixture for forecasting validation. Not part of the verified Battlefront catalog. Synthetic data; does not represent actual Battlefront historical sales.';
+    /** @var list<string> */
+    public const PRODUCT_CODES = ['10003', '43720093', '10035', '6939084200089', '6940056180506', '87399741', '10196', '19986', '10468', '10121', '10986', '10214', '10350', '10463', '28909657'];
+
+    private const CUSTOMER_EMAIL = 'historical-sales@example.test';
+
+    private const LABEL_PREFIX = 'Demonstration Historical Sales ';
+
+    private const DELIVERY_NOTE = 'Synthetic historical delivery; no payment evidence or carrier milestones retained.';
+
+    /** @var list<string> */
+    private const DESTINATIONS = ['Sagay City', 'Escalante City', 'Cadiz City', 'Bacolod City'];
 
     /**
-     * Seed synthetic sales history. Customer ownership satisfies Order persistence
-     * only; customer identity is not a forecasting input.
+     * Retail assumptions: component purchases are small; inexpensive accessories
+     * appear more frequently. Keep profiles independent of mutable current prices
+     * so existing snapshots remain reproducible after catalog price changes.
+     *
+     * @var array<int, array{visits: int, max_quantity: int, school: bool}>
      */
-    public function run(SalesHistoryCoverageRepository $coverage): void
+    private const DEMAND = [
+        10003 => ['visits' => 1, 'max_quantity' => 1, 'school' => true],
+        43720093 => ['visits' => 1, 'max_quantity' => 1, 'school' => false],
+        10035 => ['visits' => 1, 'max_quantity' => 2, 'school' => true],
+        6939084200089 => ['visits' => 1, 'max_quantity' => 2, 'school' => false],
+        6940056180506 => ['visits' => 2, 'max_quantity' => 2, 'school' => true],
+        87399741 => ['visits' => 2, 'max_quantity' => 2, 'school' => true],
+        10196 => ['visits' => 2, 'max_quantity' => 3, 'school' => true],
+        19986 => ['visits' => 2, 'max_quantity' => 3, 'school' => false],
+        10468 => ['visits' => 2, 'max_quantity' => 3, 'school' => false],
+        10121 => ['visits' => 2, 'max_quantity' => 2, 'school' => true],
+        10986 => ['visits' => 1, 'max_quantity' => 2, 'school' => true],
+        10214 => ['visits' => 1, 'max_quantity' => 1, 'school' => true],
+        10350 => ['visits' => 1, 'max_quantity' => 1, 'school' => true],
+        10463 => ['visits' => 2, 'max_quantity' => 2, 'school' => false],
+        28909657 => ['visits' => 2, 'max_quantity' => 2, 'school' => false],
+    ];
+
+    /** Seed demonstration snapshots directly, without live order services or inventory writes. */
+    public function run(SalesHistoryCoverageRepository $coverage, DeliveryRules $deliveryRules): void
     {
         if (! App::environment(['local', 'testing'])) {
             throw new RuntimeException('Historical sales development data is only allowed in local and testing environments.');
         }
 
-        $historyEnd = CarbonImmutable::instance(now(config('app.timezone')))->startOfQuarter();
+        $this->ensureNoLegacyHistory();
+        $timezone = Config::string('app.timezone');
+        $historyEnd = CarbonImmutable::instance(now($timezone))->startOfQuarter();
         $firstMonth = $historyEnd->subMonths(48);
-
         $coverage->clearDevelopment();
-        $productCodes = DB::transaction(function () use ($firstMonth, $historyEnd): array {
-            $customer = $this->seedCustomer($firstMonth->subDay());
-            $products = $this->seedProducts($firstMonth->subDay());
-            $this->removeObsoleteHistory($customer, $products, $firstMonth, $historyEnd);
 
-            foreach (range(0, 47) as $monthIndex) {
-                $start = $firstMonth->addMonths($monthIndex);
-                $calendarIndex = $start->month - 1;
-                $seasonalQuantity = [8, 10, 12, 16, 20, 24, 28, 26, 22, 18, 14, 12][$calendarIndex];
-                $label = 'Historical Sales '.$start->format('F Y');
-
-                $this->seedOrder($customer, $label, $start, [
-                    ['product' => $products['STABLE'], 'quantity' => 4, 'price' => '1000.00'],
-                    ['product' => $products['INCREASING'], 'quantity' => $seasonalQuantity + 2 * $monthIndex, 'price' => '2000.00'],
-                    ['product' => $products['DECLINING'], 'quantity' => 120 - 2 * $monthIndex, 'price' => '1500.00'],
-                ]);
-
-                $closingItems = [
-                    ['product' => $products['STABLE'], 'quantity' => 6, 'price' => '1000.00'],
-                    ['product' => $products['REPEATING'], 'quantity' => $seasonalQuantity, 'price' => '500.00'],
-                    ['product' => $products['PRICE'], 'quantity' => 4, 'price' => ['100.00', '100.00', '125.00', '125.00', '150.00', '150.00', '175.00', '175.00', '200.00', '200.00', '225.00', '225.00'][$calendarIndex]],
-                ];
-                $closingItems[] = ['product' => $products['ABRUPT'], 'quantity' => [...array_fill(0, 12, 10), ...array_fill(0, 12, 15), 80, 5, 120, 8, 90, 6, 150, 12, 100, 4, 130, 9, ...array_fill(0, 6, 5), ...array_fill(0, 6, 120)][$monthIndex], 'price' => '1000.00'];
-                foreach (['UNKNOWN', 'STALE', 'GAPPED'] as $scenario) {
-                    $closingItems[] = ['product' => $products[$scenario], 'quantity' => 10, 'price' => '1000.00'];
+        DB::transaction(function () use ($firstMonth, $historyEnd, $deliveryRules): void {
+            $this->ensureNoLegacyHistory();
+            $products = Product::query()->whereIn('product_code', self::PRODUCT_CODES)
+                ->orderBy('product_code')->lockForUpdate()->get()->keyBy('product_code');
+            foreach (self::PRODUCT_CODES as $code) {
+                if (! isset($products[$code]) || ! $products[$code]->is_catalog_imported) {
+                    throw new RuntimeException("Historical sales requires existing imported product $code. No historical transactions were changed.");
                 }
-                if ($monthIndex >= 13) {
-                    $closingItems[] = ['product' => $products['SHORT'], 'quantity' => 10, 'price' => '1000.00'];
-                }
-                $mixedQuantity = [0, 10, 0, 12, 0, 14, 0, 16, 0, 18, 0, 20][$calendarIndex];
-                if ($mixedQuantity > 0) {
-                    $closingItems[] = ['product' => $products['MIXEDZERO'], 'quantity' => $mixedQuantity, 'price' => '1000.00'];
-                }
-                $sparseQuantity = match ($start->month) {
-                    3 => 3,
-                    9 => 9,
-                    default => 0,
-                };
-                if ($sparseQuantity > 0) {
-                    $closingItems[] = ['product' => $products['SPARSE'], 'quantity' => $sparseQuantity, 'price' => '2500.00'];
-                }
-
-                $this->seedOrder($customer, $label, $start->endOfMonth(), $closingItems);
+            }
+            $operational = config('forecasting.operational_coverage');
+            if (! is_array($operational) || array_intersect(self::PRODUCT_CODES, array_keys($operational)) !== []) {
+                throw new RuntimeException('Historical sales product coverage conflicts with operational coverage.');
             }
 
-            return array_map(fn (Product $product): string => $product->product_code, $products);
+            $customer = $this->seedCustomer($firstMonth->subDay());
+            $ownedOrders = $this->ownedOrders($customer, $products->all());
+            foreach ($ownedOrders as $order) {
+                if ($order->created_at->lt($firstMonth) || $order->created_at->gte($historyEnd)) {
+                    $order->sale()->delete();
+                    $order->shipment()->delete();
+                    $order->delete();
+                }
+            }
+
+            foreach (range(0, 47) as $monthIndex) {
+                $month = $firstMonth->addMonths($monthIndex);
+                foreach ($this->monthlyOrders($month) as $slot => $quantities) {
+                    $date = $this->orderDate($month, $slot);
+                    $label = $this->orderLabel($month, $slot);
+                    if (! isset($ownedOrders[$label])) {
+                        $this->seedOrder($customer, $label, $date, $products->all(), $quantities, $deliveryRules);
+                    }
+                }
+            }
         });
 
         $entries = [];
-        foreach ($productCodes as $scenario => $code) {
-            if ($scenario === 'UNKNOWN') {
-                continue;
-            }
+        foreach (self::PRODUCT_CODES as $code) {
             $entries[$code] = [
                 'granularity' => 'month',
-                'start' => ($scenario === 'SHORT' ? $historyEnd->subMonths(35) : $firstMonth)->toDateString(),
-                'end_exclusive' => ($scenario === 'STALE' ? $historyEnd->subMonth() : $historyEnd)->toDateString(),
-                'unavailable_months' => $scenario === 'GAPPED' ? [$historyEnd->subMonths(6)->toDateString()] : [],
-                'timezone' => config('app.timezone'),
+                'start' => $firstMonth->toDateString(),
+                'end_exclusive' => $historyEnd->toDateString(),
+                'unavailable_months' => [],
+                'timezone' => $timezone,
                 'source_kind' => 'synthetic_development',
                 'sales_scope' => 'development_fixture_transactions',
             ];
         }
-        $coverage->writeDevelopment($entries);
+        try {
+            $coverage->writeDevelopment($entries);
+        } catch (Throwable $exception) {
+            $coverage->clearDevelopment();
+            throw $exception;
+        }
 
-        $this->command->info('Synthetic development sales history: '.$firstMonth->format('F Y').' - '.$historyEnd->subMonth()->format('F Y').' (48 completed months).');
+        $this->command->info('Synthetic development sales history: '.$firstMonth->format('F Y').' - '.$historyEnd->subMonth()->format('F Y').' (48 completed months; 15 imported products; 4-7 orders per month). Not verified client sales.');
+    }
+
+    private function ensureNoLegacyHistory(): void
+    {
+        if (Order::query()->where('recipient_name', 'like', self::LABEL_PREFIX.'%')
+            ->where('recipient_name', 'not like', self::LABEL_PREFIX.'% V3 %')->exists()) {
+            throw new RuntimeException('An earlier or unrecognized historical demonstration fixture was detected. Run php artisan battlefront:reset-dev --with-sales-history manually. No existing transactions were replaced.');
+        }
+        if (Product::query()->where('product_code', 'like', 'DEVHIST40%')->exists()
+            || Order::query()->where('recipient_name', 'like', 'Historical Sales %')
+                ->whereHas('user', fn (Builder $query): Builder => $query->where('email', self::CUSTOMER_EMAIL))->exists()) {
+            throw new RuntimeException('Legacy DEVHIST40 historical demonstration data was detected. Run php artisan battlefront:reset-dev --with-sales-history manually. No legacy records were converted or deleted.');
+        }
     }
 
     private function seedCustomer(CarbonImmutable $createdAt): User
     {
-        $customer = User::query()->where('email', 'historical-sales@example.test')->lockForUpdate()->first()
-            ?? new User;
-
+        $customer = User::query()->where('email', self::CUSTOMER_EMAIL)->lockForUpdate()->first() ?? new User;
         if ($customer->exists && ($customer->name !== 'Historical Sales Development Account' || $customer->role !== UserRole::Customer)) {
-            throw new RuntimeException('Historical sales customer identity conflicts with an existing account.');
+            throw new RuntimeException('Historical sales customer identity conflicts with an existing account. Run php artisan battlefront:reset-dev --with-sales-history manually.');
         }
-
         $customer->forceFill([
-            'email' => 'historical-sales@example.test',
+            'email' => self::CUSTOMER_EMAIL,
             'name' => 'Historical Sales Development Account',
             'role' => UserRole::Customer,
             'email_verified_at' => $customer->created_at?->min($createdAt) ?? $createdAt,
@@ -127,162 +164,241 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
     }
 
     /**
-     * @return array<string, Product>
+     * Validate ownership of every candidate before pruning anything. Selected real
+     * products alone never establish ownership of a customer's transaction.
+     *
+     * @param  array<int|string, Product>  $products
+     * @return array<string, Order>
      */
-    private function seedProducts(CarbonImmutable $createdAt): array
+    private function ownedOrders(User $customer, array $products): array
     {
-        $categories = [];
-        foreach (['Components', 'Peripherals'] as $name) {
-            $category = Category::query()->firstOrNew(['name' => 'Historical Sales '.$name]);
-            if ($category->exists && $category->description !== self::DESCRIPTION) {
-                throw new RuntimeException('Historical sales category identity conflicts with an existing category.');
-            }
-            $category->fill(['description' => self::DESCRIPTION, 'is_active' => false])->save();
-            $categories[$name] = $category;
+        if (Order::query()->where('recipient_name', 'like', self::LABEL_PREFIX.'%')->where('user_id', '!=', $customer->id)->exists()) {
+            throw new RuntimeException('Historical sales order ownership conflicts with another customer. Run php artisan battlefront:reset-dev --with-sales-history manually.');
         }
-
-        /** @var list<array{code: string, name: string, category: string, price: string, stock: int}> $scenarios */
-        $scenarios = [
-            ['code' => 'STABLE', 'name' => 'Stable Demand Reference Product', 'category' => 'Components', 'price' => '1000.00', 'stock' => 100],
-            ['code' => 'INCREASING', 'name' => 'Increasing Demand Reference Product', 'category' => 'Components', 'price' => '2000.00', 'stock' => 50],
-            ['code' => 'DECLINING', 'name' => 'Declining Demand Reference Product', 'category' => 'Components', 'price' => '1500.00', 'stock' => 20],
-            ['code' => 'REPEATING', 'name' => 'Repeating Demand Reference Product', 'category' => 'Peripherals', 'price' => '500.00', 'stock' => 15],
-            ['code' => 'SPARSE', 'name' => 'Sparse Demand Reference Product', 'category' => 'Peripherals', 'price' => '2500.00', 'stock' => 0],
-            ['code' => 'PRICE', 'name' => 'Price Snapshot Reference Product', 'category' => 'Peripherals', 'price' => '200.00', 'stock' => 8],
-            ['code' => 'NOHISTORY', 'name' => 'No History Reference Product', 'category' => 'Peripherals', 'price' => '750.00', 'stock' => 25],
-            ['code' => 'MIXEDZERO', 'name' => 'Eligible Mixed Zero Reference Product', 'category' => 'Peripherals', 'price' => '1000.00', 'stock' => 50],
-            ['code' => 'ABRUPT', 'name' => 'Abrupt Change Reference Product', 'category' => 'Peripherals', 'price' => '1000.00', 'stock' => 30],
-            ['code' => 'SHORT', 'name' => 'Short History Reference Product', 'category' => 'Components', 'price' => '1000.00', 'stock' => 10],
-            ['code' => 'UNKNOWN', 'name' => 'Unavailable History Reference Product', 'category' => 'Components', 'price' => '1000.00', 'stock' => 10],
-            ['code' => 'STALE', 'name' => 'Stale Coverage Reference Product', 'category' => 'Components', 'price' => '1000.00', 'stock' => 10],
-            ['code' => 'GAPPED', 'name' => 'Gapped Coverage Reference Product', 'category' => 'Components', 'price' => '1000.00', 'stock' => 10],
-        ];
-
-        $products = [];
-        foreach ($scenarios as $scenario) {
-            $category = $categories[$scenario['category']];
-            $product = Product::query()->firstOrNew(['product_code' => 'DEVHIST40'.$scenario['code']]);
-
-            if ($product->exists && ($product->is_catalog_imported || $product->description !== self::DESCRIPTION || $product->category_id !== $category->id)) {
-                throw new RuntimeException('Historical sales product code conflicts with an existing product.');
+        $owned = [];
+        $productsById = collect($products)->keyBy('id');
+        $plans = [];
+        foreach ($customer->orders()->with(['items', 'sale', 'shipment'])->lockForUpdate()->get() as $order) {
+            $date = CarbonImmutable::instance($order->created_at);
+            $monthKey = $date->format('Y-m');
+            $plan = $plans[$monthKey] ??= $this->monthlyOrders($date->startOfMonth());
+            $slot = null;
+            foreach (array_keys($plan) as $candidate) {
+                if ($date->equalTo($this->orderDate($date, $candidate))) {
+                    $slot = $candidate;
+                    break;
+                }
             }
-
-            $product->forceFill([
-                'name' => $scenario['name'],
-                'description' => self::DESCRIPTION,
-                'category_id' => $category->id,
-                'brand' => null,
-                'price' => $scenario['price'],
-                'is_catalog_imported' => false,
-                'is_active' => false,
-                'is_featured' => false,
-                'discount_price' => null,
-                'image_path' => null,
-                'created_at' => $product->exists ? $product->created_at->min($createdAt) : $createdAt,
-            ])->save();
-            $product->tags()->sync([]);
-
-            $inventory = Inventory::query()->firstOrNew(['product_id' => $product->id]);
-            $inventory->forceFill([
-                'quantity' => $scenario['stock'],
-                'reorder_level' => 10,
-            ])->save();
-            $products[$scenario['code']] = $product;
-        }
-
-        return $products;
-    }
-
-    /** @param array<string, Product> $products */
-    private function removeObsoleteHistory(User $customer, array $products, CarbonImmutable $start, CarbonImmutable $end): void
-    {
-        $productIds = array_map(fn (Product $product): int => $product->id, $products);
-        $orders = $customer->orders()->with('items')->lockForUpdate()->get();
-        $ownedOrders = [];
-        $identities = [];
-
-        foreach ($orders as $order) {
-            $itemProductIds = $order->items->pluck('product_id')->all();
-            if (! str_starts_with($order->recipient_name, 'Historical Sales ') && array_intersect($itemProductIds, $productIds) === []) {
+            if (! str_starts_with($order->recipient_name, self::LABEL_PREFIX) && $slot === null) {
                 continue;
             }
-
-            $date = CarbonImmutable::instance($order->created_at);
-            $legacy = $order->recipient_name === "Historical Sales Q{$date->quarter} {$date->year}";
-            $label = $legacy ? "Historical Sales Q{$date->quarter} {$date->year}" : 'Historical Sales '.$date->format('F Y');
-            $boundaries = $legacy
-                ? [$date->startOfQuarter()->toDateTimeString(), $date->endOfQuarter()->toDateTimeString()]
-                : [$date->startOfMonth()->toDateTimeString(), $date->endOfMonth()->toDateTimeString()];
-            $identity = $label.' '.$date->toDateTimeString();
-            if ($order->recipient_name !== $label
-                || ! in_array($date->toDateTimeString(), $boundaries, true)
-                || isset($identities[$identity])
-                || $itemProductIds === []
-                || array_diff($itemProductIds, $productIds) !== []
-                || count($itemProductIds) !== count(array_unique($itemProductIds))) {
-                throw new RuntimeException('Historical sales order ownership is ambiguous or contains unrelated or duplicate items.');
+            if ($slot === null || $order->recipient_name !== $this->orderLabel($date, $slot) || isset($owned[$order->recipient_name])) {
+                throw new RuntimeException('Historical sales order ownership or identity is ambiguous. Run php artisan battlefront:reset-dev --with-sales-history manually.');
             }
 
-            $identities[$identity] = true;
-            $ownedOrders[] = $order;
+            $expectedIds = array_map(fn (int|string $code): int => $products[$code]->id, array_keys($plan[$slot]));
+            $actualIds = $order->items->pluck('product_id')->all();
+            if (count($actualIds) !== count($expectedIds) || array_diff($expectedIds, $actualIds) !== []) {
+                throw new RuntimeException('Historical sales order ownership contains missing, unrelated or duplicate items. Run php artisan battlefront:reset-dev --with-sales-history manually.');
+            }
+            $total = '0.00';
+            foreach ($order->items as $item) {
+                $product = $productsById[$item->product_id];
+                $price = $item->price_at_time;
+                if (! is_numeric($price) || $item->quantity !== $plan[$slot][$product->product_code] || bccomp($price, '0', 2) < 0) {
+                    throw new RuntimeException('Historical sales order items conflict with the demonstration history. Run php artisan battlefront:reset-dev --with-sales-history manually.');
+                }
+                $total = bcadd($total, bcmul($price, (string) $item->quantity, 2), 2);
+            }
+            $terms = $this->orderTerms($date, $slot);
+            $deliveryFee = $order->delivery_fee;
+            if (! is_numeric($deliveryFee) || bccomp($deliveryFee, '0', 2) < 0) {
+                throw new RuntimeException('Historical sales delivery fee conflicts with the demonstration history. Run php artisan battlefront:reset-dev --with-sales-history manually.');
+            }
+            $finalTotal = bcadd($total, $deliveryFee, 2);
+            if ($order->status !== OrderStatus::Completed || $order->payment_status !== PaymentStatus::Verified
+                || $order->payment_method !== $terms['payment'] || $order->fulfillment_method !== $terms['fulfillment']
+                || ! $order->payment_method->isAvailableFor($order->fulfillment_method)
+                || $order->contact_number !== '09000000000' || ! $this->validDeliverySnapshot($order, $terms['destination'])
+                || $order->payment_proof_path !== null || $order->payment_rejection_reason !== null || $order->payment_rejection_note !== null
+                || $order->total_amount !== $finalTotal || $order->product_subtotal !== $total
+                || $order->sale === null || $order->sale->amount !== $finalTotal || $order->sale->sale_date->toDateString() !== $date->toDateString()) {
+                throw new RuntimeException('Historical sales order and sale snapshots conflict with the demonstration history. Run php artisan battlefront:reset-dev --with-sales-history manually.');
+            }
+            $owned[$order->recipient_name] = $order;
         }
 
-        foreach ($ownedOrders as $order) {
-            if (preg_match('/^Historical Sales Q[1-4] [0-9]{4}$/D', $order->recipient_name) === 1 || $order->created_at->lt($start) || $order->created_at->gte($end)) {
-                $order->sale()->delete();
-                $order->delete();
+        return $owned;
+    }
+
+    /** @return array{fulfillment: FulfillmentMethod, payment: PaymentMethod, destination: string|null} */
+    private function orderTerms(CarbonImmutable $month, int $slot): array
+    {
+        $key = $month->format('Y-m').':'.$slot;
+        $delivery = $this->variation('fulfillment:'.$key, 100) < 30;
+        $paymentRoll = $this->variation('payment:'.$key, 100);
+        $payment = $delivery
+            ? ($paymentRoll < 50 ? PaymentMethod::GCash : PaymentMethod::Maya)
+            : match (true) {
+                $paymentRoll < 55 => PaymentMethod::Cash,
+                $paymentRoll < 75 => PaymentMethod::CardAtStore,
+                $paymentRoll < 90 => PaymentMethod::GCash,
+                default => PaymentMethod::Maya,
+            };
+
+        return [
+            'fulfillment' => $delivery ? FulfillmentMethod::Delivery : FulfillmentMethod::Pickup,
+            'payment' => $payment,
+            'destination' => $delivery ? self::DESTINATIONS[$this->variation('destination:'.$key, count(self::DESTINATIONS))] : null,
+        ];
+    }
+
+    private function deliveryAddress(string $destination): string
+    {
+        return 'Demonstration address only: sample residential delivery, '.$destination.'. Not a real customer address.';
+    }
+
+    /** Validate immutable saved fees and quote context without reconstructing them from current configuration. */
+    private function validDeliverySnapshot(Order $order, ?string $destination): bool
+    {
+        if ($destination === null) {
+            return $order->delivery_address === null && $order->delivery_fee === '0.00' && $order->shipment === null
+                && $order->delivery_destination === null && $order->delivery_base_fee === null && $order->shipping_profile === null
+                && $order->handling_surcharge === null && $order->delivery_origin_city === null
+                && $order->delivery_is_demo === null && $order->delivery_assumption_label === null;
+        }
+
+        $shipment = $order->shipment;
+        $baseFee = $order->delivery_base_fee;
+        $surcharge = $order->handling_surcharge;
+        if ($order->delivery_destination !== $destination || $order->delivery_address !== $this->deliveryAddress($destination)
+            || ! is_numeric($baseFee) || bccomp($baseFee, '0', 2) < 0
+            || ! is_numeric($surcharge) || bccomp($surcharge, '0', 2) < 0
+            || $order->delivery_fee !== bcadd($baseFee, $surcharge, 2)
+            || $order->shipping_profile === null || $order->delivery_origin_city !== 'Sagay City'
+            || $order->delivery_is_demo !== true || ! str_starts_with($order->delivery_assumption_label ?? '', self::DELIVERY_NOTE)
+            || $shipment === null || $shipment->status !== ShipmentStatus::Delivered || $shipment->carrier !== 'lbc'
+            || $shipment->preparation_days < 0 || $shipment->transit_min_days < 0 || $shipment->transit_max_days < $shipment->transit_min_days
+            || $shipment->eta_min_days !== $shipment->preparation_days + $shipment->transit_min_days
+            || $shipment->eta_max_days !== $shipment->preparation_days + $shipment->transit_max_days
+            || $shipment->getRawOriginal('created_at') === null || $shipment->getRawOriginal('updated_at') === null
+            || ! $shipment->created_at->equalTo($order->created_at) || ! $shipment->updated_at->equalTo($order->created_at)) {
+            return false;
+        }
+
+        foreach (['tracking_reference', 'preparing_at', 'ready_for_dispatch_at', 'handed_to_carrier_at', 'in_transit_at',
+            'out_for_delivery_at', 'delivered_at', 'cancelled_at', 'eta_anchor_date', 'eta_timezone',
+            'estimated_delivery_start', 'estimated_delivery_end'] as $field) {
+            if ($shipment->getAttribute($field) !== null) {
+                return false;
             }
         }
+
+        return true;
+    }
+
+    /** @return array<int, array<int|string, int>> */
+    private function monthlyOrders(CarbonImmutable $month): array
+    {
+        $key = $month->format('Y-m');
+        $peak = in_array($month->month, [6, 7, 11, 12], true);
+        $count = 4 + $this->variation('orders:'.$key, 3) + (int) $peak;
+        $orders = array_fill(0, $count, []);
+        $codes = self::PRODUCT_CODES;
+        usort($codes, fn (string $left, string $right): int => strcmp(hash('sha256', $key.':'.$left), hash('sha256', $key.':'.$right)));
+        $cursor = $this->variation('basket:'.$key, $count);
+        foreach ($codes as $code) {
+            $profile = self::DEMAND[(int) $code];
+            $yearVariation = $this->variation('year:'.$month->year.':'.$code, 3);
+            $seasonal = in_array($month->month, [11, 12], true) || ($profile['school'] && in_array($month->month, [6, 7], true));
+            $visits = $profile['visits'] + (int) ($this->variation('demand:'.$key.':'.$code, 5) < 1 + $yearVariation)
+                + (int) ($seasonal && $this->variation('season:'.$key.':'.$code, 2) === 0);
+            for ($visit = 0; $visit < $visits; $visit++) {
+                $slot = $cursor++ % $count;
+                $quantity = 1;
+                if ($profile['max_quantity'] > 1 && $this->variation('units:'.$key.':'.$code.':'.$slot, 3) === 0) {
+                    $quantity += 1 + $this->variation('extra:'.$key.':'.$code.':'.$slot, $profile['max_quantity'] - 1);
+                }
+                $orders[$slot][$code] = $quantity;
+            }
+        }
+
+        return $orders;
+    }
+
+    private function variation(string $key, int $range): int
+    {
+        return (int) hexdec(substr(hash('sha256', $key), 0, 8)) % $range;
+    }
+
+    private function orderDate(CarbonImmutable $month, int $slot): CarbonImmutable
+    {
+        $key = $month->format('Y-m').':'.$slot;
+
+        return $month->startOfMonth()->day(2 + $slot * 4 + $this->variation('day:'.$key, 3))
+            ->setTime(9 + $this->variation('hour:'.$key, 9), $this->variation('minute:'.$key, 60));
+    }
+
+    private function orderLabel(CarbonImmutable $month, int $slot): string
+    {
+        return self::LABEL_PREFIX.$month->format('Y-m').' V3 '.sprintf('%02d', $slot + 1);
     }
 
     /**
-     * Persist historical snapshots without invoking live checkout or its stock deduction.
-     *
-     * @param  list<array{product: Product, quantity: int, price: numeric-string}>  $items
+     * @param  array<int|string, Product>  $products
+     * @param  array<int|string, int>  $quantities
      */
-    private function seedOrder(User $customer, string $label, CarbonImmutable $date, array $items): void
+    private function seedOrder(User $customer, string $label, CarbonImmutable $date, array $products, array $quantities, DeliveryRules $deliveryRules): void
     {
-        $matchingOrders = Order::query()->whereBelongsTo($customer)
-            ->where('recipient_name', $label)
-            ->where('created_at', $date->toDateTimeString())
-            ->get();
-        if ($matchingOrders->count() > 1) {
-            throw new RuntimeException('Historical sales order identity is ambiguous.');
-        }
-        $order = $matchingOrders->first() ?? new Order;
-
-        $productIds = array_map(fn (array $item): int => $item['product']->id, $items);
-        if ($order->exists) {
-            $order->items()->whereNotIn('product_id', $productIds)->delete();
-        }
-
+        $items = [];
         $total = '0.00';
-        foreach ($items as $item) {
-            $total = bcadd($total, bcmul($item['price'], (string) $item['quantity'], 2), 2);
+        foreach ($quantities as $code => $quantity) {
+            $product = $products[$code];
+            $price = $product->discount_price ?? $product->price;
+            if (! is_numeric($price) || bccomp($price, '0', 2) < 0) {
+                throw new RuntimeException('Historical sales product prices must be numeric and nonnegative.');
+            }
+            $items[] = ['product_id' => $product->id, 'quantity' => $quantity, 'price_at_time' => $price];
+            $total = bcadd($total, bcmul($price, (string) $quantity, 2), 2);
         }
-
+        $slot = (int) substr($label, -2) - 1;
+        $terms = $this->orderTerms($date, $slot);
+        $quote = $deliveryRules->quote($terms['fulfillment'], $terms['destination'], array_map(fn (int|string $code): Product => $products[$code], array_keys($quantities)));
+        if ($quote !== null && (! $quote['is_demo'] || $quote['origin_city'] !== 'Sagay City' || Config::string('battlefront.delivery.carrier') !== 'lbc')) {
+            throw new RuntimeException('Historical delivery requires the approved Sagay demo delivery configuration.');
+        }
+        $finalTotal = bcadd($total, $quote['delivery_fee'] ?? '0.00', 2);
+        $order = new Order;
         $order->forceFill([
             'user_id' => $customer->id,
             'recipient_name' => $label,
             'contact_number' => '09000000000',
-            'fulfillment_method' => FulfillmentMethod::Pickup,
-            'delivery_address' => null,
-            'total_amount' => $total,
+            'fulfillment_method' => $terms['fulfillment'],
+            'delivery_address' => $terms['destination'] === null ? null : $this->deliveryAddress($terms['destination']),
+            'product_subtotal' => $total,
+            'delivery_fee' => $quote['delivery_fee'] ?? '0.00',
+            'total_amount' => $finalTotal,
+            'delivery_destination' => $quote['destination'] ?? null,
+            'delivery_base_fee' => $quote['base_fee'] ?? null,
+            'shipping_profile' => $quote['shipping_profile'] ?? null,
+            'handling_surcharge' => $quote['handling_surcharge'] ?? null,
+            'delivery_origin_city' => $quote['origin_city'] ?? null,
+            'delivery_is_demo' => $quote['is_demo'] ?? null,
+            'delivery_assumption_label' => $quote === null ? null : self::DELIVERY_NOTE.' '.$quote['assumption_label'],
             'status' => OrderStatus::Completed,
             'payment_status' => PaymentStatus::Verified,
-            'payment_method' => PaymentMethod::Cash,
-            'payment_proof_path' => null,
-            'payment_rejection_reason' => null,
-            'payment_rejection_note' => null,
+            'payment_method' => $terms['payment'],
             'created_at' => $date->toDateTimeString(),
         ])->save();
-
-        foreach ($items as $item) {
-            $order->items()->updateOrCreate(['product_id' => $item['product']->id], [
-                'quantity' => $item['quantity'],
-                'price_at_time' => $item['price'],
+        $order->items()->createMany($items);
+        if ($quote !== null) {
+            $shipment = $order->shipment()->make([
+                'carrier' => Config::string('battlefront.delivery.carrier'), 'status' => ShipmentStatus::Delivered,
+                'preparation_days' => $quote['preparation_days'], 'transit_min_days' => $quote['transit_min_days'],
+                'transit_max_days' => $quote['transit_max_days'], 'eta_min_days' => $quote['eta_min_days'], 'eta_max_days' => $quote['eta_max_days'],
             ]);
+            $shipment->forceFill(['created_at' => $date->toDateTimeString(), 'updated_at' => $date->toDateTimeString()])->save();
         }
-        $order->sale()->updateOrCreate([], ['amount' => $total, 'sale_date' => $date->toDateString()]);
+        $order->sale()->create(['amount' => $finalTotal, 'sale_date' => $date->toDateString()]);
     }
 }
