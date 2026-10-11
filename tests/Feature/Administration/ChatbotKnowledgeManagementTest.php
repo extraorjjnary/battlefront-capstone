@@ -12,8 +12,8 @@ dataset('chatbot knowledge administration routes', [
     'create' => ['get', 'administration.chatbot-knowledge.create', false, []],
     'store' => ['post', 'administration.chatbot-knowledge.store', false, [
         'category' => 'faq',
-        'question_pattern' => 'What are your store hours?',
-        'response_template' => 'Battlefront is open from 8:00 AM to 6:00 PM.',
+        'question_pattern' => 'How do I search for products?',
+        'response_template' => 'Use catalog search.',
         'priority' => 10,
     ]],
     'show' => ['get', 'administration.chatbot-knowledge.show', true, []],
@@ -108,7 +108,7 @@ test('administrators can open create view and edit pages', function () {
         ->get(route('administration.chatbot-knowledge.create'))
         ->assertInertia(fn (Assert $page) => $page
             ->component('Administration/ChatbotKnowledge/Create')
-            ->has('categories', 4));
+            ->missing('categories'));
     $this->actingAs($administrator)
         ->get(route('administration.chatbot-knowledge.show', $knowledge))
         ->assertInertia(fn (Assert $page) => $page
@@ -123,7 +123,7 @@ test('administrators can open create view and edit pages', function () {
             ->component('Administration/ChatbotKnowledge/Edit')
             ->where('knowledge.response_template', 'The branch is in Sagay City.')
             ->where('knowledge.priority', 12)
-            ->has('categories', 4));
+            ->missing('categories'));
 });
 
 test('administrators can create chatbot knowledge without changing the active default', function () {
@@ -132,8 +132,8 @@ test('administrators can create chatbot knowledge without changing the active de
     $response = $this->actingAs($administrator)
         ->post(route('administration.chatbot-knowledge.store'), [
             'category' => 'faq',
-            'question_pattern' => 'What are your store hours?',
-            'response_template' => 'Battlefront is open from 8:00 AM to 6:00 PM.',
+            'question_pattern' => 'How do I search for products?',
+            'response_template' => 'Use catalog search.',
             'priority' => 10,
             'is_active' => false,
         ]);
@@ -143,9 +143,9 @@ test('administrators can create chatbot knowledge without changing the active de
         ->assertRedirect(route('administration.chatbot-knowledge.index'));
     $this->assertDatabaseHas('chatbot_knowledge', [
         'category' => 'faq',
-        'question_pattern' => 'What are your store hours?',
-        'response_template' => 'Battlefront is open from 8:00 AM to 6:00 PM.',
-        'priority' => 10,
+        'question_pattern' => 'How do I search for products?',
+        'response_template' => 'Use catalog search.',
+        'priority' => 0,
         'is_active' => true,
     ]);
 });
@@ -154,7 +154,7 @@ test('chatbot knowledge inputs are validated', function (array $payload, array $
     $administrator = User::factory()->administrator()->create();
     $validPayload = [
         'category' => 'product',
-        'question_pattern' => 'Is this product available?',
+        'question_pattern' => 'How do I search for products?',
         'response_template' => 'Check the current product information.',
         'priority' => 1,
     ];
@@ -179,36 +179,30 @@ test('chatbot knowledge inputs are validated', function (array $payload, array $
             'priority' => null,
         ],
         [
-            'category' => 'Select a chatbot category.',
             'question_pattern' => 'Enter a question pattern.',
             'response_template' => 'Enter a response template.',
-            'priority' => 'Enter a priority.',
         ],
     ],
-    'invalid category and priority' => [
-        ['category' => 'support', 'priority' => 'high'],
-        [
-            'category' => 'Select a valid chatbot category.',
-            'priority' => 'The priority must be a whole number.',
-        ],
+    'invalid question and answer types' => [
+        ['question_pattern' => ['invalid'], 'response_template' => ['invalid']],
+        ['question_pattern', 'response_template'],
     ],
     'oversized question pattern and priority' => [
         ['question_pattern' => Str::repeat('x', 256), 'priority' => 2147483648],
         [
             'question_pattern' => 'The question pattern must not exceed 255 characters.',
-            'priority' => 'The priority is outside the supported range.',
         ],
     ],
 ]);
 
 test('administrators can edit content without changing activation', function () {
     $administrator = User::factory()->administrator()->create();
-    $knowledge = ChatbotKnowledge::factory()->inactive()->create();
+    $knowledge = ChatbotKnowledge::factory()->inactive()->create(['priority' => 42]);
 
     $response = $this->actingAs($administrator)
         ->put(route('administration.chatbot-knowledge.update', $knowledge), [
             'category' => 'order',
-            'question_pattern' => 'Where is my order?',
+            'question_pattern' => 'How can I check my order status?',
             'response_template' => 'Review your current order details.',
             'priority' => -5,
             'is_active' => true,
@@ -219,17 +213,17 @@ test('administrators can edit content without changing activation', function () 
         ->assertRedirect(route('administration.chatbot-knowledge.show', $knowledge));
     $this->assertDatabaseHas('chatbot_knowledge', [
         'id' => $knowledge->id,
-        'category' => 'order',
-        'question_pattern' => 'Where is my order?',
+        'category' => 'faq',
+        'question_pattern' => 'How can I check my order status?',
         'response_template' => 'Review your current order details.',
-        'priority' => -5,
+        'priority' => 42,
         'is_active' => false,
     ]);
 });
 
 test('administrators can deactivate and reactivate knowledge without deleting it', function () {
     $administrator = User::factory()->administrator()->create();
-    $knowledge = ChatbotKnowledge::factory()->create();
+    $knowledge = ChatbotKnowledge::factory()->create(['category' => ChatbotCategory::Faq, 'question_pattern' => 'How do I search for products?']);
 
     $this->actingAs($administrator)
         ->from(route('administration.chatbot-knowledge.show', $knowledge))
@@ -254,7 +248,7 @@ test('administrators can deactivate and reactivate knowledge without deleting it
 
 test('chatbot knowledge activation requires an explicit boolean state', function () {
     $administrator = User::factory()->administrator()->create();
-    $knowledge = ChatbotKnowledge::factory()->create();
+    $knowledge = ChatbotKnowledge::factory()->create(['category' => ChatbotCategory::Faq, 'question_pattern' => 'How do I search for products?']);
 
     $this->actingAs($administrator)
         ->from(route('administration.chatbot-knowledge.show', $knowledge))

@@ -66,7 +66,7 @@ defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: 'Chatbot knowledge',
+                title: 'Chatbot FAQs',
                 href: ChatbotKnowledgeController.index(),
             },
         ],
@@ -75,7 +75,7 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Chatbot knowledge" />
+    <Head title="Chatbot FAQs" />
 
     <main
         class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
@@ -100,21 +100,19 @@ defineOptions({
                         <h1
                             class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
                         >
-                            Chatbot knowledge management
+                            Chatbot FAQs
                         </h1>
                         <p
                             class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6"
                         >
-                            Maintain approved question patterns and response
-                            templates without configuring chatbot retrieval or
-                            providers.
+                            Manage approved support FAQs. Live facts and application rules are answered automatically.
                         </p>
                     </div>
                 </div>
                 <Button as-child class="shrink-0">
                     <Link :href="ChatbotKnowledgeController.create()">
                         <Plus />
-                        Add knowledge
+                        Add FAQ
                     </Link>
                 </Button>
             </div>
@@ -144,8 +142,8 @@ defineOptions({
             <CollapsibleContent class="px-6 pb-6">
                 <p class="text-muted-foreground max-w-3xl text-sm leading-6">
                     Enter a customer question to see its category and matching
-                    active FAQ or Order knowledge across all records. This
-                    checks routing and saved knowledge only; it does not
+                    active eligible FAQs across all records. This
+                    checks routing and saved FAQs only; it does not
                     retrieve live product, branch, or customer order data, or
                     generate a chatbot reply.
                 </p>
@@ -197,7 +195,7 @@ defineOptions({
                         <p>{{ previewResult.explanation }}</p>
                         <template v-if="previewResult.matches.length">
                             <h3 class="pt-2 font-semibold">
-                                Matched knowledge
+                                Matched FAQs
                             </h3>
                             <ol class="space-y-4">
                                 <li
@@ -220,7 +218,6 @@ defineOptions({
                                                         ? 'Exact wording'
                                                         : 'Related wording'
                                                 }}
-                                                · Priority {{ match.priority }}
                                             </p>
                                         </div>
                                         <Button
@@ -258,7 +255,7 @@ defineOptions({
                     {{ knowledge.total }} records
                 </p>
                 <h2 id="knowledge-list-heading" class="text-xl font-semibold">
-                    Knowledge records
+                    FAQ and legacy records
                 </h2>
             </div>
 
@@ -271,11 +268,10 @@ defineOptions({
                         class="text-muted-foreground mx-auto size-9"
                     />
                     <p class="mt-3 font-medium">
-                        No chatbot knowledge available
+                        No chatbot FAQs available
                     </p>
                     <p class="text-muted-foreground mt-1 text-sm">
-                        Add an approved response record to begin managing
-                        knowledge.
+                        Add approved support guidance to begin managing FAQs.
                     </p>
                 </div>
             </div>
@@ -301,10 +297,9 @@ defineOptions({
                             >
                                 {{ item.is_active ? 'Active' : 'Inactive' }}
                             </Badge>
-                            <span class="text-muted-foreground text-xs"
-                                >Priority {{ item.priority }}</span
-                            >
+                            <Badge v-if="!item.eligible_for_faq" variant="outline">Needs review</Badge>
                         </div>
+                        <p v-if="!item.eligible_for_faq" class="text-muted-foreground mt-2 text-xs">{{ item.eligibility_reason }}</p>
                         <h3 class="mt-3 font-semibold">
                             {{ item.question_pattern }}
                         </h3>
@@ -352,13 +347,14 @@ defineOptions({
                                 )
                             "
                             :options="{ preserveScroll: true }"
-                            v-slot="{ processing }"
+                            v-slot="{ errors, processing }"
                         >
                             <input type="hidden" name="is_active" value="1" />
+                            <InputError :message="errors.is_active" />
                             <Button
                                 variant="outline"
                                 size="sm"
-                                :disabled="processing"
+                                :disabled="processing || !item.eligible_for_faq"
                             >
                                 <Spinner v-if="processing" />
                                 <RotateCcw v-else />
@@ -373,7 +369,7 @@ defineOptions({
                 :current-page="knowledge.current_page"
                 :last-page="knowledge.last_page"
                 :route="ChatbotKnowledgeController.index"
-                label="Chatbot knowledge pages"
+                label="Chatbot FAQs pages"
             />
         </section>
     </main>

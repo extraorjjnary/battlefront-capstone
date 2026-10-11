@@ -7,27 +7,27 @@ use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia as Assert;
 
-test('administrators preview the same saved payment knowledge used by the customer chatbot', function () {
+test('administrators preview the same saved support FAQ used by the customer chatbot', function () {
     Http::preventStrayRequests();
     ChatbotResponseAgent::fake()->preventStrayPrompts();
     $administrator = User::factory()->administrator()->create();
     $knowledge = ChatbotKnowledge::factory()->create([
-        'category' => ChatbotCategory::Order,
-        'question_pattern' => 'What payment methods can I use?',
-        'response_template' => 'Approved payment guidance.',
+        'category' => ChatbotCategory::Faq,
+        'question_pattern' => 'How do I search for products?',
+        'response_template' => 'Approved search guidance.',
     ]);
 
     $this->actingAs($administrator)->postJson(route('administration.chatbot-knowledge.preview'), [
-        'message' => 'Do you accept GCash?',
+        'message' => 'How can I search products?',
     ])->assertOk()
         ->assertJsonPath('category', 'faq')
         ->assertJsonMissingPath('record_matches')
         ->assertJsonPath('matches.0.id', $knowledge->id)
-        ->assertJsonPath('matches.0.response_template', 'Approved payment guidance.');
+        ->assertJsonPath('matches.0.response_template', 'Approved search guidance.');
 
     ChatbotResponseAgent::assertNeverPrompted();
     Http::assertNothingSent();
-    $this->assertDatabaseHas('chatbot_knowledge', ['id' => $knowledge->id, 'response_template' => 'Approved payment guidance.']);
+    $this->assertDatabaseHas('chatbot_knowledge', ['id' => $knowledge->id, 'response_template' => 'Approved search guidance.']);
 });
 
 test('preview excludes inactive knowledge and never resolves personal orders', function () {
@@ -35,11 +35,11 @@ test('preview excludes inactive knowledge and never resolves personal orders', f
     ChatbotResponseAgent::fake()->preventStrayPrompts();
     $administrator = User::factory()->administrator()->create();
     ChatbotKnowledge::factory()->inactive()->create([
-        'category' => ChatbotCategory::Faq, 'question_pattern' => 'What payment methods can I use?',
+        'category' => ChatbotCategory::Faq, 'question_pattern' => 'How do I search for products?',
     ]);
 
     $this->actingAs($administrator)->postJson(route('administration.chatbot-knowledge.preview'), [
-        'message' => 'Do you accept GCash?',
+        'message' => 'How can I search products?',
     ])->assertOk()->assertJsonPath('matches', [])->assertJsonMissingPath('record_matches');
     $this->postJson(route('administration.chatbot-knowledge.preview'), [
         'message' => 'Is my payment for BF-42 verified?',
@@ -76,12 +76,12 @@ test('the general preview finds different answers beyond the visible list page',
     ChatbotResponseAgent::fake()->preventStrayPrompts();
     ChatbotKnowledge::factory()->count(15)->create(['category' => ChatbotCategory::Product]);
     $payment = ChatbotKnowledge::factory()->create([
-        'category' => ChatbotCategory::Order,
-        'question_pattern' => 'What payment methods can I use?',
+        'category' => ChatbotCategory::Faq,
+        'question_pattern' => 'How do I search for products?',
     ]);
     $delivery = ChatbotKnowledge::factory()->create([
-        'category' => ChatbotCategory::Order,
-        'question_pattern' => 'Can I choose pickup or delivery?',
+        'category' => ChatbotCategory::Faq,
+        'question_pattern' => 'How can I check my order status?',
     ]);
     $this->actingAs(User::factory()->administrator()->create());
 
@@ -91,9 +91,9 @@ test('the general preview finds different answers beyond the visible list page',
             ->component('Administration/ChatbotKnowledge/Index')
             ->has('knowledge.data', 15)
             ->where('knowledge.total', 17));
-    $this->postJson(route('administration.chatbot-knowledge.preview'), ['message' => 'Do you accept GCash?'])
+    $this->postJson(route('administration.chatbot-knowledge.preview'), ['message' => 'How can I search products?'])
         ->assertOk()->assertJsonPath('matches.0.id', $payment->id)->assertJsonMissingPath('record_matches');
-    $this->postJson(route('administration.chatbot-knowledge.preview'), ['message' => 'Can I choose pickup or delivery?'])
+    $this->postJson(route('administration.chatbot-knowledge.preview'), ['message' => 'How can I check my order status?'])
         ->assertOk()->assertJsonPath('matches.0.id', $delivery->id)->assertJsonMissingPath('record_matches');
 
     ChatbotResponseAgent::assertNeverPrompted();
@@ -107,7 +107,7 @@ test('preview explains questions without knowledge matches even when no records 
     $this->actingAs(User::factory()->administrator()->create())
         ->postJson(route('administration.chatbot-knowledge.preview'), ['message' => $message])
         ->assertOk()
-        ->assertJsonCount(3)
+        ->assertJsonCount(6)
         ->assertJsonPath('category', $category)
         ->assertJsonPath('matches', [])
         ->assertJsonPath('explanation', fn (string $value): bool => str_contains($value, $explanation));
@@ -115,7 +115,7 @@ test('preview explains questions without knowledge matches even when no records 
     ChatbotResponseAgent::assertNeverPrompted();
     Http::assertNothingSent();
 })->with([
-    ['Do you accept GCash?', 'faq', 'No active approved knowledge'],
+    ['How can I search products?', 'faq', 'No active approved FAQ'],
     ['What is the laptop price?', 'product', 'current catalog and Sagay inventory'],
     ['Where is your Sagay branch?', 'store', 'confirmed branch information'],
     ['Tell me a joke', 'unsupported', 'unsupported'],

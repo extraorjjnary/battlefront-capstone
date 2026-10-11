@@ -88,7 +88,7 @@ export function useAppNavigation() {
                 icon: UsersRound,
             });
             items.push({
-                title: 'Chatbot knowledge',
+                title: 'Chatbot FAQs',
                 href: ChatbotKnowledgeController.index(),
                 icon: MessageSquareText,
                 activeRoutes: [ChatbotKnowledgeController.index()],

@@ -2,10 +2,10 @@
 
 namespace App\Http\Requests\Administration;
 
-use App\Enums\ChatbotCategory;
+use App\Actions\Chatbot\ValidateChatbotFaq;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class SaveChatbotKnowledgeRequest extends FormRequest
 {
@@ -25,30 +25,33 @@ class SaveChatbotKnowledgeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'category' => ['bail', 'required', Rule::enum(ChatbotCategory::class)],
             'question_pattern' => ['bail', 'required', 'string', 'max:255'],
             'response_template' => ['bail', 'required', 'string'],
-            'priority' => [
-                'bail',
-                'required',
-                'integer',
-                'between:-2147483648,2147483647',
-            ],
         ];
+    }
+
+    /** @return list<\Closure> */
+    public function after(): array
+    {
+        return [function (Validator $validator): void {
+            if ($validator->errors()->has('question_pattern')) {
+                return;
+            }
+            $record = $this->route('chatbotKnowledge');
+            $error = app(ValidateChatbotFaq::class)->execute($this->string('question_pattern')->toString(), $record?->id);
+            if ($error !== null) {
+                $validator->errors()->add('question_pattern', $error);
+            }
+        }];
     }
 
     /** @return array<string, string> */
     public function messages(): array
     {
         return [
-            'category.required' => 'Select a chatbot category.',
-            'category.enum' => 'Select a valid chatbot category.',
             'question_pattern.required' => 'Enter a question pattern.',
             'question_pattern.max' => 'The question pattern must not exceed 255 characters.',
             'response_template.required' => 'Enter a response template.',
-            'priority.required' => 'Enter a priority.',
-            'priority.integer' => 'The priority must be a whole number.',
-            'priority.between' => 'The priority is outside the supported range.',
         ];
     }
 }

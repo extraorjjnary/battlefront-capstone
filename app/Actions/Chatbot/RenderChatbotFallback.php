@@ -11,7 +11,7 @@ class RenderChatbotFallback
     public function execute(ChatbotQueryCategory $category, string $message, array $context): ?string
     {
         return match ($category) {
-            ChatbotQueryCategory::Faq => $this->faq($message, $context['knowledge']),
+            ChatbotQueryCategory::Faq => $context['guidance'] ?? $this->faq($message, $context['knowledge'] ?? []),
             ChatbotQueryCategory::Store => $this->store($message, $context['branches']),
             ChatbotQueryCategory::Product => $this->product($message, $context['products']),
             ChatbotQueryCategory::Order => $this->order($context['orders']),

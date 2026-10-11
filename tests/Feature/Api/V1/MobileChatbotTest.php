@@ -60,8 +60,8 @@ test('mobile chatbot uses shared product store and FAQ context with the resource
     } else {
         ChatbotKnowledge::factory()->create([
             'category' => ChatbotCategory::Faq,
-            'question_pattern' => 'What payment methods are accepted?',
-            'response_template' => 'Approved payment options.',
+            'question_pattern' => 'How do I search for products?',
+            'response_template' => 'Approved catalog search guidance.',
         ]);
     }
 
@@ -72,16 +72,20 @@ test('mobile chatbot uses shared product store and FAQ context with the resource
     $response = $this->post('/api/v1/chatbot', ['message' => $message])
         ->assertOk()->assertJsonCount(1)
         ->assertJsonCount(3, 'data')
-        ->assertJsonPath('data.message', 'Approved answer.')
-        ->assertJsonPath('data.source', 'gemini');
+        ->assertJsonPath('data.message', $topic === 'faq' ? $fact : 'Approved answer.')
+        ->assertJsonPath('data.source', $topic === 'faq' ? 'fallback' : 'gemini');
     expect($response->json('data.context_token'))->toBeString();
-    ChatbotResponseAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, $fact));
-    ChatbotResponseAgent::assertPromptedTimes(1);
+    if ($topic === 'faq') {
+        ChatbotResponseAgent::assertNeverPrompted();
+    } else {
+        ChatbotResponseAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, $fact));
+        ChatbotResponseAgent::assertPromptedTimes(1);
+    }
     Http::assertNothingSent();
 })->with([
     ['product', 'What is the price of Aurelius Mouse?', '123.45'],
     ['store', 'Where is the Sagay store?', 'Confirmed Sagay address'],
-    ['faq', 'What payment methods are accepted?', 'Approved payment options.'],
+    ['faq', 'How do I search for products?', 'Approved catalog search guidance.'],
 ])->with([true, false]);
 
 test('mobile chatbot validates input without invoking the provider', function (array $payload, string $field, bool $authenticated) {

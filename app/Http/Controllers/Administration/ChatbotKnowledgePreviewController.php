@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Administration;
 
+use App\Actions\Chatbot\ClassifyChatbotInquiry;
 use App\Actions\Chatbot\MatchChatbotKnowledge;
 use App\Actions\Chatbot\RouteChatbotQuery;
 use App\Enums\ChatbotQueryCategory;
 use App\Http\Controllers\Controller;
-use App\Services\Chatbot\ChatbotOrchestrationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -16,13 +16,16 @@ class ChatbotKnowledgePreviewController extends Controller
         Request $request,
         RouteChatbotQuery $router,
         MatchChatbotKnowledge $matcher,
-        ChatbotOrchestrationService $chatbot,
+        ClassifyChatbotInquiry $boundary,
     ): JsonResponse {
         $validated = $request->validate(['message' => ['required', 'string', 'max:1000']]);
 
-        if ($chatbot->containsSensitiveInput($validated['message'])) {
+        if ($boundary->containsSensitiveInput($validated['message'])) {
             return response()->json([
                 'category' => null,
+                'owner' => 'unsupported',
+                'eligible_for_faq' => false,
+                'ambiguous' => false,
                 'matches' => [],
                 'explanation' => 'Remove sensitive information before testing this question.',
             ]);
@@ -30,23 +33,42 @@ class ChatbotKnowledgePreviewController extends Controller
 
         $routing = $router->execute($validated['message']);
         $category = $routing['category'];
-        $matches = $category === ChatbotQueryCategory::Faq && $routing['choices'] === []
-            ? $matcher->execute($validated['message']) : [];
+        $classification = $boundary->execute($validated['message']);
+        $matches = $classification['eligible_for_faq'] && $category === ChatbotQueryCategory::Faq && $routing['choices'] === []
+            ? $matcher->bestMatches($validated['message']) : [];
 
         return response()->json([
             'category' => $category->value,
+            'owner' => $routing['choices'] !== [] ? 'clarification' : $classification['owner'],
+            'eligible_for_faq' => $classification['eligible_for_faq'] && $routing['choices'] === [] && $matcher->hasMeaningfulTerms($validated['message']),
+            'ambiguous' => count($matches) > 1,
             'matches' => $matches,
-            'explanation' => $routing['choices'] !== []
-                ? $router->clarification($routing['choices'])
-                : match ($category) {
-                    ChatbotQueryCategory::Product => 'Product answers use current catalog and Sagay inventory facts, not knowledge templates.',
-                    ChatbotQueryCategory::Store => 'Store answers use confirmed branch information, not knowledge templates.',
-                    ChatbotQueryCategory::Order => 'Personal order inquiries require a customer account and an owned order reference. This preview does not retrieve orders.',
-                    ChatbotQueryCategory::Unsupported => 'This wording is unsupported. An active FAQ must match the saved question wording or supported routing rules.',
-                    ChatbotQueryCategory::Faq => $matches === []
-                        ? 'No active approved knowledge matches this question.'
-                        : 'Matched active saved knowledge. Exact wording ranks first, then relevance; priority breaks equal-relevance ties.',
-                },
+            'explanation' => $this->explanation($routing, $classification, $matches, $matcher->hasMeaningfulTerms($validated['message']), $router),
         ]);
+    }
+
+    /**
+     * @param  array{category: ChatbotQueryCategory, choices: array<string, string>}  $routing
+     * @param  array<string, mixed>  $classification
+     * @param  list<array<string, mixed>>  $matches
+     */
+    private function explanation(array $routing, array $classification, array $matches, bool $hasTerms, RouteChatbotQuery $router): string
+    {
+        if ($routing['choices'] !== []) {
+            return $router->clarification($routing['choices']);
+        }
+        if (! $classification['eligible_for_faq']) {
+            return $classification['reason'];
+        }
+        if (! $hasTerms) {
+            return 'Enter a specific Battlefront support question with meaningful wording.';
+        }
+        if (count($matches) > 1) {
+            return 'Multiple FAQs match equally. The chatbot will ask which question you mean.';
+        }
+
+        return $matches === []
+            ? 'No active approved FAQ matches this question. Eligible wording can be saved as a new FAQ.'
+            : 'Matched active saved FAQ. Exact wording ranks first, then relevance. Priority does not affect matching.';
     }
 }

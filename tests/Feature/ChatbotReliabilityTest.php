@@ -49,28 +49,28 @@ test('provider outage asks for a branch instead of choosing one', function () {
     ChatbotResponseAgent::assertPromptedTimes(1);
 });
 
-test('provider outage clarifies competing knowledge matches instead of combining answers', function () {
+test('competing FAQ matches clarify before provider generation', function () {
     Http::preventStrayRequests();
     ChatbotResponseAgent::fake(fn () => throw new AiException)->preventStrayPrompts();
-    ChatbotKnowledge::factory()->create(['category' => ChatbotCategory::Faq, 'question_pattern' => 'What payment methods are accepted for pickup?', 'response_template' => 'Pickup answer.', 'priority' => 100]);
-    ChatbotKnowledge::factory()->create(['category' => ChatbotCategory::Order, 'question_pattern' => 'What payment methods are accepted for delivery?', 'response_template' => 'Delivery answer.', 'priority' => 90]);
+    ChatbotKnowledge::factory()->create(['category' => ChatbotCategory::Faq, 'question_pattern' => 'How do I search the catalog?', 'response_template' => 'Pickup answer.', 'priority' => 100]);
+    ChatbotKnowledge::factory()->create(['category' => ChatbotCategory::Faq, 'question_pattern' => 'How can I search the catalog?', 'response_template' => 'Delivery answer.', 'priority' => 90]);
 
-    $this->postJson(route('chatbot.store'), ['message' => 'Do you accept GCash?'])
-        ->assertJsonPath('message', 'Which question do you mean? What payment methods are accepted for pickup? / What payment methods are accepted for delivery?');
+    $this->postJson(route('chatbot.store'), ['message' => 'How should I search the catalog?'])
+        ->assertJsonPath('message', 'Which question do you mean? How do I search the catalog? / How can I search the catalog?');
 
-    ChatbotResponseAgent::assertPromptedTimes(1);
+    ChatbotResponseAgent::assertNeverPrompted();
 });
 
-test('provider outage prefers an exact approved FAQ over broader matches', function () {
+test('an exact approved FAQ is preferred over broader matches without calling the provider', function () {
     Http::preventStrayRequests();
     ChatbotResponseAgent::fake(fn () => throw new AiException)->preventStrayPrompts();
-    ChatbotKnowledge::factory()->create(['category' => ChatbotCategory::Order, 'question_pattern' => 'What payment methods are accepted?', 'response_template' => 'Confirmed payment options.']);
-    ChatbotKnowledge::factory()->create(['category' => ChatbotCategory::Faq, 'question_pattern' => 'What payment methods are accepted for pickup?', 'response_template' => 'Other guidance.']);
+    ChatbotKnowledge::factory()->create(['category' => ChatbotCategory::Faq, 'question_pattern' => 'How do I search for products?', 'response_template' => 'Confirmed search guidance.']);
+    ChatbotKnowledge::factory()->create(['category' => ChatbotCategory::Faq, 'question_pattern' => 'How do I search the catalog?', 'response_template' => 'Other guidance.']);
 
-    $this->postJson(route('chatbot.store'), ['message' => 'What payment methods are accepted?'])
-        ->assertJsonPath('message', 'Confirmed payment options.');
+    $this->postJson(route('chatbot.store'), ['message' => 'How do I search for products?'])
+        ->assertJsonPath('message', 'Confirmed search guidance.');
 
-    ChatbotResponseAgent::assertPromptedTimes(1);
+    ChatbotResponseAgent::assertNeverPrompted();
 });
 
 test('provider outage returns catalog price and preserves demo notice', function (string $name, string $expected) {
@@ -179,10 +179,10 @@ test('confirmed timeout still returns configured operating hours', function () {
 test('blank approved knowledge never becomes an empty customer reply after provider failure', function () {
     Http::preventStrayRequests();
     ChatbotResponseAgent::fake(fn () => throw new AiException)->preventStrayPrompts();
-    ChatbotKnowledge::factory()->create(['category' => ChatbotCategory::Faq, 'question_pattern' => 'What payment methods are accepted?', 'response_template' => '   ']);
+    ChatbotKnowledge::factory()->create(['category' => ChatbotCategory::Faq, 'question_pattern' => 'How do I search for products?', 'response_template' => '   ']);
 
-    $this->postJson(route('chatbot.store'), ['message' => 'What payment methods are accepted?'])
-        ->assertJsonPath('message', 'The chatbot is temporarily unavailable. Please try again later.');
+    $this->postJson(route('chatbot.store'), ['message' => 'How do I search for products?'])
+        ->assertJsonPath('message', 'Approved information for that question is currently unavailable.');
 
-    ChatbotResponseAgent::assertPromptedTimes(1);
+    ChatbotResponseAgent::assertNeverPrompted();
 });

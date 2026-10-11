@@ -21,8 +21,8 @@ class ChatbotKnowledgeActivationController extends Controller
         Inertia::flash('toast', [
             'type' => 'success',
             'message' => $isActive
-                ? __('Chatbot knowledge reactivated.')
-                : __('Chatbot knowledge deactivated.'),
+                ? __('Chatbot FAQ reactivated.')
+                : __('Chatbot FAQ deactivated.'),
         ]);
 
         return back();

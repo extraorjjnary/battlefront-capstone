@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Chatbot\ClassifyChatbotInquiry;
 use App\Actions\Chatbot\Context\ResolveFaqContext;
 use App\Actions\Chatbot\RouteChatbotQuery;
 use App\Ai\Agents\ChatbotResponseAgent;
@@ -11,7 +12,7 @@ use App\Models\User;
 use App\Services\Chatbot\ChatbotOrchestrationService;
 use Illuminate\Support\Facades\Http;
 
-test('payment aliases retrieve approved question patterns without searching answer text', function (string $message) {
+test('payment aliases use application rules instead of searching saved answer text', function (string $message) {
     $knowledge = ChatbotKnowledge::factory()->create([
         'category' => ChatbotCategory::Order,
         'question_pattern' => 'What payment methods can I use?',
@@ -25,10 +26,8 @@ test('payment aliases retrieve approved question patterns without searching answ
 
     $context = app(ResolveFaqContext::class)->execute($message);
 
-    expect($context['knowledge'])->toBe([[
-        'question_pattern' => $knowledge->question_pattern,
-        'response_template' => $knowledge->response_template,
-    ]]);
+    expect($context['knowledge'])->toBe([])
+        ->and(app(ClassifyChatbotInquiry::class)->execute($message)['rule_topic'])->toBe('payment_methods');
 })->with(['Do you accept GCash?', 'Can I pay cash?', 'Do you accept Maya?', 'How do I pay for my order?']);
 
 test('saved FAQs are reachable but do not bypass personal orders or unsupported restrictions', function (string $message, ChatbotQueryCategory $category) {
@@ -94,8 +93,9 @@ test('general payment guidance is available to guests without resolving their or
     $result = app(ChatbotOrchestrationService::class)->respond('How do I pay for my order?');
 
     expect($result['category'])->toBe(ChatbotQueryCategory::Faq)
-        ->and($result['source'])->toBe('gemini');
-    ChatbotResponseAgent::assertPromptedTimes(1);
+        ->and($result['source'])->toBe('fallback')
+        ->and($result['message'])->toBe('Pickup orders support Cash, Card at store, GCash, Maya. Delivery orders support GCash, Maya.');
+    ChatbotResponseAgent::assertNeverPrompted();
 });
 
 test('mixed requests clarify but branch qualifiers and payment alternatives remain a single topic', function (string $message, int $choices) {

@@ -137,7 +137,7 @@ test('guests can ask about store information', function () {
     Http::assertNothingSent();
 });
 
-test('guests can ask approved FAQ questions', function () {
+test('guests receive application payment rules without saved FAQ overrides or Gemini', function () {
     Http::preventStrayRequests();
     ChatbotResponseAgent::fake(['These are the approved payment methods.'])->preventStrayPrompts();
     ChatbotKnowledge::factory()->create([
@@ -151,11 +151,11 @@ test('guests can ask approved FAQ questions', function () {
         ->assertJsonCount(3)
         ->assertJsonStructure(['message', 'source', 'context_token'])
         ->assertJson([
-            'message' => 'These are the approved payment methods.',
-            'source' => 'gemini',
+            'message' => 'Pickup orders support Cash, Card at store, GCash, Maya. Delivery orders support GCash, Maya.',
+            'source' => 'fallback',
         ]);
 
-    ChatbotResponseAgent::assertPromptedTimes(1);
+    ChatbotResponseAgent::assertNeverPrompted();
     Http::assertNothingSent();
 });
 

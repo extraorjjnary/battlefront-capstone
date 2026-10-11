@@ -3,6 +3,7 @@ import { Form, Head, Link } from '@inertiajs/vue3';
 import { ArrowLeft, MessageSquareText, Pencil, RotateCcw } from '@lucide/vue';
 import ChatbotKnowledgeActivationController from '@/actions/App/Http/Controllers/Administration/ChatbotKnowledgeActivationController';
 import ChatbotKnowledgeController from '@/actions/App/Http/Controllers/Administration/ChatbotKnowledgeController';
+import InputError from '@/components/InputError.vue';
 import DeactivationDialog from '@/components/DeactivationDialog.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,11 +17,11 @@ defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: 'Chatbot knowledge',
+                title: 'Chatbot FAQs',
                 href: ChatbotKnowledgeController.index(),
             },
             {
-                title: 'Knowledge record',
+                title: 'FAQ record',
                 href: ChatbotKnowledgeController.index(),
             },
         ],
@@ -29,7 +30,7 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Chatbot knowledge record" />
+    <Head title="Chatbot FAQ record" />
 
     <main
         class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 p-6 lg:p-10"
@@ -50,7 +51,7 @@ defineOptions({
                             <p
                                 class="text-primary text-xs font-semibold tracking-widest uppercase"
                             >
-                                Chatbot knowledge record
+                                Chatbot FAQ record
                             </p>
                             <Badge
                                 :variant="
@@ -69,9 +70,9 @@ defineOptions({
                         >
                             {{ knowledge.question_pattern }}
                         </h1>
+                        <p v-if="!knowledge.eligible_for_faq" class="text-muted-foreground mt-2 text-sm">Needs review: {{ knowledge.eligibility_reason }}</p>
                         <p class="text-muted-foreground mt-2 text-sm">
-                            {{ knowledge.category_label }} · Priority
-                            {{ knowledge.priority }}
+                            {{ knowledge.category_label }}
                         </p>
                     </div>
                 </div>
@@ -79,7 +80,7 @@ defineOptions({
                 <Button variant="outline" size="sm" as-child>
                     <Link :href="ChatbotKnowledgeController.index()">
                         <ArrowLeft />
-                        Back to knowledge
+                        Back to FAQs
                     </Link>
                 </Button>
             </div>
@@ -92,7 +93,7 @@ defineOptions({
                         Approved content
                     </p>
                     <h2 id="response-heading" class="text-xl font-semibold">
-                        Response template
+                        Approved answer
                     </h2>
                 </div>
                 <div class="flex flex-wrap gap-2">
@@ -123,13 +124,14 @@ defineOptions({
                                 knowledge.id,
                             )
                         "
-                        v-slot="{ processing }"
+                        v-slot="{ errors, processing }"
                     >
                         <input type="hidden" name="is_active" value="1" />
+                        <InputError :message="errors.is_active" />
                         <Button
                             variant="outline"
                             size="sm"
-                            :disabled="processing"
+                            :disabled="processing || !knowledge.eligible_for_faq"
                         >
                             <Spinner v-if="processing" />
                             <RotateCcw v-else />

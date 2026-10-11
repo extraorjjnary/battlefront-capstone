@@ -68,7 +68,7 @@ class ResolveProductContext
     /**
      * Resolve authoritative catalog and Sagay inventory facts for a product inquiry.
      *
-     * @return array{products: list<array{
+     * @return array{resolution: 'matched'|'needs_details'|'not_found', products: list<array{
      *     name: string,
      *     description: string|null,
      *     brand: string|null,
@@ -86,7 +86,7 @@ class ResolveProductContext
         $terms = $this->meaningfulTerms($message);
 
         if ($terms === []) {
-            return ['products' => []];
+            return ['resolution' => 'needs_details', 'products' => []];
         }
 
         $normalizedMessage = $this->normalizedText($message);
@@ -97,19 +97,20 @@ class ResolveProductContext
             : $this->products->contextMatches($terms, availableOnly: true);
 
         return [
+            'resolution' => $products->isEmpty() ? 'not_found' : 'matched',
             'products' => array_values($products
                 ->map(fn (Product $product): array => $this->mapProduct($product))
                 ->all()),
         ];
     }
 
-    /** @return array{products: list<array<string, mixed>>} */
+    /** @return array{resolution: 'matched'|'not_found', products: list<array<string, mixed>>} */
     public function forProduct(int $productId): array
     {
         $product = Product::query()->customerEligible()
             ->with(['category', 'inventory', 'tags'])->find($productId);
 
-        return ['products' => $product === null ? [] : [$this->mapProduct($product)]];
+        return ['resolution' => $product === null ? 'not_found' : 'matched', 'products' => $product === null ? [] : [$this->mapProduct($product)]];
     }
 
     public function namesProduct(string $message): bool
@@ -145,6 +146,8 @@ class ResolveProductContext
             ->toString();
 
         $normalizedMessage = preg_replace('/\b(?:at|in) (?:the )?(?:sagay|san carlos|escalante|guihulngan)(?: city)?(?: branch| store)?\b/u', '', $normalizedMessage);
+        $normalizedMessage = preg_replace('/\b(?:on|from|in) (?:the )?(?:battlefront s? )?facebook(?: page| post)?\b/u', '', $normalizedMessage);
+        $normalizedMessage = preg_replace('/\b(?:saw|seen|facebook|page|post|battlefront|from)\b/u', '', $normalizedMessage);
 
         if ($normalizedMessage === '') {
             return [];

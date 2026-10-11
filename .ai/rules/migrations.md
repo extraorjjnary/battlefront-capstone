@@ -16,3 +16,6 @@ Migration foreign-key convention: Prefer `foreignIdFor(Model::class)` for conven
 ## EXT-80 and EXT-81 decisions are resolved
 
 The earlier EXT-6 deferral is superseded by the approved order rule in models-migrations.md. Use the approved manual payment methods and order snapshot fields for Order persistence; do not treat EXT-80 or EXT-81 as unresolved.
+
+## Limit retired chatbot preset deletion to the approved cleanup
+The approved chatbot preset cleanup is a narrow exception to legacy knowledge retention: delete only inactive, unchanged resolver-owned development presets identified by frozen complete fingerprints in a new forward-only migration. Preserve active and edited/custom knowledge and current FAQs; do not edit the prior FAQ refinement migration or recreate deleted IDs on rollback.

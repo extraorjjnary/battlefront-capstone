@@ -7,18 +7,17 @@ import { Badge } from '@/components/ui/badge';
 
 defineProps({
     knowledge: { type: Object, required: true },
-    categories: { type: Array, required: true },
 });
 
 defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: 'Chatbot knowledge',
+                title: 'Chatbot FAQs',
                 href: ChatbotKnowledgeController.index(),
             },
             {
-                title: 'Edit knowledge',
+                title: 'Edit FAQ',
                 href: ChatbotKnowledgeController.index(),
             },
         ],
@@ -27,7 +26,7 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Edit chatbot knowledge" />
+    <Head title="Edit chatbot FAQ" />
 
     <main
         class="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 p-6 lg:p-10"
@@ -58,11 +57,10 @@ defineOptions({
                         </Badge>
                     </div>
                     <h1 class="mt-2 text-2xl font-bold tracking-tight">
-                        Edit chatbot knowledge
+                        Edit chatbot FAQ
                     </h1>
                     <p class="text-muted-foreground mt-2 text-sm leading-6">
-                        Update the approved content without changing its
-                        lifecycle state.
+                        Update approved FAQ guidance while preserving its activation state.
                     </p>
                 </div>
             </div>
@@ -71,7 +69,6 @@ defineOptions({
         <section class="border-border bg-card border p-6 sm:p-8">
             <ChatbotKnowledgeForm
                 :knowledge="knowledge"
-                :categories="categories"
                 :form="ChatbotKnowledgeController.update.form(knowledge.id)"
                 submit-label="Save changes"
             />

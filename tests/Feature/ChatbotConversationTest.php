@@ -192,7 +192,7 @@ test('an explicit order reference overrides pronouns and previous order context'
 
 test('an explicit earlier order can be revisited after a FAQ without retaining its facts', function () {
     Http::preventStrayRequests();
-    ChatbotResponseAgent::fake(['Order.', 'Payment methods.', 'Current order payment.'])->preventStrayPrompts();
+    ChatbotResponseAgent::fake(['Order.', 'Current order payment.'])->preventStrayPrompts();
     $customer = User::factory()->customer()->create();
     $order = Order::factory()->for($customer)->paidWithGCash()->create();
     ChatbotKnowledge::factory()->create([
@@ -206,9 +206,10 @@ test('an explicit earlier order can be revisited after a FAQ without retaining i
     $order->update(['payment_status' => PaymentStatus::Verified]);
     $third = $chat->respond('Payment for the earlier order?', $customer, $second['context_token'], 'session-a');
 
+    expect($second['message'])->toBe('Pickup orders support Cash, Card at store, GCash, Maya. Delivery orders support GCash, Maya.');
     expect($third['message'])->toBe('Current order payment.');
     ChatbotResponseAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, 'earlier order') && str_contains($prompt->prompt, 'verified'));
-    ChatbotResponseAgent::assertPromptedTimes(3);
+    ChatbotResponseAgent::assertPromptedTimes(2);
 });
 
 test('an explicit new topic after what about is not rewritten to the previous branch intent', function () {
@@ -238,14 +239,14 @@ test('knowledge deactivated during a conversation cannot answer the next turn', 
     Http::preventStrayRequests();
     ChatbotResponseAgent::fake(['Payment guidance.'])->preventStrayPrompts();
     $knowledge = ChatbotKnowledge::factory()->create([
-        'category' => ChatbotCategory::Faq, 'question_pattern' => 'What payment methods can I use?',
+        'category' => ChatbotCategory::Faq, 'question_pattern' => 'How do I search for products?',
     ]);
     $chat = app(ChatbotConversation::class);
 
-    $first = $chat->respond('Do you accept GCash?', null, null, 'session-a');
+    $first = $chat->respond('How do I search for products?', null, null, 'session-a');
     $knowledge->update(['is_active' => false]);
-    $second = $chat->respond('Do you accept Maya?', null, $first['context_token'], 'session-a');
+    $second = $chat->respond('How can I search products?', null, $first['context_token'], 'session-a');
 
     expect($second['source'])->toBe('fallback')->and($second['message'])->toContain('currently unavailable');
-    ChatbotResponseAgent::assertPromptedTimes(1);
+    ChatbotResponseAgent::assertNeverPrompted();
 });

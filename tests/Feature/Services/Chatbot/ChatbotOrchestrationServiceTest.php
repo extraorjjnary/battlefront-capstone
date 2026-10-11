@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\Chatbot\ClassifyChatbotInquiry;
+use App\Actions\Chatbot\Context\ResolveChatbotRuleGuidance;
 use App\Actions\Chatbot\Context\ResolveFaqContext;
 use App\Actions\Chatbot\Context\ResolveOrderContext;
 use App\Actions\Chatbot\Context\ResolveProductContext;
@@ -74,6 +76,8 @@ test('categorizes before resolving context and resolves context before generatin
         $faqResolver,
         $adapter,
         new RenderChatbotFallback,
+        new ClassifyChatbotInquiry,
+        new ResolveChatbotRuleGuidance,
     ))->respond("  Is the Aurelius Link Station\navailable?  ");
 
     expect($result)->toBe([
@@ -198,38 +202,33 @@ test('sends only approved reference facts for the requested store', function () 
     Http::assertNothingSent();
 });
 
-test('sends only matching active managed knowledge for an FAQ inquiry', function () {
+test('returns only matching active managed knowledge directly for an FAQ inquiry', function () {
     Http::preventStrayRequests();
-    ChatbotResponseAgent::fake(['Approved payment guidance.'])->preventStrayPrompts();
+    ChatbotResponseAgent::fake(['Approved search guidance.'])->preventStrayPrompts();
     ChatbotKnowledge::factory()->create([
         'category' => ChatbotCategory::Faq,
-        'question_pattern' => 'What payment methods are accepted?',
-        'response_template' => 'Approved payment guidance.',
+        'question_pattern' => 'How do I search for products?',
+        'response_template' => 'Approved search guidance.',
     ]);
     ChatbotKnowledge::factory()->inactive()->create([
         'category' => ChatbotCategory::Faq,
-        'question_pattern' => 'What payment methods are accepted?',
+        'question_pattern' => 'How do I search for products?',
         'response_template' => 'Inactive private guidance.',
     ]);
     ChatbotKnowledge::factory()->create([
         'category' => ChatbotCategory::Product,
-        'question_pattern' => 'What payment methods are accepted?',
+        'question_pattern' => 'How do I search for products?',
         'response_template' => 'Wrong-topic private guidance.',
     ]);
 
-    app(ChatbotOrchestrationService::class)->respond('What payment methods are accepted?');
+    $result = app(ChatbotOrchestrationService::class)->respond('How do I search for products?');
 
-    $expectedContext = [
-        'knowledge' => [[
-            'question_pattern' => 'What payment methods are accepted?',
-            'response_template' => 'Approved payment guidance.',
-        ]],
-    ];
-    ChatbotResponseAgent::assertPrompted(function (AgentPrompt $prompt) use ($expectedContext): bool {
-        return str_contains($prompt->prompt, json_encode($expectedContext, JSON_THROW_ON_ERROR))
-            && ! str_contains($prompt->prompt, 'Inactive private guidance.')
-            && ! str_contains($prompt->prompt, 'Wrong-topic private guidance.');
-    });
+    expect($result)->toBe([
+        'category' => ChatbotQueryCategory::Faq,
+        'message' => 'Approved search guidance.',
+        'source' => 'fallback',
+    ]);
+    ChatbotResponseAgent::assertNeverPrompted();
     Http::assertNothingSent();
 });
 
@@ -278,7 +277,7 @@ test('returns category-specific missing-context fallbacks without Gemini', funct
         false,
     ],
     'no active FAQ knowledge' => [
-        'What payment methods are accepted?',
+        'How do I search for products?',
         ChatbotQueryCategory::Faq,
         'Approved information for that question is currently unavailable.',
         false,
@@ -443,26 +442,26 @@ test('returns the confirmed address after a provider connection failure', functi
     Http::assertNothingSent();
 });
 
-test('returns the approved knowledge answer for provider errors', function () {
+test('returns the approved knowledge answer without attempting an unavailable provider', function () {
     Http::preventStrayRequests();
     ChatbotResponseAgent::fake(
         fn () => throw new AiException('provider response containing a secret'),
     )->preventStrayPrompts();
     ChatbotKnowledge::factory()->create([
         'category' => ChatbotCategory::Faq,
-        'question_pattern' => 'What payment methods are accepted?',
-        'response_template' => 'Approved payment guidance.',
+        'question_pattern' => 'How do I search for products?',
+        'response_template' => 'Approved search guidance.',
     ]);
 
     $result = app(ChatbotOrchestrationService::class)->respond(
-        'What payment methods are accepted?',
+        'How do I search for products?',
     );
 
     expect($result)->toBe([
         'category' => ChatbotQueryCategory::Faq,
-        'message' => 'Approved payment guidance.',
+        'message' => 'Approved search guidance.',
         'source' => 'fallback',
     ])->not->toContain('provider response containing a secret');
-    ChatbotResponseAgent::assertPromptedTimes(1);
+    ChatbotResponseAgent::assertNeverPrompted();
     Http::assertNothingSent();
 });

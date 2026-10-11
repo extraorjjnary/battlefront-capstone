@@ -9,12 +9,13 @@ class RouteChatbotQuery
     public function __construct(
         private CategorizeChatbotQuery $categorizer,
         private MatchChatbotKnowledge $knowledge,
+        private ClassifyChatbotInquiry $boundary,
     ) {}
 
     /** @return array{category: ChatbotQueryCategory, choices: array<string, string>} */
     public function execute(string $message): array
     {
-        $category = $this->categorizer->execute($message);
+        $category = $this->boundary->execute($message)['category'];
 
         if ($this->categorizer->isBlocked($message)) {
             return ['category' => $category, 'choices' => []];
@@ -42,12 +43,10 @@ class RouteChatbotQuery
 
     private function categoryWithKnowledge(string $message): ChatbotQueryCategory
     {
-        $category = $this->categorizer->execute($message);
+        $classification = $this->boundary->execute($message);
+        $category = $classification['category'];
 
-        if (! $this->categorizer->isBlocked($message)
-            && $category !== ChatbotQueryCategory::Order
-            && ($category === ChatbotQueryCategory::Faq || ! $this->categorizer->requiresLiveFacts($message))
-            && $this->knowledge->execute($message, exactOnly: true) !== []) {
+        if ($classification['eligible_for_faq'] && $this->knowledge->execute($message) !== []) {
             $category = ChatbotQueryCategory::Faq;
         }
 

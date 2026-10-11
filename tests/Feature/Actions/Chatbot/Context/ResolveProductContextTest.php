@@ -26,6 +26,7 @@ test('finds arbitrary catalog products through supported attributes', function (
     $context = app(ResolveProductContext::class)->execute($message);
 
     expect($context)->toBe([
+        'resolution' => 'matched',
         'products' => [[
             'name' => 'Aurelius Link Station',
             'description' => 'Outdoor connectivity unit',
@@ -138,7 +139,7 @@ test('named product inquiries retain zero and missing stock while discovery hide
 
     $context = app(ResolveProductContext::class)->execute('Is a Remote Kit available?');
 
-    expect($context)->toBe(['products' => []]);
+    expect($context)->toBe(['resolution' => 'not_found', 'products' => []]);
     $missing = app(ResolveProductContext::class)->execute('Is the Alpine Remote Kit available?');
     $soldOut = app(ResolveProductContext::class)->execute('Is the ZEPHYR-REMOTE KIT available?');
     expect($missing['products'])->toHaveCount(1);
@@ -200,19 +201,19 @@ test('excludes inactive products and products in inactive categories', function 
 
     $context = app(ResolveProductContext::class)->execute('Is an Orchid product available?');
 
-    expect($context)->toBe(['products' => []]);
+    expect($context)->toBe(['resolution' => 'not_found', 'products' => []]);
 });
 
-test('returns explicit empty product context when no catalog term can be resolved', function (string $message) {
+test('returns explicit empty product context when no catalog term can be resolved', function (string $message, string $resolution) {
     Product::factory()->create(['name' => 'Known Catalog Item']);
 
     $context = app(ResolveProductContext::class)->execute($message);
 
-    expect($context)->toBe(['products' => []]);
+    expect($context)->toBe(['resolution' => $resolution, 'products' => []]);
 })->with([
-    'empty input' => ['   ...   '],
-    'only generic query words' => ['What products are available?'],
-    'natural generic query words' => ['Do you have products available currently in stock?'],
-    'generic named inquiry' => ['Are you selling a product named?'],
-    'no catalog match' => ['Do you have Nebula Quantum Parts?'],
+    'empty input' => ['   ...   ', 'needs_details'],
+    'only generic query words' => ['What products are available?', 'needs_details'],
+    'natural generic query words' => ['Do you have products available currently in stock?', 'needs_details'],
+    'generic named inquiry' => ['Are you selling a product named?', 'needs_details'],
+    'no catalog match' => ['Do you have Nebula Quantum Parts?', 'not_found'],
 ]);

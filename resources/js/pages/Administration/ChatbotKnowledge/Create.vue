@@ -4,19 +4,15 @@ import { MessageSquarePlus } from '@lucide/vue';
 import ChatbotKnowledgeController from '@/actions/App/Http/Controllers/Administration/ChatbotKnowledgeController';
 import ChatbotKnowledgeForm from '@/components/ChatbotKnowledgeForm.vue';
 
-defineProps({
-    categories: { type: Array, required: true },
-});
-
 defineOptions({
     layout: {
         breadcrumbs: [
             {
-                title: 'Chatbot knowledge',
+                title: 'Chatbot FAQs',
                 href: ChatbotKnowledgeController.index(),
             },
             {
-                title: 'Add knowledge',
+                title: 'Add FAQ',
                 href: ChatbotKnowledgeController.create(),
             },
         ],
@@ -25,7 +21,7 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Add chatbot knowledge" />
+    <Head title="Add chatbot FAQ" />
 
     <main
         class="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 p-6 lg:p-10"
@@ -47,11 +43,10 @@ defineOptions({
                         Customer support content
                     </p>
                     <h1 class="mt-2 text-2xl font-bold tracking-tight">
-                        Add chatbot knowledge
+                        Add chatbot FAQ
                     </h1>
                     <p class="text-muted-foreground mt-2 text-sm leading-6">
-                        Create an approved question and response record for
-                        future chatbot use.
+                        Create approved Battlefront support guidance. Check the question before saving to confirm where it belongs.
                     </p>
                 </div>
             </div>
@@ -59,9 +54,8 @@ defineOptions({
 
         <section class="border-border bg-card border p-6 sm:p-8">
             <ChatbotKnowledgeForm
-                :categories="categories"
                 :form="ChatbotKnowledgeController.store.form()"
-                submit-label="Create knowledge"
+                submit-label="Create FAQ"
             />
         </section>
     </main>

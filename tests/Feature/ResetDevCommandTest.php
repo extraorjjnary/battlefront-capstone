@@ -1,7 +1,9 @@
 <?php
 
 use App\Console\Commands\ResetDevCommand;
+use App\Enums\ChatbotCategory;
 use App\Models\CartItem;
+use App\Models\ChatbotKnowledge;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Sale;
@@ -241,7 +243,9 @@ test('reset restores the complete real catalog with historical sales only when r
         $this->assertDatabaseHas('users', ['email' => 'admin@example.com']);
         $this->assertDatabaseHas('users', ['email' => 'test@example.com']);
         $this->assertDatabaseHas('branches', ['city' => 'Sagay City']);
-        $this->assertDatabaseCount('chatbot_knowledge', 11);
+        $this->assertDatabaseCount('chatbot_knowledge', 4);
+        expect(ChatbotKnowledge::query()->where('category', '!=', ChatbotCategory::Faq->value)->exists())->toBeFalse();
+        expect(ChatbotKnowledge::query()->where('is_active', false)->exists())->toBeFalse();
 
         $stockBefore = $products->map(fn ($product) => [$product->inventory->quantity, $product->inventory->reorder_level])->all();
         $fixtureBefore = Product::query()->where('is_catalog_imported', false)->with('inventory')->orderBy('product_code')

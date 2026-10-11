@@ -2,6 +2,8 @@
 
 namespace App\Services\Chatbot;
 
+use App\Actions\Chatbot\ClassifyChatbotInquiry;
+use App\Actions\Chatbot\Context\ResolveChatbotRuleGuidance;
 use App\Actions\Chatbot\Context\ResolveFaqContext;
 use App\Actions\Chatbot\Context\ResolveOrderContext;
 use App\Actions\Chatbot\Context\ResolveProductContext;
@@ -35,16 +37,6 @@ class ChatbotOrchestrationService
 
     private const SENSITIVE_INPUT = 'Please remove sensitive information from your question and try again.';
 
-    /** @var list<string> */
-    private const SENSITIVE_INPUT_PATTERNS = [
-        '/\b(?:password|passcode|api[\s_-]*(?:key|secret|token)|access[\s_-]*token|internal[\s_-]*note)\s*(?::|=|\bis\b)\s*\S+/iu',
-        '/\bbearer\s+[a-z0-9._~+\/=\-]+/iu',
-        '/\bpayment-proofs[\/\\\\]\S+/iu',
-        '/\bpayment[\s_-]*proof(?:[\s_-]*path)?\s*[:=]\s*\S+/iu',
-        '/[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}/iu',
-        '/(?<!\d)(?:\+63[\s-]?|0)9(?:[\s-]?\d){9}(?!\d)/u',
-    ];
-
     public function __construct(
         private RouteChatbotQuery $routeChatbotQuery,
         private ResolveProductContext $resolveProductContext,
@@ -53,6 +45,8 @@ class ChatbotOrchestrationService
         private ResolveFaqContext $resolveFaqContext,
         private ChatbotAiAdapter $chatbotAiAdapter,
         private RenderChatbotFallback $renderChatbotFallback,
+        private ClassifyChatbotInquiry $boundary,
+        private ResolveChatbotRuleGuidance $ruleGuidance,
     ) {}
 
     /**
@@ -65,6 +59,7 @@ class ChatbotOrchestrationService
         $normalizedMessage = Str::of($message)->trim()->squish()->toString();
         $routing = $this->routeChatbotQuery->execute($normalizedMessage);
         $category = $routing['category'];
+        $classification = $this->boundary->execute($normalizedMessage);
 
         if ($normalizedMessage === '') {
             return $this->fallback($category, self::EMPTY_MESSAGE);
@@ -99,7 +94,21 @@ class ChatbotOrchestrationService
 
         $context = $productId !== null && $category === ChatbotQueryCategory::Product
             ? $this->resolveProductContext->forProduct($productId)
-            : $this->resolveContext($category, $normalizedMessage, $customer);
+            : ($classification['rule_topic'] !== null && $category === ChatbotQueryCategory::Faq
+                ? $this->ruleGuidance->execute($classification['rule_topic'])
+                : $this->resolveContext($category, $normalizedMessage, $customer));
+
+        if ($category === ChatbotQueryCategory::Product && ($context['resolution'] ?? null) === 'needs_details') {
+            $clarification = str_contains(Str::lower($normalizedMessage), 'facebook')
+                ? 'Please provide the product name, model, or identifying text from the Facebook post so I can check its current price and Sagay availability.'
+                : 'Please provide a product name or model so I can check its current price and Sagay availability.';
+
+            return $this->fallback($category, $clarification);
+        }
+
+        if ($category === ChatbotQueryCategory::Faq && count($context['knowledge'] ?? []) > 1) {
+            return $this->fallback($category, $this->renderChatbotFallback->execute($category, $normalizedMessage, $context));
+        }
 
         if ($this->hasNoContext($category, $context)) {
             return $this->fallback(
@@ -108,7 +117,16 @@ class ChatbotOrchestrationService
             );
         }
 
+        unset($context['resolution']);
         $remember?->__invoke($category, $context);
+
+        if ($category === ChatbotQueryCategory::Faq) {
+            return $this->fallback(
+                $category,
+                $this->renderChatbotFallback->execute($category, $normalizedMessage, $context) ?? self::FAQ_INFORMATION_UNAVAILABLE,
+            );
+        }
+
         $result = $this->chatbotAiAdapter->generate($normalizedMessage, $context);
 
         if ($result['successful']) {
@@ -153,7 +171,7 @@ class ChatbotOrchestrationService
             ChatbotQueryCategory::Product => $context['products'] === [],
             ChatbotQueryCategory::Order => $context['orders'] === [],
             ChatbotQueryCategory::Store => $context['branches'] === [],
-            ChatbotQueryCategory::Faq => $context['knowledge'] === [],
+            ChatbotQueryCategory::Faq => ($context['knowledge'] ?? []) === [] && trim($context['guidance'] ?? '') === '',
             ChatbotQueryCategory::Unsupported => true,
         };
     }
@@ -175,13 +193,7 @@ class ChatbotOrchestrationService
 
     public function containsSensitiveInput(string $message): bool
     {
-        foreach (self::SENSITIVE_INPUT_PATTERNS as $pattern) {
-            if (preg_match($pattern, $message) === 1) {
-                return true;
-            }
-        }
-
-        return false;
+        return $this->boundary->containsSensitiveInput($message);
     }
 
     /**

@@ -229,6 +229,11 @@ class CategorizeChatbotQuery
             || $this->containsAny($message, ['price', 'prices', 'pricing', 'cost', 'stock', 'stocks', 'available', 'availability', 'specs', 'specifications']);
     }
 
+    public function requiresStoreFacts(string $message): bool
+    {
+        return $this->containsAny($this->normalize($message), self::STORE_OPERATIONAL_PHRASES);
+    }
+
     private function normalize(string $message): string
     {
         return Str::of($message)
