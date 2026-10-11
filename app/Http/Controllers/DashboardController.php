@@ -29,6 +29,15 @@ class DashboardController extends Controller
         }
 
         return Inertia::render('Dashboard/Customer', [
+            'is_first_visit' => function () use ($request, $user): bool {
+                if ($request->prefetch() || ! $request->isMethod('GET')) {
+                    return ! $user->has_visited_dashboard;
+                }
+
+                return User::query()->whereKey($user->id)
+                    ->where('has_visited_dashboard', false)
+                    ->update(['has_visited_dashboard' => true]) === 1;
+            },
             'dashboard' => $dashboardService->customer($user),
             ...$buildRecommendationViewData($user, hideWhenPersonalizationDisabled: true),
         ]);

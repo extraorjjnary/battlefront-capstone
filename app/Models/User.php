@@ -28,6 +28,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property bool $search_recommendations_enabled
  * @property bool $product_view_recommendations_enabled
  * @property bool $personalized_recommendations_enabled
+ * @property bool $has_visited_dashboard
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
  * @property Carbon|null $two_factor_confirmed_at
@@ -44,6 +45,7 @@ use Laravel\Sanctum\HasApiTokens;
     'two_factor_secret',
     'two_factor_recovery_codes',
     'remember_token',
+    'has_visited_dashboard',
 ])]
 class User extends Authenticatable
 {
@@ -78,6 +80,7 @@ class User extends Authenticatable
             'search_recommendations_enabled' => 'boolean',
             'product_view_recommendations_enabled' => 'boolean',
             'personalized_recommendations_enabled' => 'boolean',
+            'has_visited_dashboard' => 'boolean',
         ];
     }
 

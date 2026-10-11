@@ -24,6 +24,7 @@ import { index as productIndex } from '@/routes/products';
 
 const props = defineProps({
     dashboard: { type: Object, required: true },
+    is_first_visit: { type: Boolean, default: false },
     recommendations: { type: Array, default: () => [] },
     is_personalized: { type: Boolean, default: false },
     has_featured_fallback: { type: Boolean, default: false },
@@ -80,11 +81,15 @@ defineOptions({
                             id="customer-dashboard-heading"
                             class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
                         >
-                            Welcome back, {{ user.name }}
+                            {{ props.is_first_visit ? 'Welcome' : 'Welcome back' }},
+                            {{ user.name }}!
                         </h1>
                         <p class="text-muted-foreground mt-2 text-sm leading-6">
-                            Continue shopping, check your cart, or track your
-                            latest Battlefront order.
+                            {{
+                                props.is_first_visit
+                                    ? 'Explore our products, find your next upgrade, and start shopping with Battlefront.'
+                                    : 'Continue shopping, check your cart, or track your latest Battlefront order.'
+                            }}
                         </p>
                     </div>
                     <div class="flex flex-wrap gap-3">

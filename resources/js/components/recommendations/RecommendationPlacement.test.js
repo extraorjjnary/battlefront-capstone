@@ -356,6 +356,42 @@ test('customer catalog uses account shopping wording', async () => {
     assert.match(html, /your recent browsing, cart, and completed purchases/);
 });
 
+for (const [firstVisit, heading, message] of [
+    [
+        true,
+        'Welcome, Customer!',
+        'Explore our products, find your next upgrade, and start shopping with Battlefront.',
+    ],
+    [
+        false,
+        'Welcome back, Customer!',
+        'Continue shopping, check your cart, or track your latest Battlefront order.',
+    ],
+]) {
+    test(`dashboard renders the ${firstVisit ? 'first' : 'returning'} visit greeting`, async () => {
+        const component = loadComponent('../../pages/Dashboard/Customer.vue', {
+            authenticated: true,
+        });
+        const html = await renderToString(
+            Vue.h(component, {
+                is_first_visit: firstVisit,
+                dashboard: {
+                    summary: {
+                        cart_items: 0,
+                        cart_units: 0,
+                        active_orders: 0,
+                        total_orders: 0,
+                    },
+                    latest_order: null,
+                },
+            }),
+        );
+
+        assert.ok(html.includes(heading));
+        assert.ok(html.includes(message));
+    });
+}
+
 test('dashboard keeps recommendations between shopping summary and latest order', async () => {
     const component = loadComponent('../../pages/Dashboard/Customer.vue', {
         authenticated: true,

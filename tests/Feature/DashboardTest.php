@@ -12,6 +12,8 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\User;
+use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\DevelopmentCustomerSeeder;
 use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -20,6 +22,83 @@ use Tests\HistoricalSalesCatalogFixtures;
 test('guests are redirected to the login page', function () {
     $response = $this->get(route('dashboard'));
     $response->assertRedirect(route('login'));
+});
+
+test('customers are welcomed once and welcomed back after repeat visits and signing in again', function () {
+    $customer = User::factory()->customer()->create();
+    $otherCustomer = User::factory()->customer()->create();
+
+    $this->post(route('login.store'), [
+        'email' => $customer->email,
+        'password' => 'password',
+    ])->assertRedirect(route('dashboard', absolute: false));
+    $this->assertDatabaseHas('users', ['id' => $customer->id, 'has_visited_dashboard' => false]);
+
+    $this->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
+        ->component('Dashboard/Customer')
+        ->where('is_first_visit', true)
+        ->missing('auth.user.has_visited_dashboard'));
+
+    $this->assertDatabaseHas('users', ['id' => $customer->id, 'has_visited_dashboard' => true]);
+    $this->assertDatabaseHas('users', ['id' => $otherCustomer->id, 'has_visited_dashboard' => false]);
+    $this->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
+        ->where('is_first_visit', false));
+
+    $this->post(route('logout'))->assertRedirect(route('home'));
+    $this->post(route('login.store'), [
+        'email' => $customer->email,
+        'password' => 'password',
+    ])->assertRedirect(route('dashboard', absolute: false));
+
+    $this->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
+        ->where('is_first_visit', false));
+    $this->actingAs($otherCustomer)->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
+        ->where('is_first_visit', true));
+});
+
+test('seeded demo customers are welcomed once and reseeding preserves their visit', function (string $seeder, string $email) {
+    $this->seed($seeder);
+    $customer = User::query()->where('email', $email)->firstOrFail();
+
+    $this->actingAs($customer)->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
+        ->where('is_first_visit', true));
+    $this->seed($seeder);
+
+    $this->assertDatabaseHas('users', ['id' => $customer->id, 'has_visited_dashboard' => true]);
+    $this->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
+        ->where('is_first_visit', false));
+})->with([
+    'default demo account' => [DatabaseSeeder::class, 'test@example.com'],
+    'development demo roster' => [DevelopmentCustomerSeeder::class, 'demo.customer01@example.test'],
+]);
+
+test('dashboard prefetches and head requests do not consume the first visit', function (string $method, array $headers) {
+    $customer = User::factory()->customer()->create();
+
+    $this->actingAs($customer)->call($method, route('dashboard'), server: $headers)->assertOk();
+
+    $this->assertDatabaseHas('users', ['id' => $customer->id, 'has_visited_dashboard' => false]);
+    $this->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
+        ->where('is_first_visit', true));
+})->with([
+    'prefetch' => ['GET', ['HTTP_PURPOSE' => 'prefetch']],
+    'head' => ['HEAD', []],
+]);
+
+test('dashboard partial requests without the greeting do not consume the first visit', function () {
+    $customer = User::factory()->customer()->create();
+    $initial = $this->actingAs($customer)->get(route('products.index'));
+
+    $this->get(route('dashboard'), [
+        'X-Inertia' => 'true',
+        'X-Inertia-Version' => $initial->viewData('page')['version'],
+        'X-Inertia-Partial-Component' => 'Dashboard/Customer',
+        'X-Inertia-Partial-Data' => 'dashboard',
+    ])->assertOk()->assertJsonMissingPath('props.is_first_visit');
+
+    $this->assertDatabaseHas('users', ['id' => $customer->id, 'has_visited_dashboard' => false]);
+    $this->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
+        ->where('is_first_visit', true));
 });
 
 test('customers receive only their authoritative shopping and order summary', function () {
@@ -59,6 +138,7 @@ test('customers receive only their authoritative shopping and order summary', fu
 
     $response->assertInertia(fn (Assert $page) => $page
         ->component('Dashboard/Customer')
+        ->where('is_first_visit', true)
         ->where('auth.can.accessAdministration', false)
         ->where('dashboard.summary.cart_items', 2)
         ->where('dashboard.summary.cart_units', 5)
@@ -162,7 +242,10 @@ test('administrators receive authoritative operational dashboard data', function
         ->where('dashboard.recent_orders.0.item_count', 2)
         ->where('dashboard.recent_orders.0.total_quantity', 4)
         ->missing('dashboard.summary')
-        ->missing('dashboard.latest_order'));
+        ->missing('dashboard.latest_order')
+        ->missing('is_first_visit'));
+
+    $this->assertDatabaseHas('users', ['id' => $administrator->id, 'has_visited_dashboard' => false]);
 });
 
 test('customers receive stable empty dashboard data', function () {
