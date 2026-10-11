@@ -20,7 +20,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/{Ai,Services/Chatbot}/** | .ai/rules/chatbot.md |
 | app/Services/Order/**,app/Actions/{Checkout,Order}/**,app/Models/Product.php,config/battlefront.php | .ai/rules/checkout-order-models.md |
 | config/battlefront.php,app/Http/Controllers/CheckoutController.php,resources/js/pages/Checkout/** | .ai/rules/checkout.md |
-| database/seeders/DevelopmentHistoricalSalesSeeder.php,app/Console/Commands/ResetDevCommand.php | .ai/rules/commands.md |
+| database/seeders/DevelopmentHistoricalSalesSeeder.php,app/Console/Commands/ResetDevCommand.php, database/seeders/DevelopmentCustomerSeeder.php,app/Console/Commands/ResetDevCommand.php | .ai/rules/commands.md |
 | app/Models/Inventory.php,app/Repositories/Inventory/**,app/Actions/Chatbot/Context/ResolveProductContext.php,resources/js/components/catalog/StockAvailability.vue | .ai/rules/components-catalog.md |
 | app/Actions/Chatbot/**,app/Services/Chatbot/**,resources/js/components/chatbot/** | .ai/rules/components-chatbot.md |
 | database/seeders/**,app/Http/Controllers/BranchController.php,resources/js/components/BranchMap.vue | .ai/rules/components.md |

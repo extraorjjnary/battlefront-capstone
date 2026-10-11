@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Repositories\Reporting\SalesHistoryCoverageRepository;
 use App\Services\RealCatalogImportService;
 use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\DevelopmentCustomerSeeder;
 use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -72,6 +73,12 @@ class ResetDevCommand extends Command
                 throw new RuntimeException('db:seed failed.');
             }
             $this->info('Seeders completed.');
+
+            $stage = 'Customer demonstration seeding';
+            if ($this->call('db:seed', ['--class' => DevelopmentCustomerSeeder::class, '--force' => true, '--no-interaction' => true]) !== self::SUCCESS) {
+                throw new RuntimeException('Customer demonstration seeding failed.');
+            }
+            $this->info('30 demonstration customer accounts seeded.');
 
             $stage = 'Catalog import';
             $result = $importer->execute($mapping, $manifest);

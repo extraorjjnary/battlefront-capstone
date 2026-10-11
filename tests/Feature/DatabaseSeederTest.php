@@ -39,6 +39,8 @@ test('default initialization does not load historical sales development fixtures
     $this->artisan('db:seed', ['--force' => true, '--no-interaction' => true])->assertSuccessful();
 
     $this->assertDatabaseMissing('users', ['email' => 'historical-sales@example.test']);
+    $this->assertDatabaseCount('users', 2);
+    expect(User::query()->where('email', 'like', 'demo.customer%@example.test')->exists())->toBeFalse();
     foreach (['products', 'categories', 'inventories', 'orders', 'order_items', 'sales'] as $table) {
         $this->assertDatabaseCount($table, 0);
     }

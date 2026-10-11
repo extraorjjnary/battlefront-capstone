@@ -13,11 +13,13 @@ use App\Services\Forecasting\ProductForecastPreparationService;
 use App\Services\RealCatalogImportService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\DevelopmentCustomerSeeder;
 use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\HistoricalSalesCatalogFixtures;
 
 beforeEach(function () {
     Storage::fake('local');
@@ -132,7 +134,10 @@ test('reset stops when an orchestration stage fails', function (string $stage) {
     $command->setDefinition((new ResetDevCommand)->getDefinition());
     $command->shouldReceive('call')->with('migrate:fresh', Mockery::any())->once()->andReturn($stage === 'migration' ? 1 : 0);
     if ($stage !== 'migration') {
-        $command->shouldReceive('call')->with('db:seed', Mockery::any())->once()->andReturn($stage === 'seeding' ? 1 : 0);
+        $command->shouldReceive('call')->with('db:seed', ['--class' => DatabaseSeeder::class, '--force' => true, '--no-interaction' => true])->once()->andReturn($stage === 'seeding' ? 1 : 0);
+    }
+    if (! in_array($stage, ['migration', 'seeding'], true)) {
+        $command->shouldReceive('call')->with('db:seed', ['--class' => DevelopmentCustomerSeeder::class, '--force' => true, '--no-interaction' => true])->once()->andReturn($stage === 'customers' ? 1 : 0);
     }
     Artisan::registerCommand($command);
 
@@ -142,7 +147,7 @@ test('reset stops when an orchestration stage fails', function (string $stage) {
         ->assertFailed();
 
     $this->assertModelExists($sentinel);
-})->with(['migration', 'seeding', 'import', 'count']);
+})->with(['migration', 'seeding', 'customers', 'import', 'count']);
 
 test('reset restores the complete real catalog with historical sales only when requested', function (bool $withHistory) {
     $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00'));
@@ -247,7 +252,8 @@ test('reset restores the complete real catalog with historical sales only when r
         } else {
             Storage::disk('local')->assertMissing($coveragePath);
         }
-        $this->assertDatabaseCount('users', $withHistory ? 3 : 2);
+        $this->assertDatabaseCount('users', $withHistory ? 33 : 32);
+        expect(User::query()->where('email', 'like', 'demo.customer%@example.test')->count())->toBe(30);
         expect(User::query()->where('email', 'historical-sales@example.test')->exists())->toBe($withHistory);
         expect(Product::query()->where('is_catalog_imported', false)->count())->toBe(0);
         expect(Product::where('product_code', 'like', 'DEVHIST40%')->exists())->toBeFalse();
@@ -297,6 +303,7 @@ test('reset reports optional historical seeding failure after a successful catal
     $command->setDefinition((new ResetDevCommand)->getDefinition());
     $command->shouldReceive('call')->with('migrate:fresh', Mockery::any())->once()->andReturn(0);
     $command->shouldReceive('call')->with('db:seed', ['--class' => DatabaseSeeder::class, '--force' => true, '--no-interaction' => true])->once()->andReturn(0);
+    $command->shouldReceive('call')->with('db:seed', ['--class' => DevelopmentCustomerSeeder::class, '--force' => true, '--no-interaction' => true])->once()->andReturn(0);
     $command->shouldReceive('call')->with('db:seed', ['--class' => DevelopmentHistoricalSalesSeeder::class, '--force' => true, '--no-interaction' => true])->once()->andReturn(1);
     Artisan::registerCommand($command);
 
@@ -324,3 +331,29 @@ test('history product selection is validated before database recreation', functi
     $this->assertModelExists($sentinel);
     expect(Storage::disk('local')->get(config('forecasting.development_manifest')))->toBe('existing declaration');
 });
+
+test('reset seeds thirty demonstration customers with either history option without running database recreation', function (bool $withHistory) {
+    $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00'));
+    HistoricalSalesCatalogFixtures::createProducts();
+    $this->mock(RealCatalogImportService::class, function ($mock) {
+        $mock->shouldReceive('inspectFiles')->once()->andReturn(array_pad(array_map(fn (string $code): array => ['product_code' => $code], DevelopmentHistoricalSalesSeeder::PRODUCT_CODES), 654, []));
+        $mock->shouldReceive('execute')->once()->andReturn(['created' => 654, 'updated' => 0]);
+    });
+    $command = Mockery::mock(ResetDevCommand::class)->makePartial();
+    $command->setName('battlefront:reset-dev');
+    $command->setDefinition((new ResetDevCommand)->getDefinition());
+    $command->shouldReceive('call')->with('migrate:fresh', Mockery::any())->once()->andReturn(0);
+    Artisan::registerCommand($command);
+
+    $result = Artisan::call('battlefront:reset-dev', ['--force' => true, '--with-sales-history' => $withHistory]);
+
+    expect($result)->toBe(0);
+    expect(Artisan::output())->toContain('30 demonstration customer accounts seeded.', 'Development reset completed.')
+        ->not->toContain('customer123');
+    $this->assertDatabaseCount('users', $withHistory ? 33 : 32);
+    expect(User::query()->where('email', 'like', 'demo.customer%@example.test')->count())->toBe(30);
+    expect(User::query()->where('email', 'historical-sales@example.test')->exists())->toBe($withHistory);
+    $this->assertDatabaseHas('users', ['email' => 'admin@example.com', 'role' => 'administrator']);
+    $this->assertDatabaseHas('users', ['email' => 'test@example.com', 'role' => 'customer']);
+    expect(User::query()->where('email', 'like', 'demo.customer%@example.test')->whereHas('orders')->exists())->toBeFalse();
+})->with([false, true]);
