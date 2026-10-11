@@ -6,6 +6,7 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\LazyCollection;
 use stdClass;
 
 class SalesReportRepository
@@ -103,11 +104,29 @@ class SalesReportRepository
         ?int $categoryId,
         int $perPage = 20,
     ): LengthAwarePaginator {
+        return $this->orderedProducts($dateRange, $productId, $categoryId)->paginate($perPage);
+    }
+
+    /**
+     * Iterate every matching product aggregate without loading individual sales.
+     *
+     * @param  array{0: string, 1: string}  $dateRange
+     * @return LazyCollection<int, stdClass>
+     */
+    public function exportProducts(array $dateRange, ?int $productId, ?int $categoryId): LazyCollection
+    {
+        return $this->orderedProducts($dateRange, $productId, $categoryId)->lazy(200);
+    }
+
+    /**
+     * @param  array{0: string, 1: string}  $dateRange
+     */
+    private function orderedProducts(array $dateRange, ?int $productId, ?int $categoryId): Builder
+    {
         return $this->productReportQuery($dateRange, $productId, $categoryId)
             ->orderByDesc('item_revenue')
             ->orderByDesc('quantity_sold')
-            ->orderBy('products.id')
-            ->paginate($perPage);
+            ->orderBy('products.id');
     }
 
     /**

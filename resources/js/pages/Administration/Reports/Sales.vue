@@ -17,6 +17,9 @@ import {
     CalendarRange,
     ChartNoAxesCombined,
     CircleDollarSign,
+    Download,
+    FileDown,
+    Printer,
     ReceiptText,
     ShoppingBasket,
     X,
@@ -24,6 +27,11 @@ import {
 import { computed, ref, watch } from 'vue';
 import { Bar, Doughnut, Line } from 'vue-chartjs';
 import SalesReportController from '@/actions/App/Http/Controllers/Administration/SalesReportController';
+import {
+    csv,
+    pdf,
+    printReport,
+} from '@/actions/App/Http/Controllers/Administration/SalesReportController';
 import CatalogPagination from '@/components/CatalogPagination.vue';
 import RecommendationEngagement from '@/components/recommendations/RecommendationEngagement.vue';
 import { Button } from '@/components/ui/button';
@@ -69,6 +77,30 @@ const period = ref(props.filters.period);
 const selectedProduct = ref(props.active_filters.product);
 const selectedCategory = ref(props.active_filters.category);
 const isCrossFiltering = ref(false);
+const isApplyingFilters = ref(false);
+const isUpdatingReport = computed(
+    () => isCrossFiltering.value || isApplyingFilters.value,
+);
+const exportActions = computed(() => {
+    const query = {
+        from: props.filters.from,
+        to: props.filters.to,
+        period: props.filters.period,
+        product_id: props.filters.product_id ?? undefined,
+        category_id: props.filters.category_id ?? undefined,
+    };
+
+    return [
+        {
+            label: 'Print report',
+            href: printReport.url({ query }),
+            icon: Printer,
+            print: true,
+        },
+        { label: 'Export PDF', href: pdf.url({ query }), icon: FileDown },
+        { label: 'Export CSV', href: csv.url({ query }), icon: Download },
+    ];
+});
 const numberFormatter = new Intl.NumberFormat('en-PH');
 const dateFormatter = new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium' });
 const presets = [7, 30, 90];
@@ -343,6 +375,12 @@ function submitFilters() {
             preserveScroll: true,
             preserveState: true,
             replace: true,
+            onStart: () => {
+                isApplyingFilters.value = true;
+            },
+            onFinish: () => {
+                isApplyingFilters.value = false;
+            },
         },
     );
 }
@@ -352,6 +390,12 @@ function toggleProduct(product) {
         selectedProduct.value?.id === product.id ? null : product;
 
     updateCrossFilters(nextProduct, selectedCategory.value);
+}
+
+function guardExport(event) {
+    if (isUpdatingReport.value) {
+        event.preventDefault();
+    }
 }
 
 function toggleCategory(category) {
@@ -443,11 +487,10 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Sales reports" />
-
     <main
         class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
     >
+        <Head title="Sales reports" />
         <section
             class="border-border bg-card relative overflow-hidden border p-6 sm:p-8"
         >
@@ -477,6 +520,35 @@ defineOptions({
                     <CalendarRange class="text-primary size-4" />
                     Inclusive date range
                 </div>
+            </div>
+            <div
+                class="mt-5 flex flex-wrap gap-2"
+                role="group"
+                aria-label="Sales report print and export"
+            >
+                <Button
+                    v-for="action in exportActions"
+                    :key="action.label"
+                    variant="outline"
+                    size="sm"
+                    as-child
+                >
+                    <a
+                        :href="action.href"
+                        :target="action.print ? '_blank' : undefined"
+                        :rel="action.print ? 'noopener' : undefined"
+                        :aria-disabled="isUpdatingReport"
+                        :tabindex="isUpdatingReport ? -1 : undefined"
+                        :class="{ 'opacity-50': isUpdatingReport }"
+                        @click="guardExport"
+                    >
+                        <component :is="action.icon" aria-hidden="true" />
+                        {{ action.label }}
+                        <span v-if="action.print" class="sr-only"
+                            >(opens in a new tab)</span
+                        >
+                    </a>
+                </Button>
             </div>
         </section>
 
@@ -569,6 +641,20 @@ defineOptions({
                     Last {{ days }} days
                 </Button>
             </div>
+            <p
+                v-if="page.props.errors.product_id"
+                class="text-destructive mt-3 text-sm"
+                role="alert"
+            >
+                {{ page.props.errors.product_id }}
+            </p>
+            <p
+                v-if="page.props.errors.category_id"
+                class="text-destructive mt-3 text-sm"
+                role="alert"
+            >
+                {{ page.props.errors.category_id }}
+            </p>
         </section>
 
         <section

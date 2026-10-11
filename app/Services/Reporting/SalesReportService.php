@@ -4,8 +4,17 @@ namespace App\Services\Reporting;
 
 use App\Repositories\Reporting\SalesReportRepository;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\LazyCollection;
 use stdClass;
 
+/**
+ * @phpstan-type SalesFilters array{from: string, to: string, period: string, product_id: ?int, category_id: ?int}
+ * @phpstan-type ActiveFilters array{product: ?array{id: int, name: string}, category: ?array{id: int, name: string}}
+ * @phpstan-type ProductRow array{id: int, name: string, category: string, sales_count: int, quantity_sold: int, item_revenue: string}
+ * @phpstan-type CategoryRow array{id: int, name: string, sales_count: int, quantity_sold: int, item_revenue: string}
+ * @phpstan-type Kpis array{total_sales: int, total_revenue: string, average_order_value: string, total_items_sold: int}
+ * @phpstan-type Timeline array{labels: list<string>, sales: list<int>, revenue: list<float>}
+ */
 class SalesReportService
 {
     public function __construct(private readonly SalesReportRepository $salesReportRepository) {}
@@ -18,16 +27,13 @@ class SalesReportService
      */
     public function generate(array $filters): array
     {
-        $to = isset($filters['to'])
-            ? CarbonImmutable::parse($filters['to'])
-            : CarbonImmutable::today();
-        $from = isset($filters['from'])
-            ? CarbonImmutable::parse($filters['from'])
-            : $to->subDays(29);
-        $period = $filters['period'] ?? 'day';
-        $productId = isset($filters['product_id']) ? (int) $filters['product_id'] : null;
-        $categoryId = isset($filters['category_id']) ? (int) $filters['category_id'] : null;
-        $dateRange = [$from->toDateString(), $to->addDay()->toDateString()];
+        $normalizedFilters = $this->normalizeFilters($filters);
+        $from = CarbonImmutable::parse($normalizedFilters['from']);
+        $to = CarbonImmutable::parse($normalizedFilters['to']);
+        $period = $normalizedFilters['period'];
+        $productId = $normalizedFilters['product_id'];
+        $categoryId = $normalizedFilters['category_id'];
+        $dateRange = $this->dateRange($normalizedFilters);
         $salesSummary = $this->salesReportRepository->summary($dateRange, $productId, $categoryId);
         $dailySales = $this->salesReportRepository->dailySales($dateRange, $productId, $categoryId);
         $topProducts = $this->salesReportRepository->topProducts($dateRange, $categoryId);
@@ -43,49 +49,17 @@ class SalesReportService
             }
         }
 
-        $normalizedFilters = [
-            'from' => $from->toDateString(),
-            'to' => $to->toDateString(),
-            'period' => $period,
-            'product_id' => $productId,
-            'category_id' => $categoryId,
-        ];
         $products = $this->salesReportRepository
             ->products($dateRange, $productId, $categoryId)
             ->appends($normalizedFilters)
-            ->through(fn (stdClass $product): array => [
-                'id' => (int) $product->id,
-                'name' => $product->name,
-                'category' => $product->category_name,
-                'sales_count' => (int) $product->sales_count,
-                'quantity_sold' => (int) $product->quantity_sold,
-                'item_revenue' => $this->money($product->item_revenue),
-            ]);
+            ->through($this->productData(...));
         $categoryChart = $this->salesReportRepository->categories($dateRange, $productId);
         $categoryReport = $this->salesReportRepository->categories($dateRange, $productId, $categoryId);
-        $totalSales = (int) ($salesSummary->total_sales ?? 0);
-        $totalRevenue = (float) ($salesSummary->total_revenue ?? 0);
 
         return [
             'filters' => $normalizedFilters,
-            'active_filters' => [
-                'product' => $productId === null ? null : [
-                    'id' => $productId,
-                    'name' => (string) $this->salesReportRepository->productName($productId),
-                ],
-                'category' => $categoryId === null ? null : [
-                    'id' => $categoryId,
-                    'name' => (string) $this->salesReportRepository->categoryName($categoryId),
-                ],
-            ],
-            'kpis' => [
-                'total_sales' => $totalSales,
-                'total_revenue' => $this->money($totalRevenue),
-                'average_order_value' => $this->money(
-                    $totalSales === 0 ? 0 : $totalRevenue / $totalSales,
-                ),
-                'total_items_sold' => (int) ($salesSummary->total_items_sold ?? 0),
-            ],
+            'active_filters' => $this->activeFilters($normalizedFilters),
+            'kpis' => $this->kpiData($salesSummary),
             'timeline' => $this->timelineData(array_values($dailySales->all()), $from, $to, $period),
             'top_products' => [
                 'ids' => $topProducts->pluck('id')->map(fn (mixed $id): int => (int) $id)->all(),
@@ -98,15 +72,148 @@ class SalesReportService
                 'labels' => $categoryChart->pluck('name')->all(),
                 'revenue' => $categoryChart->pluck('item_revenue')
                     ->map(fn (mixed $revenue): float => (float) $revenue)->all(),
-                'rows' => $categoryReport->map(fn (stdClass $category): array => [
-                    'id' => (int) $category->id,
-                    'name' => $category->name,
-                    'sales_count' => (int) $category->sales_count,
-                    'quantity_sold' => (int) $category->quantity_sold,
-                    'item_revenue' => $this->money($category->item_revenue),
-                ])->all(),
+                'rows' => $categoryReport->map($this->categoryData(...))->all(),
             ],
             'products' => $products,
+        ];
+    }
+
+    /**
+     * Prepare CSV metadata and lazy product rows without querying dashboard charts.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array{filters: SalesFilters, active_filters: ActiveFilters, products: LazyCollection<int, ProductRow>}
+     */
+    public function exportProducts(array $filters): array
+    {
+        $normalizedFilters = $this->normalizeFilters($filters);
+
+        return [
+            'filters' => $normalizedFilters,
+            'active_filters' => $this->activeFilters($normalizedFilters),
+            'products' => $this->salesReportRepository->exportProducts(
+                $this->dateRange($normalizedFilters),
+                $normalizedFilters['product_id'],
+                $normalizedFilters['category_id'],
+            )->map($this->productData(...)),
+        ];
+    }
+
+    /**
+     * Build the common print/PDF document from the authoritative aggregates.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return array{filters: SalesFilters, active_filters: ActiveFilters, products: LazyCollection<int, ProductRow>, kpis: Kpis, timeline: Timeline, categories: list<CategoryRow>}
+     */
+    public function document(array $filters): array
+    {
+        $report = $this->exportProducts($filters);
+        $scope = $report['filters'];
+        $dateRange = $this->dateRange($scope);
+        $dailySales = $this->salesReportRepository->dailySales($dateRange, $scope['product_id'], $scope['category_id']);
+
+        return [
+            ...$report,
+            'kpis' => $this->kpiData($this->salesReportRepository->summary($dateRange, $scope['product_id'], $scope['category_id'])),
+            'timeline' => $this->timelineData(
+                array_values($dailySales->all()),
+                CarbonImmutable::parse($scope['from']),
+                CarbonImmutable::parse($scope['to']),
+                $scope['period'],
+                includeYear: true,
+            ),
+            'categories' => array_values($this->salesReportRepository->categories($dateRange, $scope['product_id'], $scope['category_id'])
+                ->map($this->categoryData(...))->all()),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return SalesFilters
+     */
+    private function normalizeFilters(array $filters): array
+    {
+        $to = isset($filters['to']) ? CarbonImmutable::parse($filters['to']) : CarbonImmutable::today();
+        $from = isset($filters['from']) ? CarbonImmutable::parse($filters['from']) : $to->subDays(29);
+
+        return [
+            'from' => $from->toDateString(),
+            'to' => $to->toDateString(),
+            'period' => $filters['period'] ?? 'day',
+            'product_id' => isset($filters['product_id']) ? (int) $filters['product_id'] : null,
+            'category_id' => isset($filters['category_id']) ? (int) $filters['category_id'] : null,
+        ];
+    }
+
+    /**
+     * @param  SalesFilters  $filters
+     * @return array{0: string, 1: string}
+     */
+    private function dateRange(array $filters): array
+    {
+        return [$filters['from'], CarbonImmutable::parse($filters['to'])->addDay()->toDateString()];
+    }
+
+    /**
+     * @param  SalesFilters  $filters
+     * @return ActiveFilters
+     */
+    private function activeFilters(array $filters): array
+    {
+        return [
+            'product' => $filters['product_id'] === null ? null : [
+                'id' => $filters['product_id'],
+                'name' => (string) $this->salesReportRepository->productName($filters['product_id']),
+            ],
+            'category' => $filters['category_id'] === null ? null : [
+                'id' => $filters['category_id'],
+                'name' => (string) $this->salesReportRepository->categoryName($filters['category_id']),
+            ],
+        ];
+    }
+
+    /**
+     * @return Kpis
+     */
+    private function kpiData(stdClass $summary): array
+    {
+        $totalSales = (int) ($summary->total_sales ?? 0);
+        $totalRevenue = (float) ($summary->total_revenue ?? 0);
+
+        return [
+            'total_sales' => $totalSales,
+            'total_revenue' => $this->money($totalRevenue),
+            'average_order_value' => $this->money($totalSales === 0 ? 0 : $totalRevenue / $totalSales),
+            'total_items_sold' => (int) ($summary->total_items_sold ?? 0),
+        ];
+    }
+
+    /**
+     * @return ProductRow
+     */
+    private function productData(stdClass $product): array
+    {
+        return [
+            'id' => (int) $product->id,
+            'name' => (string) $product->name,
+            'category' => (string) $product->category_name,
+            'sales_count' => (int) $product->sales_count,
+            'quantity_sold' => (int) $product->quantity_sold,
+            'item_revenue' => $this->money($product->item_revenue),
+        ];
+    }
+
+    /**
+     * @return CategoryRow
+     */
+    private function categoryData(stdClass $category): array
+    {
+        return [
+            'id' => (int) $category->id,
+            'name' => (string) $category->name,
+            'sales_count' => (int) $category->sales_count,
+            'quantity_sold' => (int) $category->quantity_sold,
+            'item_revenue' => $this->money($category->item_revenue),
         ];
     }
 
@@ -119,6 +226,7 @@ class SalesReportService
         CarbonImmutable $from,
         CarbonImmutable $to,
         string $period,
+        bool $includeYear = false,
     ): array {
         $buckets = [];
         $current = $this->periodStart($from, $period);
@@ -127,7 +235,7 @@ class SalesReportService
         while ($current->lessThanOrEqualTo($last)) {
             $key = $current->toDateString();
             $buckets[$key] = [
-                'label' => $this->periodLabel($current, $period),
+                'label' => $this->periodLabel($current, $period, $includeYear),
                 'sales' => 0,
                 'revenue' => 0.0,
             ];
@@ -171,12 +279,14 @@ class SalesReportService
         };
     }
 
-    private function periodLabel(CarbonImmutable $date, string $period): string
+    private function periodLabel(CarbonImmutable $date, string $period, bool $includeYear): string
     {
+        $dateFormat = $includeYear ? 'M j, Y' : 'M j';
+
         return match ($period) {
-            'week' => $date->format('M j').' – '.$date->endOfWeek()->format('M j'),
+            'week' => $date->format($dateFormat).' – '.$date->endOfWeek()->format($dateFormat),
             'month' => $date->format('M Y'),
-            default => $date->format('M j'),
+            default => $date->format($dateFormat),
         };
     }
 

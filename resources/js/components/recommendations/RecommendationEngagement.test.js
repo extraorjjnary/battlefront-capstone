@@ -513,6 +513,9 @@ modules['@/actions/App/Http/Controllers/Administration/SalesReportController'] =
                 ...options,
             }),
         },
+        printReport: { url: () => '/administration/reports/sales/print' },
+        pdf: { url: () => '/administration/reports/sales/pdf' },
+        csv: { url: () => '/administration/reports/sales/csv' },
     };
 const salesComponent = loadComponent(
     '../../pages/Administration/Reports/Sales.vue',

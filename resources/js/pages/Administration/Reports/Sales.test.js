@@ -1,0 +1,294 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import test from 'node:test';
+import { compileScript, parse } from '@vue/compiler-sfc';
+import { renderToString } from '@vue/server-renderer';
+import * as Vue from 'vue';
+import { formatCurrency } from '../../../lib/currency.js';
+
+const primitive = {
+    inheritAttrs: false,
+    render() {
+        return Vue.h('div', this.$slots.default?.());
+    },
+};
+const button = {
+    inheritAttrs: false,
+    render() {
+        return this.$slots.default?.();
+    },
+};
+const generic = new Proxy(
+    { default: primitive },
+    { get: (target, key) => target[key] ?? primitive },
+);
+
+function salesFixture(empty = false) {
+    return {
+        filters: {
+            from: '2026-09-01',
+            to: '2026-09-30',
+            period: 'month',
+            product_id: 7,
+            category_id: 3,
+            page: 2,
+        },
+        active_filters: {
+            product: { id: 7, name: 'Ryzen 7' },
+            category: { id: 3, name: 'Components' },
+        },
+        kpis: {
+            total_sales: empty ? 0 : 2,
+            total_revenue: '400.00',
+            average_order_value: '200.00',
+            total_items_sold: 5,
+        },
+        timeline: { labels: ['Sep 2026'], sales: [2], revenue: [400] },
+        top_products: { ids: [7], labels: ['Ryzen 7'], quantities: [5] },
+        categories: {
+            ids: [3],
+            labels: ['Components'],
+            revenue: [400],
+            rows: [],
+        },
+        products: {
+            data: empty
+                ? []
+                : [
+                      {
+                          id: 7,
+                          name: 'Ryzen 7',
+                          category: 'Components',
+                          sales_count: 2,
+                          quantity_sold: 5,
+                          item_revenue: '400.00',
+                      },
+                  ],
+            total: empty ? 0 : 1,
+            current_page: 2,
+            last_page: 2,
+        },
+        recommendation_engagement: { summary: {}, placements: [] },
+    };
+}
+
+function salesHarness(t, empty = false) {
+    const props = Vue.reactive(salesFixture(empty));
+    const page = Vue.reactive({ props: { errors: {} } });
+    const visits = [];
+    const route = (format) => ({
+        url({ query }) {
+            const params = new URLSearchParams(
+                Object.entries(query).filter(
+                    ([, value]) => value !== undefined,
+                ),
+            );
+            return `/administration/reports/sales/${format}?${params}`;
+        },
+    });
+    const modules = new Proxy(
+        {
+            vue: Vue,
+            '@inertiajs/vue3': {
+                Head: primitive,
+                usePage: () => page,
+                router: { visit: (...args) => visits.push(args) },
+            },
+            'chart.js': new Proxy(
+                { Chart: { register() {} } },
+                { get: (target, key) => target[key] ?? primitive },
+            ),
+            '@/actions/App/Http/Controllers/Administration/SalesReportController':
+                {
+                    default: { index: (options) => options },
+                    printReport: route('print'),
+                    pdf: route('pdf'),
+                    csv: route('csv'),
+                },
+            '@/components/ui/button': { Button: button },
+            '@/lib/currency': { formatCurrency },
+        },
+        { get: (target, key) => target[key] ?? generic },
+    );
+    const { descriptor } = parse(
+        readFileSync(new URL('./Sales.vue', import.meta.url), 'utf8'),
+    );
+    const script = compileScript(descriptor, {
+        id: 'sales-export-test',
+        inlineTemplate: true,
+    });
+    const code = script.content
+        .replace(
+            /import\s*\{([^}]+)\}\s*from\s*['"]([^'"]+)['"];?/g,
+            (_, names, moduleName) =>
+                `const { ${names.replace(/\s+as\s+/g, ': ')} } = modules[${JSON.stringify(moduleName)}];`,
+        )
+        .replace(
+            /import\s+(\w+)\s+from\s*['"]([^'"]+)['"];?/g,
+            (_, name, moduleName) =>
+                `const ${name} = modules[${JSON.stringify(moduleName)}].default;`,
+        )
+        .replace('export default', 'return');
+    const component = new Function('modules', code)(modules);
+    const scope = Vue.effectScope();
+    t.after(() => scope.stop());
+    const render = scope.run(() => component.setup(props, { expose() {} }));
+
+    return {
+        props,
+        page,
+        visits,
+        tree: () => render({}, []),
+        html: () => renderToString(render({}, [])),
+    };
+}
+
+function findNodes(node, predicate) {
+    if (!node || typeof node !== 'object') return [];
+    const children = Array.isArray(node.children)
+        ? node.children
+        : (node.children?.default?.() ?? []);
+    return [
+        ...(predicate(node) ? [node] : []),
+        ...children.flatMap((child) => findNodes(child, predicate)),
+    ];
+}
+
+function exportLinks(harness) {
+    return findNodes(harness.tree(), (node) => node.type === 'a');
+}
+
+test('three accessible native export links use all applied filters and omit pagination', async (t) => {
+    const harness = salesHarness(t);
+    const html = await harness.html();
+
+    assert.match(html, /aria-label="Sales report print and export"/);
+    for (const label of ['Print report', 'Export PDF', 'Export CSV']) {
+        assert.ok(html.includes(label));
+    }
+    const links = exportLinks(harness);
+    assert.equal(links.length, 3);
+    for (const [index, format] of ['print', 'pdf', 'csv'].entries()) {
+        const url = new URL(
+            links[index].props.href,
+            'https://battlefront.test',
+        );
+        assert.equal(url.pathname, `/administration/reports/sales/${format}`);
+        assert.deepEqual(Object.fromEntries(url.searchParams), {
+            from: '2026-09-01',
+            to: '2026-09-30',
+            period: 'month',
+            product_id: '7',
+            category_id: '3',
+        });
+        links[index].props.onClick({ preventDefault: t.mock.fn() });
+    }
+    assert.equal(links[0].props.target, '_blank');
+    assert.equal(links[0].props.rel, 'noopener');
+    assert.equal(links[1].props.target, undefined);
+    assert.equal(harness.visits.length, 0);
+    assert.ok(html.includes('opens in a new tab'));
+});
+
+test('editing an unapplied date leaves export links bound to the displayed report', (t) => {
+    const harness = salesHarness(t);
+    const before = exportLinks(harness).map((link) => link.props.href);
+    const input = findNodes(
+        harness.tree(),
+        (node) => node.props?.id === 'sales-report-from',
+    )[0];
+
+    input.props['onUpdate:modelValue']('2026-10-01');
+
+    assert.deepEqual(
+        exportLinks(harness).map((link) => link.props.href),
+        before,
+    );
+});
+
+test('export links update after applied filters change and omit cleared cross filters', async (t) => {
+    const harness = salesHarness(t);
+    harness.props.filters = {
+        from: '2026-10-01',
+        to: '2026-10-12',
+        period: 'day',
+        product_id: null,
+        category_id: null,
+    };
+    await Vue.nextTick();
+
+    for (const link of exportLinks(harness)) {
+        const query = Object.fromEntries(
+            new URL(link.props.href, 'https://battlefront.test').searchParams,
+        );
+        assert.deepEqual(query, {
+            from: '2026-10-01',
+            to: '2026-10-12',
+            period: 'day',
+        });
+    }
+});
+
+for (const interaction of ['date range', 'product filter']) {
+    test(`export actions block navigation while a ${interaction} update is pending`, (t) => {
+        const harness = salesHarness(t);
+        if (interaction === 'date range') {
+            const form = findNodes(
+                harness.tree(),
+                (node) => node.type === 'form',
+            )[0];
+            form.props.onSubmit({ preventDefault() {} });
+        } else {
+            const product = findNodes(
+                harness.tree(),
+                (node) =>
+                    node.type === 'button' && 'aria-pressed' in node.props,
+            )[0];
+            product.props.onClick();
+        }
+        const options = harness.visits[0][1];
+        options.onStart();
+
+        for (const link of exportLinks(harness)) {
+            assert.equal(link.props['aria-disabled'], true);
+            assert.equal(link.props.tabindex, -1);
+            const preventDefault = t.mock.fn();
+            link.props.onClick({ preventDefault });
+            assert.equal(preventDefault.mock.callCount(), 1);
+        }
+        options.onFinish();
+        for (const link of exportLinks(harness)) {
+            assert.equal(link.props['aria-disabled'], false);
+            assert.equal(link.props.tabindex, undefined);
+        }
+    });
+}
+
+test('empty reports retain usable export controls', (t) => {
+    const harness = salesHarness(t, true);
+
+    assert.equal(exportLinks(harness).length, 3);
+    assert.ok(
+        exportLinks(harness).every(
+            (link) => link.props['aria-disabled'] === false,
+        ),
+    );
+});
+
+test('invalid product and category filters display accessible feedback', async (t) => {
+    const harness = salesHarness(t);
+    harness.page.props.errors = {
+        product_id: 'The selected product is unavailable.',
+        category_id: 'The selected category is unavailable.',
+    };
+
+    const html = await harness.html();
+    assert.match(
+        html,
+        /role="alert"[^>]*>\s*The selected product is unavailable\./,
+    );
+    assert.match(
+        html,
+        /role="alert"[^>]*>\s*The selected category is unavailable\./,
+    );
+});

@@ -178,6 +178,12 @@ Route::middleware(['auth', 'can:access-administration'])
         // sales report
         Route::get('reports/sales', [SalesReportController::class, 'index'])
             ->name('reports.sales');
+        Route::get('reports/sales/print', [SalesReportController::class, 'printReport'])
+            ->name('reports.sales.print');
+        Route::get('reports/sales/pdf', [SalesReportController::class, 'pdf'])
+            ->name('reports.sales.pdf');
+        Route::get('reports/sales/csv', [SalesReportController::class, 'csv'])
+            ->name('reports.sales.csv');
 
         // predictive analytics
         Route::get('forecasting', [ForecastingController::class, 'index'])
