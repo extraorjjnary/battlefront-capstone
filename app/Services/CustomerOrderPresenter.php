@@ -7,6 +7,7 @@ use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Services\Order\OrderProcessingService;
 use InvalidArgumentException;
 
 class CustomerOrderPresenter
@@ -14,6 +15,7 @@ class CustomerOrderPresenter
     public function __construct(
         private readonly DeliveryQuotePresenter $deliveryQuotePresenter,
         private readonly ShipmentPresenter $shipmentPresenter,
+        private readonly OrderProcessingService $orderProcessingService,
     ) {}
 
     /**
@@ -56,6 +58,7 @@ class CustomerOrderPresenter
     public function detail(Order $order): array
     {
         return [
+            'can_cancel' => $this->orderProcessingService->canCustomerCancel($order),
             'product_subtotal' => $order->product_subtotal,
             'delivery_fee' => $order->delivery_fee,
             'delivery_quote' => $this->deliveryQuotePresenter->stored($order),
@@ -119,6 +122,10 @@ class CustomerOrderPresenter
      */
     private function paymentNotice(Order $order): string
     {
+        if ($order->status === OrderStatus::Cancelled) {
+            return 'This order is cancelled. Cancellation does not refund or reverse any recorded payment.';
+        }
+
         if (! $order->payment_method->requiresPaymentProof()) {
             return 'Payment will be handled when you collect your order.';
         }

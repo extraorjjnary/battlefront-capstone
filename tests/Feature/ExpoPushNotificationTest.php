@@ -3,6 +3,7 @@
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\ShipmentStatus;
+use App\Enums\UserRole;
 use App\Events\OrderNotificationOccurred;
 use App\Jobs\CheckExpoReceipt;
 use App\Jobs\SendExpoNotification;
@@ -158,6 +159,47 @@ test('accepted push tickets are not resent and schedule receipt lookup without s
         && ! str_contains($request->body(), $delivery->device->user->email));
     Bus::assertDispatched(CheckExpoReceipt::class, fn ($job) => $job->deliveryId === $delivery->id && $job->delay !== null);
 });
+
+test('cancellation fanout preserves customer-only push deliveries and replay cannot resend accepted pushes', function (UserRole $initiator) {
+    config(['services.expo.enabled' => true]);
+    Http::preventStrayRequests();
+    Http::fake(['exp.host/--/api/v2/push/send' => Http::sequence()
+        ->push(['data' => ['status' => 'ok', 'id' => 'cancellation-ticket-one']])
+        ->push(['data' => ['status' => 'ok', 'id' => 'cancellation-ticket-two']])]);
+    Bus::fake([SendExpoNotification::class, CheckExpoReceipt::class]);
+    $customer = User::factory()->customer()->create();
+    PushDevice::factory()->for($customer)->count(2)->create();
+    PushDevice::factory()->create();
+    $administrators = User::factory()->administrator()->count(2)->create();
+    $order = Order::factory()->for($customer)->create(['status' => OrderStatus::Cancelled]);
+    $event = new OrderNotificationOccurred(
+        (string) Str::uuid(), 'order.cancelled', $order->id, $customer->id,
+        $order->reference, now()->toIso8601String(), $initiator,
+    );
+    $listener = app(PersistOrderNotifications::class);
+
+    $listener->handle($event);
+    foreach (Bus::dispatched(SendExpoNotification::class) as $job) {
+        app()->call([$job, 'handle']);
+        app()->call([$job, 'handle']);
+    }
+    $listener->handle($event);
+
+    $this->assertDatabaseCount('notifications', $initiator === UserRole::Customer ? 3 : 1);
+    $this->assertDatabaseCount('notification_push_deliveries', 2);
+    expect(NotificationPushDelivery::query()->where('status', 'accepted')->count())->toBe(2);
+    expect($customer->notifications()->sole()->data['cancellation_initiator'])->toBe($initiator->value);
+    foreach ($administrators as $administrator) {
+        expect($administrator->notifications()->count())->toBe($initiator === UserRole::Customer ? 1 : 0);
+    }
+    Bus::assertDispatchedTimes(SendExpoNotification::class, 2);
+    Bus::assertDispatchedTimes(CheckExpoReceipt::class, 2);
+    Http::assertSentCount(2);
+    Http::assertSent(fn (Request $request) => $request['body'] === 'An update is available. Open Battlefront to view your order.'
+        && $request['data']['order_id'] === $order->id
+        && $request['data']['deep_link'] === ['screen' => 'order_detail', 'order_id' => $order->id]
+        && ! str_contains($request->body(), 'cancellation_initiator'));
+})->with([UserRole::Customer, UserRole::Administrator]);
 
 test('unregistered provider feedback disables only the matching registration', function (string $phase) {
     config(['services.expo.enabled' => true]);

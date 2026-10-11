@@ -159,6 +159,7 @@ class OrderController extends Controller
                 'allowed_status_transitions' => collect($processing->allowedOrderTransitions($order))
                     ->map(fn (OrderStatus $status): array => $this->statusData($status))
                     ->all(),
+                'cancellation_blocked_reason' => $processing->shipmentCancellationBlockedReason($order->shipment),
                 'payment' => [
                     'method' => [
                         'value' => $order->payment_method->value,

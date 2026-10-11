@@ -106,7 +106,7 @@ test('cancelled delivery presents a terminal status and retains recorded milesto
     $this->travelTo('2026-10-08 09:00:00');
     $order = shipmentPresentationOrder();
     $processing = app(OrderProcessingService::class);
-    foreach ([ShipmentStatus::Preparing, ShipmentStatus::ReadyForDispatch, ShipmentStatus::HandedToLbc, ShipmentStatus::InTransit] as $status) {
+    foreach ([ShipmentStatus::Preparing, ShipmentStatus::ReadyForDispatch] as $status) {
         $processing->updateShipmentStatus($order, $status);
     }
     $this->travel(1)->hours();
@@ -115,7 +115,7 @@ test('cancelled delivery presents a terminal status and retains recorded milesto
 
     $web = $this->get(route('orders.show', $order))->assertOk()->assertInertia(fn (Assert $page) => $page
         ->where('order.shipment.status.value', 'cancelled')
-        ->where('order.shipment.timeline.5', ['status' => 'cancelled', 'label' => 'Cancelled', 'occurred_at' => '2026-10-08T10:00:00+00:00']));
+        ->where('order.shipment.timeline.3', ['status' => 'cancelled', 'label' => 'Cancelled', 'occurred_at' => '2026-10-08T10:00:00+00:00']));
     $this->get('/api/v1/orders/'.$order->id)->assertOk()->assertJsonPath('data.shipment', $web->inertiaProps('order.shipment'));
     $this->actingAs(User::factory()->administrator()->create())
         ->get(route('administration.orders.show', $order))->assertOk()

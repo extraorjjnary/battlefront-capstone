@@ -26,6 +26,7 @@ use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\NotificationController as CustomerNotificationController;
+use App\Http\Controllers\OrderCancellationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderPaymentProofController as CustomerOrderPaymentProofController;
 use App\Http\Controllers\PendingCartIntentController;
@@ -106,6 +107,9 @@ Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {
         ->name('orders.index');
     Route::post('orders', [OrderController::class, 'store'])
         ->name('orders.store');
+    Route::post('orders/{order}/cancel', OrderCancellationController::class)
+        ->whereNumber('order')
+        ->name('orders.cancel.store');
     Route::post('orders/{order}/payment-proof', CustomerOrderPaymentProofController::class)
         ->whereNumber('order')
         ->name('orders.payment-proof.store');

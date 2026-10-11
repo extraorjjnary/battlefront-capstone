@@ -82,7 +82,9 @@ const orderConfirmationTitle = computed(() =>
 const orderConfirmationDescription = computed(() =>
     selectedOrderStatus.value === 'completed'
         ? 'Confirm that fulfillment is finished before completing this order.'
-        : 'Confirm that this order should be cancelled.',
+        : props.order.payment.status.value === 'verified'
+          ? 'Cancelling restores reserved stock. Verified payment stays recorded; any refund requires separate manual handling.'
+          : 'Cancelling restores reserved stock and keeps the order in history.',
 );
 const paymentConfirmationTitle = computed(() =>
     paymentStatusForm.payment_status === 'verified'
@@ -641,6 +643,17 @@ defineOptions({
                         </div>
                     </div>
 
+                    <p
+                        v-if="
+                            order.cancellation_blocked_reason &&
+                            ['pending', 'processing'].includes(
+                                order.status.value,
+                            )
+                        "
+                        class="text-muted-foreground mt-4 text-sm leading-5"
+                    >
+                        {{ order.cancellation_blocked_reason }}
+                    </p>
                     <div
                         v-if="order.allowed_status_transitions.length"
                         class="border-border mt-5 grid gap-4 border-t pt-5"
@@ -688,7 +701,17 @@ defineOptions({
                                     order.status.value === 'pending'
                                         ? 'Processing'
                                         : 'Completed'
-                                }}. Cancellation remains available.
+                                }}.<template
+                                    v-if="
+                                        order.allowed_status_transitions.some(
+                                            (transition) =>
+                                                transition.value ===
+                                                'cancelled',
+                                        )
+                                    "
+                                >
+                                    Cancellation remains available.</template
+                                >
                             </p>
                             <InputError
                                 :message="orderStatusForm.errors.status"
@@ -708,7 +731,20 @@ defineOptions({
                         </Button>
                     </div>
                     <p v-else class="text-muted-foreground mt-4 text-sm">
-                        This order is in a terminal state and cannot be changed.
+                        <template
+                            v-if="
+                                ['completed', 'cancelled'].includes(
+                                    order.status.value,
+                                )
+                            "
+                        >
+                            This order is in a terminal state and cannot be
+                            changed.
+                        </template>
+                        <template v-else>
+                            Continue delivery using the shipment milestones
+                            above.
+                        </template>
                     </p>
 
                     <Dialog v-model:open="orderConfirmationOpen">
@@ -855,7 +891,10 @@ defineOptions({
                     </div>
 
                     <div
-                        v-if="order.payment.status.value === 'pending'"
+                        v-if="
+                            order.payment.status.value === 'pending' &&
+                            order.status.value !== 'cancelled'
+                        "
                         class="border-border mt-5 grid gap-4 border-t pt-5"
                     >
                         <div class="text-muted-foreground text-sm leading-6">
@@ -1044,7 +1083,14 @@ defineOptions({
                     </div>
                     <div v-else class="mt-4 grid gap-3">
                         <p class="text-muted-foreground text-sm">
-                            This payment decision is final for this review.
+                            <template v-if="order.status.value === 'cancelled'">
+                                Cancelled orders cannot accept payment
+                                decisions. Any recorded payment remains
+                                unchanged.
+                            </template>
+                            <template v-else>
+                                This payment decision is final for this review.
+                            </template>
                         </p>
                         <div
                             v-if="

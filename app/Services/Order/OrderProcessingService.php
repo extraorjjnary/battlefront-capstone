@@ -9,8 +9,10 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
 use App\Enums\ShipmentStatus;
+use App\Enums\UserRole;
 use App\Models\Order;
 use App\Models\Shipment;
+use App\Models\User;
 use App\Services\Notifications\OrderNotificationPublisher;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +27,44 @@ class OrderProcessingService
         private readonly RecordCompletedOrderSale $recordCompletedOrderSale,
         private readonly OrderNotificationPublisher $notifications,
     ) {}
+
+    public function canCustomerCancel(Order $order): bool
+    {
+        return $order->status === OrderStatus::Pending
+            && $order->payment_status === PaymentStatus::Pending
+            && (! $order->payment_method->requiresPaymentProof() || $order->payment_proof_path === null)
+            && ($order->shipment === null || $order->shipment->status === ShipmentStatus::AwaitingPreparation);
+    }
+
+    public function cancelForCustomer(User $customer, int $orderId): Order
+    {
+        return DB::transaction(function () use ($customer, $orderId): Order {
+            $order = $customer->orders()->whereKey($orderId)->lockForUpdate()->firstOrFail();
+            $shipment = $order->shipment()->lockForUpdate()->first();
+            $order->setRelation('shipment', $shipment);
+
+            if (! $this->canCustomerCancel($order)) {
+                throw ValidationException::withMessages([
+                    'status' => 'Only pending orders with pending payment, no submitted wallet proof, and no shipment preparation can be cancelled. Refresh your order to review its current status.',
+                ]);
+            }
+
+            $this->transitionLockedOrder($order, OrderStatus::Cancelled, $shipment, cancellationInitiator: UserRole::Customer);
+
+            return $order->refresh();
+        }, attempts: 3);
+    }
+
+    public function shipmentCancellationBlockedReason(?Shipment $shipment): ?string
+    {
+        if ($shipment === null || in_array($shipment->status, [ShipmentStatus::AwaitingPreparation, ShipmentStatus::Preparing, ShipmentStatus::ReadyForDispatch], strict: true)) {
+            return null;
+        }
+
+        return $shipment->status === ShipmentStatus::Cancelled
+            ? 'This shipment is already cancelled.'
+            : 'This shipment has been handed to LBC. Normal order cancellation is no longer available.';
+    }
 
     /**
      * Move an order through an approved administrator transition.
@@ -55,7 +95,11 @@ class OrderProcessingService
                 return false;
             }
 
-            return $status === OrderStatus::Cancelled || $order->payment_status === PaymentStatus::Verified;
+            if ($status === OrderStatus::Cancelled) {
+                return $this->shipmentCancellationBlockedReason($order->shipment) === null;
+            }
+
+            return $order->payment_status === PaymentStatus::Verified;
         }));
     }
 
@@ -156,8 +200,19 @@ class OrderProcessingService
         return $normalized;
     }
 
-    private function transitionLockedOrder(Order $order, OrderStatus $status, ?Shipment $shipment): void
-    {
+    private function transitionLockedOrder(
+        Order $order,
+        OrderStatus $status,
+        ?Shipment $shipment,
+        UserRole $cancellationInitiator = UserRole::Administrator,
+    ): void {
+        if ($status === OrderStatus::Cancelled) {
+            $blockedReason = $this->shipmentCancellationBlockedReason($shipment);
+            if ($blockedReason !== null) {
+                throw ValidationException::withMessages(['status' => $blockedReason]);
+            }
+        }
+
         if (! $order->status->canTransitionTo($status)) {
             throw ValidationException::withMessages(['status' => 'This order cannot move to the selected status.']);
         }
@@ -172,16 +227,13 @@ class OrderProcessingService
         }
 
         if ($status === OrderStatus::Cancelled) {
-            if ($shipment?->status === ShipmentStatus::Delivered) {
-                throw ValidationException::withMessages(['status' => 'A delivered shipment cannot be cancelled.']);
-            }
             $this->restoreOrderInventory->execute($order);
             $shipment?->update(['status' => ShipmentStatus::Cancelled, 'cancelled_at' => now()]);
         }
 
         $order->update(['status' => $status]);
         if ($status === OrderStatus::Cancelled) {
-            $this->notifications->afterCommit($order, 'order.cancelled');
+            $this->notifications->afterCommit($order, 'order.cancelled', $cancellationInitiator);
         }
         if ($status === OrderStatus::Completed) {
             $this->recordCompletedOrderSale->execute($order);
@@ -202,6 +254,12 @@ class OrderProcessingService
                 ->whereKey($order->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            if ($lockedOrder->status === OrderStatus::Cancelled) {
+                throw ValidationException::withMessages([
+                    'payment_status' => 'Cancelled orders cannot accept payment decisions.',
+                ]);
+            }
 
             if ($lockedOrder->payment_status !== PaymentStatus::Pending) {
                 throw ValidationException::withMessages([

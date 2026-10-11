@@ -25,6 +25,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/Chatbot/**,app/Services/Chatbot/**,resources/js/components/chatbot/** | .ai/rules/components-chatbot.md |
 | database/seeders/**,app/Http/Controllers/BranchController.php,resources/js/components/BranchMap.vue | .ai/rules/components.md |
 | resources/js/composables/useNotificationPolling* | .ai/rules/composables.md |
+| app/Services/Order/**,app/Http/Controllers/**/*Order*,resources/js/pages/**/Orders/** | .ai/rules/controllers-js-pages-orders.md |
 | routes/**,app/Http/Controllers/** | .ai/rules/controllers.md |
 | app/Actions/Forecasting/** | .ai/rules/forecasting.md |
 | ** | .ai/rules/general.md |

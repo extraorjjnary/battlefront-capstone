@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\CartItemController;
 use App\Http\Controllers\Api\V1\ChatbotController;
 use App\Http\Controllers\Api\V1\CheckoutController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\OrderCancellationController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\OrderPaymentProofController;
 use App\Http\Controllers\Api\V1\ProductController;
@@ -89,6 +90,8 @@ Route::prefix('v1')
             // orders
             Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
             Route::post('orders', [OrderController::class, 'store'])->name('orders.store');
+            Route::post('orders/{order}/cancel', OrderCancellationController::class)
+                ->whereNumber('order')->name('orders.cancel.store');
             Route::get('orders/{order}', [OrderController::class, 'show'])
                 ->whereNumber('order')->name('orders.show');
             Route::post('orders/{order}/payment-proof', OrderPaymentProofController::class)

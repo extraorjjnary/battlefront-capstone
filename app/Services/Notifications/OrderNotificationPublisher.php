@@ -2,6 +2,7 @@
 
 namespace App\Services\Notifications;
 
+use App\Enums\UserRole;
 use App\Events\OrderNotificationOccurred;
 use App\Jobs\RetryOrderNotifications;
 use App\Models\Order;
@@ -12,11 +13,12 @@ use Throwable;
 
 class OrderNotificationPublisher
 {
-    public function afterCommit(Order $order, string $kind): void
+    public function afterCommit(Order $order, string $kind, ?UserRole $cancellationInitiator = null): void
     {
         $event = new OrderNotificationOccurred(
             (string) Str::uuid(), $kind, $order->id, $order->user_id,
             $order->reference, now()->toIso8601String(),
+            $cancellationInitiator,
         );
 
         DB::afterCommit(function () use ($event): void {

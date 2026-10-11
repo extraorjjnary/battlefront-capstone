@@ -21,14 +21,21 @@ class PersistOrderNotifications
 
     public function handle(OrderNotificationOccurred $event): void
     {
-        $recipients = User::query()->where('role', $event->audience())
-            ->when($event->audience() === 'customer', fn ($query) => $query->whereKey($event->customerId))
+        foreach ($event->audiences() as $audience) {
+            $this->persistForAudience($event, $audience);
+        }
+    }
+
+    private function persistForAudience(OrderNotificationOccurred $event, UserRole $audience): void
+    {
+        $recipients = User::query()->where('role', $audience)
+            ->when($audience === UserRole::Customer, fn ($query) => $query->whereKey($event->customerId))
             ->lazyById();
 
         foreach ($recipients as $recipient) {
             $notification = $recipient->notifications()->firstOrCreate(
                 ['id' => Uuid::uuid5(Uuid::NAMESPACE_URL, $event->id.':'.$recipient->id)->toString()],
-                ['type' => OrderUpdateNotification::class, 'data' => (new OrderUpdateNotification($event))->toDatabase($recipient), 'read_at' => null],
+                ['type' => OrderUpdateNotification::class, 'data' => (new OrderUpdateNotification($event, $audience))->toDatabase($recipient), 'read_at' => null],
             );
 
             if ($recipient->role !== UserRole::Customer || ! config('services.expo.enabled')) {

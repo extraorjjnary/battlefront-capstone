@@ -13,6 +13,8 @@ use App\Models\User;
 use App\Services\Order\OrderProcessingService;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
+use Inertia\Testing\AssertableInertia as Assert;
 
 function shipmentWorkflowOrder(OrderStatus $status = OrderStatus::Processing, PaymentStatus $payment = PaymentStatus::Verified): Order
 {
@@ -185,9 +187,6 @@ test('cancelling an eligible delivery terminates its shipment and restores stock
     'processing before packing' => [ShipmentStatus::AwaitingPreparation, OrderStatus::Processing],
     'preparing' => [ShipmentStatus::Preparing, OrderStatus::Processing],
     'ready' => [ShipmentStatus::ReadyForDispatch, OrderStatus::Processing],
-    'handed over' => [ShipmentStatus::HandedToLbc, OrderStatus::Processing],
-    'in transit' => [ShipmentStatus::InTransit, OrderStatus::Processing],
-    'out for delivery' => [ShipmentStatus::OutForDelivery, OrderStatus::Processing],
 ]);
 
 test('sale failure rolls back shipment delivery order completion and timestamps together', function () {
@@ -208,9 +207,55 @@ test('sale failure rolls back shipment delivery order completion and timestamps 
     $this->assertDatabaseCount('sales', 0);
 });
 
+test('administrator cancellation after LBC handoff preserves stock payment shipment history and sales', function (ShipmentStatus $milestone) {
+    $order = shipmentWorkflowOrder();
+    advanceShipmentForTest($order, $milestone);
+    $originalOrder = $order->refresh()->getAttributes();
+    $originalShipment = $order->shipment->getAttributes();
+    $notificationCount = $order->user->notifications()->count();
+    $salesCount = Sale::query()->count();
+    $message = 'This shipment has been handed to LBC. Normal order cancellation is no longer available.';
+    $this->actingAs(User::factory()->administrator()->create());
+    $this->get(route('administration.orders.show', $order))->assertInertia(fn (Assert $page) => $page
+        ->where('order.allowed_status_transitions', [])
+        ->where('order.cancellation_blocked_reason', $message));
+    $this->patch(route('administration.orders.status.update', $order), ['status' => 'cancelled'])
+        ->assertSessionHasErrors(['status' => $message]);
+    expect($order->refresh()->getAttributes())->toBe($originalOrder);
+    expect($order->shipment->getAttributes())->toBe($originalShipment);
+    expect(Inventory::sole()->quantity)->toBe(5);
+    expect($order->user->notifications()->count())->toBe($notificationCount);
+    expect(Sale::query()->count())->toBe($salesCount);
+})->with([ShipmentStatus::HandedToLbc, ShipmentStatus::InTransit, ShipmentStatus::OutForDelivery, ShipmentStatus::Delivered]);
+
+test('cancellation and LBC handoff recheck persisted shipment state rather than a cached relation', function (bool $cancellationFirst) {
+    $order = shipmentWorkflowOrder();
+    advanceShipmentForTest($order, ShipmentStatus::ReadyForDispatch);
+    $staleOrder = Order::query()->with('shipment')->findOrFail($order->id);
+    $service = app(OrderProcessingService::class);
+    $notificationCount = $order->user->notifications()->count();
+    if ($cancellationFirst) {
+        $service->updateStatus($order, OrderStatus::Cancelled);
+        expect(fn () => $service->updateShipmentStatus($staleOrder, ShipmentStatus::HandedToLbc))
+            ->toThrow(ValidationException::class);
+        expect($order->refresh()->shipment)->status->toBe(ShipmentStatus::Cancelled)->handed_to_carrier_at->toBeNull();
+        expect(Inventory::sole()->quantity)->toBe(7);
+    } else {
+        $service->updateShipmentStatus($order, ShipmentStatus::HandedToLbc);
+        expect(fn () => $service->updateStatus($staleOrder, OrderStatus::Cancelled))
+            ->toThrow(ValidationException::class, 'This shipment has been handed to LBC.');
+        expect($order->refresh()->status)->toBe(OrderStatus::Processing);
+        expect($order->shipment)->status->toBe(ShipmentStatus::HandedToLbc)->cancelled_at->toBeNull();
+        expect(Inventory::sole()->quantity)->toBe(5);
+    }
+    expect($order->payment_status)->toBe(PaymentStatus::Verified);
+    expect($order->user->notifications()->count())->toBe($notificationCount + 1);
+    $this->assertDatabaseCount('sales', 0);
+})->with([true, false]);
+
 test('shipment cancellation failure rolls back order stock and shipment together', function () {
     $order = shipmentWorkflowOrder();
-    advanceShipmentForTest($order, ShipmentStatus::InTransit);
+    advanceShipmentForTest($order, ShipmentStatus::ReadyForDispatch);
     Event::listen('eloquent.updated: '.Shipment::class, fn (): never => throw new RuntimeException('Shipment failure.'));
 
     try {
@@ -221,7 +266,7 @@ test('shipment cancellation failure rolls back order stock and shipment together
     }
 
     expect($order->refresh()->status)->toBe(OrderStatus::Processing);
-    expect($order->shipment)->status->toBe(ShipmentStatus::InTransit)->cancelled_at->toBeNull();
+    expect($order->shipment)->status->toBe(ShipmentStatus::ReadyForDispatch)->cancelled_at->toBeNull();
     expect(Inventory::sole()->quantity)->toBe(5);
 });
 

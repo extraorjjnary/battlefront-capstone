@@ -13,6 +13,7 @@ import {
     Upload,
     UserRound,
 } from '@lucide/vue';
+import { ref } from 'vue';
 import OrderController from '@/actions/App/Http/Controllers/OrderController';
 import OrderPaymentProofController from '@/actions/App/Http/Controllers/OrderPaymentProofController';
 import InputError from '@/components/InputError.vue';
@@ -20,11 +21,21 @@ import ShipmentTracking from '@/components/ShipmentTracking.vue';
 import ProductImage from '@/components/catalog/ProductImage.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    Dialog,
+    DialogClose,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { formatCurrency } from '@/lib/currency';
 import { orderStatusBadgeClass } from '@/lib/orderStatus';
 import { index as productIndex } from '@/routes/products';
+import { store as cancelOrder } from '@/routes/orders/cancel';
 
 const props = defineProps({
     order: { type: Object, required: true },
@@ -34,6 +45,31 @@ const props = defineProps({
 const replacementProofForm = useForm({
     payment_proof: null,
 });
+const cancellationOpen = ref(false);
+const cancellationForm = useForm({});
+
+function requestCancellation() {
+    if (!props.order.can_cancel || cancellationForm.processing) {
+        return;
+    }
+    cancellationForm.clearErrors();
+    cancellationOpen.value = true;
+}
+
+function submitCancellation() {
+    if (!props.order.can_cancel || cancellationForm.processing) {
+        return;
+    }
+    cancellationForm.submit(cancelOrder(props.order.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            cancellationOpen.value = false;
+        },
+        onError: () => {
+            cancellationOpen.value = false;
+        },
+    });
+}
 
 const dateFormatter = new Intl.DateTimeFormat('en-PH', {
     dateStyle: 'long',
@@ -139,12 +175,65 @@ function submitReplacementProof() {
                 </div>
 
                 <div
-                    class="border-border text-muted-foreground mt-6 flex items-center gap-2 border-t pt-4 text-sm"
+                    class="border-border mt-6 flex flex-wrap items-center justify-between gap-3 border-t pt-4"
                 >
-                    <CalendarDays class="size-4" aria-hidden="true" />
-                    Submitted {{ formatOrderDate(order.created_at) }}
+                    <p
+                        class="text-muted-foreground flex items-center gap-2 text-sm"
+                    >
+                        <CalendarDays class="size-4" aria-hidden="true" />
+                        Submitted {{ formatOrderDate(order.created_at) }}
+                    </p>
+                    <Button
+                        v-if="order.can_cancel"
+                        type="button"
+                        variant="destructive-outline"
+                        size="sm"
+                        :disabled="cancellationForm.processing"
+                        @click="requestCancellation"
+                    >
+                        <Spinner v-if="cancellationForm.processing" />
+                        Cancel order
+                    </Button>
                 </div>
+                <InputError
+                    class="mt-3"
+                    :message="cancellationForm.errors.status"
+                />
             </section>
+
+            <Dialog v-model:open="cancellationOpen">
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Cancel {{ order.reference }}?</DialogTitle>
+                        <DialogDescription>
+                            Reserved stock will be released. This order will
+                            remain in your order history.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter class="mt-6 gap-2">
+                        <DialogClose as-child>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                :disabled="cancellationForm.processing"
+                            >
+                                Keep order
+                            </Button>
+                        </DialogClose>
+                        <Button
+                            type="button"
+                            variant="destructive-solid"
+                            :disabled="
+                                cancellationForm.processing || !order.can_cancel
+                            "
+                            @click="submitCancellation"
+                        >
+                            <Spinner v-if="cancellationForm.processing" />
+                            Confirm cancellation
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             <ShipmentTracking
                 v-if="order.shipment"
