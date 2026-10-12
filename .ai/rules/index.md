@@ -27,6 +27,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/js/composables/useNotificationPolling* | .ai/rules/composables.md |
 | app/Services/Order/**,app/Http/Controllers/**/*Order*,resources/js/pages/**/Orders/** | .ai/rules/controllers-js-pages-orders.md |
 | routes/**,app/Http/Controllers/** | .ai/rules/controllers.md |
+| app/Services/Order/PsgcDeliveryLocations.php,app/Http/Requests/ValidateCheckoutRequest.php,app/Actions/Checkout/**,resources/js/pages/Checkout/**,app/Http/Resources/Api/V1/CheckoutResource.php,resources/data/psgc-delivery*.json | .ai/rules/data.md |
 | app/Actions/Forecasting/** | .ai/rules/forecasting.md |
 | ** | .ai/rules/general.md |
 | app/Http/Controllers/** | .ai/rules/http-controllers.md |
@@ -54,5 +55,6 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/Chatbot/**,database/seeders/DevelopmentChatbotKnowledgeSeeder.php | .ai/rules/seeders.md |
 | app/Services/Chatbot/** | .ai/rules/services-chatbot.md |
 | app/Console/Commands/**,app/Services/RealCatalogImportService.php,database/PrepareCatalogImageManifest.ps1 | .ai/rules/services.md |
+| app/Services/Order/PsgcDeliveryLocations.php,app/Http/Requests/Settings/ProfileUpdateRequest.php,app/Models/User.php,resources/js/components/DeliveryAddressFields.vue,resources/js/pages/settings/Profile.vue,resources/js/pages/Checkout/Index.vue | .ai/rules/settings-js-pages-checkout.md |
 | routes/settings.php,app/Http/Controllers/Settings/**,resources/js/pages/settings/** | .ai/rules/settings.md |
 | app/Services/Notifications/**,app/Services/Order/**,app/Actions/Order/**,app/Jobs/**,app/Http/Controllers/**/*Notification*,app/Http/Controllers/Api/V1/PushDeviceController.php | .ai/rules/v1.md |

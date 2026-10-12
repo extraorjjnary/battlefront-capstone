@@ -2,17 +2,26 @@
 import { Form, Head, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileController';
+import DeliveryAddressFields from '@/components/DeliveryAddressFields.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { edit } from '@/routes/profile';
 
 const props = defineProps({
     canManageDefaultDeliveryAddress: { type: Boolean, required: true },
     defaultDeliveryAddress: { type: String, default: '' },
+    deliveryLocations: { type: Array, default: () => [] },
+    defaultDeliveryAddressPrefill: {
+        type: Object,
+        default: () => ({
+            delivery_destination: '',
+            delivery_barangay_code: '',
+            delivery_address_details: '',
+        }),
+    },
     searchRecommendationsEnabled: { type: Boolean, default: true },
     productViewRecommendationsEnabled: { type: Boolean, default: true },
     personalizedRecommendationsEnabled: { type: Boolean, default: true },
@@ -30,6 +39,31 @@ defineOptions({
 });
 const page = usePage();
 const user = computed(() => page.props.auth.user);
+const defaultAddress = ref({ ...props.defaultDeliveryAddressPrefill });
+const defaultAddressAction = ref('keep');
+const hasAddress = computed(() =>
+    Boolean(props.defaultDeliveryAddress) ||
+    Object.values(defaultAddress.value).some(Boolean),
+);
+
+function updateDefaultAddress(address) {
+    defaultAddress.value = address;
+    defaultAddressAction.value = 'save';
+}
+
+function clearDefaultAddress() {
+    defaultAddress.value = {
+        delivery_destination: '',
+        delivery_barangay_code: '',
+        delivery_address_details: '',
+    };
+    defaultAddressAction.value = 'clear';
+}
+
+function profileSaved() {
+    defaultAddress.value = { ...props.defaultDeliveryAddressPrefill };
+    defaultAddressAction.value = 'keep';
+}
 const personalizedRecommendationsEnabled = ref(
     props.personalizedRecommendationsEnabled,
 );
@@ -40,11 +74,9 @@ const productViewRecommendationsEnabled = ref(
 </script>
 
 <template>
-    <Head title="Profile settings" />
-
-    <h1 class="sr-only">Profile settings</h1>
-
     <div class="flex flex-col space-y-6">
+        <Head title="Profile settings" />
+        <h1 class="sr-only">Profile settings</h1>
         <Heading
             variant="small"
             title="Profile"
@@ -55,6 +87,7 @@ const productViewRecommendationsEnabled = ref(
             v-bind="ProfileController.update.form()"
             class="space-y-6"
             v-slot="{ errors, processing }"
+            @success="profileSaved"
         >
             <div class="grid gap-2">
                 <Label for="name">Name</Label>
@@ -87,28 +120,56 @@ const productViewRecommendationsEnabled = ref(
 
             <div
                 v-if="props.canManageDefaultDeliveryAddress"
-                class="grid gap-2"
+                class="grid gap-4"
             >
-                <Label for="default-delivery-address">
+                <p class="font-medium">
                     Default delivery address (optional)
-                </Label>
-                <Textarea
-                    id="default-delivery-address"
-                    name="default_delivery_address"
-                    maxlength="255"
-                    autocomplete="street-address"
-                    :default-value="props.defaultDeliveryAddress"
-                    :aria-invalid="Boolean(errors.default_delivery_address)"
-                    placeholder="House or building, street, barangay, city, and province"
+                </p>
+                <input
+                    type="hidden"
+                    name="default_delivery_address_action"
+                    :value="defaultAddressAction"
                 />
+                <DeliveryAddressFields
+                    :model-value="defaultAddress"
+                    @update:model-value="updateDefaultAddress"
+                    :locations="props.deliveryLocations"
+                    :errors="errors"
+                    name-prefix="default_delivery"
+                    :required="defaultAddressAction === 'save'"
+                />
+                <p
+                    v-if="props.defaultDeliveryAddress && defaultAddressAction !== 'clear'"
+                    class="text-muted-foreground text-sm"
+                >
+                    Saved address: {{ props.defaultDeliveryAddress }}
+                    Your saved address is kept until you replace or clear it.
+                    Choose all three fields to replace it.
+                </p>
+                <p
+                    v-if="defaultAddressAction === 'clear'"
+                    class="text-muted-foreground text-sm"
+                    role="status"
+                >
+                    Your saved address will be cleared when you save.
+                </p>
                 <p class="text-muted-foreground text-sm">
                     This address will pre-fill delivery checkout and can still
                     be changed for each order.
                 </p>
                 <InputError
-                    class="mt-2"
-                    :message="errors.default_delivery_address"
+                    :message="errors.default_delivery_address_action"
                 />
+                <Button
+                    v-if="hasAddress && defaultAddressAction !== 'clear'"
+                    type="button"
+                    variant="outline"
+                    class="w-fit"
+                    :disabled="processing"
+                    @click="clearDefaultAddress"
+                >
+                    Clear saved address
+                </Button>
             </div>
 
             <div

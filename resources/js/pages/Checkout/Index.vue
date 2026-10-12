@@ -15,20 +15,13 @@ import {
 } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { store as storeOrder } from '@/actions/App/Http/Controllers/OrderController';
+import DeliveryAddressFields from '@/components/DeliveryAddressFields.vue';
 import InputError from '@/components/InputError.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
-import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency } from '@/lib/currency';
 import { index as cartIndex } from '@/routes/cart';
 
@@ -39,13 +32,18 @@ const props = defineProps({
     fulfillmentMethods: { type: Array, required: true },
     paymentMethods: { type: Array, required: true },
     deliveryQuotes: { type: Array, required: true },
+    deliveryLocations: { type: Array, required: true },
+    deliveryAddressPrefill: { type: Object, required: true },
     pickupQuote: { type: Object, required: true },
 });
 
 const fulfillmentMethod = ref('pickup');
 const paymentMethod = ref('cash');
 const paymentProofKey = ref(0);
-const deliveryDestination = ref('');
+const deliveryAddress = ref({ ...props.deliveryAddressPrefill });
+const deliveryDestination = computed(
+    () => deliveryAddress.value.delivery_destination,
+);
 const selectedQuote = computed(() =>
     fulfillmentMethod.value === 'pickup'
         ? props.pickupQuote
@@ -78,7 +76,11 @@ function chooseFulfillment(value) {
     fulfillmentMethod.value = value;
 
     if (value === 'pickup') {
-        deliveryDestination.value = '';
+        deliveryAddress.value = {
+            ...deliveryAddress.value,
+            delivery_destination: '',
+            delivery_barangay_code: '',
+        };
     }
 
     if (
@@ -373,71 +375,24 @@ defineOptions({
                             v-if="fulfillmentMethod === 'delivery'"
                             class="grid gap-5"
                         >
-                            <div class="grid gap-2">
-                                <Label for="delivery-destination"
-                                    >Delivery city or municipality</Label
-                                >
-                                <Select v-model="deliveryDestination">
-                                    <SelectTrigger
-                                        id="delivery-destination"
-                                        class="w-full"
-                                        aria-required="true"
-                                        :aria-invalid="
-                                            Boolean(errors.delivery_destination)
-                                        "
+                            <DeliveryAddressFields
+                                v-model="deliveryAddress"
+                                :locations="deliveryLocations"
+                                :errors="errors"
+                            >
+                                <template #details-help>
+                                    <p
+                                        v-if="customer.default_delivery_address"
+                                        class="text-muted-foreground text-xs leading-5"
                                     >
-                                        <SelectValue
-                                            placeholder="Select a supported destination"
-                                        />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem
-                                            v-for="quote in deliveryQuotes"
-                                            :key="quote.destination"
-                                            :value="quote.destination"
-                                        >
-                                            {{ quote.destination }}
-                                        </SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <input
-                                    type="hidden"
-                                    name="delivery_destination"
-                                    :value="deliveryDestination"
-                                />
-                                <InputError
-                                    :message="errors.delivery_destination"
-                                />
-                            </div>
-                            <div class="grid gap-2">
-                                <Label for="delivery-address"
-                                    >Delivery address</Label
-                                >
-                                <Textarea
-                                    id="delivery-address"
-                                    name="delivery_address"
-                                    maxlength="255"
-                                    autocomplete="street-address"
-                                    :default-value="
-                                        customer.default_delivery_address ?? ''
-                                    "
-                                    placeholder="House or building, street, barangay, city, and province"
-                                    :aria-invalid="
-                                        Boolean(errors.delivery_address)
-                                    "
-                                    required
-                                />
-                                <p
-                                    v-if="customer.default_delivery_address"
-                                    class="text-muted-foreground text-xs leading-5"
-                                >
-                                    Pre-filled from your profile. Changes here
-                                    apply only to this order.
-                                </p>
-                                <InputError
-                                    :message="errors.delivery_address"
-                                />
-                            </div>
+                                        Saved profile address:
+                                        {{ customer.default_delivery_address }}
+                                        Confirm the location and enter the street
+                                        details above. Changes here apply only to
+                                        this order.
+                                    </p>
+                                </template>
+                            </DeliveryAddressFields>
                             <div
                                 v-if="selectedQuote"
                                 class="border-border bg-secondary/40 grid gap-2 border p-4 text-sm"

@@ -1,0 +1,1387 @@
+{
+    "schema_version": 1,
+    "release": "2026-Q1",
+    "as_of": "2026-03-31",
+    "source": {
+        "publisher": "Philippine Statistics Authority",
+        "official_url": "https://psa.gov.ph/classification/psgc/",
+        "mirror_url": "https://github.com/alkevintan/psgc-rb/tree/279ffe1918c2fd28206c2153f6c5c2d8280fb9f3/data",
+        "commit": "279ffe1918c2fd28206c2153f6c5c2d8280fb9f3",
+        "files": [
+            {
+                "path": "data/cities_municipalities.json",
+                "git_blob_sha": "250aba0b930310650a0816fffd31a103ffb2bef8"
+            },
+            {
+                "path": "data/barangays.json",
+                "git_blob_sha": "49f9fa82420187596178ee958855ec7fd4cf4710"
+            }
+        ],
+        "licenses": [
+            {
+                "name": "PSA data: CC BY 4.0",
+                "url": "https://psa.gov.ph/terms-of-use"
+            },
+            {
+                "name": "Mirror: MIT, Copyright (c) 2026 Al Kevin Tan",
+                "url": "https://github.com/alkevintan/psgc-rb/blob/279ffe1918c2fd28206c2153f6c5c2d8280fb9f3/LICENSE"
+            }
+        ],
+        "modifications": "Filtered to Battlefront's 12 configured destinations; retained original codes/names; replaced truncated mirror parent prefixes with full locality membership; added verified classification/province metadata; sorted barangays naturally by name."
+    },
+    "destinations": [
+        {
+            "destination": "Sagay City",
+            "code": "1804523000",
+            "name": "City of Sagay",
+            "type": "city",
+            "city_class": "CC",
+            "province": {
+                "code": "1804500000",
+                "name": "Negros Occidental"
+            },
+            "barangays": [
+                {
+                    "code": "1804523001",
+                    "name": "Andres Bonifacio"
+                },
+                {
+                    "code": "1804523002",
+                    "name": "Bato"
+                },
+                {
+                    "code": "1804523003",
+                    "name": "Baviera"
+                },
+                {
+                    "code": "1804523004",
+                    "name": "Bulanon"
+                },
+                {
+                    "code": "1804523005",
+                    "name": "Campo Himoga-an"
+                },
+                {
+                    "code": "1804523006",
+                    "name": "Campo Santiago"
+                },
+                {
+                    "code": "1804523007",
+                    "name": "Colonia Divina"
+                },
+                {
+                    "code": "1804523008",
+                    "name": "Fabrica"
+                },
+                {
+                    "code": "1804523009",
+                    "name": "General Luna"
+                },
+                {
+                    "code": "1804523010",
+                    "name": "Himoga-an Baybay"
+                },
+                {
+                    "code": "1804523011",
+                    "name": "Lopez Jaena"
+                },
+                {
+                    "code": "1804523013",
+                    "name": "Makiling"
+                },
+                {
+                    "code": "1804523012",
+                    "name": "Malubon"
+                },
+                {
+                    "code": "1804523014",
+                    "name": "Molocaboc"
+                },
+                {
+                    "code": "1804523015",
+                    "name": "Old Sagay"
+                },
+                {
+                    "code": "1804523016",
+                    "name": "Paraiso"
+                },
+                {
+                    "code": "1804523017",
+                    "name": "Plaridel"
+                },
+                {
+                    "code": "1804523018",
+                    "name": "Poblacion I"
+                },
+                {
+                    "code": "1804523019",
+                    "name": "Poblacion II"
+                },
+                {
+                    "code": "1804523020",
+                    "name": "Puey"
+                },
+                {
+                    "code": "1804523026",
+                    "name": "Rafaela Barrera"
+                },
+                {
+                    "code": "1804523021",
+                    "name": "Rizal"
+                },
+                {
+                    "code": "1804523022",
+                    "name": "Taba-ao"
+                },
+                {
+                    "code": "1804523023",
+                    "name": "Tadlong"
+                },
+                {
+                    "code": "1804523025",
+                    "name": "Vito"
+                }
+            ]
+        },
+        {
+            "destination": "Escalante City",
+            "code": "1804509000",
+            "name": "City of Escalante",
+            "type": "city",
+            "city_class": "CC",
+            "province": {
+                "code": "1804500000",
+                "name": "Negros Occidental"
+            },
+            "barangays": [
+                {
+                    "code": "1804509001",
+                    "name": "Alimango"
+                },
+                {
+                    "code": "1804509002",
+                    "name": "Balintawak"
+                },
+                {
+                    "code": "1804509004",
+                    "name": "Binaguiohan"
+                },
+                {
+                    "code": "1804509005",
+                    "name": "Buenavista"
+                },
+                {
+                    "code": "1804509006",
+                    "name": "Cervantes"
+                },
+                {
+                    "code": "1804509007",
+                    "name": "Dian-ay"
+                },
+                {
+                    "code": "1804509008",
+                    "name": "Hacienda Fe"
+                },
+                {
+                    "code": "1804509010",
+                    "name": "Japitan"
+                },
+                {
+                    "code": "1804509009",
+                    "name": "Jonobjonob"
+                },
+                {
+                    "code": "1804509011",
+                    "name": "Langub"
+                },
+                {
+                    "code": "1804509012",
+                    "name": "Libertad"
+                },
+                {
+                    "code": "1804509013",
+                    "name": "Mabini"
+                },
+                {
+                    "code": "1804509003",
+                    "name": "Magsaysay"
+                },
+                {
+                    "code": "1804509014",
+                    "name": "Malasibog"
+                },
+                {
+                    "code": "1804509017",
+                    "name": "Old Poblacion"
+                },
+                {
+                    "code": "1804509015",
+                    "name": "Paitan"
+                },
+                {
+                    "code": "1804509016",
+                    "name": "Pinapugasan"
+                },
+                {
+                    "code": "1804509018",
+                    "name": "Rizal"
+                },
+                {
+                    "code": "1804509019",
+                    "name": "Tamlang"
+                },
+                {
+                    "code": "1804509020",
+                    "name": "Udtongan"
+                },
+                {
+                    "code": "1804509021",
+                    "name": "Washington"
+                }
+            ]
+        },
+        {
+            "destination": "Cadiz City",
+            "code": "1804504000",
+            "name": "City of Cadiz",
+            "type": "city",
+            "city_class": "CC",
+            "province": {
+                "code": "1804500000",
+                "name": "Negros Occidental"
+            },
+            "barangays": [
+                {
+                    "code": "1804504001",
+                    "name": "Andres Bonifacio"
+                },
+                {
+                    "code": "1804504002",
+                    "name": "Banquerohan"
+                },
+                {
+                    "code": "1804504003",
+                    "name": "Barangay 1 Pob."
+                },
+                {
+                    "code": "1804504004",
+                    "name": "Barangay 2 Pob."
+                },
+                {
+                    "code": "1804504005",
+                    "name": "Barangay 3 Pob."
+                },
+                {
+                    "code": "1804504006",
+                    "name": "Barangay 4 Pob."
+                },
+                {
+                    "code": "1804504007",
+                    "name": "Barangay 5 Pob."
+                },
+                {
+                    "code": "1804504008",
+                    "name": "Barangay 6 Pob."
+                },
+                {
+                    "code": "1804504009",
+                    "name": "Burgos"
+                },
+                {
+                    "code": "1804504010",
+                    "name": "Cabahug"
+                },
+                {
+                    "code": "1804504011",
+                    "name": "Cadiz Viejo"
+                },
+                {
+                    "code": "1804504012",
+                    "name": "Caduha-an"
+                },
+                {
+                    "code": "1804504013",
+                    "name": "Celestino Villacin"
+                },
+                {
+                    "code": "1804504014",
+                    "name": "Daga"
+                },
+                {
+                    "code": "1804504016",
+                    "name": "Jerusalem"
+                },
+                {
+                    "code": "1804504017",
+                    "name": "Luna"
+                },
+                {
+                    "code": "1804504018",
+                    "name": "Mabini"
+                },
+                {
+                    "code": "1804504019",
+                    "name": "Magsaysay"
+                },
+                {
+                    "code": "1804504021",
+                    "name": "Sicaba"
+                },
+                {
+                    "code": "1804504022",
+                    "name": "Tiglawigan"
+                },
+                {
+                    "code": "1804504023",
+                    "name": "Tinampa-an"
+                },
+                {
+                    "code": "1804504015",
+                    "name": "V. F. Gustilo"
+                }
+            ]
+        },
+        {
+            "destination": "Toboso",
+            "code": "1804529000",
+            "name": "Toboso",
+            "type": "municipality",
+            "city_class": null,
+            "province": {
+                "code": "1804500000",
+                "name": "Negros Occidental"
+            },
+            "barangays": [
+                {
+                    "code": "1804529001",
+                    "name": "Bandila"
+                },
+                {
+                    "code": "1804529002",
+                    "name": "Bug-ang"
+                },
+                {
+                    "code": "1804529003",
+                    "name": "General Luna"
+                },
+                {
+                    "code": "1804529004",
+                    "name": "Magticol"
+                },
+                {
+                    "code": "1804529005",
+                    "name": "Poblacion"
+                },
+                {
+                    "code": "1804529006",
+                    "name": "Salamanca"
+                },
+                {
+                    "code": "1804529007",
+                    "name": "San Isidro"
+                },
+                {
+                    "code": "1804529008",
+                    "name": "San Jose"
+                },
+                {
+                    "code": "1804529009",
+                    "name": "Tabun-ac"
+                }
+            ]
+        },
+        {
+            "destination": "Manapla",
+            "code": "1804518000",
+            "name": "Manapla",
+            "type": "municipality",
+            "city_class": null,
+            "province": {
+                "code": "1804500000",
+                "name": "Negros Occidental"
+            },
+            "barangays": [
+                {
+                    "code": "1804518002",
+                    "name": "Barangay I"
+                },
+                {
+                    "code": "1804518003",
+                    "name": "Barangay I-A"
+                },
+                {
+                    "code": "1804518004",
+                    "name": "Barangay I-B"
+                },
+                {
+                    "code": "1804518005",
+                    "name": "Barangay II"
+                },
+                {
+                    "code": "1804518006",
+                    "name": "Barangay II-A"
+                },
+                {
+                    "code": "1804518001",
+                    "name": "Chambery"
+                },
+                {
+                    "code": "1804518007",
+                    "name": "Punta Mesa"
+                },
+                {
+                    "code": "1804518008",
+                    "name": "Punta Salong"
+                },
+                {
+                    "code": "1804518009",
+                    "name": "Purisima"
+                },
+                {
+                    "code": "1804518010",
+                    "name": "San Pablo"
+                },
+                {
+                    "code": "1804518011",
+                    "name": "Santa Teresa"
+                },
+                {
+                    "code": "1804518012",
+                    "name": "Tortosa"
+                }
+            ]
+        },
+        {
+            "destination": "Calatrava",
+            "code": "1804505000",
+            "name": "Calatrava",
+            "type": "municipality",
+            "city_class": null,
+            "province": {
+                "code": "1804500000",
+                "name": "Negros Occidental"
+            },
+            "barangays": [
+                {
+                    "code": "1804505001",
+                    "name": "Agpangi"
+                },
+                {
+                    "code": "1804505002",
+                    "name": "Ani-e"
+                },
+                {
+                    "code": "1804505003",
+                    "name": "Bagacay"
+                },
+                {
+                    "code": "1804505004",
+                    "name": "Bantayanon"
+                },
+                {
+                    "code": "1804505005",
+                    "name": "Buenavista"
+                },
+                {
+                    "code": "1804505006",
+                    "name": "Cabungahan"
+                },
+                {
+                    "code": "1804505007",
+                    "name": "Calampisawan"
+                },
+                {
+                    "code": "1804505008",
+                    "name": "Cambayobo"
+                },
+                {
+                    "code": "1804505009",
+                    "name": "Castellano"
+                },
+                {
+                    "code": "1804505010",
+                    "name": "Cruz"
+                },
+                {
+                    "code": "1804505011",
+                    "name": "Dolis"
+                },
+                {
+                    "code": "1804505012",
+                    "name": "Hilub-Ang"
+                },
+                {
+                    "code": "1804505013",
+                    "name": "Hinab-Ongan"
+                },
+                {
+                    "code": "1804505014",
+                    "name": "Ilaya"
+                },
+                {
+                    "code": "1804505015",
+                    "name": "Laga-an"
+                },
+                {
+                    "code": "1804505016",
+                    "name": "Lalong"
+                },
+                {
+                    "code": "1804505017",
+                    "name": "Lemery"
+                },
+                {
+                    "code": "1804505018",
+                    "name": "Lipat-on"
+                },
+                {
+                    "code": "1804505019",
+                    "name": "Lo-ok"
+                },
+                {
+                    "code": "1804505020",
+                    "name": "Ma-aslob"
+                },
+                {
+                    "code": "1804505021",
+                    "name": "Macasilao"
+                },
+                {
+                    "code": "1804505028",
+                    "name": "Mahilum"
+                },
+                {
+                    "code": "1804505022",
+                    "name": "Malanog"
+                },
+                {
+                    "code": "1804505023",
+                    "name": "Malatas"
+                },
+                {
+                    "code": "1804505024",
+                    "name": "Marcelo"
+                },
+                {
+                    "code": "1804505026",
+                    "name": "Menchaca"
+                },
+                {
+                    "code": "1804505025",
+                    "name": "Mina-utok"
+                },
+                {
+                    "code": "1804505027",
+                    "name": "Minapasuk"
+                },
+                {
+                    "code": "1804505029",
+                    "name": "Paghumayan"
+                },
+                {
+                    "code": "1804505030",
+                    "name": "Pantao"
+                },
+                {
+                    "code": "1804505031",
+                    "name": "Patun-an"
+                },
+                {
+                    "code": "1804505032",
+                    "name": "Pinocutan"
+                },
+                {
+                    "code": "1804505034",
+                    "name": "Refugio"
+                },
+                {
+                    "code": "1804505035",
+                    "name": "San Benito"
+                },
+                {
+                    "code": "1804505036",
+                    "name": "San Isidro"
+                },
+                {
+                    "code": "1804505037",
+                    "name": "Suba"
+                },
+                {
+                    "code": "1804505038",
+                    "name": "Telim"
+                },
+                {
+                    "code": "1804505039",
+                    "name": "Tigbao"
+                },
+                {
+                    "code": "1804505040",
+                    "name": "Tigbon"
+                },
+                {
+                    "code": "1804505041",
+                    "name": "Winaswasan"
+                }
+            ]
+        },
+        {
+            "destination": "Victorias City",
+            "code": "1804531000",
+            "name": "City of Victorias",
+            "type": "city",
+            "city_class": "CC",
+            "province": {
+                "code": "1804500000",
+                "name": "Negros Occidental"
+            },
+            "barangays": [
+                {
+                    "code": "1804531004",
+                    "name": "Barangay I"
+                },
+                {
+                    "code": "1804531005",
+                    "name": "Barangay II"
+                },
+                {
+                    "code": "1804531006",
+                    "name": "Barangay III"
+                },
+                {
+                    "code": "1804531007",
+                    "name": "Barangay IV"
+                },
+                {
+                    "code": "1804531012",
+                    "name": "Barangay IX"
+                },
+                {
+                    "code": "1804531008",
+                    "name": "Barangay V"
+                },
+                {
+                    "code": "1804531009",
+                    "name": "Barangay VI"
+                },
+                {
+                    "code": "1804531029",
+                    "name": "Barangay VI-A"
+                },
+                {
+                    "code": "1804531010",
+                    "name": "Barangay VII"
+                },
+                {
+                    "code": "1804531011",
+                    "name": "Barangay VIII"
+                },
+                {
+                    "code": "1804531013",
+                    "name": "Barangay X"
+                },
+                {
+                    "code": "1804531014",
+                    "name": "Barangay XI"
+                },
+                {
+                    "code": "1804531015",
+                    "name": "Barangay XII"
+                },
+                {
+                    "code": "1804531016",
+                    "name": "Barangay XIII"
+                },
+                {
+                    "code": "1804531017",
+                    "name": "Barangay XIV"
+                },
+                {
+                    "code": "1804531025",
+                    "name": "Barangay XIX"
+                },
+                {
+                    "code": "1804531026",
+                    "name": "Barangay XIX-A"
+                },
+                {
+                    "code": "1804531018",
+                    "name": "Barangay XV"
+                },
+                {
+                    "code": "1804531019",
+                    "name": "Barangay XV-A"
+                },
+                {
+                    "code": "1804531020",
+                    "name": "Barangay XVI"
+                },
+                {
+                    "code": "1804531021",
+                    "name": "Barangay XVI-A"
+                },
+                {
+                    "code": "1804531022",
+                    "name": "Barangay XVII"
+                },
+                {
+                    "code": "1804531023",
+                    "name": "Barangay XVIII"
+                },
+                {
+                    "code": "1804531024",
+                    "name": "Barangay XVIII-A"
+                },
+                {
+                    "code": "1804531027",
+                    "name": "Barangay XX"
+                },
+                {
+                    "code": "1804531028",
+                    "name": "Barangay XXI"
+                }
+            ]
+        },
+        {
+            "destination": "E.B. Magalona",
+            "code": "1804508000",
+            "name": "Enrique B. Magalona",
+            "type": "municipality",
+            "city_class": null,
+            "province": {
+                "code": "1804500000",
+                "name": "Negros Occidental"
+            },
+            "barangays": [
+                {
+                    "code": "1804508001",
+                    "name": "Alacaygan"
+                },
+                {
+                    "code": "1804508002",
+                    "name": "Alicante"
+                },
+                {
+                    "code": "1804508006",
+                    "name": "Batea"
+                },
+                {
+                    "code": "1804508011",
+                    "name": "Canlusong"
+                },
+                {
+                    "code": "1804508007",
+                    "name": "Consing"
+                },
+                {
+                    "code": "1804508008",
+                    "name": "Cudangdang"
+                },
+                {
+                    "code": "1804508009",
+                    "name": "Damgo"
+                },
+                {
+                    "code": "1804508010",
+                    "name": "Gahit"
+                },
+                {
+                    "code": "1804508012",
+                    "name": "Latasan"
+                },
+                {
+                    "code": "1804508013",
+                    "name": "Madalag"
+                },
+                {
+                    "code": "1804508014",
+                    "name": "Manta-angan"
+                },
+                {
+                    "code": "1804508015",
+                    "name": "Nanca"
+                },
+                {
+                    "code": "1804508016",
+                    "name": "Pasil"
+                },
+                {
+                    "code": "1804508003",
+                    "name": "Poblacion I"
+                },
+                {
+                    "code": "1804508004",
+                    "name": "Poblacion II"
+                },
+                {
+                    "code": "1804508005",
+                    "name": "Poblacion III"
+                },
+                {
+                    "code": "1804508017",
+                    "name": "San Isidro"
+                },
+                {
+                    "code": "1804508018",
+                    "name": "San Jose"
+                },
+                {
+                    "code": "1804508019",
+                    "name": "Santo Niño"
+                },
+                {
+                    "code": "1804508020",
+                    "name": "Tabigue"
+                },
+                {
+                    "code": "1804508021",
+                    "name": "Tanza"
+                },
+                {
+                    "code": "1804508023",
+                    "name": "Tomongtong"
+                },
+                {
+                    "code": "1804508022",
+                    "name": "Tuburan"
+                }
+            ]
+        },
+        {
+            "destination": "San Carlos City",
+            "code": "1804524000",
+            "name": "City of San Carlos",
+            "type": "city",
+            "city_class": "CC",
+            "province": {
+                "code": "1804500000",
+                "name": "Negros Occidental"
+            },
+            "barangays": [
+                {
+                    "code": "1804524001",
+                    "name": "Bagonbon"
+                },
+                {
+                    "code": "1804524010",
+                    "name": "Barangay I"
+                },
+                {
+                    "code": "1804524011",
+                    "name": "Barangay II"
+                },
+                {
+                    "code": "1804524012",
+                    "name": "Barangay III"
+                },
+                {
+                    "code": "1804524013",
+                    "name": "Barangay IV"
+                },
+                {
+                    "code": "1804524014",
+                    "name": "Barangay V"
+                },
+                {
+                    "code": "1804524015",
+                    "name": "Barangay VI"
+                },
+                {
+                    "code": "1804524002",
+                    "name": "Buluangan"
+                },
+                {
+                    "code": "1804524004",
+                    "name": "Codcod"
+                },
+                {
+                    "code": "1804524005",
+                    "name": "Ermita"
+                },
+                {
+                    "code": "1804524006",
+                    "name": "Guadalupe"
+                },
+                {
+                    "code": "1804524008",
+                    "name": "Nataban"
+                },
+                {
+                    "code": "1804524009",
+                    "name": "Palampas"
+                },
+                {
+                    "code": "1804524016",
+                    "name": "Prosperidad"
+                },
+                {
+                    "code": "1804524017",
+                    "name": "Punao"
+                },
+                {
+                    "code": "1804524018",
+                    "name": "Quezon"
+                },
+                {
+                    "code": "1804524019",
+                    "name": "Rizal"
+                },
+                {
+                    "code": "1804524020",
+                    "name": "San Juan"
+                }
+            ]
+        },
+        {
+            "destination": "Silay City",
+            "code": "1804526000",
+            "name": "City of Silay",
+            "type": "city",
+            "city_class": "CC",
+            "province": {
+                "code": "1804500000",
+                "name": "Negros Occidental"
+            },
+            "barangays": [
+                {
+                    "code": "1804526017",
+                    "name": "Bagtic"
+                },
+                {
+                    "code": "1804526001",
+                    "name": "Balaring"
+                },
+                {
+                    "code": "1804526002",
+                    "name": "Barangay I"
+                },
+                {
+                    "code": "1804526003",
+                    "name": "Barangay II"
+                },
+                {
+                    "code": "1804526004",
+                    "name": "Barangay III"
+                },
+                {
+                    "code": "1804526005",
+                    "name": "Barangay IV"
+                },
+                {
+                    "code": "1804526006",
+                    "name": "Barangay V"
+                },
+                {
+                    "code": "1804526007",
+                    "name": "Barangay VI Pob."
+                },
+                {
+                    "code": "1804526008",
+                    "name": "Eustaquio Lopez"
+                },
+                {
+                    "code": "1804526010",
+                    "name": "Guimbala-on"
+                },
+                {
+                    "code": "1804526011",
+                    "name": "Guinhalaran"
+                },
+                {
+                    "code": "1804526012",
+                    "name": "Kapitan Ramon"
+                },
+                {
+                    "code": "1804526013",
+                    "name": "Lantad"
+                },
+                {
+                    "code": "1804526015",
+                    "name": "Mambulac"
+                },
+                {
+                    "code": "1804526018",
+                    "name": "Patag"
+                },
+                {
+                    "code": "1804526016",
+                    "name": "Rizal"
+                }
+            ]
+        },
+        {
+            "destination": "Talisay City",
+            "code": "1804528000",
+            "name": "City of Talisay",
+            "type": "city",
+            "city_class": "CC",
+            "province": {
+                "code": "1804500000",
+                "name": "Negros Occidental"
+            },
+            "barangays": [
+                {
+                    "code": "1804528001",
+                    "name": "Bubog"
+                },
+                {
+                    "code": "1804528002",
+                    "name": "Cabatangan"
+                },
+                {
+                    "code": "1804528007",
+                    "name": "Concepcion"
+                },
+                {
+                    "code": "1804528010",
+                    "name": "Dos Hermanas"
+                },
+                {
+                    "code": "1804528011",
+                    "name": "Efigenio Lizares"
+                },
+                {
+                    "code": "1804528043",
+                    "name": "Katilingban"
+                },
+                {
+                    "code": "1804528023",
+                    "name": "Matab-ang"
+                },
+                {
+                    "code": "1804528030",
+                    "name": "San Fernando"
+                },
+                {
+                    "code": "1804528040",
+                    "name": "Zone 1"
+                },
+                {
+                    "code": "1804528041",
+                    "name": "Zone 2"
+                },
+                {
+                    "code": "1804528042",
+                    "name": "Zone 3"
+                },
+                {
+                    "code": "1804528004",
+                    "name": "Zone 4"
+                },
+                {
+                    "code": "1804528003",
+                    "name": "Zone 4-A"
+                },
+                {
+                    "code": "1804528020",
+                    "name": "Zone 5"
+                },
+                {
+                    "code": "1804528027",
+                    "name": "Zone 6"
+                },
+                {
+                    "code": "1804528012",
+                    "name": "Zone 7"
+                },
+                {
+                    "code": "1804528035",
+                    "name": "Zone 8"
+                },
+                {
+                    "code": "1804528025",
+                    "name": "Zone 9"
+                },
+                {
+                    "code": "1804528018",
+                    "name": "Zone 10"
+                },
+                {
+                    "code": "1804528034",
+                    "name": "Zone 11"
+                },
+                {
+                    "code": "1804528038",
+                    "name": "Zone 12"
+                },
+                {
+                    "code": "1804528015",
+                    "name": "Zone 12-A"
+                },
+                {
+                    "code": "1804528029",
+                    "name": "Zone 14"
+                },
+                {
+                    "code": "1804528033",
+                    "name": "Zone 14-A"
+                },
+                {
+                    "code": "1804528013",
+                    "name": "Zone 14-B"
+                },
+                {
+                    "code": "1804528032",
+                    "name": "Zone 15"
+                },
+                {
+                    "code": "1804528021",
+                    "name": "Zone 16"
+                }
+            ]
+        },
+        {
+            "destination": "Bacolod City",
+            "code": "1830200000",
+            "name": "City of Bacolod",
+            "type": "city",
+            "city_class": "HUC",
+            "province": null,
+            "barangays": [
+                {
+                    "code": "1830200001",
+                    "name": "Alangilan"
+                },
+                {
+                    "code": "1830200002",
+                    "name": "Alijis"
+                },
+                {
+                    "code": "1830200003",
+                    "name": "Banago"
+                },
+                {
+                    "code": "1830200004",
+                    "name": "Barangay 1"
+                },
+                {
+                    "code": "1830200015",
+                    "name": "Barangay 2"
+                },
+                {
+                    "code": "1830200026",
+                    "name": "Barangay 3"
+                },
+                {
+                    "code": "1830200037",
+                    "name": "Barangay 4"
+                },
+                {
+                    "code": "1830200040",
+                    "name": "Barangay 5"
+                },
+                {
+                    "code": "1830200041",
+                    "name": "Barangay 6"
+                },
+                {
+                    "code": "1830200042",
+                    "name": "Barangay 7"
+                },
+                {
+                    "code": "1830200043",
+                    "name": "Barangay 8"
+                },
+                {
+                    "code": "1830200044",
+                    "name": "Barangay 9"
+                },
+                {
+                    "code": "1830200005",
+                    "name": "Barangay 10"
+                },
+                {
+                    "code": "1830200006",
+                    "name": "Barangay 11"
+                },
+                {
+                    "code": "1830200007",
+                    "name": "Barangay 12"
+                },
+                {
+                    "code": "1830200008",
+                    "name": "Barangay 13"
+                },
+                {
+                    "code": "1830200009",
+                    "name": "Barangay 14"
+                },
+                {
+                    "code": "1830200010",
+                    "name": "Barangay 15"
+                },
+                {
+                    "code": "1830200011",
+                    "name": "Barangay 16"
+                },
+                {
+                    "code": "1830200012",
+                    "name": "Barangay 17"
+                },
+                {
+                    "code": "1830200013",
+                    "name": "Barangay 18"
+                },
+                {
+                    "code": "1830200014",
+                    "name": "Barangay 19"
+                },
+                {
+                    "code": "1830200016",
+                    "name": "Barangay 20"
+                },
+                {
+                    "code": "1830200017",
+                    "name": "Barangay 21"
+                },
+                {
+                    "code": "1830200018",
+                    "name": "Barangay 22"
+                },
+                {
+                    "code": "1830200019",
+                    "name": "Barangay 23"
+                },
+                {
+                    "code": "1830200020",
+                    "name": "Barangay 24"
+                },
+                {
+                    "code": "1830200021",
+                    "name": "Barangay 25"
+                },
+                {
+                    "code": "1830200022",
+                    "name": "Barangay 26"
+                },
+                {
+                    "code": "1830200023",
+                    "name": "Barangay 27"
+                },
+                {
+                    "code": "1830200024",
+                    "name": "Barangay 28"
+                },
+                {
+                    "code": "1830200025",
+                    "name": "Barangay 29"
+                },
+                {
+                    "code": "1830200027",
+                    "name": "Barangay 30"
+                },
+                {
+                    "code": "1830200028",
+                    "name": "Barangay 31"
+                },
+                {
+                    "code": "1830200029",
+                    "name": "Barangay 32"
+                },
+                {
+                    "code": "1830200030",
+                    "name": "Barangay 33"
+                },
+                {
+                    "code": "1830200031",
+                    "name": "Barangay 34"
+                },
+                {
+                    "code": "1830200032",
+                    "name": "Barangay 35"
+                },
+                {
+                    "code": "1830200033",
+                    "name": "Barangay 36"
+                },
+                {
+                    "code": "1830200034",
+                    "name": "Barangay 37"
+                },
+                {
+                    "code": "1830200035",
+                    "name": "Barangay 38"
+                },
+                {
+                    "code": "1830200036",
+                    "name": "Barangay 39"
+                },
+                {
+                    "code": "1830200038",
+                    "name": "Barangay 40"
+                },
+                {
+                    "code": "1830200039",
+                    "name": "Barangay 41"
+                },
+                {
+                    "code": "1830200045",
+                    "name": "Bata"
+                },
+                {
+                    "code": "1830200046",
+                    "name": "Cabug"
+                },
+                {
+                    "code": "1830200047",
+                    "name": "Estefania"
+                },
+                {
+                    "code": "1830200048",
+                    "name": "Felisa"
+                },
+                {
+                    "code": "1830200049",
+                    "name": "Granada"
+                },
+                {
+                    "code": "1830200061",
+                    "name": "Handumanan"
+                },
+                {
+                    "code": "1830200050",
+                    "name": "Mandalagan"
+                },
+                {
+                    "code": "1830200051",
+                    "name": "Mansilingan"
+                },
+                {
+                    "code": "1830200052",
+                    "name": "Montevista"
+                },
+                {
+                    "code": "1830200053",
+                    "name": "Pahanocoy"
+                },
+                {
+                    "code": "1830200054",
+                    "name": "Punta Taytay"
+                },
+                {
+                    "code": "1830200055",
+                    "name": "Singcang-Airport"
+                },
+                {
+                    "code": "1830200056",
+                    "name": "Sum-ag"
+                },
+                {
+                    "code": "1830200057",
+                    "name": "Taculing"
+                },
+                {
+                    "code": "1830200058",
+                    "name": "Tangub"
+                },
+                {
+                    "code": "1830200059",
+                    "name": "Villamonte"
+                },
+                {
+                    "code": "1830200060",
+                    "name": "Vista Alegre"
+                }
+            ]
+        }
+    ]
+}

@@ -17,6 +17,8 @@ class CheckoutResource extends JsonResource
         return [
             'cart' => $this->resource['cart'],
             'delivery_quotes' => $this->resource['deliveryQuotes'],
+            'delivery_locations' => $this->resource['deliveryLocations'],
+            'delivery_address_prefill' => $this->resource['deliveryAddressPrefill'],
             'pickup_quote' => $this->resource['pickupQuote'],
             'customer' => $this->resource['customer'],
             'pickup_location' => $this->resource['pickupLocation'],

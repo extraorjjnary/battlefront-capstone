@@ -17,6 +17,6 @@ class ProfileController extends Controller
 
     public function update(ProfileUpdateRequest $request, UpdateProfile $updateProfile): CustomerProfileResource
     {
-        return new CustomerProfileResource($updateProfile($request->user(), $request->validated()));
+        return new CustomerProfileResource($updateProfile($request->user(), $request->profileData()));
     }
 }

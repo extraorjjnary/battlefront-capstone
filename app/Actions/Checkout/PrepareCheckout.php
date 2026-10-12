@@ -10,6 +10,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Services\DeliveryQuotePresenter;
 use App\Services\Order\DeliveryRules;
+use App\Services\Order\PsgcDeliveryLocations;
 use Carbon\CarbonImmutable;
 
 class PrepareCheckout
@@ -18,6 +19,7 @@ class PrepareCheckout
         private readonly ReviewCheckoutCart $reviewCheckoutCart,
         private readonly DeliveryRules $deliveryRules,
         private readonly DeliveryQuotePresenter $deliveryQuotePresenter,
+        private readonly PsgcDeliveryLocations $deliveryLocations,
     ) {}
 
     /**
@@ -48,6 +50,11 @@ class PrepareCheckout
         return [
             'cart' => $cart,
             'deliveryQuotes' => $deliveryQuotes,
+            'deliveryLocations' => $this->deliveryLocations->destinations(),
+            'deliveryAddressPrefill' => $this->deliveryLocations->prefill(
+                $customer->default_delivery_address,
+                $customer->default_delivery_address_components,
+            ),
             'pickupQuote' => [
                 'product_subtotal' => $cart['total'],
                 'delivery_fee' => '0.00',

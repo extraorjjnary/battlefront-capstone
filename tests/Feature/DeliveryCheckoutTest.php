@@ -39,7 +39,8 @@ function deliveryCheckoutSubmission(array $cartItemIds, array $overrides = []): 
         'contact_number' => '09171234567',
         'fulfillment_method' => 'delivery',
         'delivery_destination' => 'Sagay City',
-        'delivery_address' => '12 Example Street, Barangay Poblacion',
+        'delivery_barangay_code' => '1804523018',
+        'delivery_address_details' => '12 Example Street',
         'payment_method' => 'gcash',
         'payment_proof' => UploadedFile::fake()->image('proof.png'),
     ], $overrides);

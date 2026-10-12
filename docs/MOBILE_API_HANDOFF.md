@@ -185,7 +185,9 @@ GET returns:
 }
 ```
 
-PATCH requires `name` and `email` (same length/email/uniqueness rules, excluding the current user). Optional `default_delivery_address` is nullable/max 255: omit to preserve, send null/blank to clear. New customers have `search_recommendations_enabled` and `product_view_recommendations_enabled` enabled by default, so no profile setup is needed. PATCH can independently disable either preference; turning one off pauses its recording/ranking and retains unexpired history. The global `personalized_recommendations_enabled` switch pauses all personal ranking and new search/view recording; all three preferences default to true. Re-enabling uses retained unexpired history. Retained activity expires after 90 days. Email changes clear the stored email verification timestamp; verification is currently optional/disabled.
+PATCH requires `name` and `email` (same length/email/uniqueness rules, excluding the current user). Legacy mobile `default_delivery_address` remains nullable/max 255: omit to preserve, send null/blank to clear. Structured clients may instead send `default_delivery_destination`, `default_delivery_barangay_code`, and `default_delivery_address_details`; all three must be valid when saving. Optional `default_delivery_address_action` explicitly selects `keep`, `save`, or `clear`; structured keys without an action imply `save`. Keep leaves the saved address untouched, save stores validated components plus a server-formatted string, and clear clears both. Structured saves ignore a supplied assembled address. Profile responses retain their existing JSON shape; checkout's `delivery_address_prefill` uses saved components directly. Legacy free-text updates clear stale components and populate new ones only when matching is unambiguous. No existing text is guessed or silently discarded by migration.
+
+New customers have `search_recommendations_enabled` and `product_view_recommendations_enabled` enabled by default, so no profile setup is needed. PATCH can independently disable either preference; turning one off pauses its recording/ranking and retains unexpired history. The global `personalized_recommendations_enabled` switch pauses all personal ranking and new search/view recording; all three preferences default to true. Re-enabling uses retained unexpired history. Retained activity expires after 90 days. Email changes clear the stored email verification timestamp; verification is currently optional/disabled.
 
 ```json
 {
@@ -497,6 +499,14 @@ Display the selected entry's monetary values; `total` is product subtotal plus d
 
 Calendar dates are checkout-only presentation. One server quote-generation date in `config('app.timezone')` (currently UTC) anchors all 12 windows in a response. Minimum/maximum total days are preparation plus transit, added as calendar days without weekend/holiday adjustment. Zero transit days means same-day transit once preparation is ready; persisted historical snapshots keep their original ranges. Treat date strings as civil dates in the returned timezone; do not shift them through the device timezone. Arrival is provisional and subject to payment verification. Refresh checkout after cart changes and before paying; placement independently recalculates current prices, profiles and configured fees/relative ETA. Neither preview quotes nor calendar windows are trusted placement inputs.
 
+### PSGC delivery dropdown data
+
+Checkout preview also exposes additive `data.delivery_locations` and `data.delivery_address_prefill` fields from the bundled Q1 2026 PSGC dataset. Existing preview fields and quotes retain their contracts. No separate location request is needed.
+
+Each location contains `destination` (the existing canonical delivery key), full string `code`, official `name`, `type`, `city_class`, nullable `province`, and `barangays: [{code, name}]`. Only the existing 12 supported destinations and their 300 barangays are returned. Bacolod is a highly urbanized city with no administrative province parent. Use readable names for labels and codes for barangay values; never derive codes from names or assume barangay numbers are codes.
+
+The prefill contains `delivery_destination`, `delivery_barangay_code`, and `delivery_address_details`, using empty strings for unknown values. It conservatively extracts recognizable parts of the existing free-text profile address. Keep ambiguous saved text as a reference instead of copying the entire address into street details. Clear the selected barangay whenever the destination changes.
+
 ### POST /orders
 
 Required fields:
@@ -508,7 +518,9 @@ Required fields:
 | contact_number       | String <=20; preserve formatting as text                                                                             |
 | fulfillment_method   | pickup or delivery                                                                                                   |
 | payment_method       | cash, card_at_store, gcash, maya                                                                                     |
-| delivery_address     | String <=255, required for delivery; prohibited when nonempty for pickup                                             |
+| delivery_address     | Legacy mobile delivery: string <=255, required when both structured fields are absent; prohibited when nonempty for pickup |
+| delivery_barangay_code | Structured delivery: required 10-digit string belonging to the selected destination; prohibited when nonempty for pickup |
+| delivery_address_details | Structured delivery: required nonblank string; composed address must fit 255 characters; prohibited when nonempty for pickup |
 | delivery_destination | Exactly one canonical destination from `delivery_quotes`, required for delivery; prohibited when nonempty for pickup |
 | payment_proof        | Required for gcash/maya; prohibited for cash/card_at_store                                                           |
 
@@ -526,7 +538,9 @@ Pickup accepts all four payment methods. Delivery accepts only gcash/maya. Submi
 
 For wallet orders submit the fields above using multipart form data with repeated `cart_item_ids[]` text fields (one ID per field), including an actual file part named `payment_proof`. JPEG/JPG, PNG, WebP only; contents must be an image, filename extension must match allowed extensions; max **5120 KB (5 MB)**. Do not send a filesystem path or base64 string as the proof, and do not manually specify a multipart boundary/Content-Type in Postman or React Native FormData.
 
-For delivery, include `delivery_destination` (for example `Sagay City`) and a separate detailed `delivery_address`. For pickup, omit both fields. Supported canonical names are Sagay City, Escalante City, Cadiz City, Toboso, Manapla, Calatrava, Victorias City, E.B. Magalona, San Carlos City, Silay City, Talisay City, and Bacolod City. Do not infer a destination from the address. Missing, unsupported, wrong-case and array destination values receive 422 `errors.delivery_destination`.
+For delivery, include `delivery_destination` (for example `Sagay City`). Existing mobile clients can retain their separate `delivery_address` by omitting both structured fields. Updated clients send `delivery_barangay_code` and `delivery_address_details` instead; sending either key, even null or empty, requires both to pass structured validation. For example, submit `delivery_barangay_code=1804523018` and `delivery_address_details=12 Mabini Street` with `delivery_destination=Sagay City`. Laravel saves `12 Mabini Street, Poblacion I, Sagay City, Negros Occidental`; client-supplied `delivery_address` is ignored in structured mode. Mismatched barangays return 422 `errors.delivery_barangay_code`, and invalid/oversized details return 422 `errors.delivery_address_details`. Web delivery always requires the structured fields. See [PSGC data and update instructions](PSGC_DELIVERY_DATA.md).
+
+For pickup, omit all delivery fields. Supported canonical names remain Sagay City, Escalante City, Cadiz City, Toboso, Manapla, Calatrava, Victorias City, E.B. Magalona, San Carlos City, Silay City, Talisay City, and Bacolod City. Do not infer a destination from the address. Missing, unsupported, wrong-case and array destination values receive 422 `errors.delivery_destination`.
 
 The server re-resolves every selected ID through shared transactional order placement, locks/rechecks ownership, quantities, eligibility and stock, snapshots current prices/recipient/fulfillment, and deducts selected inventory atomically. Only purchased cart items are removed; unselected items remain. The cart container is removed only when empty. Missing or empty selection never falls back to full-cart checkout. To purchase all items, explicitly submit all IDs from GET /cart. Selection is temporary client/checkout intent, with no permanent selection flag. Order and payment initially remain pending; payment verification is manual. Failed stock validation uses 422 `errors.cart` and rolls back the operation.
 

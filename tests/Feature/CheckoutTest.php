@@ -207,7 +207,7 @@ test('checkout rejects required and invalid fields with clear messages', functio
         ]);
 });
 
-test('delivery requires an address', function () {
+test('delivery requires a barangay and street details', function () {
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->create();
     Inventory::factory()->for($product)->create(['quantity' => 2]);
@@ -225,7 +225,8 @@ test('delivery requires an address', function () {
             'payment_proof' => UploadedFile::fake()->image('proof.png'),
         ])
         ->assertSessionHasErrors([
-            'delivery_address' => 'Enter a delivery address.',
+            'delivery_barangay_code' => 'Select a barangay.',
+            'delivery_address_details' => 'Enter the house, building, street, or landmark details.',
         ]);
 });
 
@@ -264,7 +265,8 @@ test('delivery rejects payment methods that require paying at the store', functi
             'contact_number' => '09171234567',
             'fulfillment_method' => 'delivery',
             'delivery_destination' => 'Sagay City',
-            'delivery_address' => 'Sagay City, Negros Occidental',
+            'delivery_barangay_code' => '1804523018',
+            'delivery_address_details' => '12 Mabini Street',
             'payment_method' => $paymentMethod,
         ])
         ->assertSessionHasErrors([
@@ -360,7 +362,8 @@ test('all eligible fulfillment and payment combinations place an order', functio
     ];
 
     if ($fulfillmentMethod === 'delivery') {
-        $payload['delivery_address'] = 'Sagay City, Negros Occidental';
+        $payload['delivery_barangay_code'] = '1804523018';
+        $payload['delivery_address_details'] = '12 Mabini Street';
         $payload['delivery_destination'] = 'Sagay City';
     }
 
@@ -439,7 +442,8 @@ test('a checkout override is snapshotted without changing the profile default', 
             'recipient_name' => 'Alex Customer',
             'contact_number' => '09171234567',
             'fulfillment_method' => 'delivery',
-            'delivery_address' => '99 Lopez Jaena Street, Sagay City',
+            'delivery_barangay_code' => '1804523018',
+            'delivery_address_details' => '99 Lopez Jaena Street',
             'delivery_destination' => 'Sagay City',
             'payment_method' => 'gcash',
             'payment_proof' => UploadedFile::fake()->image('proof.png'),
@@ -449,7 +453,7 @@ test('a checkout override is snapshotted without changing the profile default', 
     $order = Order::query()->sole();
 
     expect($order->delivery_address)
-        ->toBe('99 Lopez Jaena Street, Sagay City')
+        ->toBe('99 Lopez Jaena Street, Poblacion I, Sagay City, Negros Occidental')
         ->and($customer->refresh()->default_delivery_address)
         ->toBe('12 Mabini Street, Sagay City');
 
@@ -458,7 +462,7 @@ test('a checkout override is snapshotted without changing the profile default', 
     ]);
 
     expect($order->refresh()->delivery_address)
-        ->toBe('99 Lopez Jaena Street, Sagay City');
+        ->toBe('99 Lopez Jaena Street, Poblacion I, Sagay City, Negros Occidental');
 });
 
 test('pickup ignores the saved default delivery address', function () {

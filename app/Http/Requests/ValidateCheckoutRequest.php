@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Enums\FulfillmentMethod;
 use App\Enums\PaymentMethod;
 use App\Services\Order\DeliveryRules;
+use App\Services\Order\PsgcDeliveryLocations;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -19,14 +20,23 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
      */
     public function checkoutData(): array
     {
+        $legacyAddress = $this->validated('delivery_address');
+        $deliveryAddress = is_string($legacyAddress) ? $legacyAddress : null;
+
+        if ($this->input('fulfillment_method') === FulfillmentMethod::Delivery->value && $this->usesStructuredAddress()) {
+            $deliveryAddress = app(PsgcDeliveryLocations::class)->formatAddress(
+                $this->string('delivery_destination')->toString(),
+                $this->string('delivery_barangay_code')->toString(),
+                $this->string('delivery_address_details')->toString(),
+            );
+        }
+
         return [
             'cart_item_ids' => $this->cartItemIds(),
             'recipient_name' => $this->string('recipient_name')->toString(),
             'contact_number' => $this->string('contact_number')->toString(),
             'fulfillment_method' => $this->string('fulfillment_method')->toString(),
-            'delivery_address' => $this->filled('delivery_address')
-                ? $this->string('delivery_address')->toString()
-                : null,
+            'delivery_address' => $deliveryAddress,
             'delivery_destination' => $this->filled('delivery_destination')
                 ? $this->string('delivery_destination')->toString()
                 : null,
@@ -41,6 +51,9 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
      */
     public function rules(): array
     {
+        $isDelivery = $this->input('fulfillment_method') === FulfillmentMethod::Delivery->value;
+        $isPickup = $this->input('fulfillment_method') === FulfillmentMethod::Pickup->value;
+        $usesStructuredAddress = $this->usesStructuredAddress();
         $requiresPaymentProof = in_array(
             $this->input('payment_method'),
             [PaymentMethod::GCash->value, PaymentMethod::Maya->value],
@@ -62,8 +75,25 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
             ],
             'delivery_address' => [
                 'bail',
-                Rule::requiredIf($this->input('fulfillment_method') === FulfillmentMethod::Delivery->value),
-                Rule::prohibitedIf($this->input('fulfillment_method') === FulfillmentMethod::Pickup->value),
+                Rule::excludeIf($isDelivery && $usesStructuredAddress),
+                Rule::requiredIf($isDelivery && ! $usesStructuredAddress),
+                Rule::prohibitedIf($isPickup),
+                'nullable',
+                'string',
+                'max:255',
+            ],
+            'delivery_barangay_code' => [
+                'bail',
+                Rule::requiredIf($isDelivery && $usesStructuredAddress),
+                Rule::prohibitedIf($isPickup),
+                'nullable',
+                'string',
+                'regex:/\A[0-9]{10}\z/',
+            ],
+            'delivery_address_details' => [
+                'bail',
+                Rule::requiredIf($isDelivery && $usesStructuredAddress),
+                Rule::prohibitedIf($isPickup),
                 'nullable',
                 'string',
                 'max:255',
@@ -90,6 +120,21 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
     public function after(): array
     {
         return [
+            function (Validator $validator): void {
+                if ($this->input('fulfillment_method') !== FulfillmentMethod::Delivery->value
+                    || ! $this->usesStructuredAddress()
+                    || $validator->errors()->hasAny(['delivery_destination', 'delivery_barangay_code', 'delivery_address_details'])) {
+                    return;
+                }
+
+                $locations = app(PsgcDeliveryLocations::class);
+                $destination = $this->string('delivery_destination')->toString();
+                $barangayCode = $this->string('delivery_barangay_code')->toString();
+
+                foreach ($locations->addressErrors($destination, $barangayCode, $this->string('delivery_address_details')->toString()) as $field => $message) {
+                    $validator->errors()->add('delivery_'.$field, $message);
+                }
+            },
             function (Validator $validator): void {
                 if ($validator->errors()->hasAny(['fulfillment_method', 'payment_method'])) {
                     return;
@@ -130,6 +175,14 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
             'delivery_address.required' => 'Enter a delivery address.',
             'delivery_address.prohibited' => 'A delivery address is not used for pickup orders.',
             'delivery_address.max' => 'The delivery address may not exceed 255 characters.',
+            'delivery_barangay_code.required' => 'Select a barangay.',
+            'delivery_barangay_code.prohibited' => 'A barangay is not used for pickup orders.',
+            'delivery_barangay_code.string' => 'Select a valid barangay.',
+            'delivery_barangay_code.regex' => 'Select a valid barangay.',
+            'delivery_address_details.required' => 'Enter the house, building, street, or landmark details.',
+            'delivery_address_details.prohibited' => 'Delivery address details are not used for pickup orders.',
+            'delivery_address_details.string' => 'Enter the house, building, street, or landmark details.',
+            'delivery_address_details.max' => 'Delivery address details may not exceed 255 characters.',
             'payment_method.required' => 'Select a payment method.',
             'payment_method.*' => 'Select a valid payment method.',
             'payment_proof.required' => 'Upload a screenshot or snapshot of your successful payment.',
@@ -140,5 +193,11 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
             'payment_proof.extensions' => 'The payment proof filename must end in JPG, JPEG, PNG, or WebP.',
             'payment_proof.max' => 'The payment proof may not be larger than 5 MB.',
         ];
+    }
+
+    private function usesStructuredAddress(): bool
+    {
+        return ! $this->routeIs('api.v1.orders.store')
+            || $this->hasAny(['delivery_barangay_code', 'delivery_address_details']);
     }
 }

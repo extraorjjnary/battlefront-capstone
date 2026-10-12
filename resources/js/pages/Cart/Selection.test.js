@@ -209,6 +209,12 @@ test('checkout renders only server-reviewed IDs as hidden placement fields', asy
                 total: '18.66',
             },
             deliveryQuotes: [],
+            deliveryLocations: [],
+            deliveryAddressPrefill: {
+                delivery_destination: '',
+                delivery_barangay_code: '',
+                delivery_address_details: '',
+            },
         }),
     );
 

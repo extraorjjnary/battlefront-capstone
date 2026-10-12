@@ -48,7 +48,8 @@ function selectiveCheckoutPayload(array $ids, string $fulfillment = 'pickup'): a
         'payment_method' => $fulfillment === 'pickup' ? 'cash' : 'maya',
         ...($fulfillment === 'delivery' ? [
             'delivery_destination' => 'Sagay City',
-            'delivery_address' => 'Selected delivery address',
+            'delivery_barangay_code' => '1804523018',
+            'delivery_address_details' => 'Selected delivery address',
             'payment_proof' => UploadedFile::fake()->image('proof.png'),
         ] : []),
     ];

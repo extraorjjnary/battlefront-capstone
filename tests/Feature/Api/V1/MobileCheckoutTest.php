@@ -44,6 +44,8 @@ test('mobile checkout returns shared preparation and manual payment options', fu
         'fulfillment_methods' => $prepared['fulfillmentMethods'],
         'payment_methods' => $prepared['paymentMethods'],
         'delivery_quotes' => $prepared['deliveryQuotes'],
+        'delivery_locations' => $prepared['deliveryLocations'],
+        'delivery_address_prefill' => $prepared['deliveryAddressPrefill'],
         'pickup_quote' => $prepared['pickupQuote'],
     ]])->assertJsonPath('data.cart.total', '18.66')
         ->assertJsonPath('data.customer.default_delivery_address', 'Saved address');

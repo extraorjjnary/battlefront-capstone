@@ -61,25 +61,31 @@ test('default delivery address can be saved and updated', function () {
         ->patch(route('profile.update'), [
             'name' => $user->name,
             'email' => $user->email,
-            'default_delivery_address' => '12 Mabini Street, Sagay City',
+            'default_delivery_address_action' => 'save',
+            'default_delivery_destination' => 'Sagay City',
+            'default_delivery_barangay_code' => '1804523018',
+            'default_delivery_address_details' => '12 Mabini Street',
         ])
         ->assertSessionHasNoErrors()
         ->assertRedirect(route('profile.edit'));
 
     expect($user->refresh()->default_delivery_address)
-        ->toBe('12 Mabini Street, Sagay City');
+        ->toBe('12 Mabini Street, Poblacion I, Sagay City, Negros Occidental');
 
     $this->actingAs($user)
         ->patch(route('profile.update'), [
             'name' => $user->name,
             'email' => $user->email,
-            'default_delivery_address' => '45 Rizal Avenue, Escalante City',
+            'default_delivery_address_action' => 'save',
+            'default_delivery_destination' => 'Escalante City',
+            'default_delivery_barangay_code' => '1804509002',
+            'default_delivery_address_details' => '45 Rizal Avenue',
         ])
         ->assertSessionHasNoErrors()
         ->assertRedirect(route('profile.edit'));
 
     expect($user->refresh()->default_delivery_address)
-        ->toBe('45 Rizal Avenue, Escalante City');
+        ->toBe('45 Rizal Avenue, Balintawak, Escalante City, Negros Occidental');
 });
 
 test('email verification status is unchanged when the email address is unchanged', function () {
