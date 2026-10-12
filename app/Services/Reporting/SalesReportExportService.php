@@ -78,7 +78,7 @@ class SalesReportExportService
             try {
                 fwrite($stream, "\xEF\xBB\xBF");
                 $this->writeCsvRow($stream, [
-                    'Product', 'Current category', 'Number of sales', 'Quantity sold', 'Item revenue (PHP)',
+                    'Product', 'Current category', 'Number of sales', 'Quantity sold', 'Item revenue (PHP, excluding third-party delivery charges)',
                     'Report from', 'Report to', 'Reporting period', 'Product filter', 'Category filter',
                 ]);
 

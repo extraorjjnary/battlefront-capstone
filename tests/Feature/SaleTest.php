@@ -1,8 +1,10 @@
 <?php
 
+use App\Actions\Order\RecordCompletedOrderSale;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Sale;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -41,6 +43,39 @@ test('an order cannot have duplicate sales', function () {
     expect(fn () => Sale::factory()->for($sale->order)->create())
         ->toThrow(QueryException::class);
     expect(Sale::query()->count())->toBe(1);
+});
+
+test('legacy order completion records purchase time item revenue instead of a fee inclusive total', function () {
+    $this->travelTo('2026-10-13 10:00:00');
+    $order = Order::factory()->create(['total_amount' => '230.00', 'status' => OrderStatus::Completed, 'payment_status' => PaymentStatus::Verified]);
+    OrderItem::factory()->for($order)->create(['quantity' => 2, 'price_at_time' => '100.00']);
+
+    app(RecordCompletedOrderSale::class)->execute($order);
+
+    expect($order->refresh()->sale)->amount->toBe('200.00')->sale_date->toDateString()->toBe('2026-10-13');
+    expect($order->total_amount)->toBe('230.00');
+});
+
+test('recording itemless legacy orders uses the saved net payable amount', function () {
+    $order = Order::factory()->delivery()->create([
+        'total_amount' => '100.50', 'status' => OrderStatus::Completed, 'payment_status' => PaymentStatus::Verified,
+    ]);
+
+    app(RecordCompletedOrderSale::class)->execute($order);
+
+    expect($order->refresh()->sale->amount)->toBe('100.50');
+    expect($order->total_amount)->toBe('100.50');
+});
+
+test('zero product subtotals record zero revenue even when delivery has a fee', function () {
+    $order = Order::factory()->withDeliverySnapshot(subtotal: '0.00')
+        ->create(['status' => OrderStatus::Completed, 'payment_status' => PaymentStatus::Verified]);
+    OrderItem::factory()->for($order)->create(['quantity' => 2, 'price_at_time' => '0.00']);
+
+    app(RecordCompletedOrderSale::class)->execute($order);
+
+    expect($order->refresh()->sale->amount)->toBe('0.00');
+    expect($order)->product_subtotal->toBe('0.00')->delivery_fee->toBe('80.00')->total_amount->toBe('80.00');
 });
 
 test('negative sale amounts are rejected on insert and update', function () {

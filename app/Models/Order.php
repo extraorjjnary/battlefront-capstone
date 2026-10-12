@@ -34,12 +34,12 @@ use Illuminate\Support\Carbon;
  * @property string|null $delivery_base_fee
  * @property ShippingProfile|null $shipping_profile
  * @property string|null $handling_surcharge
- * @property string $delivery_fee
- * @property string|null $product_subtotal
+ * @property numeric-string $delivery_fee
+ * @property numeric-string|null $product_subtotal
  * @property string|null $delivery_origin_city
  * @property bool|null $delivery_is_demo
  * @property string|null $delivery_assumption_label
- * @property string $total_amount
+ * @property numeric-string $total_amount
  * @property OrderStatus $status
  * @property PaymentStatus $payment_status
  * @property PaymentMethod $payment_method

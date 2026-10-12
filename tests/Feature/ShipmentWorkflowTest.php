@@ -73,7 +73,8 @@ test('administrators advance the full manual lifecycle and complete one sale wit
 
     expect($order->shipment->tracking_reference)->toBe('ACTUAL-LBC-REFERENCE');
     expect($stock->refresh()->quantity)->toBe(5);
-    expect($order->sale)->amount->toBe('350.00');
+    expect($order->sale)->amount->toBe('100.00');
+    expect($order->total_amount)->toBe('350.00');
     $this->assertDatabaseCount('sales', 1);
     $this->patch(route('administration.orders.shipment.status.update', $order), ['status' => 'delivered'])->assertSessionHasErrors('status');
     $this->patch(route('administration.orders.status.update', $order), ['status' => 'completed'])->assertSessionHasErrors('status');

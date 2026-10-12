@@ -31,6 +31,7 @@ import {
     csv,
     pdf,
     printReport,
+    reset,
 } from '@/actions/App/Http/Controllers/Administration/SalesReportController';
 import CatalogPagination from '@/components/CatalogPagination.vue';
 import RecommendationEngagement from '@/components/recommendations/RecommendationEngagement.vue';
@@ -78,8 +79,12 @@ const selectedProduct = ref(props.active_filters.product);
 const selectedCategory = ref(props.active_filters.category);
 const isCrossFiltering = ref(false);
 const isApplyingFilters = ref(false);
+const isResettingFilters = ref(false);
 const isUpdatingReport = computed(
-    () => isCrossFiltering.value || isApplyingFilters.value,
+    () =>
+        isCrossFiltering.value ||
+        isApplyingFilters.value ||
+        isResettingFilters.value,
 );
 const exportActions = computed(() => {
     const query = {
@@ -143,13 +148,13 @@ const kpiCards = computed(() => [
         value: formatCurrency(props.kpis.total_revenue),
         detail: hasCrossFilter.value
             ? 'Purchase-time item revenue in this selection'
-            : 'Revenue from sale records',
+            : 'Product sales excluding delivery charges',
         icon: CircleDollarSign,
     },
     {
         label: 'Average order value',
         value: formatCurrency(props.kpis.average_order_value),
-        detail: 'Average revenue per sale',
+        detail: 'Product revenue per completed sale',
         icon: ChartNoAxesCombined,
     },
     {
@@ -164,7 +169,7 @@ const timelineData = computed(() => ({
     labels: props.timeline.labels,
     datasets: [
         {
-            label: 'Revenue',
+            label: 'Product revenue',
             data: props.timeline.revenue,
             borderColor: '#EF1B1B',
             backgroundColor: 'rgba(239, 27, 27, 0.12)',
@@ -267,7 +272,7 @@ const timelineOptions = {
             callbacks: {
                 label(context) {
                     return context.dataset.yAxisID === 'revenue'
-                        ? `Revenue: ${formatCurrency(context.raw)}`
+                        ? `Product revenue: ${formatCurrency(context.raw)}`
                         : `Sales: ${numberFormatter.format(context.raw)}`;
                 },
             },
@@ -296,7 +301,7 @@ const timelineOptions = {
 const topProductsOptions = computed(() => ({
     ...baseChartOptions,
     onClick(_event, elements) {
-        if (elements.length === 0 || isCrossFiltering.value) {
+        if (elements.length === 0 || isUpdatingReport.value) {
             return;
         }
 
@@ -318,7 +323,7 @@ const categoryOptions = computed(() => ({
     responsive: true,
     maintainAspectRatio: false,
     onClick(_event, elements) {
-        if (elements.length === 0 || isCrossFiltering.value) {
+        if (elements.length === 0 || isUpdatingReport.value) {
             return;
         }
 
@@ -407,6 +412,20 @@ function toggleCategory(category) {
 
 function clearCrossFilters() {
     updateCrossFilters(null, null);
+}
+
+function resetFilters() {
+    router.visit(reset(), {
+        preserveScroll: true,
+        preserveState: true,
+        replace: true,
+        onStart: () => {
+            isResettingFilters.value = true;
+        },
+        onFinish: () => {
+            isResettingFilters.value = false;
+        },
+    });
 }
 
 function updateCrossFilters(product, category) {
@@ -616,7 +635,7 @@ defineOptions({
                         {{ page.props.errors.period }}
                     </p>
                 </div>
-                <Button type="submit" :disabled="isCrossFiltering">
+                <Button type="submit" :disabled="isUpdatingReport">
                     Apply range
                 </Button>
             </form>
@@ -635,10 +654,19 @@ defineOptions({
                     type="button"
                     variant="outline"
                     size="sm"
-                    :disabled="isCrossFiltering"
+                    :disabled="isUpdatingReport"
                     @click="applyPreset(days)"
                 >
                     Last {{ days }} days
+                </Button>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    :disabled="isUpdatingReport"
+                    @click="resetFilters"
+                >
+                    Reset to default
                 </Button>
             </div>
             <p
@@ -672,7 +700,7 @@ defineOptions({
                 type="button"
                 variant="outline"
                 size="sm"
-                :disabled="isCrossFiltering"
+                :disabled="isUpdatingReport"
                 @click="toggleProduct(selectedProduct)"
             >
                 Product: {{ selectedProduct.name }}
@@ -683,7 +711,7 @@ defineOptions({
                 type="button"
                 variant="outline"
                 size="sm"
-                :disabled="isCrossFiltering"
+                :disabled="isUpdatingReport"
                 @click="toggleCategory(selectedCategory)"
             >
                 Category: {{ selectedCategory.name }}
@@ -693,7 +721,7 @@ defineOptions({
                 type="button"
                 variant="ghost"
                 size="sm"
-                :disabled="isCrossFiltering"
+                :disabled="isUpdatingReport"
                 @click="clearCrossFilters"
             >
                 Clear filters
@@ -714,6 +742,9 @@ defineOptions({
                 <h2 id="sales-kpis-heading" class="text-xl font-semibold">
                     Sales summary
                 </h2>
+                <p class="text-muted-foreground mt-1 text-sm">
+                    Product revenue excludes third-party delivery charges.
+                </p>
             </div>
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 <article
@@ -772,7 +803,7 @@ defineOptions({
             >
                 <div>
                     <p class="text-muted-foreground text-sm">
-                        Backend aggregates
+                        Purchase-time product revenue
                     </p>
                     <h2 id="sales-trend-heading" class="text-xl font-semibold">
                         Revenue and sales over time
@@ -896,7 +927,7 @@ defineOptions({
                                     :aria-pressed="
                                         selectedProduct?.id === product.id
                                     "
-                                    :disabled="isCrossFiltering"
+                                    :disabled="isUpdatingReport"
                                     @click="toggleProduct(product)"
                                 >
                                     {{ product.name }}
@@ -978,7 +1009,7 @@ defineOptions({
                                     :aria-pressed="
                                         selectedCategory?.id === category.id
                                     "
-                                    :disabled="isCrossFiltering"
+                                    :disabled="isUpdatingReport"
                                     @click="toggleCategory(category)"
                                 >
                                     {{ category.name }}

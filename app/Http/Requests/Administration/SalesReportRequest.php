@@ -4,10 +4,70 @@ namespace App\Http\Requests\Administration;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
 class SalesReportRequest extends FormRequest
 {
+    private const FILTER_FIELDS = ['from', 'to', 'period', 'product_id', 'category_id'];
+
+    /**
+     * Explicit filter URLs replace the selection; bare and page-only URLs restore it.
+     *
+     * @return array<string, mixed>
+     */
+    public function effectiveFilters(): array
+    {
+        if ($this->hasExplicitFilters()) {
+            return $this->safe()->only(self::FILTER_FIELDS);
+        }
+
+        $saved = $this->session()->get($this->filterSessionKey());
+        if ($saved === null) {
+            return [];
+        }
+
+        if (is_array($saved)) {
+            $saved = Arr::only($saved, self::FILTER_FIELDS);
+            $validator = Validator::make($saved, Arr::only($this->rules(), self::FILTER_FIELDS));
+            if ($validator->passes()) {
+                return $validator->validated();
+            }
+        }
+
+        if ($this->routeIs('administration.reports.sales')) {
+            $this->clearSavedFilters();
+        }
+
+        return [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    public function rememberFilters(array $filters): void
+    {
+        if ($this->hasExplicitFilters()) {
+            $this->session()->put($this->filterSessionKey(), Arr::only($filters, self::FILTER_FIELDS));
+        }
+    }
+
+    public function clearSavedFilters(): void
+    {
+        $this->session()->forget($this->filterSessionKey());
+    }
+
+    private function hasExplicitFilters(): bool
+    {
+        return array_any(self::FILTER_FIELDS, fn (string $field): bool => $this->query->has($field));
+    }
+
+    private function filterSessionKey(): string
+    {
+        return 'administration.sales_report_filters.'.$this->user()?->getAuthIdentifier();
+    }
+
     /**
      * Determine if the user is authorized to make this request.
      */

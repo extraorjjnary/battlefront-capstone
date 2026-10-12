@@ -26,15 +26,47 @@ class SalesReportRepository
                 ->first();
         }
 
-        $summary = DB::table('sales')
-            ->where('sales.sale_date', '>=', $dateRange[0])
-            ->where('sales.sale_date', '<', $dateRange[1])
-            ->selectRaw('COUNT(sales.id) as total_sales')
-            ->selectRaw('COALESCE(SUM(sales.amount), 0) as total_revenue')
-            ->first();
+        $summary = $this->recordedSalesSummary($dateRange);
         $summary->total_items_sold = $this->itemReportQuery($dateRange)->sum('order_items.quantity');
 
         return $summary;
+    }
+
+    /**
+     * Summarize product revenue without rewriting legacy sale amounts.
+     *
+     * @param  array{0: string, 1: string}|null  $dateRange
+     */
+    public function recordedSalesSummary(?array $dateRange = null): stdClass
+    {
+        return DB::query()->fromSub($this->recordedSaleQuery($dateRange), 'recorded_sales')
+            ->selectRaw('COUNT(*) as total_sales')
+            ->selectRaw('COALESCE(SUM(product_revenue), 0) as total_revenue')
+            ->first();
+    }
+
+    /**
+     * Prefer the immutable subtotal, then item snapshots, then the saved net payable
+     * amount for legacy orders without items. Never subtract fees from sales.amount:
+     * historical amounts may include fees while newly recorded amounts exclude them.
+     *
+     * @param  array{0: string, 1: string}|null  $dateRange
+     */
+    private function recordedSaleQuery(?array $dateRange): Builder
+    {
+        $query = DB::table('sales')
+            ->join('orders', 'orders.id', '=', 'sales.order_id')
+            ->select(['sales.id', 'sales.sale_date'])
+            ->selectRaw('COALESCE(orders.product_subtotal,
+                (SELECT SUM(items.quantity * items.price_at_time) FROM order_items items WHERE items.order_id = orders.id),
+                orders.total_amount - orders.delivery_fee) as product_revenue');
+
+        if ($dateRange !== null) {
+            $query->where('sales.sale_date', '>=', $dateRange[0])
+                ->where('sales.sale_date', '<', $dateRange[1]);
+        }
+
+        return $query;
     }
 
     /**
@@ -55,12 +87,10 @@ class SalesReportRepository
                 ->get();
         }
 
-        return DB::table('sales')
-            ->where('sale_date', '>=', $dateRange[0])
-            ->where('sale_date', '<', $dateRange[1])
+        return DB::query()->fromSub($this->recordedSaleQuery($dateRange), 'recorded_sales')
             ->select('sale_date')
             ->selectRaw('COUNT(*) as sales_count')
-            ->selectRaw('COALESCE(SUM(amount), 0) as revenue')
+            ->selectRaw('COALESCE(SUM(product_revenue), 0) as revenue')
             ->groupBy('sale_date')
             ->orderBy('sale_date')
             ->get();

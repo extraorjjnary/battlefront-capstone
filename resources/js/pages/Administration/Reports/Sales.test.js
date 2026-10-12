@@ -104,6 +104,10 @@ function salesHarness(t, empty = false) {
                     printReport: route('print'),
                     pdf: route('pdf'),
                     csv: route('csv'),
+                    reset: () => ({
+                        url: '/administration/reports/sales/reset',
+                        method: 'post',
+                    }),
                 },
             '@/components/ui/button': { Button: button },
             '@/lib/currency': { formatCurrency },
@@ -229,7 +233,21 @@ test('export links update after applied filters change and omit cleared cross fi
     }
 });
 
-for (const interaction of ['date range', 'product filter']) {
+function resetControl(harness) {
+    return findNodes(
+        harness.tree(),
+        (node) =>
+            node.props?.onClick &&
+            findNodes(
+                node,
+                (child) =>
+                    typeof child.children === 'string' &&
+                    child.children.trim() === 'Reset to default',
+            ).length > 0,
+    )[0];
+}
+
+for (const interaction of ['date range', 'product filter', 'reset']) {
     test(`export actions block navigation while a ${interaction} update is pending`, (t) => {
         const harness = salesHarness(t);
         if (interaction === 'date range') {
@@ -238,16 +256,20 @@ for (const interaction of ['date range', 'product filter']) {
                 (node) => node.type === 'form',
             )[0];
             form.props.onSubmit({ preventDefault() {} });
-        } else {
+        } else if (interaction === 'product filter') {
             const product = findNodes(
                 harness.tree(),
                 (node) =>
                     node.type === 'button' && 'aria-pressed' in node.props,
             )[0];
             product.props.onClick();
+        } else {
+            resetControl(harness).props.onClick();
         }
         const options = harness.visits[0][1];
         options.onStart();
+
+        assert.equal(resetControl(harness).props.disabled, true);
 
         for (const link of exportLinks(harness)) {
             assert.equal(link.props['aria-disabled'], true);
@@ -257,6 +279,7 @@ for (const interaction of ['date range', 'product filter']) {
             assert.equal(preventDefault.mock.callCount(), 1);
         }
         options.onFinish();
+        assert.equal(resetControl(harness).props.disabled, false);
         for (const link of exportLinks(harness)) {
             assert.equal(link.props['aria-disabled'], false);
             assert.equal(link.props.tabindex, undefined);
@@ -273,6 +296,48 @@ test('empty reports retain usable export controls', (t) => {
             (link) => link.props['aria-disabled'] === false,
         ),
     );
+});
+
+test('reset posts without current filters and synchronizes the controls and exports from the server response', async (t) => {
+    const harness = salesHarness(t);
+
+    resetControl(harness).props.onClick();
+
+    assert.deepEqual(harness.visits[0][0], {
+        url: '/administration/reports/sales/reset',
+        method: 'post',
+    });
+    assert.equal(harness.visits[0][1].replace, true);
+    harness.props.filters = {
+        from: '2026-09-14',
+        to: '2026-10-13',
+        period: 'day',
+        product_id: null,
+        category_id: null,
+    };
+    harness.props.active_filters = { product: null, category: null };
+    await Vue.nextTick();
+
+    const input = findNodes(
+        harness.tree(),
+        (node) => node.props?.id === 'sales-report-from',
+    )[0];
+    assert.equal(input.props.modelValue, '2026-09-14');
+    const html = await harness.html();
+    assert.ok(!html.includes('Product: Ryzen 7'));
+    assert.ok(
+        html.includes('Product revenue excludes third-party delivery charges.'),
+    );
+    for (const link of exportLinks(harness)) {
+        const query = Object.fromEntries(
+            new URL(link.props.href, 'https://battlefront.test').searchParams,
+        );
+        assert.deepEqual(query, {
+            from: '2026-09-14',
+            to: '2026-10-13',
+            period: 'day',
+        });
+    }
 });
 
 test('invalid product and category filters display accessible feedback', async (t) => {

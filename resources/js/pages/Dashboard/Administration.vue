@@ -118,7 +118,7 @@ defineOptions({
                         class="border-border border-b p-5 sm:border-r lg:border-b-0"
                     >
                         <dt class="text-muted-foreground text-sm">
-                            Recorded revenue
+                            Recorded product revenue
                         </dt>
                         <dd class="mt-2 text-2xl font-bold tabular-nums">
                             {{
@@ -132,6 +132,9 @@ defineOptions({
                                     ? 'recorded sale'
                                     : 'recorded sales'
                             }}
+                        </p>
+                        <p class="text-muted-foreground mt-1 text-xs">
+                            Excludes third-party delivery charges.
                         </p>
                     </div>
                     <div

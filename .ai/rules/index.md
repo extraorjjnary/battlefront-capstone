@@ -5,6 +5,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | Applies to | Rule file |
 | --- | --- |
 | app/Actions/{Inventory,Order}/**,app/Services/Order/**,app/Http/Controllers/Administration/Order*,resources/js/pages/Administration/Orders/** | .ai/rules/administration-orders.md |
+| app/Http/{Requests,Controllers}/Administration/SalesReport*,resources/js/pages/Administration/Reports/** | .ai/rules/administration-reports.md |
 | app/Models/Product.php,app/Http/Controllers/Administration/ProductController.php,app/Http/Requests/Administration/SaveProductRequest.php | .ai/rules/administration.md |
 | routes/api.php,app/Http/Controllers/Api/**,config/sanctum.php | .ai/rules/api.md |
 | app/**,database/**,resources/js/** | .ai/rules/app-js.md |
@@ -51,6 +52,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/{Cart,Checkout,Order,Inventory}/**,app/Services/{Cart,Order}/**,app/Http/Controllers/OrderController.php,resources/js/pages/Checkout/** | .ai/rules/pages-checkout.md |
 | app/Models/Order.php,app/Http/Controllers/OrderController.php,resources/js/pages/Orders/** | .ai/rules/pages-orders.md |
 | resources/js/app.js,resources/js/pages/** | .ai/rules/pages.md |
+| app/Repositories/Reporting/**,app/Services/{Reporting,Dashboard}/**,app/Actions/Order/RecordCompletedOrderSale.php,resources/js/pages/{Administration/Reports,Dashboard}/**,resources/views/reports/** | .ai/rules/reports.md |
 | app/Http/Requests/ProductCatalogIndexRequest.php,app/Repositories/Catalog/** | .ai/rules/repositories-catalog.md |
 | routes/api.php,app/Http/Controllers/Api/**,app/Http/Resources/** | .ai/rules/resources.md |
 | app/Actions/Chatbot/**,database/seeders/DevelopmentChatbotKnowledgeSeeder.php | .ai/rules/seeders.md |

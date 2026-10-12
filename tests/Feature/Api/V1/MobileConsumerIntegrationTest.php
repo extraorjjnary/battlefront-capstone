@@ -177,9 +177,11 @@ test('placed delivery milestones share read state and owned deep links while log
         ->assertJsonPath('data.shipment.status.value', 'delivered')->assertJsonCount(7, 'data.shipment.timeline')
         ->assertJsonPath('data.shipment.tracking_reference', 'SYNTHETIC-TEST-REFERENCE')
         ->assertJsonPath('data.shipment.eta.estimated_delivery_start', '2026-10-09')
-        ->assertJsonPath('data.shipment.eta.estimated_delivery_end', '2026-10-10')->assertJsonPath('data.total', '98.66');
+        ->assertJsonPath('data.shipment.eta.estimated_delivery_end', '2026-10-10')
+        ->assertJsonPath('data.product_subtotal', '18.66')->assertJsonPath('data.delivery_fee', '80.00')
+        ->assertJsonPath('data.total', '98.66');
     expect($stock->refresh()->quantity)->toBe(3);
-    expect($order->refresh()->sale->amount)->toBe('98.66');
+    expect($order->refresh()->sale->amount)->toBe('18.66');
     $this->assertDatabaseCount('sales', 1);
     $history = $this->getJson('/api/v1/notifications')->assertOk()->assertJsonCount(7, 'data')
         ->assertJsonPath('meta.unread_count', 7)->assertJsonPath('data.0.event', 'shipment.delivered')

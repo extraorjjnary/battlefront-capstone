@@ -203,7 +203,8 @@ test('COD progresses through all shipment milestones unpaid and confirms collect
         ->assertSessionHasNoErrors()->assertInertiaFlash('toast.message', 'COD collection confirmed. Order completed and sale recorded.');
 
     expect($order->refresh())->status->toBe(OrderStatus::Completed)->payment_status->toBe(PaymentStatus::Verified);
-    expect($order->sale)->amount->toBe('180.00')->sale_date->toDateString()->toBe('2026-10-12');
+    expect($order->sale)->amount->toBe('100.00')->sale_date->toDateString()->toBe('2026-10-12');
+    expect($order->total_amount)->toBe('180.00');
     expect($order->shipment->delivered_at->toDateTimeString())->toBe($deliveredSnapshot['delivered_at']);
     expect(Inventory::sole()->quantity)->toBe(8);
     expect($order->user->notifications()->pluck('data')->pluck('event')->sort()->values()->all())->toBe([
@@ -357,7 +358,8 @@ test('COD enters the payment attention queue and sales reporting only at the app
     expect($dashboard->administration()['needs_attention']['pending_payment_reviews'])->toBe(0);
     $summary = $reports->summary(['2026-10-01', '2026-11-01'], null, null);
     expect((int) $summary->total_sales)->toBe(1);
-    expect((float) $summary->total_revenue)->toBe(180.0);
+    expect((float) $summary->total_revenue)->toBe(100.0);
+    expect($dashboard->administration()['kpis'])->toMatchArray(['recorded_revenue' => '100.00', 'recorded_sales' => 1]);
     expect($monthly->aggregateProduct($productId, $months))->toBe([['start' => '2026-10-01', 'quantity_sold' => 2]]);
 });
 

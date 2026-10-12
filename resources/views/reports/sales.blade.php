@@ -58,7 +58,7 @@
             <td>{{ number_format($kpis['total_items_sold']) }}</td>
         </tr></tbody>
     </table>
-    <p class="note">{{ $isFiltered ? 'Revenue and average order value use purchase-time item revenue for the selected filters.' : 'Revenue and average order value use recorded sale amounts, including applicable order fees. Item breakdowns use purchase-time prices and exclude those fees.' }}</p>
+    <p class="note">Revenue and average order value reflect product sales only and exclude third-party delivery charges. {{ $isFiltered ? 'The selected filters use purchase-time item revenue.' : 'Product revenue uses saved purchase-time order and item subtotals.' }}</p>
 
     @if ($kpis['total_sales'] === 0)
         <p class="empty">No recorded sales match these filters.</p>

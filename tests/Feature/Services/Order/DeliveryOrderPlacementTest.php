@@ -222,7 +222,7 @@ test('payment rejection and proof replacement retain stock and delivery snapshot
     Storage::disk('local')->assertExists('payment-proofs/replacement.jpg');
 });
 
-test('verified shipment delivery records the snapshotted final total without changing stock', function () {
+test('verified shipment delivery records the product subtotal while preserving payable total and stock', function () {
     Storage::fake('local');
     Storage::disk('local')->put('payment-proofs/verified.jpg', 'proof');
     $customer = User::factory()->customer()->create();
@@ -238,7 +238,8 @@ test('verified shipment delivery records the snapshotted final total without cha
         $processing->updateShipmentStatus($order, $status);
     }
 
-    expect($order->refresh()->sale->amount)->toBe('330.00');
+    expect($order->refresh()->sale->amount)->toBe('200.00');
+    expect($order)->product_subtotal->toBe('200.00')->delivery_fee->toBe('130.00')->total_amount->toBe('330.00');
     expect($order->status)->toBe(OrderStatus::Completed);
     expect($order->shipment)->status->toBe(ShipmentStatus::Delivered)->handed_to_carrier_at->not->toBeNull()->delivered_at->not->toBeNull();
     expect($stock->refresh()->quantity)->toBe(8);

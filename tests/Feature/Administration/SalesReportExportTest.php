@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Testing\AssertableInertia as Assert;
 
 /**
  * @param  list<array{product: Product, quantity: int, price: string}>  $items
@@ -110,15 +111,15 @@ test('print reports contain authoritative KPIs and complete sale backed breakdow
 
     $response->assertOk()->assertHeader('Content-Type', 'text/html; charset=utf-8')
         ->assertSee('Battlefront Computer Trading')->assertSee('Oct 12, 2026, 9:30 AM')
-        ->assertSee('2026-09-01 to 2026-09-30')->assertSee('₱530.00')->assertSee('₱265.00')
+        ->assertSee('2026-09-01 to 2026-09-30')->assertSee('₱500.00')->assertSee('₱250.00')
         ->assertSee('Sales by reporting period')->assertSee('Category sales breakdown')->assertSee('Product sales breakdown')
         ->assertSee('Ryzen 7')->assertSee('Mechanical Keyboard')->assertSee('window.print()', false)
         ->assertDontSee('<nav', false)->assertDontSee('<button', false)->assertDontSee('<canvas', false)
         ->assertDontSee('Recommendation engagement')->assertDontSee('₱999.00')
         ->assertViewHas('kpis', [
-            'total_sales' => 2, 'total_revenue' => '530.00', 'average_order_value' => '265.00', 'total_items_sold' => 6,
+            'total_sales' => 2, 'total_revenue' => '500.00', 'average_order_value' => '250.00', 'total_items_sold' => 6,
         ])
-        ->assertViewHas('timeline', ['labels' => ['Sep 2026'], 'sales' => [2], 'revenue' => [530.0]])
+        ->assertViewHas('timeline', ['labels' => ['Sep 2026'], 'sales' => [2], 'revenue' => [500.0]])
         ->assertViewHas('categories', [
             ['id' => $fixture['components']->id, 'name' => 'Components', 'sales_count' => 2, 'quantity_sold' => 5, 'item_revenue' => '400.00'],
             ['id' => $fixture['peripherals']->id, 'name' => 'Peripherals', 'sales_count' => 1, 'quantity_sold' => 1, 'item_revenue' => '100.00'],
@@ -154,12 +155,69 @@ test('CSV downloads contain product totals purchase time revenue and applied fil
     $content = $response->streamedContent();
     expect($content)->toEndWith("\r\n");
     expect(salesExportCsvRows($content))->toBe([
-        ['Product', 'Current category', 'Number of sales', 'Quantity sold', 'Item revenue (PHP)', 'Report from', 'Report to', 'Reporting period', 'Product filter', 'Category filter'],
+        ['Product', 'Current category', 'Number of sales', 'Quantity sold', 'Item revenue (PHP, excluding third-party delivery charges)', 'Report from', 'Report to', 'Reporting period', 'Product filter', 'Category filter'],
         ['Ryzen 7', 'Components', '2', '5', '400.00', '2026-09-01', '2026-09-30', 'week', 'All products', 'All categories'],
         ['Mechanical Keyboard', 'Peripherals', '1', '1', '100.00', '2026-09-01', '2026-09-30', 'week', 'All products', 'All categories'],
     ]);
     expect($response->headers->get('Cache-Control'))->toContain('private', 'no-store');
 });
+
+test('exports restore saved selections and exclude snapshotted LBC fees without changing remembered filters', function (string $format) {
+    $this->travelTo('2026-09-17 10:00:00');
+    $administrator = User::factory()->administrator()->create();
+    $components = Category::factory()->create(['name' => 'Components']);
+    $peripherals = Category::factory()->create(['name' => 'Peripherals']);
+    $processor = Product::factory()->for($components)->create(['name' => 'Processor', 'price' => '9000.00']);
+    $keyboard = Product::factory()->for($peripherals)->create(['name' => 'Keyboard', 'price' => '2000.00']);
+    $order = Order::factory()->withDeliverySnapshot(subtotal: '200.00')
+        ->create(['status' => OrderStatus::Completed, 'payment_status' => PaymentStatus::Verified]);
+    OrderItem::factory()->for($order)->for($processor)->create(['quantity' => 2, 'price_at_time' => '50.00']);
+    OrderItem::factory()->for($order)->for($keyboard)->create(['quantity' => 1, 'price_at_time' => '100.00']);
+    $sale = Sale::factory()->for($order)->create(['sale_date' => '2026-09-12', 'amount' => '280.00']);
+    $filters = ['from' => '2026-09-01', 'to' => '2026-09-30', 'period' => 'month', 'product_id' => null, 'category_id' => null];
+    $key = 'administration.sales_report_filters.'.$administrator->id;
+    $this->actingAs($administrator)->get(route('administration.reports.sales', $filters))
+        ->assertSessionHas($key, $filters)
+        ->assertInertia(fn (Assert $page) => $page->where('kpis.total_revenue', '200.00')->where('timeline.revenue', [200]));
+    $this->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page->where('dashboard.kpis.recorded_revenue', '200.00'));
+
+    $response = $this->get(route('administration.reports.sales.'.$format, ['page' => 2]))->assertSessionHas($key, $filters);
+
+    if ($format === 'print') {
+        $response->assertViewHas('filters', $filters)
+            ->assertViewHas('kpis', ['total_sales' => 1, 'total_revenue' => '200.00', 'average_order_value' => '200.00', 'total_items_sold' => 3])
+            ->assertViewHas('timeline', ['labels' => ['Sep 2026'], 'sales' => [1], 'revenue' => [200.0]])
+            ->assertSee('exclude third-party delivery charges')->assertDontSee('₱280.00');
+    } elseif ($format === 'pdf') {
+        $response->assertDownload('sales-report_2026-09-01_to_2026-09-30.pdf');
+        expect(salesExportPdfStreams($response->getContent()))
+            ->toContain(mb_convert_encoding('₱200.00', 'UTF-16BE'))
+            ->not->toContain(mb_convert_encoding('₱280.00', 'UTF-16BE'));
+    } else {
+        $response->assertDownload('sales-report_2026-09-01_to_2026-09-30.csv');
+        $rows = salesExportCsvRows($response->streamedContent());
+        expect($rows[0][4])->toBe('Item revenue (PHP, excluding third-party delivery charges)');
+        expect(array_slice($rows, 1))->toBe([
+            ['Processor', 'Components', '1', '2', '100.00', '2026-09-01', '2026-09-30', 'month', 'All products', 'All categories'],
+            ['Keyboard', 'Peripherals', '1', '1', '100.00', '2026-09-01', '2026-09-30', 'month', 'All products', 'All categories'],
+        ]);
+    }
+
+    $selection = array_replace($filters, ['product_id' => $processor->id]);
+    $explicit = $this->get(route('administration.reports.sales.'.$format, $selection))->assertSessionHas($key, $filters);
+    if ($format === 'print') {
+        $explicit->assertViewHas('filters', $selection)->assertViewHas('kpis.total_revenue', '100.00');
+    } elseif ($format === 'pdf') {
+        expect(salesExportPdfStreams($explicit->getContent()))->toContain(mb_convert_encoding('₱100.00', 'UTF-16BE'));
+    } else {
+        $rows = salesExportCsvRows($explicit->streamedContent());
+        expect($rows)->toHaveCount(2);
+        expect($rows[1])->toBe(['Processor', 'Components', '1', '2', '100.00', '2026-09-01', '2026-09-30', 'month', 'Processor', 'All categories']);
+    }
+    $this->get(route('administration.reports.sales'))->assertInertia(fn (Assert $page) => $page->where('filters', $filters)->where('kpis.total_revenue', '200.00'));
+    expect($sale->refresh()->amount)->toBe('280.00');
+    expect($order->refresh())->product_subtotal->toBe('200.00')->delivery_fee->toBe('80.00')->total_amount->toBe('280.00');
+})->with(['print', 'pdf', 'csv']);
 
 test('print PDF and CSV agree on product category and combined filters', function (array $selection, array $expectedKpis, array $expectedRows) {
     $fixture = createSalesExportFixture();
@@ -194,14 +252,14 @@ test('documents preserve daily weekly and monthly buckets at inclusive boundarie
     $response = $this->actingAs(User::factory()->administrator()->create())
         ->get(route('administration.reports.sales.print', ['from' => '2026-09-01', 'to' => '2026-09-30', 'period' => $period]));
 
-    $response->assertViewHas('kpis.total_revenue', '530.00')
+    $response->assertViewHas('kpis.total_revenue', '500.00')
         ->assertViewHas('timeline', compact('labels', 'sales', 'revenue'));
     $csv = $this->get(route('administration.reports.sales.csv', ['from' => '2026-09-01', 'to' => '2026-09-30', 'period' => $period]));
     expect(array_column(array_slice(salesExportCsvRows($csv->streamedContent()), 1), 4))->toBe(['400.00', '100.00']);
 })->with([
-    'day' => ['day', array_map(fn (int $day): string => 'Sep '.$day.', 2026', range(1, 30)), [1, ...array_fill(0, 28, 0), 1], [230.0, ...array_fill(0, 28, 0.0), 300.0]],
-    'week' => ['week', ['Aug 31, 2026 – Sep 6, 2026', 'Sep 7, 2026 – Sep 13, 2026', 'Sep 14, 2026 – Sep 20, 2026', 'Sep 21, 2026 – Sep 27, 2026', 'Sep 28, 2026 – Oct 4, 2026'], [1, 0, 0, 0, 1], [230.0, 0.0, 0.0, 0.0, 300.0]],
-    'month' => ['month', ['Sep 2026'], [2], [530.0]],
+    'day' => ['day', array_map(fn (int $day): string => 'Sep '.$day.', 2026', range(1, 30)), [1, ...array_fill(0, 28, 0), 1], [200.0, ...array_fill(0, 28, 0.0), 300.0]],
+    'week' => ['week', ['Aug 31, 2026 – Sep 6, 2026', 'Sep 7, 2026 – Sep 13, 2026', 'Sep 14, 2026 – Sep 20, 2026', 'Sep 21, 2026 – Sep 27, 2026', 'Sep 28, 2026 – Oct 4, 2026'], [1, 0, 0, 0, 1], [200.0, 0.0, 0.0, 0.0, 300.0]],
+    'month' => ['month', ['Sep 2026'], [2], [500.0]],
 ]);
 
 test('empty exports use the shared default dates and retain headers zero KPIs and empty messages', function () {
@@ -222,9 +280,12 @@ test('empty exports use the shared default dates and retain headers zero KPIs an
 });
 
 test('exports reject invalid filters before returning document or file content', function (string $format, array $query, string $field, string $message) {
-    $this->actingAs(User::factory()->administrator()->create())
+    $administrator = User::factory()->administrator()->create();
+    $filters = ['from' => '2026-09-01', 'to' => '2026-09-30', 'period' => 'month', 'product_id' => null, 'category_id' => null];
+    $key = 'administration.sales_report_filters.'.$administrator->id;
+    $this->actingAs($administrator)->withSession([$key => $filters])
         ->getJson(route('administration.reports.sales.'.$format, $query))
-        ->assertUnprocessable()->assertInvalid([$field => $message]);
+        ->assertUnprocessable()->assertInvalid([$field => $message])->assertSessionHas($key, $filters);
 })->with(['print', 'pdf', 'csv'])->with([
     'invalid date' => [['from' => '2026-02-30', 'to' => '2026-09-30'], 'from', 'Enter the start date in YYYY-MM-DD format.'],
     'reversed range' => [['from' => '2026-09-30', 'to' => '2026-09-01'], 'to', 'The end date must be on or after the start date.'],

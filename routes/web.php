@@ -195,6 +195,8 @@ Route::middleware(['auth', 'can:access-administration'])
         // sales report
         Route::get('reports/sales', [SalesReportController::class, 'index'])
             ->name('reports.sales');
+        Route::post('reports/sales/reset', [SalesReportController::class, 'reset'])
+            ->name('reports.sales.reset');
         Route::get('reports/sales/print', [SalesReportController::class, 'printReport'])
             ->name('reports.sales.print');
         Route::get('reports/sales/pdf', [SalesReportController::class, 'pdf'])

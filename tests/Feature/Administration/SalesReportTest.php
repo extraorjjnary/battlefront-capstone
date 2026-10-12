@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Order\RecordCompletedOrderSale;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Category;
@@ -296,6 +297,68 @@ test('sales KPIs and product and category reports use sale-backed order records'
             'quantity_sold' => 1,
             'item_revenue' => '100.00',
         ]));
+});
+
+test('historical and newly recorded sales use product snapshots across reporting periods', function (string $period, array $revenue, array $sales) {
+    $this->travelTo('2026-09-03 10:00:00');
+    $administrator = User::factory()->administrator()->create();
+    $processor = Product::factory()->create(['price' => '9000.00']);
+    $keyboard = Product::factory()->create(['price' => '2000.00']);
+    $legacySale = createSalesReportEntry('2026-09-01', '230.00', [
+        ['product' => $processor, 'quantity' => 2, 'price' => '50.00'],
+        ['product' => $keyboard, 'quantity' => 1, 'price' => '100.00'],
+    ]);
+    $delivery = Order::factory()->withDeliverySnapshot(subtotal: '200.00')
+        ->create(['status' => OrderStatus::Completed, 'payment_status' => PaymentStatus::Verified]);
+    OrderItem::factory()->for($delivery)->for($processor)->create(['quantity' => 2, 'price_at_time' => '50.00']);
+    OrderItem::factory()->for($delivery)->for($keyboard)->create(['quantity' => 1, 'price_at_time' => '100.00']);
+    $historicalSale = Sale::factory()->for($delivery)->create(['sale_date' => '2026-09-02', 'amount' => '280.00']);
+    $newOrder = Order::factory()->withDeliverySnapshot(subtotal: '100.00')
+        ->create(['status' => OrderStatus::Completed, 'payment_status' => PaymentStatus::Verified]);
+    OrderItem::factory()->for($newOrder)->for($processor)->create(['quantity' => 2, 'price_at_time' => '50.00']);
+    app(RecordCompletedOrderSale::class)->execute($newOrder);
+    $before = DB::table('sales')->orderBy('id')->get()->all();
+
+    $this->actingAs($administrator)->get(route('administration.reports.sales', [
+        'from' => '2026-09-01', 'to' => '2026-09-03', 'period' => $period,
+    ]))->assertInertia(fn (Assert $page) => $page
+        ->where('kpis', ['total_sales' => 3, 'total_revenue' => '500.00', 'average_order_value' => '166.67', 'total_items_sold' => 8])
+        ->where('timeline.revenue', $revenue)->where('timeline.sales', $sales)
+        ->where('products.data.0.item_revenue', '300.00')->where('products.data.1.item_revenue', '200.00'));
+    $dashboard = $this->get(route('dashboard'))->inertiaProps('dashboard');
+    expect($dashboard['kpis'])->toMatchArray(['recorded_revenue' => '500.00', 'recorded_sales' => 3]);
+    expect(collect($dashboard['recent_orders'])->firstWhere('id', $delivery->id)['total'])->toBe('280.00');
+    expect($newOrder->refresh()->sale->amount)->toBe('100.00');
+    expect($newOrder->total_amount)->toBe('180.00');
+    expect($legacySale->refresh()->amount)->toBe('230.00');
+    expect($historicalSale->refresh()->amount)->toBe('280.00');
+    expect(DB::table('sales')->orderBy('id')->get()->all())->toEqual($before);
+
+    $this->get(route('administration.reports.sales', [
+        'from' => '2026-09-01', 'to' => '2026-09-03', 'period' => $period,
+        'product_id' => $processor->id, 'category_id' => $processor->category_id,
+    ]))->assertInertia(fn (Assert $page) => $page
+        ->where('kpis', ['total_sales' => 3, 'total_revenue' => '300.00', 'average_order_value' => '100.00', 'total_items_sold' => 6]));
+    $this->get(route('administration.reports.sales', [
+        'from' => '2026-09-01', 'to' => '2026-09-03', 'period' => $period, 'category_id' => $keyboard->category_id,
+    ]))->assertInertia(fn (Assert $page) => $page
+        ->where('kpis', ['total_sales' => 2, 'total_revenue' => '200.00', 'average_order_value' => '100.00', 'total_items_sold' => 2]));
+})->with(['daily' => ['day', [200, 200, 100], [1, 1, 1]], 'weekly' => ['week', [500], [3]], 'monthly' => ['month', [500], [3]]]);
+
+test('zero product subtotals and itemless legacy sales preserve sales counts without recognizing delivery revenue', function () {
+    $administrator = User::factory()->administrator()->create();
+    $zeroOrder = Order::factory()->withDeliverySnapshot(subtotal: '0.00')
+        ->create(['status' => OrderStatus::Completed, 'payment_status' => PaymentStatus::Verified]);
+    Sale::factory()->for($zeroOrder)->create(['sale_date' => '2026-09-01', 'amount' => '80.00']);
+    $legacyOrder = Order::factory()->delivery()->create([
+        'status' => OrderStatus::Completed, 'payment_status' => PaymentStatus::Verified, 'total_amount' => '100.50',
+    ]);
+    Sale::factory()->for($legacyOrder)->create(['sale_date' => '2026-09-02', 'amount' => '100.50']);
+
+    $this->actingAs($administrator)->get(route('administration.reports.sales', ['from' => '2026-09-01', 'to' => '2026-09-02']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('kpis', ['total_sales' => 2, 'total_revenue' => '100.50', 'average_order_value' => '50.25', 'total_items_sold' => 0])
+            ->where('timeline.revenue', [0, 100.5])->where('timeline.sales', [1, 1]));
 });
 
 test('date boundaries are inclusive and adjacent dates are excluded', function () {
@@ -595,7 +658,7 @@ test('demonstration historical transactions contribute exact sales and item reve
             ->has('timeline.labels', 48)
             ->where('products.data.0.name', $products['10003']->name));
 })->with([
-    'all transactions' => ['all', 259, '838450.00', 1944],
+    'all transactions' => ['all', 259, '829300.00', 1944],
     'product snapshots' => ['product', 72, '201600.00', 72],
     'actual catalog category' => ['category', 130, '373200.00', 150],
 ]);
@@ -612,9 +675,9 @@ test('demonstration monthly report counts and revenue reflect varied persisted t
         ->assertInertia(fn (Assert $page) => $page
             ->where('timeline.labels', ['Oct 2022', 'Nov 2022'])
             ->where('timeline.sales', [4, 5])
-            ->where('timeline.revenue', [17860, 19190])
+            ->where('timeline.revenue', [17560, 19070])
             ->where('kpis.total_sales', 9)
-            ->where('kpis.total_revenue', '37050.00'));
+            ->where('kpis.total_revenue', '36630.00'));
 });
 
 test('report query count does not grow with the number of sales rows', function () {

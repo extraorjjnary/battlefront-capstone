@@ -9,20 +9,18 @@ use App\Enums\ShipmentStatus;
 use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\Product;
-use App\Models\Sale;
 use App\Models\User;
+use App\Repositories\Reporting\SalesReportRepository;
 use Illuminate\Database\Eloquent\Builder;
 
 class DashboardService
 {
+    public function __construct(private readonly SalesReportRepository $salesReportRepository) {}
+
     /** @return array<string, mixed> */
     public function administration(): array
     {
-        $salesSummary = Sale::query()
-            ->toBase()
-            ->selectRaw('COUNT(*) as recorded_sales')
-            ->selectRaw('COALESCE(SUM(amount), 0) as recorded_revenue')
-            ->first();
+        $salesSummary = $this->salesReportRepository->recordedSalesSummary();
         $orderSummary = Order::query()
             ->toBase()
             ->selectRaw(
@@ -40,8 +38,8 @@ class DashboardService
 
         return [
             'kpis' => [
-                'recorded_revenue' => $this->money($salesSummary->recorded_revenue),
-                'recorded_sales' => (int) $salesSummary->recorded_sales,
+                'recorded_revenue' => $this->money($salesSummary->total_revenue),
+                'recorded_sales' => (int) $salesSummary->total_sales,
                 'pending_orders' => (int) $orderSummary->pending_orders,
                 'processing_orders' => (int) $orderSummary->processing_orders,
                 'low_stock_products' => (clone $lowStockQuery)->count(),

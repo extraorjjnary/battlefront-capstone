@@ -212,7 +212,7 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
             }
             $terms = $this->orderTerms($date, $slot);
             $deliveryFee = $order->delivery_fee;
-            if (! is_numeric($deliveryFee) || bccomp($deliveryFee, '0', 2) < 0) {
+            if (bccomp($deliveryFee, '0', 2) < 0) {
                 throw new RuntimeException('Historical sales delivery fee conflicts with the demonstration history. Run php artisan battlefront:reset-dev --with-sales-history manually.');
             }
             $finalTotal = bcadd($total, $deliveryFee, 2);
