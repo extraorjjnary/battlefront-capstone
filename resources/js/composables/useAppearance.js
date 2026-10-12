@@ -44,7 +44,9 @@ const prefersDark = () => {
     }
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
 };
+const systemPrefersDark = ref(prefersDark());
 const handleSystemThemeChange = () => {
+    systemPrefersDark.value = prefersDark();
     if (appearance.value === 'system') {
         updateTheme('system');
     }
@@ -71,7 +73,7 @@ export function initializeTheme() {
 export function useAppearance() {
     const resolvedAppearance = computed(() => {
         if (appearance.value === 'system') {
-            return prefersDark() ? 'dark' : 'light';
+            return systemPrefersDark.value ? 'dark' : 'light';
         }
         return appearance.value;
     });

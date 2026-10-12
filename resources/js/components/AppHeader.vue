@@ -2,6 +2,7 @@
 import { Link, usePage } from '@inertiajs/vue3';
 import { Menu } from '@lucide/vue';
 import { computed } from 'vue';
+import AppearanceToggle from '@/components/AppearanceToggle.vue';
 import AppLogo from '@/components/AppLogo.vue';
 import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
@@ -137,7 +138,8 @@ const activeItemStyles = 'bg-accent text-accent-foreground';
                     </NavigationMenu>
                 </div>
 
-                <div class="ml-auto flex items-center gap-2">
+                <div class="ml-auto flex shrink-0 items-center gap-2">
+                    <AppearanceToggle />
                     <NotificationBell />
                     <DropdownMenu>
                         <DropdownMenuTrigger :as-child="true">

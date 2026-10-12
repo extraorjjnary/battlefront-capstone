@@ -1,4 +1,5 @@
 <script setup>
+import AppearanceToggle from '@/components/AppearanceToggle.vue';
 import Breadcrumbs from '@/components/Breadcrumbs.vue';
 import NotificationBell from '@/components/NotificationBell.vue';
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -21,7 +22,8 @@ defineProps({
                 <Breadcrumbs :breadcrumbs="breadcrumbs" />
             </template>
         </div>
-        <div class="ml-auto">
+        <div class="ml-auto flex shrink-0 items-center gap-2">
+            <AppearanceToggle />
             <NotificationBell />
         </div>
     </header>
