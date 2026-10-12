@@ -27,7 +27,8 @@ function checkoutProps(prefill = {}) {
             { value: 'pickup', label: 'Pickup' }, { value: 'delivery', label: 'Delivery' },
         ],
         paymentMethods: [
-            { value: 'cash', label: 'Cash', available_for: ['pickup'], requires_proof: false },
+            { value: 'cash', label: 'Cash (Pay at Pickup)', description: 'Pay cash when collecting your products at the store.', available_for: ['pickup'], requires_proof: false },
+            { value: 'card_at_store', label: 'Debit/Credit Card (Pay at Store)', description: 'Pay through a physical debit/credit card terminal during pickup at the store. This is not an online payment gateway.', available_for: ['pickup'], requires_proof: false },
             {
                 value: 'gcash', label: 'GCash', available_for: ['pickup', 'delivery'], requires_proof: true,
                 payment_account: { account_name: 'Demo', account_number: '09XX', is_demo: true },
@@ -145,6 +146,25 @@ test('COD selection resets wallet evidence and switches to an eligible method fo
         page.chooseFulfillment('pickup');
         assert.equal(page.paymentMethod.value, 'cash');
         assert.equal(page.isCod.value, false);
+    } finally {
+        scope.stop();
+    }
+});
+
+test('pickup checkout displays cash and physical card descriptions without requesting proof', async () => {
+    const scope = Vue.effectScope();
+    try {
+        const render = scope.run(() => loadPage(true).setup(checkoutProps(), { expose() {} }));
+        let html = await renderToString(render({}, []));
+        assert.match(html, /Cash \(Pay at Pickup\)/);
+        assert.match(html, /Debit\/Credit Card \(Pay at Store\)/);
+        assert.match(html, /Pay cash when collecting/);
+        const card = findNode(render({}, []), (node) => node.props?.name === 'payment_method' && node.props?.value === 'card_at_store');
+        card.props.onChange();
+        html = await renderToString(render({}, []));
+        assert.match(html, /physical debit\/credit card terminal/);
+        assert.match(html, /not an online payment gateway/);
+        assert.doesNotMatch(html, /name="payment_proof"/);
     } finally {
         scope.stop();
     }

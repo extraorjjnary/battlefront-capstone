@@ -380,7 +380,7 @@ test('administrators can apply approved order status transitions', function (
     int $expectedSaleCount,
 ) {
     $administrator = User::factory()->administrator()->create();
-    $order = Order::factory()->create([
+    $order = Order::factory()->paidWithGCash()->create([
         'status' => $currentStatus,
         'payment_status' => $paymentStatus,
     ]);
@@ -431,7 +431,7 @@ test('completing an eligible order records one authoritative sale without changi
     $secondProduct = Product::factory()->create(['price' => '750.00']);
     $firstInventory = Inventory::factory()->for($firstProduct)->create(['quantity' => 3]);
     $secondInventory = Inventory::factory()->for($secondProduct)->create(['quantity' => 7]);
-    $order = Order::factory()->create([
+    $order = Order::factory()->paidWithGCash()->create([
         'total_amount' => '3200.00',
         'status' => OrderStatus::Processing,
         'payment_status' => PaymentStatus::Verified,
@@ -467,7 +467,7 @@ test('completing an eligible order records one authoritative sale without changi
 
 test('repeated completion processing cannot create duplicate sales', function () {
     $administrator = User::factory()->administrator()->create();
-    $order = Order::factory()->create([
+    $order = Order::factory()->paidWithGCash()->create([
         'status' => OrderStatus::Processing,
         'payment_status' => PaymentStatus::Verified,
     ]);
@@ -490,7 +490,7 @@ test('repeated completion processing cannot create duplicate sales', function ()
 test('completion failure rolls back both the order status and sale', function () {
     $product = Product::factory()->create();
     $inventory = Inventory::factory()->for($product)->create(['quantity' => 4]);
-    $order = Order::factory()->create([
+    $order = Order::factory()->paidWithGCash()->create([
         'status' => OrderStatus::Processing,
         'payment_status' => PaymentStatus::Verified,
     ]);
@@ -602,13 +602,13 @@ test('cancellation failure rolls back the status and restored inventory', functi
         ->and($inventory->refresh()->quantity)->toBe(4);
 });
 
-test('pending or rejected payment blocks order processing and completion', function (
+test('pending or rejected prepaid payment blocks order processing and completion', function (
     OrderStatus $currentStatus,
     OrderStatus $nextStatus,
     PaymentStatus $paymentStatus,
 ) {
     $administrator = User::factory()->administrator()->create();
-    $order = Order::factory()->create([
+    $order = Order::factory()->paidWithGCash()->create([
         'status' => $currentStatus,
         'payment_status' => $paymentStatus,
     ]);
@@ -654,7 +654,7 @@ test('administrators cannot apply unapproved order status transitions', function
     OrderStatus $nextStatus,
 ) {
     $administrator = User::factory()->administrator()->create();
-    $order = Order::factory()->create(['status' => $currentStatus]);
+    $order = Order::factory()->paidWithGCash()->create(['status' => $currentStatus]);
 
     $response = $this->actingAs($administrator)
         ->from(route('administration.orders.show', $order))
@@ -849,7 +849,7 @@ test('wallet rejection persists an optional short administrator note', function 
 
 test('payment cannot be rejected after order completion', function () {
     $administrator = User::factory()->administrator()->create();
-    $order = Order::factory()->create([
+    $order = Order::factory()->paidWithGCash()->create([
         'status' => OrderStatus::Completed,
         'payment_status' => PaymentStatus::Pending,
     ]);
@@ -858,6 +858,7 @@ test('payment cannot be rejected after order completion', function () {
         ->from(route('administration.orders.show', $order))
         ->patch(route('administration.orders.payment-status.update', $order), [
             'payment_status' => PaymentStatus::Rejected->value,
+            'rejection_reason' => PaymentRejectionReason::TransactionUnverified->value,
         ]);
 
     $response
@@ -890,7 +891,7 @@ test('invalid payment decisions are rejected without changing payment status', f
     'unknown status' => 'paid',
 ]);
 
-test('cash and card at store can be verified without online proof', function (PaymentMethod $paymentMethod) {
+test('cash and card at store require combined pickup confirmation instead of separate verification', function (PaymentMethod $paymentMethod) {
     $administrator = User::factory()->administrator()->create();
     $order = Order::factory()->create(['payment_method' => $paymentMethod]);
 
@@ -899,9 +900,9 @@ test('cash and card at store can be verified without online proof', function (Pa
             'payment_status' => PaymentStatus::Verified->value,
             'manual_verification_confirmed' => '1',
         ])
-        ->assertSessionHasNoErrors();
+        ->assertSessionHasErrors('payment_status');
 
-    expect($order->refresh()->payment_status)->toBe(PaymentStatus::Verified);
+    expect($order->refresh()->payment_status)->toBe(PaymentStatus::Pending);
 })->with([
     'cash' => PaymentMethod::Cash,
     'card at store' => PaymentMethod::CardAtStore,
@@ -909,7 +910,7 @@ test('cash and card at store can be verified without online proof', function (Pa
 
 test('final payment decisions cannot be changed', function () {
     $administrator = User::factory()->administrator()->create();
-    $order = Order::factory()->create([
+    $order = Order::factory()->paidWithGCash()->create([
         'payment_status' => PaymentStatus::Rejected,
     ]);
 

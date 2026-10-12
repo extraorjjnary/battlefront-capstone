@@ -40,6 +40,7 @@ class CustomerOrderPresenter
                 'method' => [
                     'value' => $order->payment_method->value,
                     'label' => $order->payment_method->label(),
+                    ...($order->payment_method->isPayAtPickup() ? ['description' => $order->payment_method->description()] : []),
                 ],
                 'status' => [
                     'value' => $order->payment_status->value,
@@ -83,6 +84,7 @@ class CustomerOrderPresenter
                 'method' => [
                     'value' => $order->payment_method->value,
                     'label' => $order->payment_method->label(),
+                    ...($order->payment_method->isPayAtPickup() ? ['description' => $order->payment_method->description()] : []),
                 ],
                 'status' => [
                     'value' => $order->payment_status->value,
@@ -138,8 +140,16 @@ class CustomerOrderPresenter
                 : 'The total COD amount, including the configured delivery fee, is payable upon delivery. No advance payment or uploaded proof is required. LBC booking and collection are managed manually by Battlefront.';
         }
 
-        if (! $order->payment_method->requiresPaymentProof()) {
-            return 'Payment will be handled when you collect your order.';
+        if ($order->payment_method->isPayAtPickup()) {
+            if ($order->status === OrderStatus::Completed && $order->payment_status === PaymentStatus::Verified) {
+                return 'Battlefront has confirmed your payment and completed pickup.';
+            }
+
+            if ($order->payment_status === PaymentStatus::Verified) {
+                return 'Your payment is already verified. Battlefront must confirm product handover before completing pickup.';
+            }
+
+            return $order->payment_method->description().' Battlefront confirms payment and product handover together to complete pickup.';
         }
 
         if ($order->payment_proof_path === null) {

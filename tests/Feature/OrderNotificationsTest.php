@@ -69,11 +69,13 @@ test('failed checkout and an outer rollback create no notifications', function (
 });
 
 test('manual payment decisions notify only the order owner and repeated requests cannot duplicate history', function (PaymentStatus $status) {
-    $order = Order::factory()->create();
+    Storage::fake('local');
+    $order = Order::factory()->paidWithGCash()->create();
+    Storage::disk('local')->put($order->payment_proof_path, 'proof');
     $other = User::factory()->customer()->create();
     User::factory()->administrator()->create();
 
-    app(OrderProcessingService::class)->updatePaymentStatus($order, $status);
+    app(OrderProcessingService::class)->updatePaymentStatus($order, $status, PaymentRejectionReason::TransactionUnverified);
 
     expect($order->user->notifications()->sole()->data['event'])->toBe('payment.'.$status->value);
     expect($other->notifications()->count())->toBe(0);

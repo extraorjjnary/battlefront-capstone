@@ -49,6 +49,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency } from '@/lib/currency';
 import { orderStatusBadgeClass } from '@/lib/orderStatus';
 import { store as confirmCodCollection } from '@/routes/administration/orders/cod-collection';
+import { store as confirmPickup } from '@/routes/administration/orders/pickup-confirmation';
 
 const props = defineProps({
     order: { type: Object, required: true },
@@ -59,6 +60,11 @@ const orderConfirmationOpen = ref(false);
 const paymentConfirmationOpen = ref(false);
 const codConfirmationOpen = ref(false);
 const codCollectionForm = useForm({ cod_collection_confirmed: false });
+const pickupConfirmationOpen = ref(false);
+const pickupConfirmationForm = useForm({
+    payment_received_confirmed: false,
+    products_handed_over_confirmed: false,
+});
 const orderStatusForm = useForm({ status: '' });
 const shipmentConfirmationOpen = ref(false);
 const shipmentStatusForm = useForm({ status: '', tracking_reference: null });
@@ -130,6 +136,33 @@ function submitCodCollection() {
         onSuccess: () => {
             codConfirmationOpen.value = false;
             codCollectionForm.reset();
+        },
+    });
+}
+
+function requestPickupConfirmation() {
+    if (!props.order.payment.can_confirm_pickup || pickupConfirmationForm.processing) {
+        return;
+    }
+    pickupConfirmationForm.reset();
+    pickupConfirmationForm.clearErrors();
+    pickupConfirmationOpen.value = true;
+}
+
+function submitPickupConfirmation() {
+    if (
+        !props.order.payment.can_confirm_pickup ||
+        !pickupConfirmationForm.payment_received_confirmed ||
+        !pickupConfirmationForm.products_handed_over_confirmed ||
+        pickupConfirmationForm.processing
+    ) {
+        return;
+    }
+    pickupConfirmationForm.submit(confirmPickup(props.order.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            pickupConfirmationOpen.value = false;
+            pickupConfirmationForm.reset();
         },
     });
 }
@@ -722,6 +755,7 @@ defineOptions({
                                         order.status.value,
                                     ) &&
                                     order.payment.method.value !== 'cod' &&
+                                    !order.payment.pay_at_pickup &&
                                     order.payment.status.value !== 'verified'
                                 "
                                 class="text-muted-foreground text-xs leading-5"
@@ -774,6 +808,9 @@ defineOptions({
                         <template v-else-if="order.payment.can_confirm_cod_collection">
                             Delivery is recorded. Confirm COD Collection below
                             to complete the order and record its sale.
+                        </template>
+                        <template v-else-if="order.payment.pay_at_pickup">
+                            Confirm payment and product handover below to complete pickup.
                         </template>
                         <template v-else>
                             Continue delivery using the shipment milestones
@@ -925,7 +962,78 @@ defineOptions({
                     </div>
 
                     <div
-                        v-if="
+                        v-if="order.payment.pay_at_pickup && !['completed', 'cancelled'].includes(order.status.value)"
+                        class="border-border mt-5 grid gap-4 border-t pt-5"
+                    >
+                        <p class="font-semibold">Payment and pickup confirmation</p>
+                        <p class="text-muted-foreground text-sm leading-6">
+                            {{ order.payment.method.description }}
+                            Move the order to Processing to prepare it. Confirm payment
+                            and product handover together when the customer collects it.
+                            This completes pickup and records the sale once.
+                        </p>
+                        <p v-if="order.payment.status.value === 'verified'" class="text-muted-foreground text-sm">
+                            Payment is already verified. Confirm product handover to complete pickup.
+                        </p>
+                        <Button
+                            v-if="order.payment.can_confirm_pickup"
+                            type="button"
+                            class="w-full whitespace-normal"
+                            :disabled="pickupConfirmationForm.processing"
+                            @click="requestPickupConfirmation"
+                        >
+                            Confirm Payment &amp; Complete Pickup
+                        </Button>
+                        <p v-else class="text-muted-foreground text-sm">
+                            Confirmation requires an eligible Processing pickup order.
+                        </p>
+                        <InputError :message="pickupConfirmationForm.errors.payment_received_confirmed" />
+                        <InputError :message="pickupConfirmationForm.errors.products_handed_over_confirmed" />
+                        <Dialog v-model:open="pickupConfirmationOpen">
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Confirm Payment &amp; Complete Pickup</DialogTitle>
+                                    <DialogDescription>
+                                        Confirm payment of {{ formatCurrency(order.total) }} and
+                                        product handover for {{ order.reference }}. This verifies
+                                        payment, completes pickup, and records its sale.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div class="flex items-start gap-3">
+                                    <Checkbox id="pickup-payment-confirmed" v-model="pickupConfirmationForm.payment_received_confirmed" />
+                                    <Label for="pickup-payment-confirmed" class="text-sm leading-5 font-normal">
+                                        {{ order.payment.method.value === 'cash'
+                                            ? 'I confirm that the full cash payment was received.'
+                                            : 'I confirm that the physical debit/credit card terminal transaction succeeded for the full amount.' }}
+                                    </Label>
+                                </div>
+                                <div class="flex items-start gap-3">
+                                    <Checkbox id="pickup-handover-confirmed" v-model="pickupConfirmationForm.products_handed_over_confirmed" />
+                                    <Label for="pickup-handover-confirmed" class="text-sm leading-5 font-normal">
+                                        I confirm that the products were handed over to the customer.
+                                    </Label>
+                                </div>
+                                <InputError :message="pickupConfirmationForm.errors.payment_received_confirmed" />
+                                <InputError :message="pickupConfirmationForm.errors.products_handed_over_confirmed" />
+                                <DialogFooter>
+                                    <DialogClose as-child>
+                                        <Button type="button" variant="outline">Keep preparing pickup</Button>
+                                    </DialogClose>
+                                    <Button
+                                        type="button"
+                                        class="whitespace-normal"
+                                        :disabled="!pickupConfirmationForm.payment_received_confirmed || !pickupConfirmationForm.products_handed_over_confirmed || pickupConfirmationForm.processing"
+                                        @click="submitPickupConfirmation"
+                                    >
+                                        <Spinner v-if="pickupConfirmationForm.processing" />
+                                        Confirm Payment &amp; Complete Pickup
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+                    <div
+                        v-else-if="
                             order.payment.method.value === 'cod' &&
                             order.payment.status.value === 'pending' &&
                             order.status.value !== 'cancelled'
@@ -1012,6 +1120,7 @@ defineOptions({
                     </div>
                     <div
                         v-else-if="
+                            !order.payment.pay_at_pickup &&
                             order.payment.status.value === 'pending' &&
                             order.status.value !== 'cancelled'
                         "

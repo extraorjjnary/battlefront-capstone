@@ -509,14 +509,14 @@ defineOptions({
                                         class="text-muted-foreground mt-1 block text-xs leading-5"
                                     >
                                         {{
-                                            method.value === 'cod'
+                                            method.description ?? (method.value === 'cod'
                                                 ? 'Pay upon delivery. Delivery orders only.'
                                                 : method.requires_proof
                                                 ? 'Manual e-wallet payment with proof.'
                                                 : fulfillmentMethod ===
                                                     'delivery'
                                                   ? 'Available for pickup only.'
-                                                  : 'Pay when you collect your order.'
+                                                  : 'Pay when you collect your order.')
                                         }}
                                     </span>
                                 </span>

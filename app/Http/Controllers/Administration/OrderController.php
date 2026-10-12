@@ -57,6 +57,7 @@ class OrderController extends Controller
                     'method' => [
                         'value' => $order->payment_method->value,
                         'label' => $order->payment_method->label(),
+                        ...($order->payment_method->isPayAtPickup() ? ['description' => $order->payment_method->description()] : []),
                     ],
                     'status' => [
                         'value' => $order->payment_status->value,
@@ -168,6 +169,7 @@ class OrderController extends Controller
                     'method' => [
                         'value' => $order->payment_method->value,
                         'label' => $order->payment_method->label(),
+                        ...($order->payment_method->isPayAtPickup() ? ['description' => $order->payment_method->description()] : []),
                         'requires_proof' => $order->payment_method->requiresPaymentProof(),
                     ],
                     'status' => [
@@ -175,6 +177,8 @@ class OrderController extends Controller
                         'label' => $order->paymentStatusLabel(),
                     ],
                     'can_confirm_cod_collection' => $processing->canConfirmCodCollection($order),
+                    'pay_at_pickup' => $order->payment_method->isPayAtPickup(),
+                    'can_confirm_pickup' => $processing->canConfirmPickup($order),
                     'proof_submitted' => $order->payment_proof_path !== null,
                     'proof_available' => $this->paymentProofIsAvailable($order),
                     'rejection' => $order->payment_status === PaymentStatus::Rejected

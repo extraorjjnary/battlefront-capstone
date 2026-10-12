@@ -105,8 +105,8 @@ test('rule guidance ignores saved overrides and answers without Gemini or active
     ChatbotResponseAgent::assertNeverPrompted();
     Http::assertNothingSent();
 })->with([
-    ['Do you accept GCash?', 'Pickup orders support Cash, Card at store, GCash, Maya. Delivery orders support GCash, Maya, Cash on Delivery (COD).'],
-    ['Do I need payment proof for Maya?', 'GCash and Maya require uploaded payment proof, which Battlefront staff review manually. Cash and Card at store are pickup payment methods and do not require an upload; staff confirm those payments manually. Cash on Delivery (COD) is delivery-only, requires no upload, and is collected upon delivery. Battlefront manually confirms LBC collection after delivery before completing the order. Check your order history for the latest payment status.'],
+    ['Do you accept GCash?', 'Pickup orders support Cash (Pay at Pickup), Debit/Credit Card (Pay at Store), GCash, Maya. Delivery orders support GCash, Maya, Cash on Delivery (COD).'],
+    ['Do I need payment proof for Maya?', 'GCash and Maya require uploaded payment proof, which Battlefront staff review manually. Cash (Pay at Pickup) and Debit/Credit Card (Pay at Store) are pickup payment methods and do not require an upload; cash is received or a physical card terminal transaction succeeds during pickup. Staff confirm payment and product handover together to complete pickup. Cash on Delivery (COD) is delivery-only, requires no upload, and is collected upon delivery. Battlefront manually confirms LBC collection after delivery before completing the order. Check your order history for the latest payment status.'],
     ['Can I choose pickup or delivery?', 'Battlefront supports pickup and delivery. Choose an available fulfillment option during checkout; a delivery address is required for delivery.'],
     ['What is the delivery fee?', 'The delivery fee and estimated delivery time are shown at checkout after you select your items and delivery destination.'],
 ]);

@@ -107,6 +107,9 @@ function loadPage(path, inlineTemplate = false) {
             '@/routes/administration/orders/cod-collection': {
                 store: (id) => ({ url: `/administration/orders/${id}/cod-collection`, method: 'post' }),
             },
+            '@/routes/administration/orders/pickup-confirmation': {
+                store: (id) => ({ url: `/administration/orders/${id}/pickup-confirmation`, method: 'post' }),
+            },
         },
         { get: (target, key) => target[key] ?? generic },
     );
@@ -130,8 +133,13 @@ function orderProps(overrides = {}) {
             customer: { name: 'Customer', email: 'customer@example.com' },
             fulfillment: { value: 'pickup', label: 'Pickup' },
             payment: {
-                method: { value: 'cash', label: 'Cash', requires_proof: false },
+                method: {
+                    value: 'cash', label: 'Cash (Pay at Pickup)', requires_proof: false,
+                    description: 'Pay cash when collecting your products at the store.',
+                },
                 status: { value: 'pending', label: 'Pending' },
+                pay_at_pickup: true,
+                can_confirm_pickup: false,
                 notice: 'Payment will be handled when you collect your order.',
                 rejection_reasons: [],
                 can_resubmit_proof: false,
@@ -398,6 +406,73 @@ test('processing COD cannot directly submit completion when the server excludes 
         page.requestOrderStatusUpdate();
         assert.equal(loaded.submissions.length, 0);
         assert.equal(page.orderConfirmationOpen.value, false);
+    } finally {
+        scope.stop();
+    }
+});
+
+test('pickup offers unpaid Processing and shows combined confirmation only when server eligible', async () => {
+    for (const method of ['cash', 'card_at_store']) {
+        for (const eligible of [false, true]) {
+            const props = orderProps({
+                status: { value: eligible ? 'processing' : 'pending', label: eligible ? 'Processing' : 'Pending' },
+                allowed_status_transitions: eligible
+                    ? [{ value: 'cancelled', label: 'Cancelled' }]
+                    : [{ value: 'processing', label: 'Processing' }, { value: 'cancelled', label: 'Cancelled' }],
+            });
+            props.order.payment.can_confirm_pickup = eligible;
+            props.order.payment.method.value = method;
+            props.order.payment.method.description = method === 'cash'
+                ? 'Pay cash at pickup.'
+                : 'Pay through a physical debit/credit card terminal. This is not an online payment gateway.';
+            const loaded = loadPage('../Administration/Orders/Show.vue', true);
+            const html = await renderToString(Vue.h(loaded.component, { order: props.order }));
+            assert.equal(html.includes('Confirm Payment &amp; Complete Pickup'), eligible);
+            assert.doesNotMatch(html, /Apply payment decision|Verify payment before moving|value="completed"/);
+            if (!eligible) {
+                const option = html.match(/<div\b[^>]*\bvalue="processing"[^>]*>/)?.[0];
+                assert.ok(option);
+                assert.doesNotMatch(option, /\bdisabled(?:=|\s|>)/);
+            }
+            if (method === 'card_at_store') {
+                assert.match(html, /physical debit\/credit card terminal/);
+                assert.match(html, /not an online payment gateway/);
+            }
+        }
+    }
+});
+
+test('pickup confirmation requires both checkboxes and prevents duplicate or stale submissions', () => {
+    const scope = Vue.effectScope();
+    try {
+        const loaded = loadPage('../Administration/Orders/Show.vue');
+        const props = Vue.reactive({ order: orderProps({
+            status: { value: 'processing', label: 'Processing' },
+        }).order });
+        props.order.payment.can_confirm_pickup = true;
+        const page = scope.run(() => loaded.component.setup(props, { expose() {} }));
+        page.requestPickupConfirmation();
+        assert.equal(page.pickupConfirmationOpen.value, true);
+        page.submitPickupConfirmation();
+        assert.equal(loaded.submissions.length, 0);
+        page.pickupConfirmationForm.payment_received_confirmed = true;
+        page.submitPickupConfirmation();
+        assert.equal(loaded.submissions.length, 0);
+        page.pickupConfirmationForm.products_handed_over_confirmed = true;
+        page.submitPickupConfirmation();
+        assert.deepEqual(loaded.submissions[0].target, {
+            url: '/administration/orders/7/pickup-confirmation', method: 'post',
+        });
+        page.submitPickupConfirmation();
+        assert.equal(loaded.submissions.length, 1);
+        loaded.submissions[0].options.onSuccess();
+        assert.equal(page.pickupConfirmationOpen.value, false);
+        assert.equal(page.pickupConfirmationForm.payment_received_confirmed, false);
+        assert.equal(page.pickupConfirmationForm.products_handed_over_confirmed, false);
+        props.order.payment.can_confirm_pickup = false;
+        page.pickupConfirmationForm.processing = false;
+        page.requestPickupConfirmation();
+        assert.equal(page.pickupConfirmationOpen.value, false);
     } finally {
         scope.stop();
     }

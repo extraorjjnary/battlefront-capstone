@@ -46,7 +46,7 @@ test('payment verification and method availability use application rules instead
     foreach (['How is GCash payment verified?', 'How is Maya payment verified?', 'Do I need payment proof for Maya?', 'How do staff verify cash payment?', 'How is card at store payment verified?', 'Do you accept GCash?'] as $question) {
         expect(app(MatchChatbotKnowledge::class)->execute($question))->toBe([]);
     }
-    expect(app(ResolveChatbotRuleGuidance::class)->execute('payment_proof')['guidance'])->toContain('GCash and Maya', 'Cash and Card at store');
+    expect(app(ResolveChatbotRuleGuidance::class)->execute('payment_proof')['guidance'])->toContain('GCash and Maya', 'Cash (Pay at Pickup) and Debit/Credit Card (Pay at Store)', 'physical card terminal', 'product handover together');
 });
 
 test('rerunning the FAQ seeder preserves legacy samples for migration or human review', function () {

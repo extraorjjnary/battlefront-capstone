@@ -97,14 +97,16 @@ test('checkout renders current customer items, pickup location, and supported op
         ->where('paymentMethods', [
             [
                 'value' => 'cash',
-                'label' => 'Cash',
+                'label' => 'Cash (Pay at Pickup)',
+                'description' => 'Pay cash when collecting your products at the store. No advance payment or uploaded proof is required.',
                 'requires_proof' => false,
                 'payment_account' => null,
                 'available_for' => ['pickup'],
             ],
             [
                 'value' => 'card_at_store',
-                'label' => 'Card at store',
+                'label' => 'Debit/Credit Card (Pay at Store)',
+                'description' => 'Pay through a physical debit/credit card terminal during pickup at the store. This is not an online payment gateway; no advance payment or uploaded proof is required.',
                 'requires_proof' => false,
                 'payment_account' => null,
                 'available_for' => ['pickup'],

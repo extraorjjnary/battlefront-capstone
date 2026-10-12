@@ -13,6 +13,7 @@ use App\Http\Controllers\Administration\OrderCodCollectionController;
 use App\Http\Controllers\Administration\OrderController as AdministrationOrderController;
 use App\Http\Controllers\Administration\OrderPaymentProofController;
 use App\Http\Controllers\Administration\OrderPaymentStatusController;
+use App\Http\Controllers\Administration\OrderPickupConfirmationController;
 use App\Http\Controllers\Administration\OrderShipmentReferenceController;
 use App\Http\Controllers\Administration\OrderShipmentStatusController;
 use App\Http\Controllers\Administration\OrderStatusController;
@@ -185,6 +186,9 @@ Route::middleware(['auth', 'can:access-administration'])
         Route::post('orders/{order}/cod-collection', [OrderCodCollectionController::class, 'store'])
             ->whereNumber('order')
             ->name('orders.cod-collection.store');
+        Route::post('orders/{order}/pickup-confirmation', [OrderPickupConfirmationController::class, 'store'])
+            ->whereNumber('order')
+            ->name('orders.pickup-confirmation.store');
         Route::get('orders/{order}/payment-proof', OrderPaymentProofController::class)
             ->name('orders.payment-proof.show');
 

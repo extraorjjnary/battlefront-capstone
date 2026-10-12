@@ -81,6 +81,7 @@ class PrepareCheckout
                 fn (PaymentMethod $method): array => [
                     'value' => $method->value,
                     'label' => $method->label(),
+                    ...($method->isPayAtPickup() ? ['description' => $method->description()] : []),
                     'requires_proof' => $method->requiresPaymentProof(),
                     'payment_account' => $this->paymentAccount($method),
                     'available_for' => array_values(array_map(

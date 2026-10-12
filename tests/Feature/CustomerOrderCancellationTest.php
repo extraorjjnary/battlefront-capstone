@@ -141,22 +141,23 @@ test('admin and customer cancellation cannot restore stock twice with stale mode
     expect($order->user->notifications()->count())->toBe(1);
 })->with([true, false]);
 
-test('payment decisions and customer cancellation recheck the winning state', function (bool $cancellationFirst) {
+test('pickup processing and customer cancellation recheck the winning state', function (bool $cancellationFirst) {
     $order = customerCancellationOrder();
     $staleOrder = Order::query()->findOrFail($order->id);
     $service = app(OrderProcessingService::class);
     if ($cancellationFirst) {
         $service->cancelForCustomer($order->user, $order->id);
-        expect(fn () => $service->updatePaymentStatus($staleOrder, PaymentStatus::Verified))->toThrow(ValidationException::class);
+        expect(fn () => $service->updateStatus($staleOrder, OrderStatus::Processing))->toThrow(ValidationException::class);
         expect($order->refresh()->payment_status)->toBe(PaymentStatus::Pending);
         expect(Inventory::sole()->quantity)->toBe(5);
     } else {
-        $service->updatePaymentStatus($order, PaymentStatus::Verified);
+        $service->updateStatus($order, OrderStatus::Processing);
         expect(fn () => $service->cancelForCustomer($staleOrder->user, $staleOrder->id))->toThrow(ValidationException::class);
-        expect($order->refresh()->status)->toBe(OrderStatus::Pending);
+        expect($order->refresh()->status)->toBe(OrderStatus::Processing);
+        expect($order->payment_status)->toBe(PaymentStatus::Pending);
         expect(Inventory::sole()->quantity)->toBe(3);
     }
-    expect($order->user->notifications()->count())->toBe(1);
+    expect($order->user->notifications()->count())->toBe($cancellationFirst ? 1 : 0);
 })->with([true, false]);
 
 test('cancelled orders reject both manual payment decisions through administrator endpoints', function (string $decision) {

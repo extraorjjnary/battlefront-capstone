@@ -402,7 +402,7 @@ test('COD collection does not accept prepaid orders or an internal unconfirmed a
 test('chatbot rules distinguish proof-free COD delivery from pickup payment', function () {
     $rules = app(ResolveChatbotRuleGuidance::class);
 
-    expect($rules->execute('payment_methods')['guidance'])->toBe('Pickup orders support Cash, Card at store, GCash, Maya. Delivery orders support GCash, Maya, Cash on Delivery (COD).');
+    expect($rules->execute('payment_methods')['guidance'])->toBe('Pickup orders support Cash (Pay at Pickup), Debit/Credit Card (Pay at Store), GCash, Maya. Delivery orders support GCash, Maya, Cash on Delivery (COD).');
     expect($rules->execute('payment_proof')['guidance'])->toContain('COD) is delivery-only, requires no upload', 'manually confirms LBC collection after delivery');
 });
 

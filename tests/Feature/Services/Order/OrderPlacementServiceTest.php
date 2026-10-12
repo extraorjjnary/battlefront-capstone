@@ -164,15 +164,16 @@ test('later order and payment status changes do not deduct stock again', functio
     $order = app(OrderPlacementService::class)->execute($customer, validOrderPlacementData($customer->cart->items->modelKeys()));
 
     $this->actingAs($administrator)
-        ->patch(route('administration.orders.payment-status.update', $order), [
-            'payment_status' => PaymentStatus::Verified->value,
-            'manual_verification_confirmed' => '1',
+        ->patch(route('administration.orders.status.update', $order), [
+            'status' => OrderStatus::Processing->value,
         ])->assertSessionHasNoErrors();
-    $this->patch(route('administration.orders.status.update', $order), [
-        'status' => OrderStatus::Processing->value,
+    expect($order->refresh()->payment_status)->toBe(PaymentStatus::Pending);
+    $this->post(route('administration.orders.pickup-confirmation.store', $order), [
+        'payment_received_confirmed' => true,
+        'products_handed_over_confirmed' => true,
     ])->assertSessionHasNoErrors();
 
     expect($inventory->refresh()->quantity)->toBe(3)
-        ->and($order->refresh()->status)->toBe(OrderStatus::Processing)
+        ->and($order->refresh()->status)->toBe(OrderStatus::Completed)
         ->and($order->payment_status)->toBe(PaymentStatus::Verified);
 });

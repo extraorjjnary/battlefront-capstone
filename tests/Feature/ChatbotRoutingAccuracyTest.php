@@ -94,7 +94,7 @@ test('general payment guidance is available to guests without resolving their or
 
     expect($result['category'])->toBe(ChatbotQueryCategory::Faq)
         ->and($result['source'])->toBe('fallback')
-        ->and($result['message'])->toBe('Pickup orders support Cash, Card at store, GCash, Maya. Delivery orders support GCash, Maya, Cash on Delivery (COD).');
+        ->and($result['message'])->toBe('Pickup orders support Cash (Pay at Pickup), Debit/Credit Card (Pay at Store), GCash, Maya. Delivery orders support GCash, Maya, Cash on Delivery (COD).');
     ChatbotResponseAgent::assertNeverPrompted();
 });
 

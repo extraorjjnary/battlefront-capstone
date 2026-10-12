@@ -80,6 +80,9 @@ class OrderProcessingService
 
             $shipment = $lockedOrder->shipment()->lockForUpdate()->first();
             $lockedOrder->setRelation('shipment', $shipment);
+            if ($status === OrderStatus::Completed && $lockedOrder->payment_method->isPayAtPickup()) {
+                throw ValidationException::withMessages(['status' => 'Use Confirm Payment & Complete Pickup after receiving payment and handing over the products.']);
+            }
             if ($status === OrderStatus::Completed && ($shipment !== null || $lockedOrder->payment_method === PaymentMethod::Cod)) {
                 throw ValidationException::withMessages(['status' => $lockedOrder->payment_method === PaymentMethod::Cod
                     ? 'Complete COD delivery through Confirm COD Collection after the Delivered milestone.'
@@ -95,7 +98,7 @@ class OrderProcessingService
     public function allowedOrderTransitions(Order $order): array
     {
         return array_values(array_filter($order->status->allowedTransitions(), function (OrderStatus $status) use ($order): bool {
-            if ($status === OrderStatus::Completed && ($order->shipment !== null || $order->payment_method === PaymentMethod::Cod)) {
+            if ($status === OrderStatus::Completed && ($order->shipment !== null || $order->payment_method === PaymentMethod::Cod || $order->payment_method->isPayAtPickup())) {
                 return false;
             }
 
@@ -273,6 +276,12 @@ class OrderProcessingService
                 ]);
             }
 
+            if ($lockedOrder->payment_method->isPayAtPickup()) {
+                throw ValidationException::withMessages([
+                    'payment_status' => 'Use Confirm Payment & Complete Pickup. Cash/Card pickup does not accept separate payment verification or proof rejection.',
+                ]);
+            }
+
             if ($lockedOrder->payment_status !== PaymentStatus::Pending) {
                 throw ValidationException::withMessages([
                     'payment_status' => 'This payment already has a final decision.',
@@ -360,7 +369,50 @@ class OrderProcessingService
     private function paymentAllowsFulfillment(Order $order): bool
     {
         return $order->payment_status === PaymentStatus::Verified
-            || ($order->payment_status === PaymentStatus::Pending && $this->isCodDelivery($order));
+            || ($order->payment_status === PaymentStatus::Pending && ($this->isCodDelivery($order) || $this->isPayAtPickupOrder($order)));
+    }
+
+    private function isPayAtPickupOrder(Order $order): bool
+    {
+        return $order->payment_method->isPayAtPickup()
+            && $order->fulfillment_method === FulfillmentMethod::Pickup
+            && $order->payment_proof_path === null
+            && $order->shipment === null;
+    }
+
+    public function canConfirmPickup(Order $order): bool
+    {
+        return $this->isPayAtPickupOrder($order)
+            && $order->status === OrderStatus::Processing
+            && in_array($order->payment_status, [PaymentStatus::Pending, PaymentStatus::Verified], strict: true);
+    }
+
+    public function confirmPickup(Order $order, bool $paymentReceived, bool $productsHandedOver): Order
+    {
+        return DB::transaction(function () use ($order, $paymentReceived, $productsHandedOver): Order {
+            $lockedOrder = Order::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
+            $shipment = $lockedOrder->shipment()->lockForUpdate()->first();
+            $lockedOrder->setRelation('shipment', $shipment);
+
+            if (! $paymentReceived || ! $productsHandedOver || ! $this->canConfirmPickup($lockedOrder)) {
+                throw ValidationException::withMessages([
+                    'payment_received_confirmed' => 'Confirm payment received and products handed over for an eligible Processing Cash/Card pickup order.',
+                ]);
+            }
+
+            $paymentWasPending = $lockedOrder->payment_status === PaymentStatus::Pending;
+            $lockedOrder->update([
+                'payment_status' => PaymentStatus::Verified,
+                'payment_rejection_reason' => null,
+                'payment_rejection_note' => null,
+            ]);
+            $this->transitionLockedOrder($lockedOrder, OrderStatus::Completed, $shipment);
+            if ($paymentWasPending) {
+                $this->notifications->afterCommit($lockedOrder, 'payment.verified');
+            }
+
+            return $lockedOrder->refresh();
+        }, attempts: 3);
     }
 
     public function canConfirmCodCollection(Order $order): bool

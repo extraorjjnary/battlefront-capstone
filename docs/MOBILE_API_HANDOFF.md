@@ -425,14 +425,16 @@ Requires an explicit nonempty `cart_item_ids` list of distinct positive integer 
         "payment_methods": [
             {
                 "value": "cash",
-                "label": "Cash",
+                "label": "Cash (Pay at Pickup)",
+                "description": "Pay cash when collecting your products at the store. No advance payment or uploaded proof is required.",
                 "requires_proof": false,
                 "payment_account": null,
                 "available_for": ["pickup"]
             },
             {
                 "value": "card_at_store",
-                "label": "Card at store",
+                "label": "Debit/Credit Card (Pay at Store)",
+                "description": "Pay through a physical debit/credit card terminal during pickup at the store. This is not an online payment gateway; no advance payment or uploaded proof is required.",
                 "requires_proof": false,
                 "payment_account": null,
                 "available_for": ["pickup"]
@@ -597,14 +599,15 @@ Client fee/base fee/surcharge/profile/preparation/transit/ETA/subtotal/total val
         "payment": {
             "method": {
                 "value": "cash",
-                "label": "Cash"
+                "label": "Cash (Pay at Pickup)",
+                "description": "Pay cash when collecting your products at the store. No advance payment or uploaded proof is required."
             },
             "status": {
                 "value": "pending",
                 "label": "Pending"
             },
             "proof_submitted": false,
-            "notice": "Payment will be handled when you collect your order.",
+            "notice": "Pay cash when collecting your products at the store. No advance payment or uploaded proof is required. Battlefront confirms payment and product handover together to complete pickup.",
             "rejection": null,
             "can_resubmit_proof": false
         },
@@ -702,7 +705,8 @@ History is customer-owned, paginated at 10. Each `data` entry is:
     "payment": {
         "method": {
             "value": "cash",
-            "label": "Cash"
+            "label": "Cash (Pay at Pickup)",
+            "description": "Pay cash when collecting your products at the store. No advance payment or uploaded proof is required."
         },
         "status": {
             "value": "pending",
@@ -718,6 +722,8 @@ History is customer-owned, paginated at 10. Each `data` entry is:
 Detail is customer-owned and uses the full order shape above. Missing/foreign IDs get 404. Owning customers may use the existing cancellation endpoint only while `can_cancel` is true: Pending order/payment, no submitted wallet proof, and no shipment preparation. COD is eligible before Processing. Administrators may cancel only before LBC handoff. Cancellation restores stock once; reading an order or pending COD collection never restores inventory.
 
 COD collection confirmation remains web-administrator-only after Delivered. Explicit manual verification atomically changes payment to Verified, completes the order, records one sale, and publishes the existing `payment.verified` customer notification. Customers cannot verify/reject COD or upload replacement proof. Failed delivery, uncollected payment, carrier returns, refunds, and return-to-sender are outside this workflow; no automatic paid/completed/cancelled/refunded/returned outcome is inferred. There is no live LBC settlement verification.
+
+Cash and Card-at-Store retain internal values `cash` and `card_at_store` and remain pickup-only. Render their returned labels and `description`; card payment uses a physical terminal during pickup, with no online gateway. Both may become Processing while payment remains Pending. Only the web administrator's **Confirm Payment & Complete Pickup** action, with explicit payment-received and product-handover confirmations, verifies payment, completes the pickup, and records one sale atomically. Separate payment verification/rejection and direct completion cannot bypass this action. Existing verified Processing pickups use the same handover action without another payment notification; completed history remains unchanged. Customer cancellation remains limited to eligible Pending orders, and GCash/Maya still require advance verification.
 
 ### POST /orders/{order}/payment-proof
 

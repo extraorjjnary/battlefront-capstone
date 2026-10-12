@@ -303,14 +303,14 @@ test('push provider failure cannot change completed payment cancellation or ship
     PushDevice::factory()->for($customer)->create();
     $inventory = Inventory::factory()->create(['quantity' => 5]);
     $order = $action === 'delivered' ? Order::factory()->for($customer)->withDeliverySnapshot()->create(['status' => OrderStatus::Processing, 'payment_status' => PaymentStatus::Verified])
-        : Order::factory()->for($customer)->create();
+        : Order::factory()->for($customer)->create(['status' => $action === 'payment' ? OrderStatus::Processing : OrderStatus::Pending]);
     OrderItem::factory()->for($order)->create(['product_id' => $inventory->product_id, 'quantity' => 2]);
     if ($action === 'delivered') {
         Shipment::factory()->for($order)->create(['status' => ShipmentStatus::OutForDelivery]);
     }
 
     match ($action) {
-        'payment' => app(OrderProcessingService::class)->updatePaymentStatus($order, PaymentStatus::Verified),
+        'payment' => app(OrderProcessingService::class)->confirmPickup($order, true, true),
         'cancelled' => app(OrderProcessingService::class)->updateStatus($order, OrderStatus::Cancelled),
         'delivered' => app(OrderProcessingService::class)->updateShipmentStatus($order, ShipmentStatus::Delivered),
     };
@@ -323,19 +323,21 @@ test('push provider failure cannot change completed payment cancellation or ship
     expect($order->refresh()->getAttributes())->toBe($attributes);
     expect($customer->notifications()->count())->toBe(1);
     expect($inventory->refresh()->quantity)->toBe($action === 'cancelled' ? 7 : 5);
-    $this->assertDatabaseCount('sales', $action === 'delivered' ? 1 : 0);
+    $this->assertDatabaseCount('sales', $action === 'cancelled' ? 0 : 1);
 })->with(['payment', 'cancelled', 'delivered']);
 
-test('push queue failure does not escape a committed payment decision', function () {
+test('push queue failure does not escape a committed pickup payment and completion', function () {
     config(['services.expo.enabled' => true]);
     $customer = User::factory()->customer()->create();
     PushDevice::factory()->for($customer)->create();
-    $order = Order::factory()->for($customer)->create();
+    $order = Order::factory()->for($customer)->create(['status' => OrderStatus::Processing]);
     Bus::shouldReceive('dispatch')->andThrow(new RuntimeException('Queue unavailable'));
 
-    app(OrderProcessingService::class)->updatePaymentStatus($order, PaymentStatus::Verified);
+    app(OrderProcessingService::class)->confirmPickup($order, true, true);
 
     expect($order->refresh()->payment_status)->toBe(PaymentStatus::Verified);
+    expect($order->status)->toBe(OrderStatus::Completed);
+    $this->assertDatabaseCount('sales', 1);
     $this->assertDatabaseCount('notifications', 1);
 });
 
