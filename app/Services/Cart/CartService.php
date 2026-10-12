@@ -19,6 +19,18 @@ use InvalidArgumentException;
 class CartService
 {
     /**
+     * Count persisted units without loading cart lines or product data.
+     */
+    public function totalQuantity(User $customer): int
+    {
+        if ($customer->role !== UserRole::Customer) {
+            throw new AuthorizationException('Customer cart operations are not available for this account.');
+        }
+
+        return (int) $this->customerItemsQuery($customer)->sum('quantity');
+    }
+
+    /**
      * Add a quantity of a product to the customer's cart.
      */
     public function add(User $customer, int $productId, int $quantity): CartItem

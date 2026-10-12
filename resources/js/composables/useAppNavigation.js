@@ -112,6 +112,7 @@ export function useAppNavigation() {
                 title: 'Cart',
                 href: cartIndex(),
                 icon: ShoppingCart,
+                badgeCount: page.props.cartQuantity ?? 0,
             });
         }
 

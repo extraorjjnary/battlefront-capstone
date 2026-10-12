@@ -3,8 +3,10 @@
 namespace App\Http\Middleware;
 
 use App\Enums\AppearancePreference;
+use App\Services\Cart\CartService;
 use App\Services\Notifications\NotificationHistory;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -37,12 +39,17 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        $customer = $request->user();
+        $canUseCustomerCart = $customer?->can('use-customer-cart') ?? false;
         $sidebarCookieName = $request->user() === null
             ? null
             : 'sidebar_state_'.$request->user()->getKey();
 
         return [
             ...parent::share($request),
+            ...($customer !== null && $canUseCustomerCart ? [
+                'cartQuantity' => Inertia::always(fn (): int => app(CartService::class)->totalQuantity($customer)),
+            ] : []),
             'name' => config('app.name'),
             'notificationSummary' => fn (): ?array => $request->user() === null
                 ? null : app(NotificationHistory::class)->summary($request->user()),
@@ -52,7 +59,7 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
                 'can' => [
                     'accessAdministration' => $request->user()?->can('access-administration') ?? false,
-                    'useCustomerCart' => $request->user()?->can('use-customer-cart') ?? false,
+                    'useCustomerCart' => $canUseCustomerCart,
                 ],
             ],
             'sidebarOpen' => $sidebarCookieName === null

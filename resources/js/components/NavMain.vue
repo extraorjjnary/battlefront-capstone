@@ -31,8 +31,33 @@ const { isCurrentOrParentUrl, isCurrentUrl } = useCurrentUrl();
                     "
                     :tooltip="item.title"
                 >
-                    <Link :href="item.href">
-                        <component :is="item.icon" />
+                    <Link
+                        :href="item.href"
+                        :aria-label="
+                            item.badgeCount !== undefined
+                                ? `${item.title}, ${item.badgeCount} ${item.badgeCount === 1 ? 'unit' : 'units'} in cart`
+                                : undefined
+                        "
+                    >
+                        <span
+                            v-if="item.badgeCount !== undefined"
+                            class="relative size-4 shrink-0"
+                        >
+                            <component :is="item.icon" class="size-4" />
+                            <span
+                                v-if="item.badgeCount > 0"
+                                data-slot="cart-quantity-badge"
+                                aria-hidden="true"
+                                class="bg-destructive-action text-destructive-action-foreground ring-sidebar pointer-events-none absolute -top-1.5 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-1 text-[9px] leading-none font-semibold tabular-nums ring-1"
+                            >
+                                {{
+                                    item.badgeCount > 99
+                                        ? '99+'
+                                        : item.badgeCount
+                                }}
+                            </span>
+                        </span>
+                        <component :is="item.icon" v-else />
                         <span>{{ item.title }}</span>
                     </Link>
                 </SidebarMenuButton>
