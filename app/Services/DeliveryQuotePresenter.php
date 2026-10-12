@@ -12,7 +12,7 @@ use InvalidArgumentException;
 /** @phpstan-import-type DeliveryQuote from DeliveryRules */
 class DeliveryQuotePresenter
 {
-    public const ESTIMATE_NOTICE = 'Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification.';
+    public const ESTIMATE_NOTICE = 'Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional. Prepaid orders are subject to payment verification; COD payment is collected upon delivery. This does not book or approve an LBC shipment.';
 
     /**
      * Calendar windows are checkout-only estimates anchored to the server quote date.

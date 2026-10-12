@@ -37,13 +37,8 @@ class ResolveOrderContext
 
         $referenceId = $this->referenceId($message);
         $includePayment = $referenceId !== null && $this->isPaymentInquiry($message);
-        $columns = ['id', 'user_id', 'fulfillment_method', 'status', 'created_at'];
-
-        if ($includePayment) {
-            array_push($columns, 'payment_method', 'payment_status');
-        }
-
-        $orderQuery = $customer->orders()->select($columns);
+        $columns = ['id', 'user_id', 'fulfillment_method', 'status', 'created_at', 'payment_method', 'payment_status'];
+        $orderQuery = $customer->orders()->select($columns)->with('shipment:id,order_id,status');
 
         if ($referenceId !== null) {
             $orderQuery->whereKey($referenceId);
@@ -64,7 +59,7 @@ class ResolveOrderContext
                         'created_at' => $order->created_at->toIso8601String(),
                         'status' => [
                             'value' => $order->status->value,
-                            'label' => $order->status->customerLabel($order->fulfillment_method),
+                            'label' => $order->customerStatusLabel(),
                         ],
                         'fulfillment' => [
                             'value' => $order->fulfillment_method->value,
@@ -80,7 +75,7 @@ class ResolveOrderContext
                             ],
                             'status' => [
                                 'value' => $order->payment_status->value,
-                                'label' => $order->payment_status->label(),
+                                'label' => $order->paymentStatusLabel(),
                             ],
                         ];
                     }
@@ -93,7 +88,7 @@ class ResolveOrderContext
 
     private function isPaymentInquiry(string $message): bool
     {
-        return preg_match('/\b(?:payment|pay|paid|proof|gcash|maya|cash|card)\b/iu', $message) === 1;
+        return preg_match('/\b(?:payment|pay|paid|proof|gcash|maya|cash|card|cod)\b/iu', $message) === 1;
     }
 
     private function referenceId(string $message): ?int

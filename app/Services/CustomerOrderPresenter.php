@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
+use App\Enums\ShipmentStatus;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Services\Order\OrderProcessingService;
@@ -41,7 +43,7 @@ class CustomerOrderPresenter
                 ],
                 'status' => [
                     'value' => $order->payment_status->value,
-                    'label' => $order->payment_status->label(),
+                    'label' => $order->paymentStatusLabel(),
                 ],
             ],
             'item_count' => (int) $order->getAttribute('items_count'),
@@ -84,7 +86,7 @@ class CustomerOrderPresenter
                 ],
                 'status' => [
                     'value' => $order->payment_status->value,
-                    'label' => $order->payment_status->label(),
+                    'label' => $order->paymentStatusLabel(),
                 ],
                 'proof_submitted' => $order->payment_proof_path !== null,
                 'notice' => $this->paymentNotice($order),
@@ -126,6 +128,16 @@ class CustomerOrderPresenter
             return 'This order is cancelled. Cancellation does not refund or reverse any recorded payment.';
         }
 
+        if ($order->payment_method === PaymentMethod::Cod) {
+            if ($order->payment_status === PaymentStatus::Verified) {
+                return 'Battlefront has manually confirmed that LBC collected your COD payment.';
+            }
+
+            return $order->shipment?->status === ShipmentStatus::Delivered
+                ? 'Delivery is recorded. Your order remains Processing until Battlefront manually confirms LBC collected the COD payment.'
+                : 'The total COD amount, including the configured delivery fee, is payable upon delivery. No advance payment or uploaded proof is required. LBC booking and collection are managed manually by Battlefront.';
+        }
+
         if (! $order->payment_method->requiresPaymentProof()) {
             return 'Payment will be handled when you collect your order.';
         }
@@ -150,7 +162,7 @@ class CustomerOrderPresenter
     {
         return [
             'value' => $order->status->value,
-            'label' => $order->status->customerLabel($order->fulfillment_method),
+            'label' => $order->customerStatusLabel(),
         ];
     }
 

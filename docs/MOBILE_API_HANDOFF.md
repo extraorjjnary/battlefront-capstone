@@ -458,13 +458,20 @@ Requires an explicit nonempty `cart_item_ids` list of distinct positive integer 
                     "is_demo": true
                 },
                 "available_for": ["pickup", "delivery"]
+            },
+            {
+                "value": "cod",
+                "label": "Cash on Delivery (COD)",
+                "requires_proof": false,
+                "payment_account": null,
+                "available_for": ["delivery"]
             }
         ]
     }
 }
 ```
 
-Checkout cart lines omit the ordinary cart's availability and category/price fields; use the shown snapshot shape. `payment_account` is null for cash/card, or an object with account_name/account_number/is_demo for wallets. Display configured values from the response and honor demo labeling; the example account above is synthetic. No transfer is initiated by this API.
+Checkout cart lines omit the ordinary cart's availability and category/price fields; use the shown snapshot shape. `payment_account` is null for cash/card/COD, or an object with account_name/account_number/is_demo for wallets. Display configured values from the response and honor demo labeling; the example account above is synthetic. No transfer is initiated by this API.
 
 `pickup_quote` is `{"product_subtotal":"200.00","delivery_fee":"0.00","total":"200.00"}` for the example cart. Each `delivery_quotes` entry contains the complete server-derived quote for that cart and one destination. Example entry for standard-profile Sagay delivery:
 
@@ -491,13 +498,13 @@ Checkout cart lines omit the ordinary cart's availability and category/price fie
     "eta_timezone": "UTC",
     "estimated_delivery_start": "2026-10-09",
     "estimated_delivery_end": "2026-10-10",
-    "notice": "Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional and subject to payment verification."
+    "notice": "Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional. Prepaid orders are subject to payment verification; COD payment is collected upon delivery. This does not book or approve an LBC shipment."
 }
 ```
 
 Display the selected entry's monetary values; `total` is product subtotal plus delivery fee. Mixed carts use their highest persisted shipping profile (`standard < fragile < bulky`) once, regardless of quantities/line count. Fees and dates are Battlefront-configured demo estimates, not live LBC quotations or tracking. Display carrier `lbc` as **LBC**, the packing expectation, estimate notice and demo assumption label.
 
-Calendar dates are checkout-only presentation. One server quote-generation date in `config('app.timezone')` (currently UTC) anchors all 12 windows in a response. Minimum/maximum total days are preparation plus transit, added as calendar days without weekend/holiday adjustment. Zero transit days means same-day transit once preparation is ready; persisted historical snapshots keep their original ranges. Treat date strings as civil dates in the returned timezone; do not shift them through the device timezone. Arrival is provisional and subject to payment verification. Refresh checkout after cart changes and before paying; placement independently recalculates current prices, profiles and configured fees/relative ETA. Neither preview quotes nor calendar windows are trusted placement inputs.
+Calendar dates are checkout-only presentation. One server quote-generation date in `config('app.timezone')` (currently UTC) anchors all 12 windows in a response. Minimum/maximum total days are preparation plus transit, added as calendar days without weekend/holiday adjustment. Zero transit days means same-day transit once preparation is ready; persisted historical snapshots keep their original ranges. Treat date strings as civil dates in the returned timezone; do not shift them through the device timezone. Arrival is provisional; prepaid orders require payment verification, while COD is collected upon delivery. Refresh checkout after cart changes and before paying; placement independently recalculates current prices, profiles and configured fees/relative ETA. Neither preview quotes nor calendar windows are trusted placement inputs.
 
 ### PSGC delivery dropdown data
 
@@ -517,14 +524,14 @@ Required fields:
 | recipient_name       | String <=255                                                                                                         |
 | contact_number       | String <=20; preserve formatting as text                                                                             |
 | fulfillment_method   | pickup or delivery                                                                                                   |
-| payment_method       | cash, card_at_store, gcash, maya                                                                                     |
+| payment_method       | cash, card_at_store, gcash, maya, cod                                                                                |
 | delivery_address     | Legacy mobile delivery: string <=255, required when both structured fields are absent; prohibited when nonempty for pickup |
 | delivery_barangay_code | Structured delivery: required 10-digit string belonging to the selected destination; prohibited when nonempty for pickup |
 | delivery_address_details | Structured delivery: required nonblank string; composed address must fit 255 characters; prohibited when nonempty for pickup |
 | delivery_destination | Exactly one canonical destination from `delivery_quotes`, required for delivery; prohibited when nonempty for pickup |
-| payment_proof        | Required for gcash/maya; prohibited for cash/card_at_store                                                           |
+| payment_proof        | Required for gcash/maya; prohibited for cash/card_at_store/cod                                                       |
 
-Pickup accepts all four payment methods. Delivery accepts only gcash/maya. Submit JSON for cash/card pickup:
+Pickup accepts cash, card_at_store, gcash, and maya. Delivery accepts gcash, maya, and cod. COD is delivery-only and requires no uploaded proof or advance payment. Submit JSON for cash/card pickup:
 
 ```json
 {
@@ -535,6 +542,23 @@ Pickup accepts all four payment methods. Delivery accepts only gcash/maya. Submi
     "payment_method": "cash"
 }
 ```
+
+For COD delivery, submit JSON without `payment_proof`:
+
+```json
+{
+    "cart_item_ids": [12, 15],
+    "recipient_name": "Example Customer",
+    "contact_number": "EXAMPLE",
+    "fulfillment_method": "delivery",
+    "payment_method": "cod",
+    "delivery_destination": "Sagay City",
+    "delivery_barangay_code": "1804523018",
+    "delivery_address_details": "12 Mabini Street"
+}
+```
+
+Display product subtotal, configured demo delivery fee, and the returned `total` as the total COD amount payable upon delivery. No advance payment, receiving account, or proof is required. This selection does not book or approve COD with LBC. Existing supported destinations and shipping calculations apply without a new COD surcharge.
 
 For wallet orders submit the fields above using multipart form data with repeated `cart_item_ids[]` text fields (one ID per field), including an actual file part named `payment_proof`. JPEG/JPG, PNG, WebP only; contents must be an image, filename extension must match allowed extensions; max **5120 KB (5 MB)**. Do not send a filesystem path or base64 string as the proof, and do not manually specify a multipart boundary/Content-Type in Postman or React Native FormData.
 
@@ -648,7 +672,7 @@ GET order detail, successful placement and payment-proof replacement share the s
 }
 ```
 
-Forward values are `awaiting_preparation`, `preparing`, `ready_for_dispatch`, `handed_to_lbc`, `in_transit`, `out_for_delivery`, `delivered`. `cancelled` is a separate terminal outcome from eligible administrator order cancellation. Shipment status is independent of order/payment status: awaiting preparation means only a record exists. Progression starts only after payment verification and explicit order processing. Delivered atomically completes the order and records one sale; cancellation terminates shipment progression and restores eligible order quantities once.
+Forward values are `awaiting_preparation`, `preparing`, `ready_for_dispatch`, `handed_to_lbc`, `in_transit`, `out_for_delivery`, `delivered`. `cancelled` is a separate terminal outcome from eligible order cancellation. Shipment status is independent of order/payment status: awaiting preparation means only a record exists. Prepaid progression requires payment verification and explicit order processing. COD can progress after explicit Processing while payment remains Pending. Delivered completes prepaid orders and records one sale; COD remains Processing with no sale until an administrator manually confirms LBC collection. Cancellation terminates shipment progression and restores eligible order quantities once.
 
 Render the returned status label and `notice`. Read destination/fee components from `delivery_quote`, the detailed address from `fulfillment.delivery_address`, and operational dates from `shipment.eta`. These dates are persisted once at preparation using saved total ETA days; they do not drift when configuration changes or the client refreshes. Before preparation, all four ETA date/timezone fields are null: show the saved relative day range without inventing calendar dates. Treat civil dates in the supplied timezone without converting them through the device timezone. For cancelled shipments, label retained dates as the original estimate.
 
@@ -656,7 +680,7 @@ Render the returned status label and `notice`. Read destination/fee components f
 
 Only the owning customer can read shipment detail; foreign/missing orders remain 404. Customer bearer tokens cannot mutate shipment milestones, tracking references or payment verification. No shipment mutation endpoint exists under `/api/v1`. Updates occur in the existing web administration workflow. Do not fabricate references, carrier locations, maps or GPS data; there is no live LBC integration, courier booking or notification delivery in EXT-89. The React Native UI remains the separate mobile project's responsibility.
 
-Order status values: pending, processing, completed, cancelled. Labels reflect fulfillment (e.g. Preparing for pickup / Preparing for delivery). Payment statuses: pending, verified, rejected. They are separate state machines; proof submission is not payment verification.
+Order status values: pending, processing, completed, cancelled. Payment statuses: pending, verified, rejected. Render server labels: unpaid active COD displays `COD — Awaiting Collection`; delivered unpaid COD has order value `processing` and label `Delivered — awaiting COD confirmation`. Confirmation returns `completed` and `verified`. Proof submission and Delivered alone never verify COD payment.
 
 ### GET /orders and GET /orders/{order}
 
@@ -691,7 +715,9 @@ History is customer-owned, paginated at 10. Each `data` entry is:
 }
 ```
 
-Detail is customer-owned and uses the full order shape above. Missing/foreign IDs get 404. No customer cancellation, status mutation, payment verification or inventory restoration endpoint is exposed. Existing administrator cancellation logic owns restoration; reading an order does not restore inventory.
+Detail is customer-owned and uses the full order shape above. Missing/foreign IDs get 404. Owning customers may use the existing cancellation endpoint only while `can_cancel` is true: Pending order/payment, no submitted wallet proof, and no shipment preparation. COD is eligible before Processing. Administrators may cancel only before LBC handoff. Cancellation restores stock once; reading an order or pending COD collection never restores inventory.
+
+COD collection confirmation remains web-administrator-only after Delivered. Explicit manual verification atomically changes payment to Verified, completes the order, records one sale, and publishes the existing `payment.verified` customer notification. Customers cannot verify/reject COD or upload replacement proof. Failed delivery, uncollected payment, carrier returns, refunds, and return-to-sender are outside this workflow; no automatic paid/completed/cancelled/refunded/returned outcome is inferred. There is no live LBC settlement verification.
 
 ### POST /orders/{order}/payment-proof
 

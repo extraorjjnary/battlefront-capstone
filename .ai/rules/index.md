@@ -19,6 +19,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/Chatbot/**,app/Http/Controllers/Administration/ChatbotKnowledgeController.php,resources/js/pages/Administration/ChatbotKnowledge/** | .ai/rules/chatbot-knowledge.md |
 | app/{Ai,Services/Chatbot}/** | .ai/rules/chatbot.md |
 | app/Services/Order/**,app/Actions/{Checkout,Order}/**,app/Models/Product.php,config/battlefront.php | .ai/rules/checkout-order-models.md |
+| app/Services/Order/**,app/Enums/PaymentMethod.php,app/Models/Order.php,app/Http/Controllers/Administration/Order*,resources/js/pages/{Checkout,Orders,Administration/Orders}/** | .ai/rules/checkout-orders-administration-orders.md |
 | config/battlefront.php,app/Http/Controllers/CheckoutController.php,resources/js/pages/Checkout/** | .ai/rules/checkout.md |
 | database/seeders/DevelopmentHistoricalSalesSeeder.php,app/Console/Commands/ResetDevCommand.php, database/seeders/DevelopmentCustomerSeeder.php,app/Console/Commands/ResetDevCommand.php | .ai/rules/commands.md |
 | app/Models/Inventory.php,app/Repositories/Inventory/**,app/Actions/Chatbot/Context/ResolveProductContext.php,resources/js/components/catalog/StockAvailability.vue | .ai/rules/components-catalog.md |

@@ -9,6 +9,7 @@ use App\Http\Controllers\Administration\CustomerController;
 use App\Http\Controllers\Administration\ForecastingController;
 use App\Http\Controllers\Administration\InventoryController;
 use App\Http\Controllers\Administration\NotificationController as AdministrationNotificationController;
+use App\Http\Controllers\Administration\OrderCodCollectionController;
 use App\Http\Controllers\Administration\OrderController as AdministrationOrderController;
 use App\Http\Controllers\Administration\OrderPaymentProofController;
 use App\Http\Controllers\Administration\OrderPaymentStatusController;
@@ -181,6 +182,9 @@ Route::middleware(['auth', 'can:access-administration'])
             ->name('orders.shipment.reference.update');
         Route::patch('orders/{order}/payment-status', [OrderPaymentStatusController::class, 'update'])
             ->name('orders.payment-status.update');
+        Route::post('orders/{order}/cod-collection', [OrderCodCollectionController::class, 'store'])
+            ->whereNumber('order')
+            ->name('orders.cod-collection.store');
         Route::get('orders/{order}/payment-proof', OrderPaymentProofController::class)
             ->name('orders.payment-proof.show');
 

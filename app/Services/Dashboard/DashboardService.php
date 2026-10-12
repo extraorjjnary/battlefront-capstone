@@ -3,7 +3,9 @@
 namespace App\Services\Dashboard;
 
 use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Enums\ShipmentStatus;
 use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\Product;
@@ -31,14 +33,6 @@ class DashboardService
                 'COUNT(CASE WHEN status = ? THEN 1 END) as processing_orders',
                 [OrderStatus::Processing->value],
             )
-            ->selectRaw(
-                'COUNT(CASE WHEN payment_status = ? AND status IN (?, ?) THEN 1 END) as pending_payment_reviews',
-                [
-                    PaymentStatus::Pending->value,
-                    OrderStatus::Pending->value,
-                    OrderStatus::Processing->value,
-                ],
-            )
             ->first();
         $operationalInventory = Inventory::query()->whereIn('product_id', Product::query()->customerEligible()->select('id'));
         $lowStockQuery = (clone $operationalInventory)->lowStock();
@@ -54,7 +48,7 @@ class DashboardService
                 'out_of_stock_products' => (clone $outOfStockQuery)->count(),
             ],
             'needs_attention' => [
-                'pending_payment_reviews' => (int) $orderSummary->pending_payment_reviews,
+                'pending_payment_reviews' => $this->pendingPaymentReviewsQuery()->count(),
                 'payment_orders' => $this->paymentReviewOrders(),
                 'out_of_stock_products' => $this->stockProducts($outOfStockQuery),
                 'low_stock_products' => $this->stockProducts($lowStockQuery),
@@ -84,6 +78,7 @@ class DashboardService
                 'id', 'user_id', 'fulfillment_method', 'total_amount', 'status',
                 'payment_status', 'payment_method', 'created_at',
             ])
+            ->with('shipment:id,order_id,status')
             ->withCount('items')
             ->withSum('items as total_quantity', 'quantity')
             ->orderByDesc('created_at')
@@ -106,14 +101,12 @@ class DashboardService
     /** @return list<array<string, mixed>> */
     private function paymentReviewOrders(): array
     {
-        return array_values(Order::query()
+        return array_values($this->pendingPaymentReviewsQuery()
             ->select([
                 'id', 'user_id', 'total_amount', 'status', 'payment_status',
                 'payment_method', 'created_at',
             ])
             ->with('user:id,name')
-            ->where('payment_status', PaymentStatus::Pending->value)
-            ->whereIn('status', [OrderStatus::Pending->value, OrderStatus::Processing->value])
             ->orderBy('created_at')
             ->orderBy('id')
             ->limit(5)
@@ -127,10 +120,29 @@ class DashboardService
                     'value' => $order->status->value,
                     'label' => $order->status->label(),
                 ],
-                'payment_method' => $order->payment_method->label(),
+                'payment_method' => $order->payment_method === PaymentMethod::Cod
+                    ? $order->paymentStatusLabel()
+                    : $order->payment_method->label(),
                 'total' => $order->total_amount,
             ])
             ->all());
+    }
+
+    /** @return Builder<Order> */
+    private function pendingPaymentReviewsQuery(): Builder
+    {
+        return Order::query()
+            ->where('payment_status', PaymentStatus::Pending)
+            ->whereIn('status', [OrderStatus::Pending, OrderStatus::Processing])
+            ->where(function (Builder $query): void {
+                $query->where('payment_method', '<>', PaymentMethod::Cod)
+                    ->orWhere(function (Builder $cod): void {
+                        $cod->where('payment_method', PaymentMethod::Cod)
+                            ->where('status', OrderStatus::Processing)
+                            ->whereHas('shipment', fn (Builder $shipment): Builder => $shipment
+                                ->where('carrier', 'lbc')->where('status', ShipmentStatus::Delivered));
+                    });
+            });
     }
 
     /**
@@ -163,7 +175,7 @@ class DashboardService
         return array_values(Order::query()
             ->select([
                 'id', 'user_id', 'fulfillment_method', 'total_amount', 'status',
-                'payment_status', 'created_at',
+                'payment_status', 'payment_method', 'created_at',
             ])
             ->with('user:id,name')
             ->withCount('items')
@@ -183,7 +195,7 @@ class DashboardService
                 ],
                 'payment_status' => [
                     'value' => $order->payment_status->value,
-                    'label' => $order->payment_status->label(),
+                    'label' => $order->paymentStatusLabel(),
                 ],
                 'item_count' => (int) $order->getAttribute('items_count'),
                 'total_quantity' => (int) ($order->getAttribute('total_quantity') ?? 0),
@@ -201,7 +213,7 @@ class DashboardService
             'created_at' => $order->created_at->toIso8601String(),
             'status' => [
                 'value' => $order->status->value,
-                'label' => $order->status->customerLabel($order->fulfillment_method),
+                'label' => $order->customerStatusLabel(),
             ],
             'fulfillment' => [
                 'value' => $order->fulfillment_method->value,
@@ -211,7 +223,7 @@ class DashboardService
                 'method' => $order->payment_method->label(),
                 'status' => [
                     'value' => $order->payment_status->value,
-                    'label' => $order->payment_status->label(),
+                    'label' => $order->paymentStatusLabel(),
                 ],
             ],
             'item_count' => (int) $order->getAttribute('items_count'),

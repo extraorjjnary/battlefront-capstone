@@ -146,7 +146,9 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
                 if (! $paymentMethod->isAvailableFor($fulfillmentMethod)) {
                     $validator->errors()->add(
                         'payment_method',
-                        'Delivery orders must be paid through GCash or Maya.',
+                        $fulfillmentMethod === FulfillmentMethod::Pickup
+                            ? 'Cash on Delivery (COD) is available for delivery orders only.'
+                            : 'Delivery orders must use GCash, Maya, or Cash on Delivery (COD).',
                     );
                 }
             },

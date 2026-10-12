@@ -7,6 +7,7 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
+use App\Enums\ShipmentStatus;
 use App\Enums\ShippingProfile;
 use App\Enums\UserRole;
 use Database\Factories\OrderFactory;
@@ -133,6 +134,30 @@ class Order extends Model
     public function shipment(): HasOne
     {
         return $this->hasOne(Shipment::class);
+    }
+
+    public function paymentStatusLabel(): string
+    {
+        return $this->payment_method === PaymentMethod::Cod
+            && $this->payment_status === PaymentStatus::Pending
+            && $this->status !== OrderStatus::Cancelled
+                ? 'COD — Awaiting Collection'
+                : $this->payment_status->label();
+    }
+
+    public function customerStatusLabel(): string
+    {
+        return $this->isDeliveredCodAwaitingCollection()
+            ? 'Delivered — awaiting COD confirmation'
+            : $this->status->customerLabel($this->fulfillment_method);
+    }
+
+    public function isDeliveredCodAwaitingCollection(): bool
+    {
+        return $this->payment_method === PaymentMethod::Cod
+            && $this->status === OrderStatus::Processing
+            && $this->payment_status === PaymentStatus::Pending
+            && $this->shipment?->status === ShipmentStatus::Delivered;
     }
 
     /**

@@ -32,6 +32,7 @@ function checkoutProps(prefill = {}) {
                 value: 'gcash', label: 'GCash', available_for: ['pickup', 'delivery'], requires_proof: true,
                 payment_account: { account_name: 'Demo', account_number: '09XX', is_demo: true },
             },
+            { value: 'cod', label: 'Cash on Delivery (COD)', available_for: ['delivery'], requires_proof: false, payment_account: null },
         ],
         pickupQuote: { product_subtotal: '100.00', delivery_fee: '0.00', total: '100.00' },
         deliveryQuotes: locations.map((location) => ({
@@ -123,6 +124,48 @@ test('checkout renders shared structured fields and errors, and pickup submits n
         html = await renderToString(root());
         assert.doesNotMatch(html, /name="delivery_(?:destination|barangay_code|address_details)"/);
         assert.match(html, /Pickup address/);
+    } finally {
+        scope.stop();
+    }
+});
+
+test('COD selection resets wallet evidence and switches to an eligible method for pickup', () => {
+    const scope = Vue.effectScope();
+    try {
+        const page = scope.run(() => loadPage().setup(checkoutProps(), { expose() {} }));
+        assert.equal(page.availablePaymentMethods.value.some((method) => method.value === 'cod'), false);
+        page.chooseFulfillment('delivery');
+        assert.equal(page.requiresPaymentProof.value, true);
+        const proofKey = page.paymentProofKey.value;
+        page.choosePayment('cod');
+        assert.equal(page.isCod.value, true);
+        assert.equal(page.requiresPaymentProof.value, false);
+        assert.equal(page.selectedPaymentAccount.value, null);
+        assert.equal(page.paymentProofKey.value, proofKey + 1);
+        page.chooseFulfillment('pickup');
+        assert.equal(page.paymentMethod.value, 'cash');
+        assert.equal(page.isCod.value, false);
+    } finally {
+        scope.stop();
+    }
+});
+
+test('COD checkout displays the server quote total with collection guidance and no proof input', async () => {
+    const scope = Vue.effectScope();
+    try {
+        const render = scope.run(() => loadPage(true).setup(checkoutProps({
+            delivery_destination: 'Sagay City', delivery_barangay_code: '1804523018', delivery_address_details: '12 Mabini Street',
+        }), { expose() {} }));
+        const root = () => render({}, []);
+        findNode(root(), (node) => node.props?.name === 'fulfillment_method' && node.props?.value === 'delivery').props.onChange();
+        findNode(root(), (node) => node.props?.name === 'payment_method' && node.props?.value === 'cod').props.onChange();
+        const html = await renderToString(root());
+        assert.match(html, /Total COD amount payable/);
+        assert.match(html, /180\.00/);
+        assert.match(html, /Payment will\s+be collected upon delivery/);
+        assert.match(html, /does\s+not book or approve COD with LBC/);
+        assert.doesNotMatch(html, /name="payment_proof"/);
+        assert.doesNotMatch(html, /receiving account/);
     } finally {
         scope.stop();
     }

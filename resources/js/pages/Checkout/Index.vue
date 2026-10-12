@@ -65,6 +65,7 @@ const availablePaymentMethods = computed(() =>
 const selectedPaymentMethod = computed(() =>
     props.paymentMethods.find((method) => method.value === paymentMethod.value),
 );
+const isCod = computed(() => paymentMethod.value === 'cod');
 const requiresPaymentProof = computed(
     () => selectedPaymentMethod.value?.requires_proof ?? false,
 );
@@ -508,7 +509,9 @@ defineOptions({
                                         class="text-muted-foreground mt-1 block text-xs leading-5"
                                     >
                                         {{
-                                            method.requires_proof
+                                            method.value === 'cod'
+                                                ? 'Pay upon delivery. Delivery orders only.'
+                                                : method.requires_proof
                                                 ? 'Manual e-wallet payment with proof.'
                                                 : fulfillmentMethod ===
                                                     'delivery'
@@ -520,6 +523,18 @@ defineOptions({
                             </label>
                         </div>
                         <InputError :message="errors.payment_method" />
+
+                        <Alert v-if="isCod">
+                            <AlertTitle>Pay upon delivery</AlertTitle>
+                            <AlertDescription>
+                                The total COD amount includes your products and
+                                the configured demo delivery fee. Payment will
+                                be collected upon delivery; no advance payment
+                                or payment proof is required. Battlefront
+                                manually arranges delivery. This selection does
+                                not book or approve COD with LBC.
+                            </AlertDescription>
+                        </Alert>
 
                         <div
                             v-if="requiresPaymentProof"
@@ -709,7 +724,13 @@ defineOptions({
                         <div
                             class="border-border flex items-end justify-between gap-4 border-t pt-4"
                         >
-                            <dt class="font-semibold">Final total</dt>
+                            <dt class="font-semibold">
+                                {{
+                                    isCod
+                                        ? 'Total COD amount payable'
+                                        : 'Final total'
+                                }}
+                            </dt>
                             <dd class="text-2xl font-bold tabular-nums">
                                 {{
                                     selectedQuote
@@ -721,7 +742,7 @@ defineOptions({
                     </dl>
 
                     <div
-                        v-if="progress"
+                        v-if="progress && requiresPaymentProof"
                         class="mb-4 grid gap-2"
                         aria-live="polite"
                     >

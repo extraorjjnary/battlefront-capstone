@@ -48,6 +48,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency } from '@/lib/currency';
 import { orderStatusBadgeClass } from '@/lib/orderStatus';
+import { store as confirmCodCollection } from '@/routes/administration/orders/cod-collection';
 
 const props = defineProps({
     order: { type: Object, required: true },
@@ -56,6 +57,8 @@ const props = defineProps({
 const selectedOrderStatus = ref('');
 const orderConfirmationOpen = ref(false);
 const paymentConfirmationOpen = ref(false);
+const codConfirmationOpen = ref(false);
+const codCollectionForm = useForm({ cod_collection_confirmed: false });
 const orderStatusForm = useForm({ status: '' });
 const shipmentConfirmationOpen = ref(false);
 const shipmentStatusForm = useForm({ status: '', tracking_reference: null });
@@ -101,6 +104,35 @@ const rejectingWalletPayment = computed(
         paymentStatusForm.payment_status === 'rejected' &&
         props.order.payment.method.requires_proof,
 );
+
+function requestCodConfirmation() {
+    if (
+        !props.order.payment.can_confirm_cod_collection ||
+        codCollectionForm.processing
+    ) {
+        return;
+    }
+    codCollectionForm.reset();
+    codCollectionForm.clearErrors();
+    codConfirmationOpen.value = true;
+}
+
+function submitCodCollection() {
+    if (
+        !props.order.payment.can_confirm_cod_collection ||
+        !codCollectionForm.cod_collection_confirmed ||
+        codCollectionForm.processing
+    ) {
+        return;
+    }
+    codCollectionForm.submit(confirmCodCollection(props.order.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            codConfirmationOpen.value = false;
+            codCollectionForm.reset();
+        },
+    });
+}
 
 const dateFormatter = new Intl.DateTimeFormat('en-PH', {
     dateStyle: 'long',
@@ -551,8 +583,11 @@ defineOptions({
                         "
                         class="text-muted-foreground text-sm leading-5"
                     >
-                        Verify payment and move the order to Processing before
-                        advancing shipment milestones.
+                        {{
+                            order.payment.method.value === 'cod'
+                                ? 'Move the COD order to Processing before advancing shipment milestones. Payment remains Pending until collection is confirmed after delivery.'
+                                : 'Verify payment and move the order to Processing before advancing shipment milestones.'
+                        }}
                     </p>
                     <p v-else class="text-muted-foreground text-sm">
                         Shipment progression is closed for this order.
@@ -603,9 +638,11 @@ defineOptions({
                                     delivered?</DialogTitle
                                 >
                                 <DialogDescription
-                                    >Confirm the delivery has finished. This
-                                    completes the order and records its
-                                    sale.</DialogDescription
+                                    >{{
+                                        order.payment.method.value === 'cod'
+                                            ? 'Confirm the delivery has finished. Payment remains Pending and the order remains Processing until COD collection is manually confirmed. No sale is recorded yet.'
+                                            : 'Confirm the delivery has finished. This completes the order and records its sale.'
+                                    }}</DialogDescription
                                 >
                             </DialogHeader>
                             <DialogFooter>
@@ -674,14 +711,6 @@ defineOptions({
                                         v-for="transition in order.allowed_status_transitions"
                                         :key="transition.value"
                                         :value="transition.value"
-                                        :disabled="
-                                            [
-                                                'processing',
-                                                'completed',
-                                            ].includes(transition.value) &&
-                                            order.payment.status.value !==
-                                                'verified'
-                                        "
                                     >
                                         {{ transition.label }}
                                     </SelectItem>
@@ -692,6 +721,7 @@ defineOptions({
                                     ['pending', 'processing'].includes(
                                         order.status.value,
                                     ) &&
+                                    order.payment.method.value !== 'cod' &&
                                     order.payment.status.value !== 'verified'
                                 "
                                 class="text-muted-foreground text-xs leading-5"
@@ -740,6 +770,10 @@ defineOptions({
                         >
                             This order is in a terminal state and cannot be
                             changed.
+                        </template>
+                        <template v-else-if="order.payment.can_confirm_cod_collection">
+                            Delivery is recorded. Confirm COD Collection below
+                            to complete the order and record its sale.
                         </template>
                         <template v-else>
                             Continue delivery using the shipment milestones
@@ -892,6 +926,92 @@ defineOptions({
 
                     <div
                         v-if="
+                            order.payment.method.value === 'cod' &&
+                            order.payment.status.value === 'pending' &&
+                            order.status.value !== 'cancelled'
+                        "
+                        class="border-border mt-5 grid gap-4 border-t pt-5"
+                    >
+                        <p class="font-semibold">COD — Awaiting Collection</p>
+                        <p class="text-muted-foreground text-sm leading-6">
+                            Payment is collected upon delivery. Marking the
+                            shipment Delivered does not verify payment or
+                            record a sale. Confirm collection only after
+                            manually verifying that LBC collected the total COD
+                            amount of {{ formatCurrency(order.total) }}.
+                        </p>
+                        <Button
+                            v-if="order.payment.can_confirm_cod_collection"
+                            type="button"
+                            :disabled="codCollectionForm.processing"
+                            @click="requestCodConfirmation"
+                        >
+                            Confirm COD Collection
+                        </Button>
+                        <p v-else class="text-muted-foreground text-sm">
+                            Collection confirmation becomes available after the
+                            shipment reaches Delivered.
+                        </p>
+                        <p class="text-muted-foreground text-xs leading-5">
+                            Failed delivery, uncollected payment, and returns
+                            require separate manual follow-up. This workflow
+                            does not cancel, refund, return, or restore stock
+                            automatically. No live LBC settlement is verified.
+                        </p>
+                        <Dialog v-model:open="codConfirmationOpen">
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>
+                                        Confirm COD Collection for
+                                        {{ order.reference }}?
+                                    </DialogTitle>
+                                    <DialogDescription>
+                                        Confirm that you manually verified LBC
+                                        collected
+                                        {{ formatCurrency(order.total) }}.
+                                        This verifies payment, completes the
+                                        order, and records its sale.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div class="flex items-start gap-3">
+                                    <Checkbox
+                                        id="cod-collection-confirmed"
+                                        v-model="codCollectionForm.cod_collection_confirmed"
+                                    />
+                                    <Label
+                                        for="cod-collection-confirmed"
+                                        class="text-sm leading-5 font-normal"
+                                    >
+                                        I manually verified that LBC collected
+                                        the full COD payment.
+                                    </Label>
+                                </div>
+                                <InputError
+                                    :message="codCollectionForm.errors.cod_collection_confirmed"
+                                />
+                                <DialogFooter>
+                                    <DialogClose as-child>
+                                        <Button type="button" variant="outline">
+                                            Keep awaiting collection
+                                        </Button>
+                                    </DialogClose>
+                                    <Button
+                                        type="button"
+                                        :disabled="
+                                            !codCollectionForm.cod_collection_confirmed ||
+                                            codCollectionForm.processing
+                                        "
+                                        @click="submitCodCollection"
+                                    >
+                                        <Spinner v-if="codCollectionForm.processing" />
+                                        Confirm COD Collection
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+                    <div
+                        v-else-if="
                             order.payment.status.value === 'pending' &&
                             order.status.value !== 'cancelled'
                         "

@@ -151,7 +151,7 @@ test('guests receive application payment rules without saved FAQ overrides or Ge
         ->assertJsonCount(3)
         ->assertJsonStructure(['message', 'source', 'context_token'])
         ->assertJson([
-            'message' => 'Pickup orders support Cash, Card at store, GCash, Maya. Delivery orders support GCash, Maya.',
+            'message' => 'Pickup orders support Cash, Card at store, GCash, Maya. Delivery orders support GCash, Maya, Cash on Delivery (COD).',
             'source' => 'fallback',
         ]);
 

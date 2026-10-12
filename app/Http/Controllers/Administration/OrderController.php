@@ -60,7 +60,7 @@ class OrderController extends Controller
                     ],
                     'status' => [
                         'value' => $order->payment_status->value,
-                        'label' => $order->payment_status->label(),
+                        'label' => $order->paymentStatusLabel(),
                     ],
                 ],
                 'item_count' => (int) $order->getAttribute('items_count'),
@@ -108,6 +108,10 @@ class OrderController extends Controller
      */
     private function fulfillmentOperationalLabel(Order $order): string
     {
+        if ($order->isDeliveredCodAwaitingCollection()) {
+            return $order->customerStatusLabel();
+        }
+
         if ($order->status !== OrderStatus::Processing) {
             return $order->fulfillment_method->label();
         }
@@ -168,8 +172,9 @@ class OrderController extends Controller
                     ],
                     'status' => [
                         'value' => $order->payment_status->value,
-                        'label' => $order->payment_status->label(),
+                        'label' => $order->paymentStatusLabel(),
                     ],
+                    'can_confirm_cod_collection' => $processing->canConfirmCodCollection($order),
                     'proof_submitted' => $order->payment_proof_path !== null,
                     'proof_available' => $this->paymentProofIsAvailable($order),
                     'rejection' => $order->payment_status === PaymentStatus::Rejected

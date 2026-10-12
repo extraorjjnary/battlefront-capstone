@@ -206,7 +206,7 @@ test('an explicit earlier order can be revisited after a FAQ without retaining i
     $order->update(['payment_status' => PaymentStatus::Verified]);
     $third = $chat->respond('Payment for the earlier order?', $customer, $second['context_token'], 'session-a');
 
-    expect($second['message'])->toBe('Pickup orders support Cash, Card at store, GCash, Maya. Delivery orders support GCash, Maya.');
+    expect($second['message'])->toBe('Pickup orders support Cash, Card at store, GCash, Maya. Delivery orders support GCash, Maya, Cash on Delivery (COD).');
     expect($third['message'])->toBe('Current order payment.');
     ChatbotResponseAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, 'earlier order') && str_contains($prompt->prompt, 'verified'));
     ChatbotResponseAgent::assertPromptedTimes(2);

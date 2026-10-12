@@ -6,6 +6,7 @@ use App\Actions\Inventory\RestoreOrderInventory;
 use App\Actions\Order\RecordCompletedOrderSale;
 use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
 use App\Enums\ShipmentStatus;
@@ -78,8 +79,11 @@ class OrderProcessingService
                 ->firstOrFail();
 
             $shipment = $lockedOrder->shipment()->lockForUpdate()->first();
-            if ($status === OrderStatus::Completed && $shipment !== null) {
-                throw ValidationException::withMessages(['status' => 'Complete delivery through the shipment Delivered milestone.']);
+            $lockedOrder->setRelation('shipment', $shipment);
+            if ($status === OrderStatus::Completed && ($shipment !== null || $lockedOrder->payment_method === PaymentMethod::Cod)) {
+                throw ValidationException::withMessages(['status' => $lockedOrder->payment_method === PaymentMethod::Cod
+                    ? 'Complete COD delivery through Confirm COD Collection after the Delivered milestone.'
+                    : 'Complete delivery through the shipment Delivered milestone.']);
             }
             $this->transitionLockedOrder($lockedOrder, $status, $shipment);
 
@@ -91,7 +95,7 @@ class OrderProcessingService
     public function allowedOrderTransitions(Order $order): array
     {
         return array_values(array_filter($order->status->allowedTransitions(), function (OrderStatus $status) use ($order): bool {
-            if ($status === OrderStatus::Completed && $order->shipment !== null) {
+            if ($status === OrderStatus::Completed && ($order->shipment !== null || $order->payment_method === PaymentMethod::Cod)) {
                 return false;
             }
 
@@ -99,7 +103,9 @@ class OrderProcessingService
                 return $this->shipmentCancellationBlockedReason($order->shipment) === null;
             }
 
-            return $order->payment_status === PaymentStatus::Verified;
+            return $status === OrderStatus::Processing
+                ? $this->paymentAllowsFulfillment($order)
+                : $order->payment_status === PaymentStatus::Verified;
         }));
     }
 
@@ -107,7 +113,7 @@ class OrderProcessingService
     {
         if ($order->fulfillment_method !== FulfillmentMethod::Delivery
             || $order->status !== OrderStatus::Processing
-            || $order->payment_status !== PaymentStatus::Verified) {
+            || ! $this->paymentAllowsFulfillment($order)) {
             return null;
         }
 
@@ -120,7 +126,7 @@ class OrderProcessingService
 
         return $order->fulfillment_method === FulfillmentMethod::Delivery
             && $shipment !== null
-            && $order->payment_status === PaymentStatus::Verified
+            && $this->paymentAllowsFulfillment($order)
             && in_array($shipment->status, [ShipmentStatus::HandedToLbc, ShipmentStatus::InTransit, ShipmentStatus::OutForDelivery, ShipmentStatus::Delivered], strict: true)
             && ($order->status === OrderStatus::Processing
                 || ($order->status === OrderStatus::Completed && $shipment->status === ShipmentStatus::Delivered));
@@ -135,7 +141,7 @@ class OrderProcessingService
 
             if ($this->nextShipmentStatus($lockedOrder) !== $status) {
                 throw ValidationException::withMessages([
-                    'status' => 'Shipment progression requires verified payment, a processing delivery order, and the next milestone only.',
+                    'status' => 'Shipment progression requires verified prepaid payment or pending COD, a processing delivery order, and the next milestone only.',
                 ]);
             }
 
@@ -163,7 +169,7 @@ class OrderProcessingService
 
             $shipment->update($changes);
 
-            if ($status === ShipmentStatus::Delivered) {
+            if ($status === ShipmentStatus::Delivered && $lockedOrder->payment_method !== PaymentMethod::Cod) {
                 $this->transitionLockedOrder($lockedOrder, OrderStatus::Completed, $shipment);
             }
 
@@ -217,8 +223,8 @@ class OrderProcessingService
             throw ValidationException::withMessages(['status' => 'This order cannot move to the selected status.']);
         }
 
-        if (in_array($status, [OrderStatus::Processing, OrderStatus::Completed], strict: true)
-            && $order->payment_status !== PaymentStatus::Verified) {
+        if (($status === OrderStatus::Processing && ! $this->paymentAllowsFulfillment($order))
+            || ($status === OrderStatus::Completed && $order->payment_status !== PaymentStatus::Verified)) {
             throw ValidationException::withMessages(['status' => 'Verify payment before processing or completing this order.']);
         }
 
@@ -254,6 +260,12 @@ class OrderProcessingService
                 ->whereKey($order->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
+
+            if ($lockedOrder->payment_method === PaymentMethod::Cod) {
+                throw ValidationException::withMessages([
+                    'payment_status' => 'Use Confirm COD Collection after delivery. COD does not accept ordinary payment verification or proof rejection.',
+                ]);
+            }
 
             if ($lockedOrder->status === OrderStatus::Cancelled) {
                 throw ValidationException::withMessages([
@@ -334,5 +346,53 @@ class OrderProcessingService
         return is_string($order->payment_proof_path)
             && Str::startsWith($order->payment_proof_path, 'payment-proofs/')
             && Storage::disk('local')->exists($order->payment_proof_path);
+    }
+
+    private function isCodDelivery(Order $order): bool
+    {
+        return $order->payment_method === PaymentMethod::Cod
+            && $order->fulfillment_method === FulfillmentMethod::Delivery
+            && $order->delivery_destination !== null
+            && $order->payment_proof_path === null
+            && $order->shipment?->carrier === 'lbc';
+    }
+
+    private function paymentAllowsFulfillment(Order $order): bool
+    {
+        return $order->payment_status === PaymentStatus::Verified
+            || ($order->payment_status === PaymentStatus::Pending && $this->isCodDelivery($order));
+    }
+
+    public function canConfirmCodCollection(Order $order): bool
+    {
+        return $this->isCodDelivery($order)
+            && $order->status === OrderStatus::Processing
+            && $order->payment_status === PaymentStatus::Pending
+            && $order->shipment?->status === ShipmentStatus::Delivered;
+    }
+
+    public function confirmCodCollection(Order $order, bool $collectionConfirmed): Order
+    {
+        return DB::transaction(function () use ($order, $collectionConfirmed): Order {
+            $lockedOrder = Order::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
+            $shipment = $lockedOrder->shipment()->lockForUpdate()->first();
+            $lockedOrder->setRelation('shipment', $shipment);
+
+            if (! $collectionConfirmed || ! $this->canConfirmCodCollection($lockedOrder)) {
+                throw ValidationException::withMessages([
+                    'cod_collection_confirmed' => 'Explicitly confirm verified LBC collection for a delivered COD order with pending payment and Processing status.',
+                ]);
+            }
+
+            $lockedOrder->update([
+                'payment_status' => PaymentStatus::Verified,
+                'payment_rejection_reason' => null,
+                'payment_rejection_note' => null,
+            ]);
+            $this->transitionLockedOrder($lockedOrder, OrderStatus::Completed, $shipment);
+            $this->notifications->afterCommit($lockedOrder, 'payment.verified');
+
+            return $lockedOrder->refresh();
+        }, attempts: 3);
     }
 }

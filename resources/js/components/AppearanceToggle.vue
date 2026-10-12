@@ -37,7 +37,7 @@ function toggleAppearance() {
                     @click="toggleAppearance"
                 >
                     <span
-                        class="relative h-6 w-10 rounded-full border border-(--appearance-toggle-accent)/60 bg-muted transition-colors duration-200 group-hover:border-(--appearance-toggle-accent) motion-reduce:transition-none"
+                        class="relative h-6 w-10 rounded-full border border-black/10 dark:border-white/15 bg-muted transition-colors duration-200 group-hover:border-black/20 dark:group-hover:border-white/25 motion-reduce:transition-none"
                         aria-hidden="true"
                     >
                         <span

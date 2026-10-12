@@ -8,6 +8,7 @@ enum PaymentMethod: string
     case CardAtStore = 'card_at_store';
     case GCash = 'gcash';
     case Maya = 'maya';
+    case Cod = 'cod';
 
     /**
      * Get the customer-facing payment label.
@@ -19,6 +20,7 @@ enum PaymentMethod: string
             self::CardAtStore => 'Card at store',
             self::GCash => 'GCash',
             self::Maya => 'Maya',
+            self::Cod => 'Cash on Delivery (COD)',
         };
     }
 
@@ -29,7 +31,7 @@ enum PaymentMethod: string
     {
         return match ($this) {
             self::GCash, self::Maya => true,
-            self::Cash, self::CardAtStore => false,
+            self::Cash, self::CardAtStore, self::Cod => false,
         };
     }
 
@@ -38,7 +40,9 @@ enum PaymentMethod: string
      */
     public function isAvailableFor(FulfillmentMethod $fulfillmentMethod): bool
     {
-        return $fulfillmentMethod === FulfillmentMethod::Pickup
-            || in_array($this, [self::GCash, self::Maya], strict: true);
+        return match ($fulfillmentMethod) {
+            FulfillmentMethod::Pickup => $this !== self::Cod,
+            FulfillmentMethod::Delivery => in_array($this, [self::GCash, self::Maya, self::Cod], strict: true),
+        };
     }
 }

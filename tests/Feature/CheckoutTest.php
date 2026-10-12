@@ -131,6 +131,13 @@ test('checkout renders current customer items, pickup location, and supported op
                 ],
                 'available_for' => ['pickup', 'delivery'],
             ],
+            [
+                'value' => 'cod',
+                'label' => 'Cash on Delivery (COD)',
+                'requires_proof' => false,
+                'payment_account' => null,
+                'available_for' => ['delivery'],
+            ],
         ]));
 
     expect(collect($response->inertiaProps('cart.items'))->pluck('product.id'))
@@ -270,7 +277,7 @@ test('delivery rejects payment methods that require paying at the store', functi
             'payment_method' => $paymentMethod,
         ])
         ->assertSessionHasErrors([
-            'payment_method' => 'Delivery orders must be paid through GCash or Maya.',
+            'payment_method' => 'Delivery orders must use GCash, Maya, or Cash on Delivery (COD).',
         ]);
 })->with(['cash', 'card_at_store']);
 
@@ -397,6 +404,7 @@ test('all eligible fulfillment and payment combinations place an order', functio
     'pickup with maya' => ['pickup', 'maya', true],
     'delivery with gcash' => ['delivery', 'gcash', true],
     'delivery with maya' => ['delivery', 'maya', true],
+    'delivery with COD' => ['delivery', 'cod', false],
 ]);
 
 test('checkout rechecks current stock on submission', function () {

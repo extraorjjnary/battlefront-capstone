@@ -8,6 +8,7 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -288,7 +289,9 @@ test('print documents escape product category and filter names as text', functio
 test('all matching products export across CSV batches and dashboard pages with a multipage PDF', function () {
     Storage::fake('sales-report-preview');
     $category = Category::factory()->create(['name' => 'Components']);
-    $products = Product::factory()->for($category)->count(201)->create();
+    $products = Product::factory()->for($category)->count(201)
+        ->sequence(fn (Sequence $sequence): array => ['name' => sprintf('Export product %03d', $sequence->index + 1)])
+        ->create();
     createSalesExportEntry('2026-09-12', '2010.00', $products->map(fn (Product $product): array => [
         'product' => $product, 'quantity' => 1, 'price' => '10.00',
     ])->all());

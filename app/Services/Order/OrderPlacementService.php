@@ -24,6 +24,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 /**
@@ -91,6 +92,17 @@ class OrderPlacementService
 
             if (! $this->cartService->isValidCheckoutSelection($cartItemIds)) {
                 throw OrderPlacementException::invalidSelection();
+            }
+
+            if ($checkout['payment_method'] === PaymentMethod::Cod
+                && ($checkout['fulfillment_method'] !== FulfillmentMethod::Delivery
+                    || $deliveryDestination === null
+                    || ! filled($checkout['delivery_address'])
+                    || $checkout['payment_proof_path'] !== null
+                    || Config::string('battlefront.delivery.carrier') !== 'lbc')) {
+                throw ValidationException::withMessages([
+                    'payment_method' => 'COD requires a quoted LBC delivery with a delivery address and no payment proof.',
+                ]);
             }
 
             $cart = Cart::query()

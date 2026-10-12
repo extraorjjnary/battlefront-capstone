@@ -107,6 +107,15 @@ class OrderFactory extends Factory
         ]);
     }
 
+    public function cashOnDelivery(string $destination = 'Sagay City'): static
+    {
+        return $this->withDeliverySnapshot($destination)->state(fn (array $attributes): array => [
+            'payment_method' => PaymentMethod::Cod,
+            'payment_proof_path' => null,
+            'payment_status' => PaymentStatus::Pending,
+        ]);
+    }
+
     /**
      * Indicate that submitted wallet evidence was rejected.
      */
