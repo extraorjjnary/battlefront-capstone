@@ -41,12 +41,20 @@ const enteredQuantity = ref(props.item.quantity);
 const isAvailable = computed(
     () => props.item.availability.status === 'available',
 );
+const availableQuantity = computed(() => {
+    const quantity = props.item.availability.available_quantity;
+    return Number.isInteger(quantity) && quantity >= 0 ? quantity : null;
+});
+const exceedsStock = computed(
+    () => canUpdate.value && enteredQuantity.value > availableQuantity.value,
+);
 const isAtMaximum = computed(
     () =>
-        isAvailable.value &&
-        enteredQuantity.value >= props.item.availability.available_quantity,
+        canUpdate.value &&
+        enteredQuantity.value === availableQuantity.value,
 );
 const canUpdate = computed(() =>
+    availableQuantity.value > 0 &&
     ['available', 'insufficient_stock'].includes(
         props.item.availability.status,
     ),
@@ -60,8 +68,9 @@ function trackEnteredQuantity(event) {
 }
 
 const availabilityCopy = computed(() => {
-    const availableQuantity = props.item.availability.available_quantity;
-
+    const status = isAvailable.value && !(availableQuantity.value > 0)
+        ? 'inventory_unavailable'
+        : props.item.availability.status;
     return {
         product_ineligible: {
             title: 'Product unavailable',
@@ -83,10 +92,12 @@ const availabilityCopy = computed(() => {
         },
         insufficient_stock: {
             title: 'Quantity exceeds stock',
-            description: `Only ${availableQuantity} item(s) are currently available. Reduce the quantity to continue.`,
+            description: availableQuantity.value === null
+                ? 'Current stock information is unavailable. Check again before continuing.'
+                : `Your cart has ${props.item.quantity}, but only ${availableQuantity.value} are currently available. Reduce the quantity to continue.`,
             icon: TriangleAlert,
         },
-    }[props.item.availability.status];
+    }[status];
 });
 </script>
 
@@ -118,10 +129,13 @@ const availabilityCopy = computed(() => {
                         <Badge variant="secondary">
                             {{ item.product.category }}
                         </Badge>
-                        <Badge v-if="isAvailable" variant="outline">
-                            In stock
+                        <Badge v-if="isAvailable && availableQuantity > 0" variant="outline">
+                            In stock<template v-if="availableQuantity > 0"> · {{ availableQuantity }} available</template>
                         </Badge>
                     </div>
+                    <p v-if="!isAvailable && item.availability.status !== 'product_ineligible' && availableQuantity !== null" class="text-muted-foreground mt-2 text-xs" aria-live="polite">
+                        {{ availableQuantity }} available
+                    </p>
                     <p
                         v-if="item.product.brand"
                         class="text-muted-foreground mt-3 text-xs font-semibold tracking-wide uppercase"
@@ -194,17 +208,14 @@ const availabilityCopy = computed(() => {
                             name="quantity"
                             type="number"
                             min="1"
-                            :max="
-                                item.availability.available_quantity ??
-                                4294967295
-                            "
+                            :max="availableQuantity ?? 0"
                             step="1"
                             inputmode="numeric"
                             :default-value="item.quantity"
                             :disabled="!canUpdate || processing"
                             :aria-invalid="Boolean(errors.quantity)"
                             :aria-describedby="
-                                isAtMaximum
+                                isAtMaximum || exceedsStock
                                     ? `cart-quantity-limit-${item.id}`
                                     : undefined
                             "
@@ -212,12 +223,12 @@ const availabilityCopy = computed(() => {
                             @input="trackEnteredQuantity"
                         />
                         <p
-                            v-if="isAtMaximum"
+                            v-if="isAtMaximum || exceedsStock"
                             :id="`cart-quantity-limit-${item.id}`"
                             class="text-muted-foreground text-xs"
                             aria-live="polite"
                         >
-                            Maximum available quantity reached.
+                            {{ exceedsStock ? `Only ${availableQuantity} available. Reduce the quantity to continue.` : 'Maximum available quantity reached.' }}
                         </p>
                         <InputError :message="errors.quantity" />
                     </div>

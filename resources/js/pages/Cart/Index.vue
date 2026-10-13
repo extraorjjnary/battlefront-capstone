@@ -137,6 +137,8 @@ defineOptions({
                         >
                             Review current Battlefront pricing, stock, and
                             quantities before continuing to checkout.
+                            Cart items do not reserve stock. Availability is
+                            checked again at checkout.
                         </p>
                     </div>
                 </div>

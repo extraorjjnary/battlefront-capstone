@@ -12,13 +12,19 @@ import { Spinner } from '@/components/ui/spinner';
 
 const props = defineProps({
     productId: { type: Number, required: true },
-    availableQuantity: { type: Number, required: true },
+    availableQuantity: { type: Number, default: null },
     guest: { type: Boolean, default: false },
 });
 
 const enteredQuantity = ref(1);
+const hasAvailableStock = computed(
+    () => Number.isInteger(props.availableQuantity) && props.availableQuantity > 0,
+);
+const exceedsStock = computed(
+    () => hasAvailableStock.value && enteredQuantity.value > props.availableQuantity,
+);
 const isAtMaximum = computed(
-    () => enteredQuantity.value >= props.availableQuantity,
+    () => hasAvailableStock.value && enteredQuantity.value === props.availableQuantity,
 );
 
 function trackEnteredQuantity(event) {
@@ -39,27 +45,29 @@ function trackEnteredQuantity(event) {
 
         <div class="grid gap-2">
             <Label :for="`add-cart-quantity-${productId}`">Quantity</Label>
+            <p :id="`add-cart-stock-${productId}`" class="text-muted-foreground text-xs" aria-live="polite">
+                {{ hasAvailableStock ? `${availableQuantity} available` : availableQuantity === 0 ? 'Out of stock' : 'Stock unavailable' }}
+            </p>
             <Input
                 :id="`add-cart-quantity-${productId}`"
                 name="quantity"
                 type="number"
                 min="1"
-                :max="availableQuantity"
+                :max="hasAvailableStock ? availableQuantity : 0"
+                :disabled="!hasAvailableStock || processing"
                 step="1"
                 inputmode="numeric"
                 :default-value="1"
                 :aria-invalid="Boolean(errors.quantity)"
                 :aria-describedby="
-                    isAtMaximum
-                        ? `add-cart-quantity-limit-${productId}`
-                        : undefined
+                    `add-cart-stock-${productId}${isAtMaximum || exceedsStock ? ` add-cart-quantity-limit-${productId}` : ''}`
                 "
                 required
                 @input="trackEnteredQuantity"
             />
         </div>
 
-        <Button type="submit" :disabled="processing">
+        <Button type="submit" :disabled="processing || !hasAvailableStock">
             <Spinner v-if="processing" />
             <LogIn v-else-if="guest" aria-hidden="true" />
             <ShoppingCart v-else aria-hidden="true" />
@@ -76,11 +84,14 @@ function trackEnteredQuantity(event) {
 
         <div class="min-h-8 sm:col-span-2" aria-live="polite">
             <p
-                v-if="isAtMaximum"
+                v-if="isAtMaximum || exceedsStock"
                 :id="`add-cart-quantity-limit-${productId}`"
                 class="text-muted-foreground text-xs"
             >
-                Maximum available quantity reached.
+                {{ exceedsStock ? `Only ${availableQuantity} available. Reduce the quantity to continue.` : 'Maximum available quantity reached.' }}
+            </p>
+            <p class="text-muted-foreground text-xs">
+                Adding to your cart does not reserve stock. Availability is checked again at checkout.
             </p>
         </div>
 

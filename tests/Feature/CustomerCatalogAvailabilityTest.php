@@ -30,6 +30,12 @@ test('customer catalog availability and stock labels agree at every boundary', f
     $response->assertOk();
     expect(array_column(customerAvailabilityRows($response, $channel), 'id'))->toBe($visible ? [$product->id] : []);
     expect($presented['inventory']['status'])->toBe($status);
+    expect($presented['inventory']['quantity'])->toBe($quantity);
+    if ($channel === 'web' && $visible) {
+        $response->assertInertia(fn (Assert $page) => $page
+            ->where('products.data.0.inventory.quantity', $quantity)
+            ->where('products.data.0.inventory.status', $status));
+    }
     expect(Product::query()->customerAvailable()->whereKey($product->id)->exists())->toBe($visible);
     expect(Product::query()->cartEligible()->whereKey($product->id)->exists())->toBe($visible);
     expect(Product::query()->customerEligible()->whereKey($product->id)->exists())->toBeTrue();
@@ -37,7 +43,9 @@ test('customer catalog availability and stock labels agree at every boundary', f
     if ($visible) {
         $detail->assertOk();
         if ($channel === 'web') {
-            $detail->assertInertia(fn (Assert $page) => $page->where('product.inventory.status', $status));
+            $detail->assertInertia(fn (Assert $page) => $page
+                ->where('product.inventory.status', $status)
+                ->where('product.inventory.quantity', $quantity));
         } else {
             $detail->assertJsonPath('data.inventory', ['status' => $status]);
         }

@@ -110,3 +110,29 @@ test('catalog pages share the customer cart capability', function (string $accou
     'customer' => ['customer', true],
     'administrator' => ['administrator', false],
 ]);
+
+test('cart stock counts refresh after depletion missing inventory and restocking', function () {
+    $customer = User::factory()->customer()->create();
+    $product = Product::factory()->create();
+    $inventory = Inventory::factory()->for($product)->create(['quantity' => 5]);
+    $item = (new CartService)->add($customer, $product->id, 3);
+
+    foreach ([[5, 'available'], [2, 'insufficient_stock'], [0, 'out_of_stock'], [null, 'inventory_unavailable'], [8, 'available']] as [$quantity, $status]) {
+        if ($quantity === null) {
+            $inventory->delete();
+        } elseif ($inventory->exists) {
+            $inventory->update(['quantity' => $quantity]);
+        } else {
+            $inventory = Inventory::factory()->for($product)->create(['quantity' => $quantity]);
+        }
+
+        $this->actingAs($customer)->get(route('cart.index'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('cart.items.0.quantity', 3)
+                ->where('cart.items.0.availability.available_quantity', $quantity)
+                ->where('cart.items.0.availability.status', $status));
+    }
+
+    expect($item->refresh()->quantity)->toBe(3)
+        ->and($inventory->refresh()->quantity)->toBe(8);
+});

@@ -29,7 +29,7 @@ const canUseCustomerCart = computed(
     () => page.props.auth?.can?.useCustomerCart === true,
 );
 const hasAvailableStock = computed(
-    () => Number(props.product.inventory.quantity) > 0,
+    () => Number.isInteger(props.product.inventory?.quantity) && props.product.inventory.quantity > 0,
 );
 const canReturnToCatalog = consumeCatalogVisit(props.product.id);
 let visibleSince = null;
@@ -229,7 +229,7 @@ function returnToCatalog() {
                         <p
                             v-if="
                                 ['out_of_stock', 'unavailable'].includes(
-                                    product.inventory.status,
+                                    product.inventory?.status,
                                 )
                             "
                             class="text-muted-foreground mt-3 text-sm leading-6"

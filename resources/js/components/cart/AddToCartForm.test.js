@@ -153,9 +153,49 @@ test('guest and customer quantity forms use their corresponding POST endpoints',
         );
         assert.match(html, /required/);
         assert.match(html, /value="1"/);
+        assert.ok(html.includes('4 available'));
+        assert.ok(html.includes('does not reserve stock'));
         assert.ok(
             html.includes(guest ? 'Log in to add to cart' : 'Add to cart'),
         );
+    }
+});
+
+test('quantity guidance follows changing availability without resetting the chosen quantity', () => {
+    const scope = Vue.effectScope();
+    try {
+        const props = Vue.reactive({ productId: 7, availableQuantity: 4 });
+        const form = scope.run(() => loadComponent('./AddToCartForm.vue', componentModules(), false)
+            .setup(props, { expose() {} }));
+        form.trackEnteredQuantity({ currentTarget: { valueAsNumber: 3 } });
+        props.availableQuantity = 2;
+        assert.equal(form.exceedsStock.value, true);
+        assert.equal(form.isAtMaximum.value, false);
+        props.availableQuantity = 3;
+        assert.equal(form.exceedsStock.value, false);
+        assert.equal(form.isAtMaximum.value, true);
+        props.availableQuantity = null;
+        assert.equal(form.hasAvailableStock.value, false);
+        props.availableQuantity = 0;
+        assert.equal(form.hasAvailableStock.value, false);
+        props.availableQuantity = 8;
+        assert.equal(form.hasAvailableStock.value, true);
+        assert.equal(form.enteredQuantity.value, 3);
+    } finally {
+        scope.stop();
+    }
+});
+
+test('quantity forms disable purchasing when stock is zero or missing', async () => {
+    for (const availableQuantity of [0, null]) {
+        const modules = componentModules();
+        const html = await renderToString(Vue.h(modules['@/components/cart/AddToCartForm.vue'].default, {
+            productId: 7, availableQuantity,
+        }));
+        assert.match(html, /<button[^>]*disabled/);
+        assert.match(html, /<input[^>]*name="quantity"[^>]*disabled/);
+        assert.ok(html.includes(availableQuantity === 0 ? 'Out of stock' : 'Stock unavailable'));
+        assert.doesNotMatch(html, /null available|0 available/);
     }
 });
 
