@@ -7,7 +7,6 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\ShipmentStatus;
-use App\Enums\UserRole;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
@@ -19,6 +18,7 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 use Throwable;
 
@@ -27,9 +27,13 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
     /** @var list<string> */
     public const PRODUCT_CODES = ['10003', '43720093', '10035', '6939084200089', '6940056180506', '87399741', '10196', '19986', '10468', '10121', '10986', '10214', '10350', '10463', '28909657'];
 
-    private const CUSTOMER_EMAIL = 'historical-sales@example.test';
+    private const LEGACY_CUSTOMER_EMAIL = 'historical-sales@example.test';
 
     private const LABEL_PREFIX = 'Demonstration Historical Sales ';
+
+    private const FIXTURE_PREFIX = 'historical-sales:';
+
+    private const REMEDIATION = 'Separate approval is required for development-only remediation. No existing records were changed.';
 
     private const DELIVERY_NOTE = 'Synthetic historical delivery; no payment evidence or carrier milestones retained.';
 
@@ -69,12 +73,15 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
         }
 
         $this->ensureNoLegacyHistory();
+        if (! Schema::hasColumn('orders', 'development_fixture_key')) {
+            throw new RuntimeException('Historical sales requires the reviewed development fixture key schema migration. No existing records were changed.');
+        }
         $timezone = Config::string('app.timezone');
         $historyEnd = CarbonImmutable::instance(now($timezone))->startOfQuarter();
         $firstMonth = $historyEnd->subMonths(48);
         $coverage->clearDevelopment();
 
-        DB::transaction(function () use ($firstMonth, $historyEnd, $deliveryRules): void {
+        DB::transaction(function () use ($firstMonth, $deliveryRules): void {
             $this->ensureNoLegacyHistory();
             $products = Product::query()->whereIn('product_code', self::PRODUCT_CODES)
                 ->orderBy('product_code')->lockForUpdate()->get()->keyBy('product_code');
@@ -88,23 +95,18 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
                 throw new RuntimeException('Historical sales product coverage conflicts with operational coverage.');
             }
 
-            $customer = $this->seedCustomer($firstMonth->subDay());
-            $ownedOrders = $this->ownedOrders($customer, $products->all());
-            foreach ($ownedOrders as $order) {
-                if ($order->created_at->lt($firstMonth) || $order->created_at->gte($historyEnd)) {
-                    $order->sale()->delete();
-                    $order->shipment()->delete();
-                    $order->delete();
-                }
-            }
+            $this->call(DevelopmentCustomerSeeder::class);
+            $customers = array_values(User::query()->whereIn('email', array_keys(DevelopmentCustomerSeeder::accounts()))
+                ->orderBy('email')->lockForUpdate()->get()->all());
+            $ownedOrders = $this->ownedOrders($customers, $products->all());
 
             foreach (range(0, 47) as $monthIndex) {
                 $month = $firstMonth->addMonths($monthIndex);
                 foreach ($this->monthlyOrders($month) as $slot => $quantities) {
                     $date = $this->orderDate($month, $slot);
-                    $label = $this->orderLabel($month, $slot);
-                    if (! isset($ownedOrders[$label])) {
-                        $this->seedOrder($customer, $label, $date, $products->all(), $quantities, $deliveryRules);
+                    $key = $this->fixtureKey($month, $slot);
+                    if (! isset($ownedOrders[$key])) {
+                        $this->seedOrder($this->customerFor($month, $slot, $customers), $key, $date, $products->all(), $quantities, $deliveryRules);
                     }
                 }
             }
@@ -129,56 +131,43 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
             throw $exception;
         }
 
-        $this->command->info('Synthetic development sales history: '.$firstMonth->format('F Y').' - '.$historyEnd->subMonth()->format('F Y').' (48 completed months; 15 imported products; 4-7 orders per month). Not verified client sales.');
+        $this->command->info('Synthetic development sales history: '.$firstMonth->format('F Y').' - '.$historyEnd->subMonth()->format('F Y').' (48 completed months; 15 imported products; 4-7 orders per month; 30 demonstration customers). Older fixtures retained. Not verified client sales.');
     }
 
     private function ensureNoLegacyHistory(): void
     {
-        if (Order::query()->where('recipient_name', 'like', self::LABEL_PREFIX.'%')
-            ->where('recipient_name', 'not like', self::LABEL_PREFIX.'% V3 %')->exists()) {
-            throw new RuntimeException('An earlier or unrecognized historical demonstration fixture was detected. Run php artisan battlefront:reset-dev --with-sales-history manually. No existing transactions were replaced.');
+        if (Order::query()->where('recipient_name', 'like', self::LABEL_PREFIX.'%')->exists()) {
+            throw new RuntimeException('An earlier or unrecognized historical demonstration fixture was detected. '.self::REMEDIATION);
         }
         if (Product::query()->where('product_code', 'like', 'DEVHIST40%')->exists()
             || Order::query()->where('recipient_name', 'like', 'Historical Sales %')
-                ->whereHas('user', fn (Builder $query): Builder => $query->where('email', self::CUSTOMER_EMAIL))->exists()) {
-            throw new RuntimeException('Legacy DEVHIST40 historical demonstration data was detected. Run php artisan battlefront:reset-dev --with-sales-history manually. No legacy records were converted or deleted.');
+                ->whereHas('user', fn (Builder $query): Builder => $query->where('email', self::LEGACY_CUSTOMER_EMAIL))->exists()) {
+            throw new RuntimeException('Legacy DEVHIST40 historical demonstration data was detected. '.self::REMEDIATION);
         }
     }
 
-    private function seedCustomer(CarbonImmutable $createdAt): User
+    /** @param list<User> $customers */
+    private function customerFor(CarbonImmutable $month, int $slot, array $customers): User
     {
-        $customer = User::query()->where('email', self::CUSTOMER_EMAIL)->lockForUpdate()->first() ?? new User;
-        if ($customer->exists && ($customer->name !== 'Historical Sales Development Account' || $customer->role !== UserRole::Customer)) {
-            throw new RuntimeException('Historical sales customer identity conflicts with an existing account. Run php artisan battlefront:reset-dev --with-sales-history manually.');
-        }
-        $customer->forceFill([
-            'email' => self::CUSTOMER_EMAIL,
-            'name' => 'Historical Sales Development Account',
-            'role' => UserRole::Customer,
-            'email_verified_at' => $customer->created_at?->min($createdAt) ?? $createdAt,
-            'password' => $customer->exists ? $customer->password : 'password',
-            'created_at' => $customer->created_at?->min($createdAt) ?? $createdAt,
-        ])->save();
+        $absoluteMonth = 12 * ($month->year - 1) + $month->month - 1;
 
-        return $customer;
+        return $customers[(7 * $absoluteMonth + $slot) % count($customers)];
     }
 
     /**
-     * Validate ownership of every candidate before pruning anything. Selected real
-     * products alone never establish ownership of a customer's transaction.
+     * Validate explicitly marked fixtures without claiming ordinary customer orders.
      *
+     * @param  list<User>  $customers
      * @param  array<int|string, Product>  $products
      * @return array<string, Order>
      */
-    private function ownedOrders(User $customer, array $products): array
+    private function ownedOrders(array $customers, array $products): array
     {
-        if (Order::query()->where('recipient_name', 'like', self::LABEL_PREFIX.'%')->where('user_id', '!=', $customer->id)->exists()) {
-            throw new RuntimeException('Historical sales order ownership conflicts with another customer. Run php artisan battlefront:reset-dev --with-sales-history manually.');
-        }
         $owned = [];
         $productsById = collect($products)->keyBy('id');
         $plans = [];
-        foreach ($customer->orders()->with(['items', 'sale', 'shipment'])->lockForUpdate()->get() as $order) {
+        foreach (Order::query()->where('development_fixture_key', 'like', self::FIXTURE_PREFIX.'%')
+            ->with(['items', 'sale', 'shipment'])->lockForUpdate()->get() as $order) {
             $date = CarbonImmutable::instance($order->created_at);
             $monthKey = $date->format('Y-m');
             $plan = $plans[$monthKey] ??= $this->monthlyOrders($date->startOfMonth());
@@ -189,31 +178,33 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
                     break;
                 }
             }
-            if (! str_starts_with($order->recipient_name, self::LABEL_PREFIX) && $slot === null) {
-                continue;
+            if ($slot === null || $order->development_fixture_key !== $this->fixtureKey($date, $slot)
+                || isset($owned[$order->development_fixture_key])) {
+                throw new RuntimeException('Historical sales order ownership or identity is ambiguous. '.self::REMEDIATION);
             }
-            if ($slot === null || $order->recipient_name !== $this->orderLabel($date, $slot) || isset($owned[$order->recipient_name])) {
-                throw new RuntimeException('Historical sales order ownership or identity is ambiguous. Run php artisan battlefront:reset-dev --with-sales-history manually.');
+            $customer = $this->customerFor($date, $slot, $customers);
+            if ($order->user_id !== $customer->id || $order->recipient_name !== $customer->name) {
+                throw new RuntimeException('Historical sales order ownership conflicts with the assigned demonstration customer. '.self::REMEDIATION);
             }
 
             $expectedIds = array_map(fn (int|string $code): int => $products[$code]->id, array_keys($plan[$slot]));
             $actualIds = $order->items->pluck('product_id')->all();
             if (count($actualIds) !== count($expectedIds) || array_diff($expectedIds, $actualIds) !== []) {
-                throw new RuntimeException('Historical sales order ownership contains missing, unrelated or duplicate items. Run php artisan battlefront:reset-dev --with-sales-history manually.');
+                throw new RuntimeException('Historical sales order ownership contains missing, unrelated or duplicate items. '.self::REMEDIATION);
             }
             $total = '0.00';
             foreach ($order->items as $item) {
                 $product = $productsById[$item->product_id];
                 $price = $item->price_at_time;
                 if (! is_numeric($price) || $item->quantity !== $plan[$slot][$product->product_code] || bccomp($price, '0', 2) < 0) {
-                    throw new RuntimeException('Historical sales order items conflict with the demonstration history. Run php artisan battlefront:reset-dev --with-sales-history manually.');
+                    throw new RuntimeException('Historical sales order items conflict with the demonstration history. '.self::REMEDIATION);
                 }
                 $total = bcadd($total, bcmul($price, (string) $item->quantity, 2), 2);
             }
             $terms = $this->orderTerms($date, $slot);
             $deliveryFee = $order->delivery_fee;
             if (bccomp($deliveryFee, '0', 2) < 0) {
-                throw new RuntimeException('Historical sales delivery fee conflicts with the demonstration history. Run php artisan battlefront:reset-dev --with-sales-history manually.');
+                throw new RuntimeException('Historical sales delivery fee conflicts with the demonstration history. '.self::REMEDIATION);
             }
             $finalTotal = bcadd($total, $deliveryFee, 2);
             if ($order->status !== OrderStatus::Completed || $order->payment_status !== PaymentStatus::Verified
@@ -222,10 +213,10 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
                 || $order->contact_number !== '09000000000' || ! $this->validDeliverySnapshot($order, $terms['destination'])
                 || $order->payment_proof_path !== null || $order->payment_rejection_reason !== null || $order->payment_rejection_note !== null
                 || $order->total_amount !== $finalTotal || $order->product_subtotal !== $total
-                || $order->sale === null || $order->sale->amount !== $finalTotal || $order->sale->sale_date->toDateString() !== $date->toDateString()) {
-                throw new RuntimeException('Historical sales order and sale snapshots conflict with the demonstration history. Run php artisan battlefront:reset-dev --with-sales-history manually.');
+                || $order->sale === null || $order->sale->amount !== $total || $order->sale->sale_date->toDateString() !== $date->toDateString()) {
+                throw new RuntimeException('Historical sales order and sale snapshots conflict with the demonstration history. '.self::REMEDIATION);
             }
-            $owned[$order->recipient_name] = $order;
+            $owned[$order->development_fixture_key] = $order;
         }
 
         return $owned;
@@ -339,16 +330,16 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
             ->setTime(9 + $this->variation('hour:'.$key, 9), $this->variation('minute:'.$key, 60));
     }
 
-    private function orderLabel(CarbonImmutable $month, int $slot): string
+    private function fixtureKey(CarbonImmutable $month, int $slot): string
     {
-        return self::LABEL_PREFIX.$month->format('Y-m').' V3 '.sprintf('%02d', $slot + 1);
+        return self::FIXTURE_PREFIX.'V4:'.$month->format('Y-m').':'.sprintf('%02d', $slot + 1);
     }
 
     /**
      * @param  array<int|string, Product>  $products
      * @param  array<int|string, int>  $quantities
      */
-    private function seedOrder(User $customer, string $label, CarbonImmutable $date, array $products, array $quantities, DeliveryRules $deliveryRules): void
+    private function seedOrder(User $customer, string $key, CarbonImmutable $date, array $products, array $quantities, DeliveryRules $deliveryRules): void
     {
         $items = [];
         $total = '0.00';
@@ -361,7 +352,7 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
             $items[] = ['product_id' => $product->id, 'quantity' => $quantity, 'price_at_time' => $price];
             $total = bcadd($total, bcmul($price, (string) $quantity, 2), 2);
         }
-        $slot = (int) substr($label, -2) - 1;
+        $slot = (int) substr($key, -2) - 1;
         $terms = $this->orderTerms($date, $slot);
         $quote = $deliveryRules->quote($terms['fulfillment'], $terms['destination'], array_map(fn (int|string $code): Product => $products[$code], array_keys($quantities)));
         if ($quote !== null && (! $quote['is_demo'] || $quote['origin_city'] !== 'Sagay City' || Config::string('battlefront.delivery.carrier') !== 'lbc')) {
@@ -371,7 +362,8 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
         $order = new Order;
         $order->forceFill([
             'user_id' => $customer->id,
-            'recipient_name' => $label,
+            'recipient_name' => $customer->name,
+            'development_fixture_key' => $key,
             'contact_number' => '09000000000',
             'fulfillment_method' => $terms['fulfillment'],
             'delivery_address' => $terms['destination'] === null ? null : $this->deliveryAddress($terms['destination']),
@@ -399,6 +391,6 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
             ]);
             $shipment->forceFill(['created_at' => $date->toDateTimeString(), 'updated_at' => $date->toDateTimeString()])->save();
         }
-        $order->sale()->create(['amount' => $finalTotal, 'sale_date' => $date->toDateString()]);
+        $order->sale()->create(['amount' => $total, 'sale_date' => $date->toDateString()]);
     }
 }

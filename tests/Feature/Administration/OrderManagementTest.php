@@ -19,21 +19,21 @@ use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\HistoricalSalesCatalogFixtures;
 
-test('completed transaction history identifies demonstration orders and their dedicated customer', function () {
+test('completed transaction history identifies demonstration orders and their assigned customer', function () {
     Storage::fake('local');
     config(['app.timezone' => 'UTC']);
     $this->travelTo('2026-10-15 12:00:00');
     HistoricalSalesCatalogFixtures::createProducts();
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
-    $lastOrder = Order::with('items')->where('recipient_name', 'Demonstration Historical Sales 2022-10 V3 04')->sole();
+    $lastOrder = Order::with('items', 'user')->where('development_fixture_key', 'historical-sales:V4:2022-10:04')->sole();
 
     $this->actingAs(User::factory()->administrator()->create())
-        ->get(route('administration.orders.index', ['status' => 'completed', 'q' => 'Demonstration Historical Sales 2022-10']))
+        ->get(route('administration.orders.index', ['status' => 'completed', 'q' => $lastOrder->reference]))
         ->assertInertia(fn (Assert $page) => $page
-            ->where('orders.total', 4)
-            ->where('orders.data.0.recipient_name', 'Demonstration Historical Sales 2022-10 V3 04')
-            ->where('orders.data.0.customer.name', 'Historical Sales Development Account')
-            ->where('orders.data.0.customer.email', 'historical-sales@example.test')
+            ->where('orders.total', 1)
+            ->where('orders.data.0.recipient_name', 'Miguel Santos')
+            ->where('orders.data.0.customer.name', 'Miguel Santos')
+            ->where('orders.data.0.customer.email', 'demo.customer01@example.test')
             ->where('orders.data.0.status.value', 'completed')
             ->where('orders.data.0.payment.status.value', 'verified')
             ->where('orders.data.0.item_count', $lastOrder->items->count())

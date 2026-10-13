@@ -27,6 +27,7 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $user_id
  * @property string $recipient_name
+ * @property string|null $development_fixture_key
  * @property string $contact_number
  * @property FulfillmentMethod $fulfillment_method
  * @property string|null $delivery_address
@@ -76,7 +77,7 @@ use Illuminate\Support\Carbon;
     'payment_rejection_reason',
     'payment_rejection_note',
 ])]
-#[Hidden(['payment_proof_path'])]
+#[Hidden(['payment_proof_path', 'development_fixture_key'])]
 class Order extends Model
 {
     /** @use HasFactory<OrderFactory> */
@@ -189,6 +190,10 @@ class Order extends Model
         });
 
         static::saving(function (Order $order): void {
+            if ($order->exists && $order->isDirty('development_fixture_key')) {
+                throw new DomainException('Persisted development fixture identities cannot be changed.');
+            }
+
             $belongsToCustomer = User::query()
                 ->whereKey($order->user_id)
                 ->where('role', UserRole::Customer->value)

@@ -22,6 +22,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Services/Order/**,app/Actions/{Checkout,Order}/**,app/Models/Product.php,config/battlefront.php | .ai/rules/checkout-order-models.md |
 | app/Services/Order/**,app/Enums/PaymentMethod.php,app/Models/Order.php,app/Http/Controllers/Administration/Order*,resources/js/pages/{Checkout,Orders,Administration/Orders}/** | .ai/rules/checkout-orders-administration-orders.md |
 | config/battlefront.php,app/Http/Controllers/CheckoutController.php,resources/js/pages/Checkout/** | .ai/rules/checkout.md |
+| database/seeders/DevelopmentHistoricalSalesSeeder.php,app/Console/Commands/ResetDevCommand.php,database/seeders/DevelopmentCustomerSeeder.php | .ai/rules/commands-seeders.md |
 | database/seeders/DevelopmentHistoricalSalesSeeder.php,app/Console/Commands/ResetDevCommand.php, database/seeders/DevelopmentCustomerSeeder.php,app/Console/Commands/ResetDevCommand.php | .ai/rules/commands.md |
 | app/Models/Inventory.php,app/Repositories/Inventory/**,app/Actions/Chatbot/Context/ResolveProductContext.php,resources/js/components/catalog/StockAvailability.vue | .ai/rules/components-catalog.md |
 | app/Actions/Chatbot/**,app/Services/Chatbot/**,resources/js/components/chatbot/** | .ai/rules/components-chatbot.md |
@@ -43,7 +44,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | database/migrations/** | .ai/rules/migrations.md |
 | app/Services/Order/**,app/Models/Shipment.php,resources/js/pages/**/Orders/** | .ai/rules/models-js-pages-orders.md |
 | config/**,database/seeders/**,app/Models/Branch.php,resources/js/** | .ai/rules/models-js.md |
-| app/Models/**,database/migrations/**, app/Models/{Order,OrderItem}.php,database/migrations/*_create_order*_table.php | .ai/rules/models-migrations.md |
+| app/Models/**,database/migrations/**, app/Models/{Order,OrderItem}.php,database/migrations/*_create_order*_table.php, app/Models/Order.php,database/migrations/*development_fixture_key*,tests/LegacyQuarterlySalesFixtures.php | .ai/rules/models-migrations.md |
 | app/Models/Product.php,app/Repositories/Catalog/** | .ai/rules/models-repositories-catalog.md |
 | database/migrations/**,app/Models/** | .ai/rules/models.md |
 | resources/js/lib/orderStatus.js,resources/js/pages/{Administration/Orders,Orders}/** | .ai/rules/orders-orders.md |

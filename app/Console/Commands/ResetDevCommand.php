@@ -91,7 +91,7 @@ class ResetDevCommand extends Command
                 if ($this->call('db:seed', ['--class' => DevelopmentHistoricalSalesSeeder::class, '--force' => true, '--no-interaction' => true]) !== self::SUCCESS) {
                     throw new RuntimeException('Historical sales seeding failed.');
                 }
-                $this->info('Synthetic development history seeded: 15 imported products, 4-7 completed orders per month across 48 completed months. Current inventory preserved; not verified client sales.');
+                $this->info('Synthetic development history seeded: 15 imported products, 4-7 completed orders per month across 48 completed months, distributed across 30 demonstration customers. Current inventory preserved; not verified client sales.');
             }
             $this->info('Development reset completed.');
 

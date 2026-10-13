@@ -63,10 +63,7 @@ class DevelopmentCustomerSeeder extends Seeder
             throw new RuntimeException('Customer demonstration data is only allowed in local and testing environments.');
         }
 
-        $accounts = [];
-        foreach (self::NAMES as $index => $name) {
-            $accounts[sprintf('demo.customer%02d@example.test', $index + 1)] = $name;
-        }
+        $accounts = self::accounts();
 
         DB::transaction(function () use ($accounts): void {
             $existing = User::query()->whereIn(DB::raw('LOWER(email)'), array_keys($accounts))
@@ -93,6 +90,17 @@ class DevelopmentCustomerSeeder extends Seeder
                 ])->save();
             }
         });
+    }
+
+    /** @return array<string, string> */
+    public static function accounts(): array
+    {
+        $accounts = [];
+        foreach (self::NAMES as $index => $name) {
+            $accounts[sprintf('demo.customer%02d@example.test', $index + 1)] = $name;
+        }
+
+        return $accounts;
     }
 
     private function matchesAccount(User $customer, string $email, string $name): bool
