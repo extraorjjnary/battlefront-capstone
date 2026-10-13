@@ -183,12 +183,13 @@ function returnToCatalog() {
                 class="border-border bg-card mt-6 grid overflow-hidden border lg:grid-cols-[minmax(0,1.3fr)_minmax(22rem,1fr)]"
             >
                 <div
-                    class="border-border aspect-square overflow-hidden border-b sm:aspect-4/3 lg:aspect-auto lg:h-144 lg:max-h-[70vh] lg:border-r lg:border-b-0"
+                    class="border-border aspect-square overflow-hidden border-b sm:aspect-4/3 lg:relative lg:aspect-auto lg:min-h-[min(36rem,70vh)] lg:border-r lg:border-b-0"
                 >
                     <ProductImage
                         :image-url="product.image_url"
                         :product-name="product.name"
                         contain
+                        class="lg:absolute lg:inset-0 lg:[&_img]:object-cover"
                     />
                 </div>
 

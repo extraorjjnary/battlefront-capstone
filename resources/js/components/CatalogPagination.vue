@@ -15,7 +15,7 @@ defineProps({
     <nav
         v-if="lastPage > 1"
         :aria-label="label"
-        class="mt-5 flex items-center justify-between gap-4"
+        class="mt-5 flex flex-wrap items-center justify-between gap-2 sm:gap-4"
     >
         <Button v-if="currentPage > 1" variant="outline" size="sm" as-child>
             <Link
@@ -31,7 +31,7 @@ defineProps({
             Previous
         </Button>
 
-        <p class="text-muted-foreground text-sm">
+        <p class="text-muted-foreground order-first w-full text-center text-sm sm:order-none sm:w-auto">
             Page {{ currentPage }} of {{ lastPage }}
         </p>
 

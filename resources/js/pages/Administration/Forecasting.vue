@@ -521,7 +521,7 @@ const chartOptions = {
                     >
                         View monthly history
                     </summary>
-                    <div class="mt-3 overflow-x-auto">
+                    <div class="mt-3 overflow-x-auto" tabindex="0" role="region" aria-label="Monthly demand history table">
                         <table class="w-full text-left text-sm">
                             <caption class="sr-only">
                                 Completed monthly sales used for this generation
@@ -587,8 +587,8 @@ const chartOptions = {
                     >
                 </div>
             </div>
-            <div v-if="forecasts.data.length" class="mt-5 overflow-x-auto">
-                <table class="w-full text-left text-sm">
+            <div v-if="forecasts.data.length" class="mt-5 overflow-x-auto" tabindex="0" role="region" aria-label="Saved forecasts table">
+                <table class="w-full min-w-3xl text-left text-sm">
                     <caption class="sr-only">
                         Persisted product demand forecasts
                     </caption>

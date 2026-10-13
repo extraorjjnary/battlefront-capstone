@@ -33,7 +33,7 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
         />
 
         <div class="flex flex-col lg:flex-row lg:space-x-12">
-            <aside class="w-full max-w-xl lg:w-48">
+            <aside class="w-full max-w-xl lg:w-48 lg:shrink-0">
                 <nav
                     class="flex flex-col space-y-1 space-x-0"
                     aria-label="Settings"
@@ -58,7 +58,7 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
 
             <Separator class="my-6 lg:hidden" />
 
-            <div class="flex-1 md:max-w-2xl">
+            <div class="min-w-0 flex-1 md:max-w-2xl">
                 <section class="max-w-xl space-y-12">
                     <slot />
                 </section>

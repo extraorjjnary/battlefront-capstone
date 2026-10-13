@@ -91,7 +91,7 @@ defineOptions({
                     <UserInfo :user="customer" show-email />
                 </div>
 
-                <dl class="divide-border grid md:grid-cols-2 md:divide-x">
+                <dl class="divide-border grid grid-cols-1 md:grid-cols-2 md:divide-x">
                     <div class="border-border flex gap-3 p-5 max-md:border-b">
                         <Mail
                             class="text-muted-foreground mt-0.5 size-5 shrink-0"
@@ -100,7 +100,7 @@ defineOptions({
                             <dt class="text-muted-foreground text-sm">
                                 Email address
                             </dt>
-                            <dd class="mt-1 truncate font-medium">
+                            <dd class="mt-1 font-medium wrap-anywhere">
                                 {{ customer.email }}
                             </dd>
                         </div>

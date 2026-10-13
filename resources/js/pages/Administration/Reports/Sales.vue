@@ -593,7 +593,7 @@ defineOptions({
             </div>
 
             <form
-                class="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr_1fr_auto] lg:items-end"
+                class="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end"
                 @submit.prevent="submitFilters"
             >
                 <div class="grid gap-2">
@@ -700,6 +700,7 @@ defineOptions({
                 type="button"
                 variant="outline"
                 size="sm"
+                class="h-auto min-h-8 min-w-0 py-2 wrap-anywhere whitespace-normal"
                 :disabled="isUpdatingReport"
                 @click="toggleProduct(selectedProduct)"
             >
@@ -711,6 +712,7 @@ defineOptions({
                 type="button"
                 variant="outline"
                 size="sm"
+                class="h-auto min-h-8 min-w-0 py-2 wrap-anywhere whitespace-normal"
                 :disabled="isUpdatingReport"
                 @click="toggleCategory(selectedCategory)"
             >
@@ -750,7 +752,7 @@ defineOptions({
                 <article
                     v-for="card in kpiCards"
                     :key="card.label"
-                    class="border-border bg-card border p-5"
+                    class="border-border bg-card min-w-0 border p-5"
                 >
                     <div class="flex items-start justify-between gap-4">
                         <div>
@@ -816,7 +818,7 @@ defineOptions({
 
             <div class="grid gap-6 xl:grid-cols-2">
                 <section
-                    class="border-border bg-card border p-5"
+                    class="border-border bg-card min-w-0 border p-5"
                     aria-labelledby="top-products-heading"
                 >
                     <p class="text-muted-foreground text-sm">
@@ -838,7 +840,7 @@ defineOptions({
                 </section>
 
                 <section
-                    class="border-border bg-card border p-5"
+                    class="border-border bg-card min-w-0 border p-5"
                     aria-labelledby="category-sales-heading"
                 >
                     <p class="text-muted-foreground text-sm">
@@ -897,7 +899,7 @@ defineOptions({
                 </p>
             </div>
 
-            <div v-else class="border-border bg-card overflow-x-auto border">
+            <div v-else class="border-border bg-card overflow-x-auto border" tabindex="0" role="region" aria-label="Product performance table">
                 <table class="w-full min-w-3xl text-left text-sm">
                     <thead
                         class="bg-secondary/60 text-muted-foreground text-xs uppercase"
@@ -923,7 +925,7 @@ defineOptions({
                             <td class="px-5 py-4 font-medium">
                                 <button
                                     type="button"
-                                    class="hover:text-primary focus-visible:ring-ring text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                                    class="hover:text-primary focus-visible:ring-ring max-md:min-h-11 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
                                     :aria-pressed="
                                         selectedProduct?.id === product.id
                                     "
@@ -979,7 +981,7 @@ defineOptions({
             >
                 <p class="font-medium">No category sales to report</p>
             </div>
-            <div v-else class="border-border bg-card overflow-x-auto border">
+            <div v-else class="border-border bg-card overflow-x-auto border" tabindex="0" role="region" aria-label="Category performance table">
                 <table class="w-full min-w-2xl text-left text-sm">
                     <thead
                         class="bg-secondary/60 text-muted-foreground text-xs uppercase"
@@ -1005,7 +1007,7 @@ defineOptions({
                             <td class="px-5 py-4 font-medium">
                                 <button
                                     type="button"
-                                    class="hover:text-primary focus-visible:ring-ring text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                                    class="hover:text-primary focus-visible:ring-ring max-md:min-h-11 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
                                     :aria-pressed="
                                         selectedCategory?.id === category.id
                                     "

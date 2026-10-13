@@ -4,6 +4,7 @@ import { formatCurrency } from '@/lib/currency';
 defineProps({
     price: { type: String, required: true },
     discountPrice: { type: String, default: null },
+    compact: { type: Boolean, default: false },
 });
 </script>
 
@@ -15,7 +16,10 @@ defineProps({
         >
             {{ formatCurrency(price) }}
         </span>
-        <span class="text-xl font-bold tracking-tight">
+        <span
+            class="max-w-full font-bold tracking-tight wrap-anywhere"
+            :class="compact ? 'text-sm sm:text-xl' : 'text-xl'"
+        >
             {{ formatCurrency(discountPrice ?? price) }}
         </span>
     </div>

@@ -452,7 +452,7 @@ watch([categoryId, brand, tagId], updateFilters);
                     v-if="products.data.length"
                     data="products"
                     :buffer="300"
-                    class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+                    class="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4"
                 >
                     <Link
                         v-for="product in products.data"
@@ -468,19 +468,20 @@ watch([categoryId, brand, tagId], updateFilters);
                             cancelProductPrefetch();
                             rememberCatalogVisit($event, product.id);
                         "
-                        class="border-border bg-card focus-visible:ring-ring group hover:border-primary/60 flex min-h-full flex-col overflow-hidden border transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                        class="border-border bg-card focus-visible:ring-ring group hover:border-primary/60 flex min-h-full min-w-0 flex-col overflow-hidden border transition-colors focus-visible:ring-2 focus-visible:outline-none"
                     >
-                        <div class="aspect-3/2 overflow-hidden">
+                        <div class="aspect-square overflow-hidden sm:aspect-3/2">
                             <ProductImage
                                 :image-url="product.image_url"
                                 :product-name="product.name"
-                                class="transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none"
+                                contain
+                                class="transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none [&_img]:size-[98%] lg:[&_img]:size-full lg:[&_img]:object-cover"
                             />
                         </div>
 
-                        <article class="flex flex-1 flex-col gap-3 p-4">
+                        <article class="flex min-w-0 flex-1 flex-col gap-2 p-2.5 sm:gap-3 sm:p-4">
                             <div class="flex flex-wrap items-center gap-2">
-                                <Badge variant="secondary">
+                                <Badge variant="secondary" class="max-w-full wrap-anywhere whitespace-normal">
                                     {{ product.category.name }}
                                 </Badge>
                                 <Badge v-if="product.is_featured">
@@ -491,18 +492,18 @@ watch([categoryId, brand, tagId], updateFilters);
                             <div>
                                 <p
                                     v-if="product.brand"
-                                    class="text-muted-foreground text-xs font-semibold tracking-wide uppercase"
+                                    class="text-muted-foreground truncate text-xs font-semibold tracking-wide uppercase"
                                 >
                                     {{ product.brand }}
                                 </p>
                                 <h3
-                                    class="mt-1 text-lg leading-snug font-bold tracking-tight"
+                                    class="mt-1 line-clamp-2 text-sm leading-snug font-bold tracking-tight wrap-anywhere sm:text-lg"
                                 >
                                     {{ product.name }}
                                 </h3>
                                 <p
                                     v-if="product.description"
-                                    class="text-muted-foreground mt-2 line-clamp-2 text-sm leading-6"
+                                    class="text-muted-foreground mt-2 hidden text-sm leading-6 sm:line-clamp-2"
                                 >
                                     {{ product.description }}
                                 </p>
@@ -512,15 +513,16 @@ watch([categoryId, brand, tagId], updateFilters);
                                 <ProductPrice
                                     :price="product.price"
                                     :discount-price="product.discount_price"
+                                    compact
                                 />
                                 <div
-                                    class="flex items-end justify-between gap-3"
+                                    class="flex flex-wrap items-end justify-between gap-2"
                                 >
                                     <StockAvailability
                                         :inventory="product.inventory"
                                     />
                                     <ArrowRight
-                                        class="text-muted-foreground size-4 shrink-0 transition-transform group-hover:translate-x-1 motion-reduce:transition-none"
+                                        class="text-muted-foreground hidden size-4 shrink-0 transition-transform group-hover:translate-x-1 motion-reduce:transition-none sm:block"
                                         aria-hidden="true"
                                     />
                                 </div>
@@ -531,13 +533,13 @@ watch([categoryId, brand, tagId], updateFilters);
                         <p
                             v-if="loading"
                             role="status"
-                            class="text-muted-foreground mt-6 text-center text-sm"
+                            class="text-muted-foreground col-span-full mt-6 text-center text-sm"
                         >
                             Loading more products...
                         </p>
                         <p
                             v-else-if="!hasMore"
-                            class="text-muted-foreground mt-6 text-center text-sm"
+                            class="text-muted-foreground col-span-full mt-6 text-center text-sm"
                         >
                             You've reached the end of the catalog.
                         </p>

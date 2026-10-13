@@ -5,6 +5,7 @@ import { computed, ref, watch } from 'vue';
 const props = defineProps({
     imageUrl: { type: String, default: null },
     productName: { type: String, required: true },
+    contain: { type: Boolean, default: true },
 });
 
 const failedToLoad = ref(false);
@@ -29,19 +30,20 @@ watch(
             :alt="`${productName} product image`"
             loading="lazy"
             decoding="async"
-            class="size-full object-cover"
+            class="size-full"
+            :class="contain ? 'object-contain' : 'object-cover'"
             @error="failedToLoad = true"
         />
         <div
             v-else
-            class="text-muted-foreground flex flex-col items-center gap-3 px-6 text-center"
+            class="text-muted-foreground flex min-w-0 flex-col items-center gap-2 px-2 text-center sm:gap-3 sm:px-6"
         >
             <span
-                class="border-border bg-background/50 flex size-14 items-center justify-center border"
+                class="border-border bg-background/50 flex size-10 items-center justify-center border sm:size-14"
             >
                 <ImageOff class="size-6" aria-hidden="true" />
             </span>
-            <span class="text-sm font-medium">Image unavailable</span>
+            <span class="text-xs font-medium wrap-anywhere sm:text-sm">Image unavailable</span>
         </div>
         <span
             v-if="hasImage && isDemoImage"
