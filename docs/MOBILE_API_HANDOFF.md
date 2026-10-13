@@ -102,6 +102,8 @@ All paths below are relative to `base_url`. GET routes also support HEAD through
 | PATCH  | /cart/items/{cartItem}             | Customer       | 200     |
 | DELETE | /cart/items/{cartItem}             | Customer       | 200     |
 | GET    | /checkout                          | Customer       | 200     |
+| GET    | /delivery-locations                | Customer       | 200     |
+| GET    | /checkout/delivery-quote           | Customer       | 200     |
 | POST   | /orders                            | Customer       | 201     |
 | GET    | /orders                            | Customer       | 200     |
 | GET    | /orders/{order}                    | Customer       | 200     |
@@ -185,7 +187,7 @@ GET returns:
 }
 ```
 
-PATCH requires `name` and `email` (same length/email/uniqueness rules, excluding the current user). Legacy mobile `default_delivery_address` remains nullable/max 255: omit to preserve, send null/blank to clear. Structured clients may instead send `default_delivery_destination`, `default_delivery_barangay_code`, and `default_delivery_address_details`; all three must be valid when saving. Optional `default_delivery_address_action` explicitly selects `keep`, `save`, or `clear`; structured keys without an action imply `save`. Keep leaves the saved address untouched, save stores validated components plus a server-formatted string, and clear clears both. Structured saves ignore a supplied assembled address. Profile responses retain their existing JSON shape; checkout's `delivery_address_prefill` uses saved components directly. Legacy free-text updates clear stale components and populate new ones only when matching is unambiguous. No existing text is guessed or silently discarded by migration.
+PATCH requires `name` and `email` (same length/email/uniqueness rules, excluding the current user). Legacy mobile `default_delivery_address` remains nullable/max 255: omit to preserve, send null/blank to clear. Existing v1 structured clients may send `default_delivery_destination`, `default_delivery_barangay_code`, and `default_delivery_address_details`. Nationwide clients also send `default_delivery_region_code`, nullable `default_delivery_province_code`, and `default_delivery_city_code`; the destination may be omitted and resolved from the city code. Complete parent membership is validated locally. Optional `default_delivery_address_action` explicitly selects `keep`, `save`, or `clear`; structured keys without an action imply `save`. Keep leaves the saved address untouched, save stores validated components plus a server-formatted string, and clear clears both. Structured saves ignore a supplied assembled address. Profile responses retain their existing JSON shape; checkout's `delivery_address_prefill` uses saved components directly. Legacy free-text updates clear stale components and populate new ones only when matching is unambiguous. No existing text is guessed or silently discarded by migration.
 
 New customers have `search_recommendations_enabled` and `product_view_recommendations_enabled` enabled by default, so no profile setup is needed. PATCH can independently disable either preference; turning one off pauses its recording/ranking and retains unexpired history. The global `personalized_recommendations_enabled` switch pauses all personal ranking and new search/view recording; all three preferences default to true. Re-enabling uses retained unexpired history. Retained activity expires after 90 days. Email changes clear the stored email verification timestamp; verification is currently optional/disabled.
 
@@ -303,13 +305,14 @@ Unpaginated `data` array. Returns current static directory rows, operational Sag
             "longitude": null,
             "email": null,
             "operating_hours": "8:00 AM–6:00 PM",
+            "operational_notice": "LBC COD Arrangement: Collection of both product payment and delivery fees is subject to confirmation with the LBC branch serving Battlefront's Sagay City operations. Current shipping rates and collection arrangements are configured for demonstration purposes and are not official LBC quotations.",
             "is_operational": true
         }
     ]
 }
 ```
 
-`id` integer; `name/city/operating_hours` strings; `is_operational` boolean; address/contact/email nullable strings; latitude/longitude nullable numbers. Other branches provide static reference information, not selectable live inventory pools.
+`id` integer; `name/city/operating_hours` strings; `is_operational` boolean; address/contact/email nullable strings; latitude/longitude nullable numbers. `operational_notice` is the Sagay-only COD confirmation notice and is null elsewhere. Other branches provide static reference information, not selectable live inventory pools.
 
 ## 5. Cart
 
@@ -482,7 +485,7 @@ Checkout cart lines omit the ordinary cart's availability and category/price fie
     "origin_city": "Sagay City",
     "destination": "Sagay City",
     "is_demo": true,
-    "assumption_label": "Battlefront-configured demo delivery assumptions; not official LBC rates.",
+    "assumption_label": "Battlefront-configured demonstration estimates, not official LBC quotations.",
     "shipping_profile": "standard",
     "base_fee": "80.00",
     "handling_surcharge": "0.00",
@@ -510,11 +513,51 @@ Calendar dates are checkout-only presentation. One server quote-generation date 
 
 ### PSGC delivery dropdown data
 
-Checkout preview also exposes additive `data.delivery_locations` and `data.delivery_address_prefill` fields from the bundled Q1 2026 PSGC dataset. Existing preview fields and quotes retain their contracts. No separate location request is needed.
+Checkout preview exposes compatible `data.delivery_locations` and `data.delivery_address_prefill` fields from the bundled Q1 2026 PSGC dataset. These remain bounded to the original 12 destinations. Updated nationwide clients use the additional local lookup and quote endpoints below; do not expect all geography in preview.
 
 Each location contains `destination` (the existing canonical delivery key), full string `code`, official `name`, `type`, `city_class`, nullable `province`, and `barangays: [{code, name}]`. Only the existing 12 supported destinations and their 300 barangays are returned. Bacolod is a highly urbanized city with no administrative province parent. Use readable names for labels and codes for barangay values; never derive codes from names or assume barangay numbers are codes.
 
 The prefill contains `delivery_destination`, `delivery_barangay_code`, and `delivery_address_details`, using empty strings for unknown values. It conservatively extracts recognizable parts of the existing free-text profile address. Keep ambiguous saved text as a reference instead of copying the entire address into street details. Clear the selected barangay whenever the destination changes.
+
+### Nationwide local lookup and selected-cart quote (additive v1 contract)
+
+All requests use the existing customer bearer token. `GET /delivery-locations` returns `{data:{version:"2026-03-31.v2",locations:[...]}}`. Lazily load:
+
+| Query | Result |
+| --- | --- |
+| `level=regions` | 18 regions: code/name |
+| `level=provinces&parent_code=1800000000` | Provinces in Negros Island Region: code/name/region_code |
+| `level=cities&parent_code=1804500000` | Cities/municipalities belonging to Negros Occidental |
+| `level=cities&parent_code=1300000000` | NCR cities/municipalities with no province |
+| `level=city&parent_code=1804523000` | One city for saved-address hydration |
+| `level=barangays&parent_code=1804523000` | Sagay barangays: code/name/city_code |
+
+City records include code/name/region_code/nullable province_code/destination/type/city_class. Use null province for independent localities, including HUCs, NCR, Isabela and SGA; null does not itself imply HUC. Manila district metadata belongs to City of Manila. Keep every code as a string. Reset descendants after parent changes and discard stale responses. Invalid parents return 422 `errors.parent_code`. No external PSGC API is needed.
+
+`GET /checkout/delivery-quote?delivery_city_code=1804523000&cart_item_ids[]=12` reviews only the customer's selected cart and returns `{data:{available:true,quote:{...}}}`. The quote adds `pricing_configured`, `destination_label`, `payment_methods` and `zone` (rule ID/version and geographic codes). Its `destination` is the selected city code. Render the label and monetary strings; choose payment only from `payment_methods`. Do not calculate shipping locally. A valid destination without configured pricing returns HTTP 200 with `available=true`, `pricing_configured=false`, `delivery_fee="0.00"`, total equal to product subtotal, `carrier=null`, null transit/calendar fields, and `payment_methods=["gcash","maya"]`. Show its notice and allow prepaid submission. Explicitly disabled/malformed rules return `available=false`; invalid city or cart selection returns 422. Foreign cart IDs never reveal their owner.
+
+Only the original 12 routes currently have approved demo fees and GCash/Maya/COD eligibility. Other nationwide addresses support GCash/Maya product-only checkout with no delivery fee, ETA, carrier assignment or LBC Shipment; the response and order metadata label pricing/logistics as not configured. Rates, preparation/transit ranges and collect-both COD arrangements for configured routes are Battlefront demonstration assumptions, not official LBC quotations or confirmed service agreements. Configured-route GCash/Maya orders pay the subtotal-plus-fee total to Battlefront with proof. Unconfigured-route GCash/Maya orders pay only the subtotal. COD completion still requires administrator confirmation of collection and is unavailable on unconfigured routes.
+
+New mobile delivery submissions use the following fields (wallets use multipart with a proof file):
+
+```json
+{
+    "cart_item_ids": [12],
+    "recipient_name": "Example Customer",
+    "contact_number": "EXAMPLE",
+    "fulfillment_method": "delivery",
+    "payment_method": "cod",
+    "delivery_region_code": "1800000000",
+    "delivery_province_code": "1804500000",
+    "delivery_city_code": "1804523000",
+    "delivery_barangay_code": "1804523018",
+    "delivery_address_details": "12 Mabini Street"
+}
+```
+
+`delivery_destination` may be omitted and resolved from `delivery_city_code`; if supplied it must match that code or its compatibility alias. Any nationwide parent field or code destination opts into complete hierarchy validation. Province is nullable only where the selected city has no administrative province. Incorrect parents return field-specific 422 errors. Server composition ignores client address/fees and placement recomputes eligibility and snapshots accepted facts. Existing alias/free-text and original barangay/details requests remain supported as documented below. Historical order addresses and snapshots are never rewritten. Customer defaults use equivalent `default_delivery_` fields through the existing web settings flow or mobile `PATCH /profile`.
+
+Order detail `delivery_quote` adds nullable `metadata` containing accepted geographic/rule/dataset facts, payment assumptions and structured address components. Historical metadata remains null. Existing `PATCH /profile` accepts the equivalent `default_delivery_` nationwide fields with `default_delivery_address_action=save`; its response shape remains compatible. Branch responses add nullable `operational_notice`, populated only for Sagay; show it in branch information. See [all configured rates, classification decisions and rollout instructions](PSGC_DELIVERY_DATA.md).
 
 ### POST /orders
 

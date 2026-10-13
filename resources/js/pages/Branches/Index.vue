@@ -218,6 +218,7 @@ const phoneUrl = (phoneNumber) => `tel:${phoneNumber.replaceAll(' ', '')}`;
                                 </div>
                             </div>
                         </dl>
+                        <p v-if="branch.operational_notice" class="text-muted-foreground mt-4 text-sm leading-6">{{ branch.operational_notice }}</p>
                     </article>
                 </div>
 

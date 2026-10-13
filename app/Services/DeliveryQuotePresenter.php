@@ -14,6 +14,8 @@ class DeliveryQuotePresenter
 {
     public const ESTIMATE_NOTICE = 'Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional. Prepaid orders are subject to payment verification; COD payment is collected upon delivery. This does not book or approve an LBC shipment.';
 
+    public function __construct(private readonly DeliveryRules $deliveryRules) {}
+
     /**
      * Calendar windows are checkout-only estimates anchored to the server quote date.
      *
@@ -26,17 +28,32 @@ class DeliveryQuotePresenter
             throw new InvalidArgumentException('Delivery presentation requires a quote and numeric subtotal.');
         }
 
+        $zone = $this->deliveryRules->zone($quote['destination']);
+
+        $pricingConfigured = $quote['pricing_configured'];
+
         return [
             ...$quote,
-            'carrier' => Config::string('battlefront.delivery.carrier'),
-            'packing_expectation' => $this->packingExpectation(ShippingProfile::from($quote['shipping_profile'])),
+            'zone' => [
+                'rule_id' => $zone['rule_id'],
+                'rules_version' => $zone['rules_version'],
+                'region_code' => $zone['region_code'],
+                'province_code' => $zone['province_code'],
+                'city_code' => $zone['city_code'],
+            ],
+            'destination_label' => $zone['destination'],
+            'payment_methods' => $zone['payment_methods'],
+            'carrier' => $pricingConfigured ? Config::string('battlefront.delivery.carrier') : null,
+            'packing_expectation' => $pricingConfigured ? $this->packingExpectation(ShippingProfile::from($quote['shipping_profile'])) : null,
             'product_subtotal' => $subtotal,
             'total' => bcadd($subtotal, $quote['delivery_fee'], 2),
-            'eta_anchor_date' => $anchor->toDateString(),
-            'eta_timezone' => $anchor->timezoneName,
-            'estimated_delivery_start' => $anchor->addDays($quote['eta_min_days'])->toDateString(),
-            'estimated_delivery_end' => $anchor->addDays($quote['eta_max_days'])->toDateString(),
-            'notice' => self::ESTIMATE_NOTICE,
+            'eta_anchor_date' => $pricingConfigured ? $anchor->toDateString() : null,
+            'eta_timezone' => $pricingConfigured ? $anchor->timezoneName : null,
+            'estimated_delivery_start' => $pricingConfigured ? $anchor->addDays($quote['eta_min_days'])->toDateString() : null,
+            'estimated_delivery_end' => $pricingConfigured ? $anchor->addDays($quote['eta_max_days'])->toDateString() : null,
+            'notice' => $pricingConfigured
+                ? self::ESTIMATE_NOTICE
+                : Config::string('battlefront.delivery.unconfigured_route.notice'),
         ];
     }
 
@@ -45,29 +62,35 @@ class DeliveryQuotePresenter
     {
         $shipment = $order->shipment;
 
-        if ($order->delivery_destination === null || $order->shipping_profile === null || $shipment === null) {
+        if ($order->delivery_destination === null || $order->shipping_profile === null) {
             return null;
         }
 
+        $pricingConfigured = ($order->delivery_quote_metadata['pricing_status'] ?? null) !== 'not_configured';
+
         return [
             'origin_city' => $order->delivery_origin_city,
+            'metadata' => $order->delivery_quote_metadata,
             'destination' => $order->delivery_destination,
             'is_demo' => $order->delivery_is_demo,
             'assumption_label' => $order->delivery_assumption_label,
+            'pricing_configured' => $pricingConfigured,
             'shipping_profile' => $order->shipping_profile->value,
             'base_fee' => $order->delivery_base_fee,
             'handling_surcharge' => $order->handling_surcharge,
             'delivery_fee' => $order->delivery_fee,
-            'preparation_days' => $shipment->preparation_days,
-            'transit_min_days' => $shipment->transit_min_days,
-            'transit_max_days' => $shipment->transit_max_days,
-            'eta_min_days' => $shipment->eta_min_days,
-            'eta_max_days' => $shipment->eta_max_days,
-            'carrier' => $shipment->carrier,
-            'packing_expectation' => $this->packingExpectation($order->shipping_profile),
+            'preparation_days' => $shipment?->preparation_days,
+            'transit_min_days' => $shipment?->transit_min_days,
+            'transit_max_days' => $shipment?->transit_max_days,
+            'eta_min_days' => $shipment?->eta_min_days,
+            'eta_max_days' => $shipment?->eta_max_days,
+            'carrier' => $shipment?->carrier,
+            'packing_expectation' => $pricingConfigured ? $this->packingExpectation($order->shipping_profile) : null,
             'product_subtotal' => $order->product_subtotal,
             'total' => $order->total_amount,
-            'notice' => self::ESTIMATE_NOTICE,
+            'notice' => $pricingConfigured
+                ? self::ESTIMATE_NOTICE
+                : Config::string('battlefront.delivery.unconfigured_route.notice'),
         ];
     }
 

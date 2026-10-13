@@ -32,8 +32,9 @@ export function loadAddressComponent(path, inlineTemplate = false, options = {})
     };
     const route = () => ({ url: '/orders', method: 'post' });
     route.form = () => ({ action: '/orders', method: 'post' });
+    route.url = (options = {}) => '/delivery-locations?' + new URLSearchParams(options.query ?? {});
     const generic = new Proxy({}, {
-        get: (_, key) => ['store', 'index', 'edit'].includes(key) ? route : primitive,
+        get: (_, key) => ['store', 'index', 'edit', 'show'].includes(key) ? route : primitive,
     });
     const modules = new Proxy({
         vue: Vue,

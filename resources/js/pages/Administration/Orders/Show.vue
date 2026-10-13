@@ -365,6 +365,26 @@ defineOptions({
                     :shipment="order.shipment"
                     :quote="order.delivery_quote"
                 />
+                <div
+                    v-if="
+                        order.delivery_quote?.pricing_configured === false &&
+                        !order.shipment
+                    "
+                    class="border-border bg-secondary/40 grid gap-2 border p-5 text-sm"
+                    role="status"
+                >
+                    <p class="font-semibold">
+                        Delivery pricing and logistics not configured
+                    </p>
+                    <p class="text-muted-foreground leading-6">
+                        This order includes the product subtotal only and has
+                        no LBC shipment or delivery estimate. Coordinate its
+                        fulfillment separately.
+                    </p>
+                    <p class="text-muted-foreground text-xs leading-5">
+                        {{ order.delivery_quote.assumption_label }}
+                    </p>
+                </div>
                 <section aria-labelledby="processing-details-heading">
                     <div class="mb-4">
                         <p class="text-muted-foreground text-sm">

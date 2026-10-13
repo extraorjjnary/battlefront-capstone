@@ -48,6 +48,9 @@ const checkout = {
     pickupQuote: { product_subtotal: cart.total, delivery_fee: '0.00', total: cart.total },
     deliveryQuotes: [{ destination: 'Sagay City', carrier: 'lbc', product_subtotal: cart.total,
         delivery_fee: '80.00', total: '200079.98', base_fee: '80.00', handling_surcharge: '0.00',
+        preparation_days: 1, packing_expectation: 'Standard packing', is_demo: true,
+        assumption_label: 'Battlefront-configured demonstration estimates, not official LBC quotations.',
+        notice: 'Battlefront estimates, not live LBC quotations or tracking.',
         estimated_delivery_start: '2026-10-13', estimated_delivery_end: '2026-10-15' }],
     deliveryLocations: [{ code: '1804523000', destination: 'Sagay City', name: 'Sagay City',
         barangays: [{ code: '1804523018', name: 'Poblacion II' }] }],
@@ -96,7 +99,10 @@ async function openBrowser(t) {
             if (message.error) request.reject(new Error(JSON.stringify(message.error)));
             else request.resolve(message.result);
         } else if (message.method === 'Fetch.requestPaused') {
-            void intercept(message.params).catch(error => exceptions.push(error.message));
+            void intercept(message.params).catch(error => {
+                if (error.message.includes('Invalid InterceptionId')) diagnostics.push(error.message);
+                else exceptions.push(error.message);
+            });
         } else if (message.method === 'Runtime.exceptionThrown') {
             exceptions.push(message.params.exceptionDetails.exception?.description ?? message.params.exceptionDetails.text);
         } else if (message.method === 'Log.entryAdded') {
@@ -140,6 +146,22 @@ async function openBrowser(t) {
             assert.notEqual(html, template, 'Replace the initial Inertia page with an isolated fixture');
             await command('Fetch.fulfillRequest', { requestId, responseCode: 200,
                 responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], body: Buffer.from(html).toString('base64') });
+        } else if (new URL(request.url).pathname.endsWith('/delivery-locations')) {
+            const url = new URL(request.url);
+            const level = url.searchParams.get('level');
+            const parent = url.searchParams.get('parent_code');
+            const city = { code: '1804523000', name: 'Sagay City', destination: 'Sagay City', region_code: '1800000000', province_code: '1804500000', type: 'city', city_class: 'CC' };
+            const locations = level === 'regions' ? [{ code: '1800000000', name: 'Negros Island Region' }]
+                : level === 'provinces' ? [{ code: '1804500000', name: 'Negros Occidental', region_code: '1800000000' }]
+                    : level === 'cities' && parent === '1804500000' ? [city]
+                        : level === 'city' ? [city]
+                            : level === 'barangays' ? checkout.deliveryLocations[0].barangays.map(barangay => ({ ...barangay, city_code: city.code })) : [];
+            await command('Fetch.fulfillRequest', { requestId, responseCode: 200,
+                responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body: Buffer.from(JSON.stringify({ data: { version: '2026-03-31.v2', locations } })).toString('base64') });
+        } else if (new URL(request.url).pathname.endsWith('/checkout/delivery-quote')) {
+            const quote = { ...checkout.deliveryQuotes[0], destination: '1804523000', destination_label: 'Sagay City', payment_methods: ['gcash', 'maya', 'cod'] };
+            await command('Fetch.fulfillRequest', { requestId, responseCode: 200,
+                responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body: Buffer.from(JSON.stringify({ data: { available: true, quote } })).toString('base64') });
         } else if (request.method !== 'GET') {
             await command('Fetch.failRequest', { requestId, errorReason: 'Aborted' });
         } else if (new URL(request.url).pathname.endsWith('/notifications/summary')) {
@@ -149,7 +171,7 @@ async function openBrowser(t) {
     };
     await command('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }, { urlPattern: '*/__responsive_fixture', requestStage: 'Response' }] });
     return {
-        command, evaluate, exceptions,
+        command, evaluate, exceptions, diagnostics,
         async show(component, props, customer = true) {
             fixture = { component, props, number: ++fixtureNumber, auth: customer ? { user: { id: 999999, name: 'Responsive Customer', email: 'fixture@example.test', role: customer === 'admin' ? 'administrator' : 'customer', appearance: 'dark' },
                 can: { useCustomerCart: customer !== 'admin', accessAdministration: customer === 'admin' } } : undefined };
@@ -253,8 +275,16 @@ test('responsive shopping layouts remain usable in a real browser', {
             await assertFits(browser, `checkout pickup ${width}`);
         }
         await browser.resize(320);
+        const checkoutState = await browser.evaluate(`(() => ({
+            hasDelivery: !!document.querySelector('input[name=fulfillment_method][value=delivery]'),
+            heading: document.querySelector('h1')?.textContent,
+            text: document.querySelector('main')?.innerText.slice(0, 300),
+        }))()`);
+        assert.equal(checkoutState.hasDelivery, true, `Checkout fixture must finish mounting: ${JSON.stringify(checkoutState)}; ${browser.exceptions.join('; ')}; ${browser.diagnostics.slice(-5).join('; ')}`);
         await browser.evaluate(`document.querySelector('input[name=fulfillment_method][value=delivery]').click()`);
-        await delay(100);
+        await delay(300);
+        assert.equal(await browser.evaluate(`document.querySelector('input[name=delivery_region_code]').value`), '1800000000');
+        assert.equal(await browser.evaluate(`document.querySelector('input[name=delivery_city_code]').value`), '1804523000');
         for (const value of ['gcash', 'maya', 'cod']) {
             await browser.evaluate(`document.querySelector('input[name=payment_method][value=${value}]').click()`);
             await delay(100);

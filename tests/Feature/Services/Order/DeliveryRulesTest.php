@@ -32,7 +32,8 @@ test('all configured destinations resolve approved fees and transit ranges witho
         'origin_city' => 'Sagay City',
         'destination' => $destination,
         'is_demo' => true,
-        'assumption_label' => 'Battlefront-configured demo delivery assumptions; not official LBC rates.',
+        'assumption_label' => 'Battlefront-configured demonstration estimates, not official LBC quotations.',
+        'pricing_configured' => true,
         'shipping_profile' => 'standard',
         'base_fee' => $baseFee,
         'handling_surcharge' => '0.00',
@@ -156,6 +157,24 @@ test('persisted mixed carts keep one surcharge when line quantities change', fun
         ->preparation_days->toBe(3)
         ->eta_min_days->toBe(4)
         ->eta_max_days->toBe(4);
+});
+
+test('valid nationwide destinations without configured pricing return a zero fee without an ETA', function () {
+    $product = Product::factory()->bulky()->make(['category_id' => 1]);
+
+    $quote = app(DeliveryRules::class)->quote(FulfillmentMethod::Delivery, '1380300000', [$product]);
+
+    expect($quote)
+        ->pricing_configured->toBeFalse()
+        ->shipping_profile->toBe('bulky')
+        ->base_fee->toBe('0.00')
+        ->handling_surcharge->toBe('0.00')
+        ->delivery_fee->toBe('0.00')
+        ->preparation_days->toBeNull()
+        ->transit_min_days->toBeNull()
+        ->transit_max_days->toBeNull()
+        ->eta_min_days->toBeNull()
+        ->eta_max_days->toBeNull();
 });
 
 test('pickup bypasses destination lookup and product evaluation', function (?string $destination) {

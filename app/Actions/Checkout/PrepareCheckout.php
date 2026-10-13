@@ -12,6 +12,8 @@ use App\Services\DeliveryQuotePresenter;
 use App\Services\Order\DeliveryRules;
 use App\Services\Order\PsgcDeliveryLocations;
 use Carbon\CarbonImmutable;
+use DomainException;
+use Illuminate\Validation\ValidationException;
 
 class PrepareCheckout
 {
@@ -39,8 +41,12 @@ class PrepareCheckout
         $deliveryQuotes = [];
 
         foreach (array_keys($this->deliveryRules->destinations()) as $destination) {
-            $quote = $this->deliveryRules->quote(FulfillmentMethod::Delivery, $destination, $products);
-            $deliveryQuotes[] = $this->deliveryQuotePresenter->checkout($quote, $cart['total'], $anchor);
+            try {
+                $quote = $this->deliveryRules->quote(FulfillmentMethod::Delivery, $destination, $products);
+                $deliveryQuotes[] = $this->deliveryQuotePresenter->checkout($quote, $cart['total'], $anchor);
+            } catch (DomainException) {
+                // A specific configured exclusion can retire a legacy route.
+            }
         }
         $pickupBranch = Branch::query()
             ->select(['name', 'address', 'city', 'contact_number'])
@@ -95,6 +101,28 @@ class PrepareCheckout
                 PaymentMethod::cases(),
             ),
         ];
+    }
+
+    /** @param list<int> $cartItemIds
+     * @return array<string, mixed>
+     */
+    public function quote(User $customer, array $cartItemIds, string $cityCode): array
+    {
+        $cart = $this->reviewCheckoutCart->execute($customer, $cartItemIds);
+        $products = Product::query()->select(['id', 'shipping_profile'])
+            ->whereKey(array_column(array_column($cart['items'], 'product'), 'id'))->get();
+        try {
+            $this->deliveryLocations->city($cityCode);
+        } catch (DomainException $exception) {
+            throw ValidationException::withMessages(['delivery_city_code' => $exception->getMessage()]);
+        }
+        try {
+            $quote = $this->deliveryRules->quote(FulfillmentMethod::Delivery, $cityCode, $products);
+        } catch (DomainException $exception) {
+            return ['available' => false, 'quote' => null, 'notice' => $exception->getMessage()];
+        }
+
+        return ['available' => true, 'quote' => $this->deliveryQuotePresenter->checkout($quote, $cart['total'], CarbonImmutable::now(config('app.timezone'))->startOfDay())];
     }
 
     /**

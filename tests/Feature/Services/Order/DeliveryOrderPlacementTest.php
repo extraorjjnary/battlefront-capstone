@@ -60,7 +60,7 @@ test('delivery placement snapshots each profile and the relative quote in one st
         ->handling_surcharge->toBe($surcharge)->delivery_fee->toBe($fee)
         ->product_subtotal->toBe('18.66')->total_amount->toBe($finalTotal)
         ->delivery_origin_city->toBe('Sagay City')->delivery_is_demo->toBeTrue()
-        ->delivery_assumption_label->toBe('Battlefront-configured demo delivery assumptions; not official LBC rates.')
+        ->delivery_assumption_label->toBe('Battlefront-configured demonstration estimates, not official LBC quotations.')
         ->status->toBe(OrderStatus::Pending)->payment_status->toBe(PaymentStatus::Pending);
     expect($order->shipment)->carrier->toBe('lbc')->status->toBe(ShipmentStatus::AwaitingPreparation)
         ->preparation_days->toBe($preparation)->transit_min_days->toBe(1)->transit_max_days->toBe(2)

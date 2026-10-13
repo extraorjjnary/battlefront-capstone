@@ -658,8 +658,10 @@ test('pending fixture schema stops seeding safely and its migration preserves ex
 
     $migration->up();
 
-    expect($ordinaryOrder->refresh()->getRawOriginal())->toBe($ordinaryBefore);
+    expect(collect($ordinaryOrder->refresh()->getRawOriginal())->sortKeys()->all())
+        ->toBe(collect($ordinaryBefore)->sortKeys()->all());
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
-    expect($ordinaryOrder->refresh()->getRawOriginal())->toBe($ordinaryBefore);
+    expect(collect($ordinaryOrder->refresh()->getRawOriginal())->sortKeys()->all())
+        ->toBe(collect($ordinaryBefore)->sortKeys()->all());
     $this->assertDatabaseCount('orders', 260);
 });

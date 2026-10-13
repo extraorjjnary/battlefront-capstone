@@ -11,6 +11,7 @@ use App\Http\Requests\Administration\SaveProductRequest;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\Tag;
+use App\Services\CatalogShippingClassification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
@@ -204,6 +205,9 @@ class ProductController extends Controller
         return Inertia::render('Administration/Products/Edit', [
             ...$this->productOptions(),
             'product' => [
+                'shipping_profile' => $product->shipping_profile->value,
+                'shipping_profile_source' => $product->shipping_profile_source,
+                'shipping_suggestion' => app(CatalogShippingClassification::class)->suggestion($product),
                 ...$product->only([
                     'id',
                     'product_code',

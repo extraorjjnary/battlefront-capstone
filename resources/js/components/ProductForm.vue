@@ -32,6 +32,8 @@ const categoryId = ref(
     String(props.product?.category_id ?? props.categories[0]?.id ?? ''),
 );
 const isFeatured = ref(props.product?.is_featured ?? false);
+const shippingProfile = ref(props.product?.shipping_profile ?? 'standard');
+const shippingProfileReviewed = ref(false);
 const selectedTagIds = ref([...(props.product?.tag_ids ?? [])]);
 const selectedImagePreviewUrl = ref(null);
 const imagePreviewFailed = ref(false);
@@ -95,6 +97,22 @@ function firstTagError(errors) {
             </div>
 
             <div class="grid gap-5 md:grid-cols-2">
+                <div class="grid gap-2 md:col-span-2">
+                    <Label for="shipping-profile">Shipping handling</Label>
+                    <Select v-model="shippingProfile" @update:model-value="shippingProfileReviewed = true">
+                        <SelectTrigger id="shipping-profile" class="w-full"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="standard">Standard</SelectItem>
+                            <SelectItem value="fragile">Fragile — protective packing</SelectItem>
+                            <SelectItem value="bulky">Bulky — additional handling</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <input type="hidden" name="shipping_profile" :value="shippingProfile" />
+                    <input type="hidden" name="shipping_profile_reviewed" :value="shippingProfileReviewed ? '1' : '0'" />
+                    <label class="flex items-center gap-2 text-sm"><input v-model="shippingProfileReviewed" type="checkbox" />Confirm this handling profile as reviewed</label>
+                    <p class="text-muted-foreground text-sm">{{ product?.shipping_suggestion?.reason ?? 'Review the product packing requirements.' }} Assignment: {{ product?.shipping_profile_source ?? 'Unreviewed' }}. Handling applies once per order.</p>
+                    <InputError :message="errors.shipping_profile" />
+                </div>
                 <div v-if="product" class="grid gap-2 md:col-span-2">
                     <Label for="product_code">Product code</Label>
                     <Input

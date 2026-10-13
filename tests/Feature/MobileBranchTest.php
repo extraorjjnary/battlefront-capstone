@@ -13,6 +13,7 @@ test('guests receive all five static branches in the same order and shape as the
         ->assertJsonCount(5, 'data')
         ->assertJsonPath('data.0.city', 'Sagay City')
         ->assertJsonPath('data.0.is_operational', true)
+        ->assertJsonPath('data.0.operational_notice', config('battlefront.sagay_cod_notice'))
         ->assertJsonPath('data.0.contact_number', '0938 647 6046')
         ->assertJsonPath('data.0.email', 'battlefrontcomputertrading@gmail.com')
         ->assertJsonPath('data.0.operating_hours', '8:00 AM–6:00 PM')
@@ -21,6 +22,7 @@ test('guests receive all five static branches in the same order and shape as the
         ->assertJsonPath('data.1.city', 'Bacolod City')
         ->assertJsonPath('data.1.email', 'battlefrontbacolod@gmail.com')
         ->assertJsonPath('data.1.is_operational', false)
+        ->assertJsonPath('data.1.operational_notice', null)
         ->assertJsonPath('data.2.city', 'Escalante City')
         ->assertJsonPath('data.2.address', null)
         ->assertJsonPath('data.2.contact_number', null)
@@ -30,7 +32,7 @@ test('guests receive all five static branches in the same order and shape as the
         ->assertJsonPath('data.4.email', null);
     expect(array_keys($response->json('data.0')))->toEqualCanonicalizing([
         'id', 'name', 'address', 'city', 'contact_number', 'latitude', 'longitude',
-        'email', 'operating_hours', 'is_operational',
+        'email', 'operating_hours', 'is_operational', 'operational_notice',
     ]);
     expect($response->json('data'))->toBe($webResponse->inertiaProps('branches'));
 });
@@ -46,7 +48,7 @@ test('unconfirmed branch fields remain null and hours come from configuration', 
         'id' => $branch->id, 'name' => 'Battlefront Computer Trading',
         'city' => 'Unconfirmed City', 'address' => null, 'contact_number' => null,
         'latitude' => null, 'longitude' => null, 'email' => null,
-        'operating_hours' => '9:00 AM–5:00 PM', 'is_operational' => false,
+        'operating_hours' => '9:00 AM–5:00 PM', 'is_operational' => false, 'operational_notice' => null,
     ]]]);
 });
 

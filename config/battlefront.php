@@ -12,14 +12,50 @@ return [
     'operating_hours' => '8:00 AM–6:00 PM',
 
     /**
-     * Battlefront-configured capstone/demo assumptions, not official LBC rates.
+     * Battlefront-configured demonstration estimates, not official LBC quotations.
      * Sagay is the fixed origin for this table; no runtime distance lookup is used.
      */
     'delivery' => [
         'carrier' => 'lbc',
         'origin_city' => 'Sagay City',
         'is_demo' => true,
-        'assumption_label' => 'Battlefront-configured demo delivery assumptions; not official LBC rates.',
+        'assumption_label' => 'Battlefront-configured demonstration estimates, not official LBC quotations.',
+        'rules_version' => 'nationwide-demo-v2',
+        'payment_assumptions' => [
+            'gcash' => 'Customer pays product subtotal and estimated delivery fee to Battlefront; Battlefront arranges shipment and pays the carrier at dispatch.',
+            'maya' => 'Customer pays product subtotal and estimated delivery fee to Battlefront; Battlefront arranges shipment and pays the carrier at dispatch.',
+            'cod' => 'Demonstration assumption: courier collects product payment and delivery fee together; carrier collection and remittance arrangements require confirmation. Administrator confirms successful collection.',
+        ],
+        'unconfigured_route' => [
+            'base_fee' => '0.00',
+            'payment_methods' => ['gcash', 'maya'],
+            'assumption_label' => 'Delivery pricing and third-party logistics are not configured for this destination. No delivery fee is included in this order, and no LBC quotation or booking exists.',
+            'notice' => 'Delivery fee not configured. Your order includes the product subtotal only; Battlefront will coordinate fulfillment separately.',
+            'payment_assumptions' => [
+                'gcash' => 'Customer pays the product subtotal only. No delivery fee is charged, and delivery logistics are coordinated separately.',
+                'maya' => 'Customer pays the product subtotal only. No delivery fee is charged, and delivery logistics are coordinated separately.',
+            ],
+        ],
+        // Specific rules supersede broader rules, including quotation-only exclusions.
+        // Enabled rules require base_fee, transit_min_days, transit_max_days and payment_methods.
+        'zones' => [
+            'cities' => [
+                '1804523000' => ['legacy_destination' => 'Sagay City', 'payment_methods' => ['gcash', 'maya', 'cod']],
+                '1804509000' => ['legacy_destination' => 'Escalante City', 'payment_methods' => ['gcash', 'maya', 'cod']],
+                '1804504000' => ['legacy_destination' => 'Cadiz City', 'payment_methods' => ['gcash', 'maya', 'cod']],
+                '1804529000' => ['legacy_destination' => 'Toboso', 'payment_methods' => ['gcash', 'maya', 'cod']],
+                '1804518000' => ['legacy_destination' => 'Manapla', 'payment_methods' => ['gcash', 'maya', 'cod']],
+                '1804505000' => ['legacy_destination' => 'Calatrava', 'payment_methods' => ['gcash', 'maya', 'cod']],
+                '1804531000' => ['legacy_destination' => 'Victorias City', 'payment_methods' => ['gcash', 'maya', 'cod']],
+                '1804508000' => ['legacy_destination' => 'E.B. Magalona', 'payment_methods' => ['gcash', 'maya', 'cod']],
+                '1804524000' => ['legacy_destination' => 'San Carlos City', 'payment_methods' => ['gcash', 'maya', 'cod']],
+                '1804526000' => ['legacy_destination' => 'Silay City', 'payment_methods' => ['gcash', 'maya', 'cod']],
+                '1804528000' => ['legacy_destination' => 'Talisay City', 'payment_methods' => ['gcash', 'maya', 'cod']],
+                '1830200000' => ['legacy_destination' => 'Bacolod City', 'payment_methods' => ['gcash', 'maya', 'cod']],
+            ],
+            'provinces' => [],
+            'regions' => [],
+        ],
         'destinations' => [
             'Sagay City' => ['base_fee' => '80.00', 'transit_min_days' => 0, 'transit_max_days' => 1],
             'Escalante City' => ['base_fee' => '100.00', 'transit_min_days' => 1, 'transit_max_days' => 1],
@@ -40,6 +76,8 @@ return [
             'bulky' => ['surcharge' => '100.00', 'preparation_days' => 3],
         ],
     ],
+
+    'sagay_cod_notice' => 'LBC COD Arrangement: Collection of both product payment and delivery fees is subject to confirmation with the LBC branch serving Battlefront\'s Sagay City operations. Current shipping rates and collection arrangements are configured for demonstration purposes and are not official LBC quotations.',
 
     'branch_emails' => [
         'Sagay City' => 'battlefrontcomputertrading@gmail.com',

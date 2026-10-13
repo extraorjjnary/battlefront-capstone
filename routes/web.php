@@ -26,6 +26,8 @@ use App\Http\Controllers\CartItemController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DeliveryLocationController;
+use App\Http\Controllers\DeliveryQuoteController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\NotificationController as CustomerNotificationController;
 use App\Http\Controllers\OrderCancellationController;
@@ -97,7 +99,11 @@ Route::middleware(['auth', 'can:use-customer-cart'])
     ->group(function () {
         Route::get('/', [CheckoutController::class, 'index'])
             ->name('index');
+        Route::get('delivery-quote', [DeliveryQuoteController::class, 'show'])->name('delivery-quote.show');
     });
+
+Route::get('delivery-locations', [DeliveryLocationController::class, 'index'])
+    ->middleware(['auth', 'can:use-customer-cart', 'throttle:120,1'])->name('delivery-locations.index');
 
 // customer orders
 Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {

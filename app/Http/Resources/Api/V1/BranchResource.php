@@ -25,6 +25,7 @@ class BranchResource extends JsonResource
             'email' => $this->resource['email'],
             'operating_hours' => $this->resource['operating_hours'],
             'is_operational' => $this->resource['is_operational'],
+            'operational_notice' => $this->resource['operational_notice'],
         ];
     }
 }

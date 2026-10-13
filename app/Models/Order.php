@@ -40,6 +40,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $delivery_origin_city
  * @property bool|null $delivery_is_demo
  * @property string|null $delivery_assumption_label
+ * @property array<string, mixed>|null $delivery_quote_metadata
  * @property numeric-string $total_amount
  * @property OrderStatus $status
  * @property PaymentStatus $payment_status
@@ -69,6 +70,7 @@ use Illuminate\Support\Carbon;
     'delivery_origin_city',
     'delivery_is_demo',
     'delivery_assumption_label',
+    'delivery_quote_metadata',
     'total_amount',
     'status',
     'payment_status',
@@ -180,7 +182,7 @@ class Order extends Model
     {
         static::updating(function (Order $order): void {
             if ($order->getRawOriginal('product_subtotal') !== null && $order->isDirty([
-                'user_id', 'fulfillment_method', 'delivery_address',
+                'user_id', 'fulfillment_method', 'delivery_address', 'delivery_quote_metadata',
                 'product_subtotal', 'total_amount', 'delivery_destination', 'delivery_base_fee',
                 'shipping_profile', 'handling_surcharge', 'delivery_fee',
                 'delivery_origin_city', 'delivery_is_demo', 'delivery_assumption_label',
@@ -224,6 +226,7 @@ class Order extends Model
             'delivery_fee' => 'decimal:2',
             'product_subtotal' => 'decimal:2',
             'delivery_is_demo' => 'boolean',
+            'delivery_quote_metadata' => 'array',
             'total_amount' => 'decimal:2',
             'status' => OrderStatus::class,
             'payment_status' => PaymentStatus::class,

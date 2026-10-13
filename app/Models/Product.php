@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Storage;
  * @property string $product_code
  * @property bool $is_catalog_imported
  * @property ShippingProfile $shipping_profile
+ * @property string|null $shipping_profile_source
  * @property string $name
  * @property string|null $description
  * @property int $category_id
