@@ -154,6 +154,7 @@ class OrderController extends Controller
                 'status' => $this->statusData($order->status),
                 'delivery_quote' => $quotes->stored($order),
                 'shipment' => $shipments->detail($order),
+                'can_create_manual_shipment' => $processing->canCreateManualShipment($order),
                 'shipment_actions' => $order->shipment === null ? null : [
                     'next_status' => $nextShipmentStatus === null ? null : [
                         'value' => $nextShipmentStatus->value,

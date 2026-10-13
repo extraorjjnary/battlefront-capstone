@@ -2,7 +2,9 @@
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
+use App\Enums\ShipmentArrangement;
 use App\Enums\ShipmentStatus;
+use App\Enums\ShippingProfile;
 use App\Models\Order;
 use App\Models\Shipment;
 use App\Models\User;
@@ -28,7 +30,8 @@ test('web and API expose identical persisted shipment facts at every lifecycle m
     $processing = app(OrderProcessingService::class);
     $timeline = [['status' => 'awaiting_preparation', 'label' => 'Awaiting preparation', 'occurred_at' => '2026-10-08T08:00:00+00:00']];
     $eta = [
-        'anchor_date' => null, 'timezone' => null, 'estimated_delivery_start' => null, 'estimated_delivery_end' => null,
+        'anchor_date' => null, 'timezone' => null, 'min_days' => 2, 'max_days' => 3,
+        'estimated_delivery_start' => null, 'estimated_delivery_end' => null,
         'notice' => 'Battlefront estimate from the start of preparation; arrival is not guaranteed.',
     ];
     $milestones = [
@@ -50,7 +53,9 @@ test('web and API expose identical persisted shipment facts at every lifecycle m
             ];
         }
         $expected = [
-            'carrier' => 'lbc', 'status' => ['value' => $status, 'label' => $label],
+            'carrier' => 'lbc',
+            'arrangement' => ['value' => 'configured_rate', 'label' => 'Configured-rate LBC delivery'],
+            'status' => ['value' => $status, 'label' => $label],
             'tracking_reference' => count($timeline) >= 4 ? 'SUPPLIED-REFERENCE' : null,
             'eta' => $eta, 'timeline' => $timeline,
             'notice' => 'Shipment status is manually maintained by Battlefront. This is not live LBC or GPS tracking.',
@@ -145,6 +150,40 @@ test('administrator shipment actions reflect order prerequisites and only the ne
     'old completed order' => [OrderStatus::Completed, PaymentStatus::Verified, null],
 ]);
 
+test('administrator order details offer manual setup only for eligible unconfigured deliveries', function () {
+    $administrator = User::factory()->administrator()->create();
+    $manualEligibleOrder = Order::factory()->delivery()->create([
+        'product_subtotal' => '100.00',
+        'delivery_destination' => 'City of Makati',
+        'delivery_base_fee' => '0.00',
+        'shipping_profile' => ShippingProfile::Standard,
+        'handling_surcharge' => '0.00',
+        'delivery_fee' => '0.00',
+        'delivery_origin_city' => 'Sagay City',
+        'delivery_is_demo' => false,
+        'delivery_assumption_label' => 'No delivery fee is included; no LBC quotation or booking exists.',
+        'delivery_quote_metadata' => ['pricing_status' => 'not_configured'],
+        'total_amount' => '100.00',
+        'status' => OrderStatus::Processing,
+        'payment_status' => PaymentStatus::Verified,
+    ]);
+    $configuredOrder = Order::factory()->withDeliverySnapshot()->create();
+
+    $this->actingAs($administrator)
+        ->get(route('administration.orders.show', $manualEligibleOrder))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('order.delivery_quote.pricing_configured', false)
+            ->where('order.can_create_manual_shipment', true)
+            ->where('order.shipment', null)
+            ->where('order.shipment_actions', null));
+
+    $this->get(route('administration.orders.show', $configuredOrder))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('order.delivery_quote.pricing_configured', true)
+            ->where('order.can_create_manual_shipment', false)
+            ->where('order.shipment', null));
+});
+
 test('old completed delivery is read only and does not invent delivery dates', function () {
     $order = shipmentPresentationOrder();
     $order->update(['status' => OrderStatus::Completed]);
@@ -158,3 +197,53 @@ test('old completed delivery is read only and does not invent delivery dates', f
     expect($order->refresh()->shipment->delivered_at)->toBeNull();
     $this->assertDatabaseCount('sales', 0);
 });
+
+test('manual shipment presentation distinguishes arrangement and does not invent an ETA', function (string $channel) {
+    $order = Order::factory()->delivery()->create([
+        'product_subtotal' => '100.00',
+        'delivery_destination' => 'City of Makati',
+        'delivery_base_fee' => '0.00',
+        'shipping_profile' => ShippingProfile::Standard,
+        'handling_surcharge' => '0.00',
+        'delivery_fee' => '0.00',
+        'delivery_origin_city' => 'Sagay City',
+        'delivery_is_demo' => false,
+        'delivery_assumption_label' => 'No delivery fee is included; no LBC quotation or booking exists.',
+        'delivery_quote_metadata' => ['pricing_status' => 'not_configured'],
+        'total_amount' => '100.00',
+        'status' => OrderStatus::Processing,
+        'payment_status' => PaymentStatus::Verified,
+    ]);
+    Shipment::factory()->for($order)->create([
+        'arrangement_type' => ShipmentArrangement::Manual,
+        'preparation_days' => null,
+        'transit_min_days' => null,
+        'transit_max_days' => null,
+        'eta_min_days' => null,
+        'eta_max_days' => null,
+    ]);
+    $customer = $order->user;
+    $this->actingAs($customer)->withToken($customer->createToken('Phone')->plainTextToken);
+
+    if ($channel === 'web') {
+        $this->get(route('orders.show', $order))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('order.shipment.arrangement', [
+                    'value' => 'manual',
+                    'label' => 'Manually arranged LBC delivery',
+                ])
+                ->where('order.shipment.eta.min_days', null)
+                ->where('order.shipment.eta.max_days', null)
+                ->where('order.shipment.eta.estimated_delivery_start', null)
+                ->where('order.delivery_fee', '0.00')
+                ->where('order.total', '100.00'));
+    } else {
+        $this->get('/api/v1/orders/'.$order->id)->assertOk()
+            ->assertJsonPath('data.shipment.arrangement.value', 'manual')
+            ->assertJsonPath('data.shipment.eta.min_days', null)
+            ->assertJsonPath('data.shipment.eta.max_days', null)
+            ->assertJsonPath('data.shipment.eta.estimated_delivery_start', null)
+            ->assertJsonPath('data.delivery_fee', '0.00')
+            ->assertJsonPath('data.total', '100.00');
+    }
+})->with(['web', 'api']);

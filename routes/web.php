@@ -11,6 +11,7 @@ use App\Http\Controllers\Administration\InventoryController;
 use App\Http\Controllers\Administration\NotificationController as AdministrationNotificationController;
 use App\Http\Controllers\Administration\OrderCodCollectionController;
 use App\Http\Controllers\Administration\OrderController as AdministrationOrderController;
+use App\Http\Controllers\Administration\OrderManualShipmentController;
 use App\Http\Controllers\Administration\OrderPaymentProofController;
 use App\Http\Controllers\Administration\OrderPaymentStatusController;
 use App\Http\Controllers\Administration\OrderPickupConfirmationController;
@@ -183,6 +184,8 @@ Route::middleware(['auth', 'can:access-administration'])
             ->only(['index', 'show']);
         Route::patch('orders/{order}/status', [OrderStatusController::class, 'update'])
             ->name('orders.status.update');
+        Route::post('orders/{order}/shipment/manual', [OrderManualShipmentController::class, 'store'])
+            ->name('orders.shipment.manual.store');
         Route::patch('orders/{order}/shipment/status', [OrderShipmentStatusController::class, 'update'])
             ->name('orders.shipment.status.update');
         Route::patch('orders/{order}/shipment/reference', [OrderShipmentReferenceController::class, 'update'])

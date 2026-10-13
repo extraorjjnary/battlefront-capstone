@@ -96,7 +96,7 @@ test('quotes share configured estimates and zero-fee unconfigured delivery optio
     $api->assertJsonPath('data.quote.delivery_fee', '130.00')
         ->assertJsonPath('data.quote.total', '330.00')
         ->assertJsonPath('data.quote.zone.rule_id', 'cities:1804523000')
-        ->assertJsonPath('data.quote.zone.rules_version', 'nationwide-demo-v2')
+        ->assertJsonPath('data.quote.zone.rules_version', 'nationwide-demo-v3')
         ->assertJsonPath('data.quote.zone.city_code', '1804523000')
         ->assertJsonMissingPath('data.quote.zone.base_fee');
     $this->getJson(route('checkout.delivery-quote.show', [...$query, 'delivery_city_code' => '1380300000']))
@@ -108,7 +108,7 @@ test('quotes share configured estimates and zero-fee unconfigured delivery optio
         ->assertJsonPath('data.quote.carrier', null)
         ->assertJsonPath('data.quote.estimated_delivery_start', null)
         ->assertJsonPath('data.quote.zone.rule_id', 'unconfigured:1380300000')
-        ->assertJsonPath('data.quote.payment_methods', ['gcash', 'maya']);
+        ->assertJsonPath('data.quote.payment_methods', ['gcash', 'maya', 'cod']);
     $this->actingAs(User::factory()->customer()->create())->getJson(route('checkout.delivery-quote.show', $query))->assertUnprocessable()->assertJsonValidationErrors('cart');
     $this->assertDatabaseCount('orders', 0);
 });
@@ -161,12 +161,12 @@ test('unconfigured nationwide routes place prepaid product-only orders without a
     expect($order->delivery_quote_metadata)
         ->pricing_status->toBe('not_configured')
         ->rule_id->toBe('unconfigured:1380300000')
-        ->payment_methods->toBe(['gcash', 'maya']);
+        ->payment_methods->toBe(['gcash', 'maya', 'cod']);
     expect($order->delivery_assumption_label)->toContain('No delivery fee is included', 'no LBC quotation or booking exists');
     expect($inventory->refresh()->quantity)->toBe(8);
 })->with(['web', 'api']);
 
-test('unconfigured nationwide routes do not offer COD without a courier collection arrangement', function () {
+test('unconfigured nationwide routes accept COD for product subtotal without a delivery fee', function (string $channel) {
     [$customer, $data] = nationwideCheckout();
     $barangay = app(PsgcDeliveryLocations::class)->cityBarangays('1380300000')[0]['code'];
     $data = [...$data,
@@ -174,11 +174,28 @@ test('unconfigured nationwide routes do not offer COD without a courier collecti
         'delivery_city_code' => '1380300000', 'delivery_barangay_code' => $barangay,
     ];
 
-    $this->actingAs($customer)->postJson(route('orders.store'), $data)
-        ->assertUnprocessable()
-        ->assertJsonValidationErrors('payment_method');
-    $this->assertDatabaseCount('orders', 0);
-});
+    $this->actingAs($customer)->withToken($customer->createToken('Phone')->plainTextToken);
+
+    $response = $this->post($channel === 'web' ? route('orders.store') : '/api/v1/orders', $data);
+
+    if ($channel === 'web') {
+        $response->assertSessionHasNoErrors()->assertRedirect();
+    } else {
+        $response->assertCreated()
+            ->assertJsonPath('data.payment.notice', fn (string $notice): bool => str_contains($notice, 'product subtotal is payable upon delivery'))
+            ->assertJsonPath('data.delivery_fee', '0.00')
+            ->assertJsonPath('data.shipment', null);
+    }
+    $order = Order::sole();
+    expect($order)
+        ->payment_method->value->toBe('cod')
+        ->product_subtotal->toBe('200.00')
+        ->delivery_fee->toBe('0.00')
+        ->total_amount->toBe('200.00')
+        ->payment_proof_path->toBeNull()
+        ->shipment->toBeNull();
+    expect($order->delivery_quote_metadata['payment_assumption'])->toContain('product subtotal only upon delivery', 'No delivery fee is collected');
+})->with(['web', 'api']);
 
 test('wallets and COD snapshot accepted fees and assumptions without trusting client prices', function (string $method, string $channel) {
     Storage::fake('local');

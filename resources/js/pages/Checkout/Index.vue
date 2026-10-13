@@ -624,12 +624,25 @@ defineOptions({
                         <Alert v-if="isCod">
                             <AlertTitle>Pay upon delivery</AlertTitle>
                             <AlertDescription>
+                                <template
+                                    v-if="
+                                        selectedQuote?.pricing_configured ===
+                                        false
+                                    "
+                                >
+                                    Only the product subtotal will be collected
+                                    upon delivery. No delivery fee is included,
+                                    and this order does not create or confirm an
+                                    LBC booking.
+                                </template>
+                                <template v-else>
                                 The total COD amount includes your products and
                                 the configured demo delivery fee. Payment will
                                 be collected upon delivery; no advance payment
                                 or payment proof is required. Battlefront
                                 manually arranges delivery. This selection does
                                 not book or approve COD with LBC.
+                                </template>
                             </AlertDescription>
                         </Alert>
 

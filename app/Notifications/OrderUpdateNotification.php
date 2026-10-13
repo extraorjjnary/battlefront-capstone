@@ -30,6 +30,7 @@ class OrderUpdateNotification extends Notification
             'payment.verified' => 'Payment verified',
             'payment.rejected' => 'Payment rejected',
             'order.cancelled' => 'Order cancelled',
+            'shipment.manual_created' => 'Delivery arrangement recorded',
             'shipment.preparing' => 'Preparing your shipment',
             'shipment.ready_for_dispatch' => 'Shipment ready for dispatch',
             'shipment.handed_to_lbc' => 'Shipment handed to LBC',

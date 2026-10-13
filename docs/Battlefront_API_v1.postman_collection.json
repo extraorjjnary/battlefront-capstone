@@ -74,7 +74,7 @@
                         "method": "GET",
                         "header": [{ "key": "Accept", "value": "application/json" }],
                         "url": "{{base_url}}/checkout/delivery-quote?delivery_city_code=1380300000&cart_item_ids[]={{cart_item_id}}",
-                        "description": "Valid address without configured pricing: HTTP 200, available=true, pricing_configured=false, delivery_fee=0.00, no ETA/carrier, and GCash/Maya eligibility. Submit product subtotal only; this does not create an LBC booking."
+                        "description": "Valid address without configured pricing: HTTP 200, available=true, pricing_configured=false, delivery_fee=0.00, no ETA/carrier, and GCash/Maya/COD eligibility. Submit product subtotal only; COD collects only that subtotal, and this does not create an LBC booking."
                     }
                 }
             ]

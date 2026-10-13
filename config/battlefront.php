@@ -20,7 +20,7 @@ return [
         'origin_city' => 'Sagay City',
         'is_demo' => true,
         'assumption_label' => 'Battlefront-configured demonstration estimates, not official LBC quotations.',
-        'rules_version' => 'nationwide-demo-v2',
+        'rules_version' => 'nationwide-demo-v3',
         'payment_assumptions' => [
             'gcash' => 'Customer pays product subtotal and estimated delivery fee to Battlefront; Battlefront arranges shipment and pays the carrier at dispatch.',
             'maya' => 'Customer pays product subtotal and estimated delivery fee to Battlefront; Battlefront arranges shipment and pays the carrier at dispatch.',
@@ -28,12 +28,13 @@ return [
         ],
         'unconfigured_route' => [
             'base_fee' => '0.00',
-            'payment_methods' => ['gcash', 'maya'],
+            'payment_methods' => ['gcash', 'maya', 'cod'],
             'assumption_label' => 'Delivery pricing and third-party logistics are not configured for this destination. No delivery fee is included in this order, and no LBC quotation or booking exists.',
             'notice' => 'Delivery fee not configured. Your order includes the product subtotal only; Battlefront will coordinate fulfillment separately.',
             'payment_assumptions' => [
                 'gcash' => 'Customer pays the product subtotal only. No delivery fee is charged, and delivery logistics are coordinated separately.',
                 'maya' => 'Customer pays the product subtotal only. No delivery fee is charged, and delivery logistics are coordinated separately.',
+                'cod' => 'Customer pays the product subtotal only upon delivery. No delivery fee is collected, and no LBC booking or carrier collection arrangement is represented.',
             ],
         ],
         // Specific rules supersede broader rules, including quotation-only exclusions.

@@ -34,6 +34,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/Forecasting/** | .ai/rules/forecasting.md |
 | ** | .ai/rules/general.md |
 | app/Http/Controllers/** | .ai/rules/http-controllers.md |
+| app/Services/Order/**,app/Services/CustomerOrderPresenter.php,app/Http/Requests/ValidateCheckoutRequest.php,config/battlefront.php,resources/js/pages/Checkout/**,docs/*API*,docs/PSGC_DELIVERY_DATA.md | .ai/rules/http-requests-js-pages-checkout.md |
 | app/Services/Dashboard/**,app/Repositories/Inventory/** | .ai/rules/inventory.md |
 | app/Http/Controllers/BranchController.php,resources/js/pages/Branches/**,resources/js/components/BranchMap.vue | .ai/rules/js-components.md |
 | app/Actions/{Checkout,Order}/**,app/Http/Requests/ValidateCheckoutRequest.php,app/Services/DeliveryQuotePresenter.php,resources/js/pages/Checkout/** | .ai/rules/js-pages-checkout.md |

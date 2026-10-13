@@ -104,7 +104,7 @@ test('unconfigured delivery addresses can proceed without a delivery fee or logi
                     destination: '1380300000',
                     destination_label: 'City of Makati',
                     pricing_configured: false,
-                    payment_methods: ['gcash', 'maya'],
+                    payment_methods: ['gcash', 'maya', 'cod'],
                     product_subtotal: '100.00',
                     delivery_fee: '0.00',
                     total: '100.00',
@@ -139,7 +139,7 @@ test('unconfigured delivery addresses can proceed without a delivery fee or logi
         await new Promise((resolve) => setImmediate(resolve));
         await Vue.nextTick();
 
-        const html = await renderToString(root());
+        let html = await renderToString(root());
         assert.match(html, /Delivery fee not configured/);
         assert.match(html, /pay the product\s+subtotal only/);
         assert.match(html, /No LBC quotation or booking exists/);
@@ -148,6 +148,16 @@ test('unconfigured delivery addresses can proceed without a delivery fee or logi
         assert.doesNotMatch(html, /Refresh quote|Retry quote/);
         assert.match(html, /Place order<\/button>/);
         assert.doesNotMatch(html, /Manual quotation required/);
+        findNode(
+            root(),
+            (node) =>
+                node.props?.name === 'payment_method' &&
+                node.props?.value === 'cod',
+        ).props.onChange();
+        html = await renderToString(root());
+        assert.match(html, /Only the product subtotal will be collected\s+upon delivery/);
+        assert.match(html, /No delivery fee is included/);
+        assert.doesNotMatch(html, /configured demo delivery fee/);
     } finally {
         scope.stop();
         globalThis.fetch = originalFetch;

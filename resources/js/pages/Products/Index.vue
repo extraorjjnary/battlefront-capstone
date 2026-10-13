@@ -1,5 +1,5 @@
 <script setup>
-import { Head, InfiniteScroll, Link, router, usePage } from '@inertiajs/vue3';
+import { Head, InfiniteScroll, Link, router, usePage } from "@inertiajs/vue3";
 import {
     ArrowRight,
     Boxes,
@@ -7,28 +7,28 @@ import {
     Search,
     SlidersHorizontal,
     X,
-} from '@lucide/vue';
-import { computed, ref, watch } from 'vue';
-import ProductImage from '@/components/catalog/ProductImage.vue';
-import ProductPrice from '@/components/catalog/ProductPrice.vue';
-import StockAvailability from '@/components/catalog/StockAvailability.vue';
-import RecommendationSection from '@/components/recommendations/RecommendationSection.vue';
-import StorefrontHeader from '@/components/StorefrontHeader.vue';
-import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
-import { useProductPrefetch } from '@/composables/useProductPrefetch';
-import { rememberCatalogVisit } from '@/lib/catalogReturn';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from "@lucide/vue";
+import { computed, ref, watch } from "vue";
+import ProductImage from "@/components/catalog/ProductImage.vue";
+import ProductPrice from "@/components/catalog/ProductPrice.vue";
+import StockAvailability from "@/components/catalog/StockAvailability.vue";
+import RecommendationSection from "@/components/recommendations/RecommendationSection.vue";
+import StorefrontHeader from "@/components/StorefrontHeader.vue";
+import { useDebouncedSearch } from "@/composables/useDebouncedSearch";
+import { useProductPrefetch } from "@/composables/useProductPrefetch";
+import { rememberCatalogVisit } from "@/lib/catalogReturn";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
     Select,
     SelectContent,
     SelectItem,
     SelectTrigger,
     SelectValue,
-} from '@/components/ui/select';
-import { index as productIndex, show as productShow } from '@/routes/products';
+} from "@/components/ui/select";
+import { index as productIndex, show as productShow } from "@/routes/products";
 
 const props = defineProps({
     products: { type: Object, required: true },
@@ -41,37 +41,37 @@ const props = defineProps({
 
 const page = usePage();
 const isAuthenticated = computed(() => Boolean(page.props.auth?.user));
-const categoryId = ref(String(props.filters.category_id ?? 'all'));
-const brand = ref(props.filters.brand ?? 'all');
-const tagId = ref(String(props.filters.tag_id ?? 'all'));
+const categoryId = ref(String(props.filters.category_id ?? "all"));
+const brand = ref(props.filters.brand ?? "all");
+const tagId = ref(String(props.filters.tag_id ?? "all"));
 const categoryPlaceholder = computed(() =>
-    categoryId.value !== 'all' &&
+    categoryId.value !== "all" &&
     !props.filter_options.categories.some(
         (category) => String(category.id) === categoryId.value,
     )
-        ? 'Selected category unavailable'
-        : 'All categories',
+        ? "Selected category unavailable"
+        : "All categories",
 );
 const brandPlaceholder = computed(() =>
-    brand.value !== 'all' && !props.filter_options.brands.includes(brand.value)
-        ? 'Selected brand unavailable'
-        : 'All brands',
+    brand.value !== "all" && !props.filter_options.brands.includes(brand.value)
+        ? "Selected brand unavailable"
+        : "All brands",
 );
 const tagPlaceholder = computed(() =>
-    tagId.value !== 'all' &&
+    tagId.value !== "all" &&
     !props.filter_options.tags.some((tag) => String(tag.id) === tagId.value)
-        ? 'Selected tag unavailable'
-        : 'All tags',
+        ? "Selected tag unavailable"
+        : "All tags",
 );
 const { prefetchProduct, cancelProductPrefetch } = useProductPrefetch();
 const catalogReloadProps = [
-    'products',
-    'filters',
-    'filter_options',
-    'recommendations',
-    'is_personalized',
-    'has_featured_fallback',
-    'guest_recommendation_scope',
+    "products",
+    "filters",
+    "filter_options",
+    "recommendations",
+    "is_personalized",
+    "has_featured_fallback",
+    "guest_recommendation_scope",
 ];
 
 const { search, isSearching, clearSearch, cancelPendingSearch } =
@@ -80,7 +80,7 @@ const { search, isSearching, clearSearch, cancelPendingSearch } =
         currentSearch: () => props.filters.q,
         route: productIndex,
         query: selectedFilters,
-        reset: ['products'],
+        reset: ["products"],
         only: catalogReloadProps,
         preserveScroll: false,
     });
@@ -88,7 +88,7 @@ const { search, isSearching, clearSearch, cancelPendingSearch } =
 const hasSearch = computed(() => Boolean(props.filters.q));
 const hasSearchInput = computed(() => Boolean(search.value.trim()));
 const hasAppliedFilters = computed(() =>
-    ['category_id', 'brand', 'tag_id'].some(
+    ["category_id", "brand", "tag_id"].some(
         (filter) => props.filters[filter] !== null,
     ),
 );
@@ -101,12 +101,12 @@ const showRecommendations = computed(
         !hasActiveQuery.value &&
         !hasSearchInput.value &&
         [categoryId.value, brand.value, tagId.value].every(
-            (value) => value === 'all',
+            (value) => value === "all",
         ),
 );
 
 function selectedValue(value) {
-    return value === 'all' ? undefined : value;
+    return value === "all" ? undefined : value;
 }
 
 function appliedFilters() {
@@ -131,7 +131,7 @@ function filtersAreCurrent() {
 
     return Object.keys(selected).every(
         (filter) =>
-            String(selected[filter] ?? '') === String(applied[filter] ?? ''),
+            String(selected[filter] ?? "") === String(applied[filter] ?? ""),
     );
 }
 
@@ -153,7 +153,7 @@ function updateFilters() {
             preserveScroll: false,
             preserveState: true,
             replace: true,
-            reset: ['products'],
+            reset: ["products"],
             only: catalogReloadProps,
         },
     );
@@ -161,9 +161,9 @@ function updateFilters() {
 
 function clearFilters() {
     cancelPendingSearch();
-    categoryId.value = 'all';
-    brand.value = 'all';
-    tagId.value = 'all';
+    categoryId.value = "all";
+    brand.value = "all";
+    tagId.value = "all";
 }
 
 watch([categoryId, brand, tagId], updateFilters);
@@ -201,12 +201,6 @@ watch([categoryId, brand, tagId], updateFilters);
                     >
                         Customer catalog
                     </p>
-                    <h1
-                        id="catalog-heading"
-                        class="mt-3 max-w-3xl text-3xl font-bold tracking-tight sm:text-4xl"
-                    >
-                        Computer hardware, clearly presented
-                    </h1>
                     <p
                         class="text-muted-foreground mt-4 max-w-2xl text-base leading-7"
                     >
@@ -222,8 +216,8 @@ watch([categoryId, brand, tagId], updateFilters);
                     <p class="text-muted-foreground text-sm font-medium">
                         {{
                             hasActiveQuery
-                                ? 'Products matching your catalog query'
-                                : 'Products available to browse'
+                                ? "Products matching your catalog query"
+                                : "Products available to browse"
                         }}
                     </p>
                     <p class="mt-1 text-3xl font-bold">{{ products.total }}</p>
@@ -304,8 +298,8 @@ watch([categoryId, brand, tagId], updateFilters);
                         >
                             {{
                                 isSearching
-                                    ? 'Updating results...'
-                                    : 'Results update automatically as you type.'
+                                    ? "Updating results..."
+                                    : "Results update automatically as you type."
                             }}
                         </p>
                     </div>
@@ -470,7 +464,9 @@ watch([categoryId, brand, tagId], updateFilters);
                         "
                         class="border-border bg-card focus-visible:ring-ring group hover:border-primary/60 flex min-h-full min-w-0 flex-col overflow-hidden border transition-colors focus-visible:ring-2 focus-visible:outline-none"
                     >
-                        <div class="aspect-square overflow-hidden sm:aspect-3/2">
+                        <div
+                            class="aspect-square overflow-hidden sm:aspect-3/2"
+                        >
                             <ProductImage
                                 :image-url="product.image_url"
                                 :product-name="product.name"
@@ -479,9 +475,14 @@ watch([categoryId, brand, tagId], updateFilters);
                             />
                         </div>
 
-                        <article class="flex min-w-0 flex-1 flex-col gap-2 p-2.5 sm:gap-3 sm:p-4">
+                        <article
+                            class="flex min-w-0 flex-1 flex-col gap-2 p-2.5 sm:gap-3 sm:p-4"
+                        >
                             <div class="flex flex-wrap items-center gap-2">
-                                <Badge variant="secondary" class="max-w-full wrap-anywhere whitespace-normal">
+                                <Badge
+                                    variant="secondary"
+                                    class="max-w-full wrap-anywhere whitespace-normal"
+                                >
                                     {{ product.category.name }}
                                 </Badge>
                                 <Badge v-if="product.is_featured">
@@ -557,15 +558,15 @@ watch([categoryId, brand, tagId], updateFilters);
                     <p class="mt-4 font-semibold">
                         {{
                             hasActiveQuery
-                                ? 'No products match your search and filters.'
-                                : 'No products are currently available to browse.'
+                                ? "No products match your search and filters."
+                                : "No products are currently available to browse."
                         }}
                     </p>
                     <p class="text-muted-foreground mt-1 text-sm">
                         {{
                             hasActiveQuery
-                                ? 'Try another search term or clear the applied filters.'
-                                : 'Please check again later for catalog updates.'
+                                ? "Try another search term or clear the applied filters."
+                                : "Please check again later for catalog updates."
                         }}
                     </p>
                     <div

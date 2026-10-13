@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\FulfillmentMethod;
+use App\Enums\ShipmentArrangement;
 use App\Enums\ShipmentStatus;
 use Database\Factories\ShipmentFactory;
 use DomainException;
@@ -16,12 +17,13 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $order_id
  * @property string $carrier
+ * @property ShipmentArrangement $arrangement_type
  * @property ShipmentStatus $status
- * @property int $preparation_days
- * @property int $transit_min_days
- * @property int $transit_max_days
- * @property int $eta_min_days
- * @property int $eta_max_days
+ * @property int|null $preparation_days
+ * @property int|null $transit_min_days
+ * @property int|null $transit_max_days
+ * @property int|null $eta_min_days
+ * @property int|null $eta_max_days
  * @property string|null $tracking_reference
  * @property Carbon|null $handed_to_carrier_at
  * @property Carbon|null $delivered_at
@@ -39,7 +41,7 @@ use Illuminate\Support\Carbon;
  * @property-read Order $order
  */
 #[Fillable([
-    'order_id', 'carrier', 'status', 'preparation_days', 'transit_min_days', 'transit_max_days',
+    'order_id', 'carrier', 'arrangement_type', 'status', 'preparation_days', 'transit_min_days', 'transit_max_days',
     'eta_min_days', 'eta_max_days', 'tracking_reference', 'handed_to_carrier_at', 'delivered_at',
     'preparing_at', 'ready_for_dispatch_at', 'in_transit_at', 'out_for_delivery_at', 'cancelled_at',
     'eta_anchor_date', 'eta_timezone', 'estimated_delivery_start', 'estimated_delivery_end',
@@ -51,6 +53,7 @@ class Shipment extends Model
 
     /** @var array<string, mixed> */
     protected $attributes = [
+        'arrangement_type' => 'configured_rate',
         'status' => 'awaiting_preparation',
     ];
 
@@ -64,20 +67,21 @@ class Shipment extends Model
     {
         static::saving(function (Shipment $shipment): void {
             if ($shipment->exists && $shipment->isDirty([
-                'order_id', 'carrier', 'preparation_days', 'transit_min_days', 'transit_max_days',
+                'order_id', 'carrier', 'arrangement_type', 'preparation_days', 'transit_min_days', 'transit_max_days',
                 'eta_min_days', 'eta_max_days',
             ])) {
                 throw new DomainException('Shipment ownership and quote context cannot be changed.');
             }
 
-            $hasQuotedDeliveryOrder = Order::query()
+            $order = Order::query()
                 ->whereKey($shipment->order_id)
-                ->where('fulfillment_method', FulfillmentMethod::Delivery->value)
-                ->whereNotNull('delivery_destination')
-                ->whereNotNull('shipping_profile')
-                ->exists();
+                ->first();
 
-            if (! $hasQuotedDeliveryOrder) {
+            if (
+                $order === null
+                || $order->fulfillment_method !== FulfillmentMethod::Delivery
+                || ! $shipment->belongsToEligibleOrder($order)
+            ) {
                 throw new DomainException('Shipments require a quoted delivery order.');
             }
 
@@ -89,10 +93,33 @@ class Shipment extends Model
         });
     }
 
+    private function belongsToEligibleOrder(Order $order): bool
+    {
+        if ($this->arrangement_type === ShipmentArrangement::Manual) {
+            return ($order->delivery_quote_metadata['pricing_status'] ?? null) === 'not_configured'
+                && $order->delivery_fee === '0.00'
+                && $order->product_subtotal !== null
+                && bccomp($order->total_amount, $order->product_subtotal, 2) === 0
+                && $this->carrier === 'lbc'
+                && $this->preparation_days === null
+                && $this->transit_min_days === null
+                && $this->transit_max_days === null
+                && (($this->eta_min_days === null && $this->eta_max_days === null)
+                    || ($this->eta_min_days !== null
+                        && $this->eta_max_days !== null
+                        && $this->eta_max_days >= $this->eta_min_days));
+        }
+
+        return $order->delivery_destination !== null
+            && $order->shipping_profile !== null
+            && ($order->delivery_quote_metadata['pricing_status'] ?? null) !== 'not_configured';
+    }
+
     /** @return array<string, string> */
     protected function casts(): array
     {
         return [
+            'arrangement_type' => ShipmentArrangement::class,
             'status' => ShipmentStatus::class,
             'preparation_days' => 'integer',
             'transit_min_days' => 'integer',

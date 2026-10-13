@@ -18,6 +18,7 @@ import { computed, ref } from 'vue';
 import OrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
 import OrderPaymentProofController from '@/actions/App/Http/Controllers/Administration/OrderPaymentProofController';
 import OrderPaymentStatusController from '@/actions/App/Http/Controllers/Administration/OrderPaymentStatusController';
+import OrderManualShipmentController from '@/actions/App/Http/Controllers/Administration/OrderManualShipmentController';
 import OrderStatusController from '@/actions/App/Http/Controllers/Administration/OrderStatusController';
 import OrderShipmentStatusController from '@/actions/App/Http/Controllers/Administration/OrderShipmentStatusController';
 import OrderShipmentReferenceController from '@/actions/App/Http/Controllers/Administration/OrderShipmentReferenceController';
@@ -66,6 +67,14 @@ const pickupConfirmationForm = useForm({
     products_handed_over_confirmed: false,
 });
 const orderStatusForm = useForm({ status: '' });
+const manualShipmentDialogOpen = ref(false);
+const manualShipmentForm = useForm({
+    arrangement_confirmed: false,
+    carrier: '',
+    tracking_reference: '',
+    eta_min_days: '',
+    eta_max_days: '',
+});
 const shipmentConfirmationOpen = ref(false);
 const shipmentStatusForm = useForm({ status: '', tracking_reference: null });
 const shipmentReferenceForm = useForm({
@@ -247,6 +256,38 @@ function submitShipmentReference() {
     );
 }
 
+function requestManualShipment() {
+    if (!props.order.can_create_manual_shipment || manualShipmentForm.processing) {
+        return;
+    }
+
+    manualShipmentForm.reset();
+    manualShipmentForm.clearErrors();
+    manualShipmentDialogOpen.value = true;
+}
+
+function submitManualShipment() {
+    if (
+        !props.order.can_create_manual_shipment ||
+        !manualShipmentForm.arrangement_confirmed ||
+        !manualShipmentForm.carrier ||
+        manualShipmentForm.processing
+    ) {
+        return;
+    }
+
+    manualShipmentForm.post(
+        OrderManualShipmentController.store(props.order.id),
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                manualShipmentDialogOpen.value = false;
+                manualShipmentForm.reset();
+            },
+        },
+    );
+}
+
 function selectPaymentStatus(status) {
     paymentStatusForm.payment_status = status;
     paymentStatusForm.clearErrors();
@@ -370,19 +411,178 @@ defineOptions({
                         order.delivery_quote?.pricing_configured === false &&
                         !order.shipment
                     "
-                    class="border-border bg-secondary/40 grid gap-2 border p-5 text-sm"
+                    class="border-border bg-secondary/40 grid gap-3 border p-5 text-sm"
                     role="status"
                 >
-                    <p class="font-semibold">
-                        Delivery pricing and logistics not configured
-                    </p>
+                    <p class="font-semibold">No configured delivery rate</p>
                     <p class="text-muted-foreground leading-6">
-                        This order includes the product subtotal only and has
-                        no LBC shipment or delivery estimate. Coordinate its
-                        fulfillment separately.
+                        This order remains at its saved product subtotal with
+                        no delivery fee. No LBC quote, booking, or estimate is
+                        implied. Recording a manually arranged LBC shipment
+                        will not change the saved order amount or add a fee.
                     </p>
                     <p class="text-muted-foreground text-xs leading-5">
                         {{ order.delivery_quote.assumption_label }}
+                    </p>
+                    <div v-if="order.can_create_manual_shipment">
+                        <Button
+                            type="button"
+                            @click="requestManualShipment"
+                        >
+                            <Truck />
+                            Create Manual Shipment
+                        </Button>
+                        <Dialog v-model:open="manualShipmentDialogOpen">
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>
+                                        Create Manual Shipment
+                                    </DialogTitle>
+                                    <DialogDescription>
+                                        Record an LBC arrangement confirmed
+                                        outside checkout. This does not add a
+                                        delivery fee or change the order total.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div class="grid gap-4">
+                                    <div class="grid gap-2">
+                                        <Label for="manual-shipment-carrier">
+                                            Carrier
+                                        </Label>
+                                        <Select
+                                            :model-value="manualShipmentForm.carrier"
+                                            @update:model-value="manualShipmentForm.carrier = $event"
+                                        >
+                                            <SelectTrigger
+                                                id="manual-shipment-carrier"
+                                                class="w-full"
+                                            >
+                                                <SelectValue
+                                                    placeholder="Select confirmed carrier"
+                                                />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="lbc">
+                                                    LBC
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <InputError
+                                            :message="manualShipmentForm.errors.carrier"
+                                        />
+                                    </div>
+                                    <div class="grid gap-2">
+                                        <Label for="manual-tracking-reference">
+                                            LBC tracking / reference (optional)
+                                        </Label>
+                                        <Input
+                                            id="manual-tracking-reference"
+                                            v-model="manualShipmentForm.tracking_reference"
+                                            maxlength="255"
+                                            placeholder="Enter only a reference actually supplied by LBC"
+                                        />
+                                        <InputError
+                                            :message="manualShipmentForm.errors.tracking_reference"
+                                        />
+                                    </div>
+                                    <fieldset class="grid gap-2">
+                                        <legend class="text-sm font-medium">
+                                            Estimated delivery from preparation
+                                            (optional)
+                                        </legend>
+                                        <p class="text-muted-foreground text-xs leading-5">
+                                            Enter both day values only when an
+                                            estimate is available. Leave both
+                                            blank if no estimate has been
+                                            supplied.
+                                        </p>
+                                        <div class="grid gap-3 sm:grid-cols-2">
+                                            <div class="grid gap-2">
+                                                <Label for="manual-eta-min">
+                                                    Minimum days
+                                                </Label>
+                                                <Input
+                                                    id="manual-eta-min"
+                                                    v-model="manualShipmentForm.eta_min_days"
+                                                    type="number"
+                                                    min="0"
+                                                    max="3650"
+                                                    step="1"
+                                                />
+                                                <InputError
+                                                    :message="manualShipmentForm.errors.eta_min_days"
+                                                />
+                                            </div>
+                                            <div class="grid gap-2">
+                                                <Label for="manual-eta-max">
+                                                    Maximum days
+                                                </Label>
+                                                <Input
+                                                    id="manual-eta-max"
+                                                    v-model="manualShipmentForm.eta_max_days"
+                                                    type="number"
+                                                    min="0"
+                                                    max="3650"
+                                                    step="1"
+                                                />
+                                                <InputError
+                                                    :message="manualShipmentForm.errors.eta_max_days"
+                                                />
+                                            </div>
+                                        </div>
+                                    </fieldset>
+                                    <div class="grid gap-2">
+                                        <div class="flex items-start gap-3">
+                                            <Checkbox
+                                                id="manual-arrangement-confirmed"
+                                                v-model="manualShipmentForm.arrangement_confirmed"
+                                            />
+                                            <Label
+                                                for="manual-arrangement-confirmed"
+                                                class="text-sm leading-5 font-normal"
+                                            >
+                                                I confirm LBC has accepted this
+                                                delivery arrangement. I
+                                                understand no delivery fee or
+                                                estimate is added unless
+                                                explicitly entered above.
+                                            </Label>
+                                        </div>
+                                        <InputError
+                                            :message="manualShipmentForm.errors.arrangement_confirmed"
+                                        />
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <DialogClose as-child>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                        >
+                                            Keep unconfigured
+                                        </Button>
+                                    </DialogClose>
+                                    <Button
+                                        type="button"
+                                        :disabled="
+                                            !manualShipmentForm.arrangement_confirmed ||
+                                            !manualShipmentForm.carrier ||
+                                            manualShipmentForm.processing
+                                        "
+                                        @click="submitManualShipment"
+                                    >
+                                        <Spinner
+                                            v-if="manualShipmentForm.processing"
+                                        />
+                                        Create Manual Shipment
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+                    <p v-else class="text-muted-foreground text-sm">
+                        Manual shipment setup is unavailable for this order's
+                        current status or payment state.
                     </p>
                 </div>
                 <section aria-labelledby="processing-details-heading">
