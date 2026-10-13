@@ -17,15 +17,17 @@ class SavePushDeviceRequest extends FormRequest
         return [
             'expo_push_token' => ['required', 'string', 'max:255', 'regex:/^(ExpoPushToken|ExponentPushToken)\[[A-Za-z0-9_-]+\]$/'],
             'platform' => ['required', 'string', 'in:ios,android'],
+            'notification_channel' => ['sometimes', 'nullable', 'string', 'in:order-updates-v2'],
         ];
     }
 
-    /** @return array{expo_push_token: string, platform: string} */
+    /** @return array{expo_push_token: string, platform: string, notification_channel: string|null} */
     public function deviceData(): array
     {
         return [
             'expo_push_token' => $this->string('expo_push_token')->toString(),
             'platform' => $this->string('platform')->toString(),
+            'notification_channel' => $this->input('notification_channel'),
         ];
     }
 }

@@ -67,6 +67,7 @@ Route::prefix('v1')
             Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
             Route::patch('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
             Route::patch('notifications/{notification}/read', [NotificationController::class, 'update'])->whereUuid('notification')->name('notifications.update');
+            Route::get('push-devices/{device}', [PushDeviceController::class, 'show'])->whereUuid('device')->name('push-devices.show');
             Route::put('push-devices/{device}', [PushDeviceController::class, 'update'])->whereUuid('device')->name('push-devices.update');
             Route::delete('push-devices/{device}', [PushDeviceController::class, 'destroy'])->whereUuid('device')->name('push-devices.destroy');
 

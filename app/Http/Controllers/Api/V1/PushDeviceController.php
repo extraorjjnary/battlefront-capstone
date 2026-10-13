@@ -12,6 +12,14 @@ use Illuminate\Http\Response;
 
 class PushDeviceController extends Controller
 {
+    public function show(Request $request, string $device, PushDeviceService $devices): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        return response()->json(['data' => $devices->status($user, $user->currentAccessToken(), $device)]);
+    }
+
     public function update(SavePushDeviceRequest $request, string $device, PushDeviceService $devices): JsonResponse
     {
         /** @var User $user */

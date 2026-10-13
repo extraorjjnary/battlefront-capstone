@@ -3,6 +3,7 @@
 namespace App\Services\Notifications;
 
 use App\Enums\UserRole;
+use App\Models\NotificationPushDelivery;
 use App\Models\PushDevice;
 use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -13,7 +14,7 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 class PushDeviceService
 {
-    /** @param array{expo_push_token: string, platform: string} $data */
+    /** @param array{expo_push_token: string, platform: string, notification_channel: string|null} $data */
     public function register(User $user, PersonalAccessToken $session, string $deviceId, array $data): PushDevice
     {
         try {
@@ -34,6 +35,7 @@ class PushDeviceService
                 $device->fill([
                     'personal_access_token_id' => $session->id, 'platform' => $data['platform'],
                     'expo_push_token' => $data['expo_push_token'], 'token_hash' => $hash,
+                    'notification_channel' => $data['platform'] === 'android' ? ($data['notification_channel'] ?? null) : null,
                     'is_active' => true,
                     'registration_version' => $sameRegistration ? $device->registration_version : (string) Str::uuid(),
                 ])->save();
@@ -49,6 +51,15 @@ class PushDeviceService
     {
         $device = PushDevice::query()->whereBelongsTo($user)->where('device_id', $deviceId)->firstOrFail();
         $this->deactivate($device);
+    }
+
+    /** @return array<string, mixed>|null */
+    public function status(User $user, PersonalAccessToken $session, string $deviceId): ?array
+    {
+        $device = PushDevice::query()->whereBelongsTo($user)->where('personal_access_token_id', $session->id)
+            ->where('device_id', $deviceId)->first();
+
+        return $device === null ? null : $this->present($device);
     }
 
     public function eligible(PushDevice $device): bool
@@ -71,12 +82,20 @@ class PushDeviceService
             ->update(['is_active' => false, 'expo_push_token' => null, 'token_hash' => null, 'updated_at' => now()]);
     }
 
-    /** @return array{id: int, device_id: string, platform: string, is_active: bool, updated_at: string} */
+    /** @return array{id: int, device_id: string, platform: string, is_active: bool, notification_channel: string|null, updated_at: string, last_delivery: array{status: string, error_code: string|null, current_registration: bool, updated_at: string}|null} */
     public function present(PushDevice $device): array
     {
+        $delivery = NotificationPushDelivery::query()->where('push_device_id', $device->id)->latest('id')->first();
+
         return [
             'id' => $device->id, 'device_id' => $device->device_id, 'platform' => $device->platform,
-            'is_active' => $device->is_active, 'updated_at' => $device->updated_at->toIso8601String(),
+            'is_active' => $device->is_active, 'notification_channel' => $device->notification_channel,
+            'updated_at' => $device->updated_at->toIso8601String(),
+            'last_delivery' => $delivery === null ? null : [
+                'status' => $delivery->status, 'error_code' => $delivery->error_code,
+                'current_registration' => $delivery->registration_version === $device->registration_version,
+                'updated_at' => $delivery->updated_at->toIso8601String(),
+            ],
         ];
     }
 }

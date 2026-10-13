@@ -4,6 +4,7 @@ return [
     'expo' => [
         'enabled' => env('EXPO_PUSH_ENABLED', false),
         'access_token' => env('EXPO_PUSH_ACCESS_TOKEN'),
+        'ca_bundle' => env('EXPO_PUSH_CA_BUNDLE'),
     ],
 
     /*

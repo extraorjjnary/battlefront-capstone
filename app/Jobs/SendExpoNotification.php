@@ -76,7 +76,7 @@ class SendExpoNotification implements ShouldQueue
             $result = $expo->send((string) $device->expo_push_token, [
                 'notification_id' => $notification->id, 'order_id' => $presented['order']['id'],
                 'deep_link' => $presented['order']['deep_link'],
-            ]);
+            ], $device->platform === 'android' ? $device->notification_channel : null);
         } catch (RuntimeException $exception) {
             $delivery->update(['status' => 'pending']);
             throw $exception;

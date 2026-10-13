@@ -18,6 +18,7 @@ use Laravel\Sanctum\PersonalAccessToken;
  * @property int|null $personal_access_token_id
  * @property string $platform
  * @property string|null $expo_push_token
+ * @property string|null $notification_channel
  * @property string|null $token_hash
  * @property string $registration_version
  * @property bool $is_active
@@ -25,8 +26,8 @@ use Laravel\Sanctum\PersonalAccessToken;
  * @property-read User $user
  * @property-read PersonalAccessToken|null $accessToken
  */
-#[Fillable(['user_id', 'device_id', 'personal_access_token_id', 'platform', 'expo_push_token', 'token_hash', 'registration_version', 'is_active'])]
-#[Hidden(['expo_push_token', 'token_hash', 'personal_access_token_id', 'registration_version'])]
+#[Fillable(['user_id', 'device_id', 'personal_access_token_id', 'platform', 'expo_push_token', 'token_hash', 'notification_channel', 'registration_version', 'is_active'])]
+#[Hidden(['expo_push_token', 'token_hash', 'notification_channel', 'personal_access_token_id', 'registration_version'])]
 class PushDevice extends Model
 {
     /** @use HasFactory<PushDeviceFactory> */
