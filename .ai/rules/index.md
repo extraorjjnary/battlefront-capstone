@@ -30,6 +30,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/js/composables/useNotificationPolling* | .ai/rules/composables.md |
 | app/Services/Order/**,app/Http/Controllers/**/*Order*,resources/js/pages/**/Orders/** | .ai/rules/controllers-js-pages-orders.md |
 | routes/**,app/Http/Controllers/** | .ai/rules/controllers.md |
+| app/Http/Controllers/{DashboardController,ProductCatalogController}.php,resources/js/pages/{Dashboard,Products}/** | .ai/rules/dashboard-products.md |
 | app/Services/Order/PsgcDeliveryLocations.php,app/Http/Requests/ValidateCheckoutRequest.php,app/Actions/Checkout/**,resources/js/pages/Checkout/**,app/Http/Resources/Api/V1/CheckoutResource.php,resources/data/psgc-delivery*.json | .ai/rules/data.md |
 | app/Actions/Forecasting/** | .ai/rules/forecasting.md |
 | ** | .ai/rules/general.md |

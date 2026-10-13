@@ -145,7 +145,7 @@ test('disposing the catalog cancels its pending hover request', (t) => {
     assert.equal(harness.request.mock.callCount(), 0);
 });
 
-function loadCatalog(rememberVisit) {
+function loadCatalog(rememberVisit, path = './Index.vue') {
     const primitive = {};
     const modules = new Proxy(
         {
@@ -175,8 +175,16 @@ function loadCatalog(rememberVisit) {
                 target[name] ?? new Proxy({}, { get: () => primitive }),
         },
     );
+    if (path === './Index.vue') {
+        modules['@/components/catalog/ProductCard.vue'] = {
+            default: loadCatalog(
+                rememberVisit,
+                '../../components/catalog/ProductCard.vue',
+            ),
+        };
+    }
     const { descriptor } = parse(
-        readFileSync(new URL('./Index.vue', import.meta.url), 'utf8'),
+        readFileSync(new URL(path, import.meta.url), 'utf8'),
     );
     const script = compileScript(descriptor, {
         id: 'catalog-prefetch-test',
@@ -199,6 +207,11 @@ function loadCatalog(rememberVisit) {
 }
 
 function productCard(node) {
+    if (node?.props?.product && typeof node.type?.setup === 'function') {
+        return productCard(
+            node.type.setup(node.props, { expose() {} })({}, []),
+        );
+    }
     if (node?.type === Link && node.props?.href?.url === '/products/1')
         return node;
     const children = Array.isArray(node?.children)
@@ -242,7 +255,7 @@ test('catalog cards wire hover cancellation while retaining their Inertia links 
             { expose() {} },
         ),
     );
-    const card = productCard(render({}, []));
+    const card = harness.scope.run(() => productCard(render({}, [])));
     assert.deepEqual(card.props.href, productRoute(1));
     assert.equal(card.props.prefetch, undefined);
 

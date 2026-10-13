@@ -92,6 +92,120 @@ test('nationwide quotes discard stale responses and use server payment eligibili
     }
 });
 
+function quoteLoadingHarness(t) {
+    const scope = Vue.effectScope();
+    t.after(() => scope.stop());
+    const requests = [];
+    t.mock.method(
+        globalThis,
+        'fetch',
+        (url) => new Promise((resolve) => requests.push({ url, resolve })),
+    );
+    const render = scope.run(() =>
+        loadPage(true).setup(checkoutProps(), { expose() {} }),
+    );
+    const root = () => render({}, []);
+    const chooseFulfillment = (value) =>
+        findNode(
+            root(),
+            (node) =>
+                node.props?.name === 'fulfillment_method' &&
+                node.props?.value === value,
+        ).props.onChange();
+    const setDestination = async (destination) => {
+        findNode(root(), (node) => node.props?.locations === locations).props[
+            'onUpdate:modelValue'
+        ]({
+            ...emptyDeliveryAddress(),
+            delivery_destination: destination,
+        });
+        await Vue.nextTick();
+    };
+    const reply = async (index, data, ok = true) => {
+        requests[index].resolve({ ok, json: async () => ({ data }) });
+        await new Promise((resolve) => setImmediate(resolve));
+        await Vue.nextTick();
+    };
+
+    return {
+        root,
+        chooseFulfillment,
+        setDestination,
+        reply,
+        html: () => renderToString(root()),
+    };
+}
+
+test('checkout shows a local skeleton for the current quote request and discards stale completion', async (t) => {
+    const checkout = quoteLoadingHarness(t);
+    assert.doesNotMatch(await checkout.html(), /delivery-quote-skeleton/);
+    checkout.chooseFulfillment('delivery');
+    assert.doesNotMatch(await checkout.html(), /delivery-quote-skeleton/);
+    await checkout.setDestination('1804523000');
+
+    let html = await checkout.html();
+    assert.match(html, /role="status"[\s\S]*Refreshing delivery estimate/);
+    assert.match(
+        html,
+        /data-slot="delivery-quote-skeleton" aria-hidden="true"/,
+    );
+    assert.doesNotMatch(html, /LBC delivery estimate/);
+
+    await checkout.setDestination('1380300000');
+    const quote = checkoutProps().deliveryQuotes[0];
+    await checkout.reply(0, { quote: { ...quote, destination: '1804523000' } });
+    assert.match(await checkout.html(), /delivery-quote-skeleton/);
+    await checkout.reply(1, { quote: { ...quote, destination: '1380300000' } });
+    html = await checkout.html();
+    assert.match(html, /LBC delivery estimate/);
+    assert.doesNotMatch(
+        html,
+        /delivery-quote-skeleton|Refreshing delivery estimate/,
+    );
+
+    await checkout.setDestination('1804523000');
+    checkout.chooseFulfillment('pickup');
+    await Vue.nextTick();
+    await checkout.reply(2, { quote: { ...quote, destination: '1804523000' } });
+    html = await checkout.html();
+    assert.match(html, /Pickup address/);
+    assert.doesNotMatch(html, /delivery-quote-skeleton|LBC delivery estimate/);
+});
+
+test('quote failures clear the skeleton and retry resolves to the existing unavailable notice', async (t) => {
+    const checkout = quoteLoadingHarness(t);
+    checkout.chooseFulfillment('delivery');
+    await checkout.setDestination('1804523000');
+    await checkout.reply(0, {}, false);
+
+    let html = await checkout.html();
+    assert.match(
+        html,
+        /role="alert"[\s\S]*Unable to refresh the delivery quote/,
+    );
+    assert.match(html, /Retry quote/);
+    assert.doesNotMatch(html, /delivery-quote-skeleton/);
+
+    const retry = findNode(
+        checkout.root(),
+        (node) =>
+            node.type === 'button' &&
+            typeof node.children === 'string' &&
+            node.children.includes('Retry quote'),
+    );
+    const pending = retry.props.onClick();
+    assert.match(await checkout.html(), /delivery-quote-skeleton/);
+    await checkout.reply(1, {
+        quote: null,
+        notice: 'Delivery is unavailable for this location.',
+    });
+    await pending;
+    html = await checkout.html();
+    assert.match(html, /Delivery unavailable/);
+    assert.match(html, /Delivery is unavailable for this location/);
+    assert.doesNotMatch(html, /delivery-quote-skeleton|Retry quote/);
+});
+
 test('unconfigured delivery addresses allow subtotal-only checkout without a quoted ETA', async () => {
     const scope = Vue.effectScope();
     const originalFetch = globalThis.fetch;

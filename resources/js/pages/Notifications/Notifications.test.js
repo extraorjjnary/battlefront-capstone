@@ -4,6 +4,7 @@ import test from 'node:test';
 import { compileScript, parse } from '@vue/compiler-sfc';
 import { renderToString } from '@vue/server-renderer';
 import * as Vue from 'vue';
+import { loadSkeletonComponent } from '../../lib/skeletonTestHelpers.js';
 
 const primitive = {
     render() {
@@ -42,6 +43,9 @@ function loadNotificationComponent(
         unread = 0,
         router = {},
         refreshSummary = () => {},
+        loading = Vue.ref(false),
+        error = Vue.ref(''),
+        summary = Vue.ref({ unread_count: unread, recent }),
         inlineTemplate = true,
     } = {},
 ) {
@@ -54,6 +58,9 @@ function loadNotificationComponent(
             ArrowRight: primitive,
         },
         '@/components/ui/button': { Button: button },
+        '@/components/ListSkeleton.vue': {
+            default: loadSkeletonComponent('ListSkeleton.vue'),
+        },
         '@/components/CatalogPagination.vue': { default: primitive },
         '@/components/ui/dropdown-menu': {
             DropdownMenu: primitive,
@@ -66,7 +73,7 @@ function loadNotificationComponent(
         '@/composables/useNotificationNavigation': {
             useNotificationNavigation: () => ({
                 isAdministrator: Vue.ref(administrator),
-                summary: Vue.ref({ unread_count: unread, recent }),
+                summary,
                 index: () => ({
                     url: administrator
                         ? '/administration/notifications'
@@ -85,8 +92,8 @@ function loadNotificationComponent(
         },
         '@/composables/useNotificationPolling': {
             useNotificationPolling: () => ({
-                loading: Vue.ref(false),
-                error: Vue.ref(''),
+                loading,
+                error,
                 refresh: refreshSummary,
             }),
         },
@@ -229,4 +236,55 @@ test('bell refreshes the summary and marks a notification read before opening it
     assert.equal(visits.length, 0);
     readRequest[2].onSuccess();
     assert.deepEqual(visits, ['/orders/1']);
+});
+
+test('bell shows skeletons only while an empty summary is loading and resolves to real or empty content', async () => {
+    const loading = Vue.ref(true);
+    const summary = Vue.ref({ unread_count: 0, recent: [] });
+    const component = loadNotificationComponent(
+        '../../components/NotificationBell.vue',
+        { loading, summary },
+    );
+    const html = () => renderToString(Vue.h(component));
+
+    let rendered = await html();
+    assert.match(rendered, /role="status"[\s\S]*Loading notifications/);
+    assert.match(rendered, /data-slot="list-skeleton"/);
+    assert.doesNotMatch(rendered, /No order updates yet/);
+
+    summary.value = { unread_count: 1, recent: [notificationFixture()] };
+    rendered = await html();
+    assert.match(rendered, /Payment verified/);
+    assert.doesNotMatch(rendered, /list-skeleton|Loading notifications/);
+
+    loading.value = false;
+    summary.value = { unread_count: 0, recent: [] };
+    rendered = await html();
+    assert.match(rendered, /No order updates yet/);
+    assert.doesNotMatch(rendered, /list-skeleton/);
+});
+
+test('bell retains cached entries during refresh and displays errors without a stuck skeleton', async () => {
+    const loading = Vue.ref(true);
+    const error = Vue.ref('');
+    const component = loadNotificationComponent(
+        '../../components/NotificationBell.vue',
+        {
+            loading,
+            error,
+            recent: [notificationFixture()],
+            unread: 1,
+        },
+    );
+
+    let html = await renderToString(Vue.h(component));
+    assert.match(html, /Payment verified/);
+    assert.doesNotMatch(html, /list-skeleton/);
+
+    error.value = 'Unable to refresh notifications.';
+    loading.value = false;
+    html = await renderToString(Vue.h(component));
+    assert.match(html, /role="alert"[\s\S]*Unable to refresh notifications/);
+    assert.match(html, /Payment verified/);
+    assert.doesNotMatch(html, /list-skeleton/);
 });

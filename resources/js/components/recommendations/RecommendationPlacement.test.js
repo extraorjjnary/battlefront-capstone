@@ -208,7 +208,6 @@ function catalogProps(overrides = {}) {
         },
         filters: { q: null, category_id: null, brand: null, tag_id: null },
         filter_options: { categories: [], brands: [], tags: [] },
-        featured_products: [],
         recommendations: [
             {
                 product: { id: 99, name: 'Behavioral suggestion' },
@@ -520,6 +519,7 @@ test('first live catalog search and clear refresh filters and recommendations al
     assert.equal(requests[0].route.url, '/products?q=laptop');
     assert.ok(requests[0].options.only?.includes('filters'));
     assert.ok(requests[0].options.only?.includes('recommendations'));
+    assert.ok(requests[0].options.only?.includes('recommendations_enabled'));
     props.filters = { ...props.filters, q: 'laptop' };
     props.recommendations = [];
     requests[0].options.onFinish();
@@ -529,6 +529,7 @@ test('first live catalog search and clear refresh filters and recommendations al
     assert.equal(requests[1].route.url, '/products');
     assert.ok(requests[1].options.only.includes('filters'));
     assert.ok(requests[1].options.only.includes('recommendations'));
+    assert.ok(requests[1].options.only.includes('recommendations_enabled'));
     assert.deepEqual(requests[1].options.reset, ['products']);
     props.filters = { ...props.filters, q: null };
     props.recommendations = catalogProps().recommendations;
@@ -601,69 +602,61 @@ test('profile settings explain disabled discovery sections and remaining context
 });
 
 
-test('catalog renders curated products before distinct recommendations with shared product cards', async () => {
+test('featured products retain main grid badges and navigation without a standalone showcase', async () => {
     const props = catalogProps();
-    props.featured_products = [{ ...props.products.data[0], id: 77, name: 'Curated hardware', is_featured: true }];
-    props.recommendations.unshift({ product: props.featured_products[0], reasons: [{ code: 'matched_recent_searches' }] });
+    props.products.data[0] = { ...props.products.data[0], id: 77, name: 'Featured hardware', is_featured: true };
     const html = await renderToString(Vue.h(loadComponent('../../pages/Products/Index.vue'), props));
     assert.match(html, /<h1 id="catalog-heading"/);
-    assert.ok(html.indexOf('Featured Products') < html.indexOf('Recommended for you'));
+    assert.doesNotMatch(html, /featured-products-heading|Featured Products|Selected by Battlefront, with current stock available/);
     assert.ok(html.indexOf('Recommended for you') < html.indexOf('All products'));
     assert.equal(html.split('href="/products/77"').length - 1, 1);
-    assert.ok(html.includes('href="/products/77"'));
-    assert.match(html, /Featured/);
-    assert.match(html, /grid-cols-2/);
+    const results = html.split('data-catalog-results')[1];
+    assert.match(results, />\s*Featured\s*</);
+    assert.match(results, /Featured hardware/);
+    assert.match(results, /grid-cols-2/);
     assert.match(html, /Sort by/);
     for (const label of ['Featured First', 'Price: Low to High', 'Price: High to Low']) assert.ok(html.includes(label));
-    assert.match(html, /Ordinary catalog product/);
 });
 
-test('empty featured and fully overlapping recommendation sections leave no empty block', async () => {
+test('featured products remain visible in recommendations even when also present in the main grid', async () => {
     const props = catalogProps();
-    let html = await renderToString(Vue.h(loadComponent('../../pages/Products/Index.vue'), props));
+    props.products.data[0] = { ...props.products.data[0], id: 99, name: 'Recommended featured hardware', is_featured: true };
+    props.recommendations[0].product = props.products.data[0];
+    const html = await renderToString(Vue.h(loadComponent('../../pages/Products/Index.vue'), props));
     assert.doesNotMatch(html, /featured-products-heading/);
-    props.featured_products = [{ ...props.products.data[0], id: 99 }];
-    html = await renderToString(Vue.h(loadComponent('../../pages/Products/Index.vue'), props));
-    assert.match(html, /featured-products-heading/);
-    assert.doesNotMatch(html, /data-placement="catalog"|Recommended for you/);
+    assert.match(html, /data-placement="catalog"/);
+    assert.match(html.split('data-placement="catalog"')[1].split('All products')[0], /Recommended featured hardware/);
+    assert.match(html.split('data-catalog-results')[1], /Recommended featured hardware/);
 });
 
 for (const [filter, value] of Object.entries({ q: 'Atlas', category_id: 7, brand: 'Atlas', tag_id: 8 })) {
-    test('featured showcase stays hidden during ' + filter + ' filtering even with stale props', async () => {
+    test('featured badges remain on main grid matches during ' + filter + ' filtering', async () => {
         const props = catalogProps();
-        props.featured_products = [props.products.data[0]];
+        props.products.data[0].is_featured = true;
         props.filters[filter] = value;
         const html = await renderToString(Vue.h(loadComponent('../../pages/Products/Index.vue'), props));
-        assert.doesNotMatch(html, /featured-products-heading/);
+        assert.doesNotMatch(html, /featured-products-heading|data-placement="catalog"/);
+        assert.match(html.split('data-catalog-results')[1], />\s*Featured\s*</);
     });
 }
 
-test('featured visibility follows pending intent and ignores recommendation preferences and sorting', () => {
-    const props = Vue.reactive(catalogProps({ recommendations: [], is_personalized: false }));
-    props.featured_products = [props.products.data[0]];
-    const scope = Vue.effectScope();
-    try {
-        const component = loadComponent('../../pages/Products/Index.vue', { inlineTemplate: false });
-        const state = scope.run(() => component.setup(props, { expose() {} }));
-        assert.equal(state.showFeatured.value, true);
-        state.search.value = 'Atlas';
-        assert.equal(state.showFeatured.value, false);
-        state.search.value = '';
-        state.brand.value = 'Atlas';
-        assert.equal(state.showFeatured.value, false);
-        state.brand.value = 'all';
-        state.sort.value = 'price_desc';
-        assert.equal(state.showFeatured.value, true);
-    } finally { scope.stop(); }
+test('disabled recommendations leave featured main grid cards and sorting visible', async () => {
+    const props = catalogProps({ recommendations: [], is_personalized: false });
+    props.products.data[0].is_featured = true;
+    const html = await renderToString(Vue.h(loadComponent('../../pages/Products/Index.vue'), props));
+    assert.doesNotMatch(html, /featured-products-heading|data-placement="catalog"/);
+    assert.match(html.split('data-catalog-results')[1], />\s*Featured\s*</);
+    assert.match(html, /Sort by/);
 });
 
-test('recommendation headings describe remaining reasons after showcase deduplication', async () => {
-    const props = catalogProps();
-    props.featured_products = [{ ...props.products.data[0], id: 99 }];
+test('catalog retains all recommendations in server order and uses server heading metadata', async () => {
+    const props = catalogProps({ is_personalized: false, has_featured_fallback: true });
+    props.recommendations[0].product.is_featured = true;
     props.recommendations.push({ product: { id: 88, name: 'Popular hardware' }, reasons: [{ code: 'popular_with_customers' }] });
     const html = await renderToString(Vue.h(loadComponent('../../pages/Products/Index.vue'), props));
-    assert.match(html, /Popular products/);
-    assert.doesNotMatch(html, /Recommended for you/);
+    assert.match(html, /Popular and featured products/);
+    assert.doesNotMatch(html, /Recommended for you|featured-products-heading/);
+    assert.ok(html.indexOf('Behavioral suggestion') < html.indexOf('Popular hardware'));
     assert.equal(props.recommendations.length, 2);
 });
 
@@ -695,7 +688,8 @@ test('sort changes preserve query selections cancel pending search and reset acc
     assert.deepEqual(cancellations, [{ prefetch: false }]);
     assert.deepEqual(requests[0].options.reset, ['products']);
     assert.equal(requests[0].options.replace, false);
-    assert.ok(requests[0].options.only.includes('featured_products'));
+    assert.ok(requests[0].options.only.includes('recommendations'));
+    assert.ok(!requests[0].options.only.includes('featured_products'));
 
     props.filters = { ...props.filters, q: 'Latest Part', sort: 'price_asc' };
     await Vue.nextTick();

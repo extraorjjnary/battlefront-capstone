@@ -1,6 +1,7 @@
 <script setup>
 import { Link, router } from '@inertiajs/vue3';
 import { Bell } from '@lucide/vue';
+import ListSkeleton from '@/components/ListSkeleton.vue';
 import { Button } from '@/components/ui/button';
 import {
     DropdownMenu,
@@ -73,12 +74,10 @@ function openNotification(notification) {
             >
                 {{ error }}
             </p>
-            <p
-                v-if="loading && !summary.recent.length"
-                class="text-muted-foreground animate-pulse px-2 py-4 text-sm"
-            >
-                Loading notifications…
-            </p>
+            <div v-if="loading && !summary.recent.length" role="status">
+                <span class="sr-only">Loading notifications…</span>
+                <ListSkeleton />
+            </div>
             <p
                 v-else-if="!summary.recent.length"
                 class="text-muted-foreground px-2 py-4 text-sm"

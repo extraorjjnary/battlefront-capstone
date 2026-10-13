@@ -325,9 +325,12 @@ test('historical and newly recorded sales use product snapshots across reporting
         ->where('kpis', ['total_sales' => 3, 'total_revenue' => '500.00', 'average_order_value' => '166.67', 'total_items_sold' => 8])
         ->where('timeline.revenue', $revenue)->where('timeline.sales', $sales)
         ->where('products.data.0.item_revenue', '300.00')->where('products.data.1.item_revenue', '200.00'));
-    $dashboard = $this->get(route('dashboard'))->inertiaProps('dashboard');
-    expect($dashboard['kpis'])->toMatchArray(['recorded_revenue' => '500.00', 'recorded_sales' => 3]);
-    expect(collect($dashboard['recent_orders'])->firstWhere('id', $delivery->id)['total'])->toBe('280.00');
+    $this->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
+        ->missing('dashboard')
+        ->loadDeferredProps('dashboard', fn (Assert $page) => $page
+            ->where('dashboard.kpis.recorded_revenue', '500.00')
+            ->where('dashboard.kpis.recorded_sales', 3)
+            ->where('dashboard.recent_orders', fn ($orders): bool => collect($orders)->firstWhere('id', $delivery->id)['total'] === '280.00')));
     expect($newOrder->refresh()->sale->amount)->toBe('100.00');
     expect($newOrder->total_amount)->toBe('180.00');
     expect($legacySale->refresh()->amount)->toBe('230.00');

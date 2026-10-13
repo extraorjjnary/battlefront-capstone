@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { compileScript, parse } from '@vue/compiler-sfc';
 import * as Vue from 'vue';
 import { formatCurrency } from './currency.js';
+import { loadSkeletonComponent } from './skeletonTestHelpers.js';
 
 export const deliveryLocations = JSON.parse(
     readFileSync(new URL('../../data/psgc-delivery-2026-03-31.v1.json', import.meta.url), 'utf8'),
@@ -43,6 +44,9 @@ export function loadAddressComponent(path, inlineTemplate = false, options = {})
             usePage: () => ({ props: { auth: { user } } }),
         },
         '@/lib/currency': { formatCurrency },
+        '@/components/ui/skeleton': {
+            Skeleton: loadSkeletonComponent('ui/skeleton/Skeleton.vue'),
+        },
         '@/components/ui/textarea': { Textarea: textarea },
         '@/components/ui/button': {
             Button: { render() { return Vue.h('button', this.$attrs, this.$slots.default?.()); } },

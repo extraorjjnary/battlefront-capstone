@@ -16,14 +16,18 @@ import InventoryController from '@/actions/App/Http/Controllers/Administration/I
 import OrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import SalesReportController from '@/actions/App/Http/Controllers/Administration/SalesReportController';
+import DeferredContent from '@/components/DeferredContent.vue';
+import ListSkeleton from '@/components/ListSkeleton.vue';
+import StatSkeleton from '@/components/StatSkeleton.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency } from '@/lib/currency';
 import { orderStatusBadgeClass } from '@/lib/orderStatus';
 import { dashboard as dashboardRoute } from '@/routes';
 
 const props = defineProps({
-    dashboard: { type: Object, required: true },
+    dashboard: { type: Object },
 });
 
 const page = usePage();
@@ -111,87 +115,106 @@ defineOptions({
                 <h2 id="operations-summary-heading" class="sr-only">
                     Operations summary
                 </h2>
-                <dl
-                    class="border-border bg-card grid border sm:grid-cols-2 xl:grid-cols-5"
+                <DeferredContent
+                    data="dashboard"
+                    label="Loading operations summary…"
+                    error-message="The operations summary could not be loaded."
                 >
-                    <div
-                        class="border-border border-b p-5 sm:border-r xl:border-b-0"
-                    >
-                        <dt class="text-muted-foreground text-sm">
-                            Recorded product revenue
-                        </dt>
-                        <dd class="mt-2 text-2xl font-bold tabular-nums">
-                            {{
-                                formatCurrency(dashboard.kpis.recorded_revenue)
-                            }}
-                        </dd>
-                        <p class="text-muted-foreground mt-1 text-xs">
-                            {{ dashboard.kpis.recorded_sales }}
-                            {{
-                                dashboard.kpis.recorded_sales === 1
-                                    ? 'recorded sale'
-                                    : 'recorded sales'
-                            }}
-                        </p>
-                        <p class="text-muted-foreground mt-1 text-xs">
-                            Excludes third-party delivery charges.
-                        </p>
-                    </div>
-                    <div
-                        class="border-border border-b p-5 sm:border-r-0 xl:border-r xl:border-b-0"
-                    >
-                        <dt class="text-muted-foreground text-sm">
-                            Pending orders
-                        </dt>
-                        <dd class="mt-2 text-2xl font-bold tabular-nums">
-                            {{ dashboard.kpis.pending_orders }}
-                        </dd>
-                        <p class="text-muted-foreground mt-1 text-xs">
-                            Awaiting review or payment verification
-                        </p>
-                    </div>
-                    <div
-                        class="border-border border-b p-5 sm:border-r sm:border-b-0"
-                    >
-                        <dt class="text-muted-foreground text-sm">
-                            Processing orders
-                        </dt>
-                        <dd class="mt-2 text-2xl font-bold tabular-nums">
-                            {{ dashboard.kpis.processing_orders }}
-                        </dd>
-                        <p class="text-muted-foreground mt-1 text-xs">
-                            Currently being fulfilled
-                        </p>
-                    </div>
-                    <div
-                        class="border-border border-b p-5 sm:border-r sm:border-b-0"
-                    >
-                        <dt class="text-muted-foreground text-sm">
-                            Low-stock products
-                        </dt>
-                        <dd class="mt-2 text-2xl font-bold tabular-nums">
-                            {{ dashboard.kpis.low_stock_products }}
-                        </dd>
-                        <p class="text-muted-foreground mt-1 text-xs">
-                            Stock remains below the reorder level
-                        </p>
-                    </div>
-                    <div
-                        class="border-destructive/50 bg-destructive/5 border-t p-5 sm:col-span-2 xl:col-span-1 xl:border-t-0 xl:border-l"
-                    >
-                        <dt class="text-destructive text-sm font-semibold">
-                            Out-of-stock products
-                        </dt>
-                        <dd
-                            class="text-destructive mt-2 text-2xl font-bold tabular-nums"
+                    <template #fallback>
+                        <div
+                            aria-hidden="true"
+                            class="border-border bg-card grid border sm:grid-cols-2 xl:grid-cols-5"
                         >
-                            {{ dashboard.kpis.out_of_stock_products }}
-                        </dd>
-                        <p class="text-muted-foreground mt-1 text-xs">
-                            No units available
-                        </p>
-                    </div>
-                </dl>
+                            <StatSkeleton
+                                v-for="stat in 5"
+                                :key="stat"
+                                class="border-border border-b sm:border-r xl:border-b-0"
+                                :class="stat === 5 ? 'sm:col-span-2 xl:col-span-1' : ''"
+                            />
+                        </div>
+                    </template>
+                    <dl
+                        class="border-border bg-card grid border sm:grid-cols-2 xl:grid-cols-5"
+                    >
+                        <div
+                            class="border-border border-b p-5 sm:border-r xl:border-b-0"
+                        >
+                            <dt class="text-muted-foreground text-sm">
+                                Recorded product revenue
+                            </dt>
+                            <dd class="mt-2 text-2xl font-bold tabular-nums">
+                                {{
+                                    formatCurrency(dashboard.kpis.recorded_revenue)
+                                }}
+                            </dd>
+                            <p class="text-muted-foreground mt-1 text-xs">
+                                {{ dashboard.kpis.recorded_sales }}
+                                {{
+                                    dashboard.kpis.recorded_sales === 1
+                                        ? 'recorded sale'
+                                        : 'recorded sales'
+                                }}
+                            </p>
+                            <p class="text-muted-foreground mt-1 text-xs">
+                                Excludes third-party delivery charges.
+                            </p>
+                        </div>
+                        <div
+                            class="border-border border-b p-5 sm:border-r-0 xl:border-r xl:border-b-0"
+                        >
+                            <dt class="text-muted-foreground text-sm">
+                                Pending orders
+                            </dt>
+                            <dd class="mt-2 text-2xl font-bold tabular-nums">
+                                {{ dashboard.kpis.pending_orders }}
+                            </dd>
+                            <p class="text-muted-foreground mt-1 text-xs">
+                                Awaiting review or payment verification
+                            </p>
+                        </div>
+                        <div
+                            class="border-border border-b p-5 sm:border-r sm:border-b-0"
+                        >
+                            <dt class="text-muted-foreground text-sm">
+                                Processing orders
+                            </dt>
+                            <dd class="mt-2 text-2xl font-bold tabular-nums">
+                                {{ dashboard.kpis.processing_orders }}
+                            </dd>
+                            <p class="text-muted-foreground mt-1 text-xs">
+                                Currently being fulfilled
+                            </p>
+                        </div>
+                        <div
+                            class="border-border border-b p-5 sm:border-r sm:border-b-0"
+                        >
+                            <dt class="text-muted-foreground text-sm">
+                                Low-stock products
+                            </dt>
+                            <dd class="mt-2 text-2xl font-bold tabular-nums">
+                                {{ dashboard.kpis.low_stock_products }}
+                            </dd>
+                            <p class="text-muted-foreground mt-1 text-xs">
+                                Stock remains below the reorder level
+                            </p>
+                        </div>
+                        <div
+                            class="border-destructive/50 bg-destructive/5 border-t p-5 sm:col-span-2 xl:col-span-1 xl:border-t-0 xl:border-l"
+                        >
+                            <dt class="text-destructive text-sm font-semibold">
+                                Out-of-stock products
+                            </dt>
+                            <dd
+                                class="text-destructive mt-2 text-2xl font-bold tabular-nums"
+                            >
+                                {{ dashboard.kpis.out_of_stock_products }}
+                            </dd>
+                            <p class="text-muted-foreground mt-1 text-xs">
+                                No units available
+                            </p>
+                        </div>
+                    </dl>
+                </DeferredContent>
             </section>
 
             <section
@@ -219,251 +242,268 @@ defineOptions({
                         </Button>
                     </div>
 
-                    <div class="border-border bg-card border">
-                        <div class="border-border border-b p-5">
-                            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                                <div class="flex gap-3">
-                                    <span
-                                        class="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center rounded-md"
-                                    >
-                                        <WalletCards
-                                            class="size-5"
-                                            aria-hidden="true"
-                                        />
-                                    </span>
-                                    <div>
-                                        <h3 class="font-semibold">
-                                            Pending payment checks
-                                        </h3>
-                                        <p
-                                            class="text-muted-foreground mt-1 text-sm"
+                    <DeferredContent
+                        data="dashboard"
+                        label="Loading operational priorities…"
+                        error-message="Operational priorities could not be loaded."
+                    >
+                        <template #fallback>
+                            <div
+                                aria-hidden="true"
+                                class="border-border bg-card divide-border divide-y border"
+                            >
+                                <div v-for="queue in 3" :key="queue" class="p-5">
+                                    <Skeleton class="h-5 w-40 max-w-full" />
+                                    <ListSkeleton :rows="1" class="mt-4" />
+                                </div>
+                            </div>
+                        </template>
+                        <div class="border-border bg-card border">
+                            <div class="border-border border-b p-5">
+                                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                    <div class="flex gap-3">
+                                        <span
+                                            class="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center rounded-md"
                                         >
-                                            {{
-                                                dashboard.needs_attention
-                                                    .pending_payment_reviews
-                                            }}
-                                            active
-                                            {{
-                                                dashboard.needs_attention
-                                                    .pending_payment_reviews ===
-                                                1
-                                                    ? 'order needs'
-                                                    : 'orders need'
-                                            }}
-                                            a payment decision.
-                                        </p>
+                                            <WalletCards
+                                                class="size-5"
+                                                aria-hidden="true"
+                                            />
+                                        </span>
+                                        <div>
+                                            <h3 class="font-semibold">
+                                                Pending payment checks
+                                            </h3>
+                                            <p
+                                                class="text-muted-foreground mt-1 text-sm"
+                                            >
+                                                {{
+                                                    dashboard.needs_attention
+                                                        .pending_payment_reviews
+                                                }}
+                                                active
+                                                {{
+                                                    dashboard.needs_attention
+                                                        .pending_payment_reviews ===
+                                                    1
+                                                        ? 'order needs'
+                                                        : 'orders need'
+                                                }}
+                                                a payment decision.
+                                            </p>
+                                        </div>
                                     </div>
+                                </div>
+
+                                <div
+                                    v-if="
+                                        dashboard.needs_attention.payment_orders
+                                            .length === 0
+                                    "
+                                    class="text-muted-foreground mt-5 flex items-center gap-2 border-t pt-4 text-sm"
+                                >
+                                    <CircleAlert
+                                        class="size-4"
+                                        aria-hidden="true"
+                                    />
+                                    No active payment checks are waiting.
+                                </div>
+                                <div v-else class="mt-5 grid gap-1">
+                                    <Link
+                                        v-for="order in dashboard.needs_attention
+                                            .payment_orders"
+                                        :key="order.id"
+                                        :href="OrderController.show(order.id)"
+                                        class="hover:bg-accent focus-visible:ring-ring grid gap-2 px-3 py-3 transition-colors focus-visible:ring-2 focus-visible:outline-none sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                                    >
+                                        <div class="min-w-0">
+                                            <p class="truncate font-semibold">
+                                                {{ order.reference }} ·
+                                                {{ order.customer_name }}
+                                            </p>
+                                            <p
+                                                class="text-muted-foreground mt-1 text-xs"
+                                            >
+                                                {{ order.payment_method }} ·
+                                                {{ formatDate(order.created_at) }}
+                                            </p>
+                                        </div>
+                                        <p class="font-semibold tabular-nums">
+                                            {{ formatCurrency(order.total) }}
+                                        </p>
+                                    </Link>
                                 </div>
                             </div>
 
                             <div
-                                v-if="
-                                    dashboard.needs_attention.payment_orders
-                                        .length === 0
-                                "
-                                class="text-muted-foreground mt-5 flex items-center gap-2 border-t pt-4 text-sm"
+                                class="border-destructive/40 bg-destructive/5 border-b p-5"
                             >
-                                <CircleAlert
-                                    class="size-4"
-                                    aria-hidden="true"
-                                />
-                                No active payment checks are waiting.
-                            </div>
-                            <div v-else class="mt-5 grid gap-1">
-                                <Link
-                                    v-for="order in dashboard.needs_attention
-                                        .payment_orders"
-                                    :key="order.id"
-                                    :href="OrderController.show(order.id)"
-                                    class="hover:bg-accent focus-visible:ring-ring grid gap-2 px-3 py-3 transition-colors focus-visible:ring-2 focus-visible:outline-none sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-                                >
-                                    <div class="min-w-0">
-                                        <p class="truncate font-semibold">
-                                            {{ order.reference }} ·
-                                            {{ order.customer_name }}
-                                        </p>
-                                        <p
-                                            class="text-muted-foreground mt-1 text-xs"
+                                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                    <div class="flex gap-3">
+                                        <span
+                                            class="bg-destructive/10 text-destructive flex size-10 shrink-0 items-center justify-center rounded-md"
                                         >
-                                            {{ order.payment_method }} ·
-                                            {{ formatDate(order.created_at) }}
-                                        </p>
+                                            <CircleX
+                                                class="size-5"
+                                                aria-hidden="true"
+                                            />
+                                        </span>
+                                        <div>
+                                            <h3
+                                                class="text-destructive font-semibold"
+                                            >
+                                                Out-of-stock inventory
+                                            </h3>
+                                            <p
+                                                class="text-muted-foreground mt-1 text-sm"
+                                            >
+                                                {{
+                                                    dashboard.kpis
+                                                        .out_of_stock_products
+                                                }}
+                                                products have no units available.
+                                            </p>
+                                        </div>
                                     </div>
-                                    <p class="font-semibold tabular-nums">
-                                        {{ formatCurrency(order.total) }}
-                                    </p>
-                                </Link>
-                            </div>
-                        </div>
-
-                        <div
-                            class="border-destructive/40 bg-destructive/5 border-b p-5"
-                        >
-                            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                                <div class="flex gap-3">
-                                    <span
-                                        class="bg-destructive/10 text-destructive flex size-10 shrink-0 items-center justify-center rounded-md"
-                                    >
-                                        <CircleX
-                                            class="size-5"
-                                            aria-hidden="true"
-                                        />
-                                    </span>
-                                    <div>
-                                        <h3
-                                            class="text-destructive font-semibold"
+                                    <Button variant="ghost" size="sm" as-child>
+                                        <Link
+                                            :href="
+                                                InventoryController.index({
+                                                    query: {
+                                                        stock: 'out_of_stock',
+                                                    },
+                                                })
+                                            "
                                         >
-                                            Out-of-stock inventory
-                                        </h3>
-                                        <p
-                                            class="text-muted-foreground mt-1 text-sm"
-                                        >
-                                            {{
-                                                dashboard.kpis
-                                                    .out_of_stock_products
-                                            }}
-                                            products have no units available.
-                                        </p>
-                                    </div>
+                                            Inventory
+                                            <ArrowRight aria-hidden="true" />
+                                        </Link>
+                                    </Button>
                                 </div>
-                                <Button variant="ghost" size="sm" as-child>
-                                    <Link
-                                        :href="
-                                            InventoryController.index({
-                                                query: {
-                                                    stock: 'out_of_stock',
-                                                },
-                                            })
-                                        "
-                                    >
-                                        Inventory
-                                        <ArrowRight aria-hidden="true" />
-                                    </Link>
-                                </Button>
-                            </div>
-                            <p
-                                v-if="
-                                    dashboard.needs_attention
-                                        .out_of_stock_products.length === 0
-                                "
-                                class="text-muted-foreground mt-5 border-t pt-4 text-sm"
-                            >
-                                No products are out of stock.
-                            </p>
-                            <div v-else class="mt-5 divide-y">
-                                <div
-                                    v-for="product in dashboard.needs_attention
-                                        .out_of_stock_products"
-                                    :key="product.id"
-                                    class="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
+                                <p
+                                    v-if="
+                                        dashboard.needs_attention
+                                            .out_of_stock_products.length === 0
+                                    "
+                                    class="text-muted-foreground mt-5 border-t pt-4 text-sm"
                                 >
-                                    <p class="min-w-0 truncate font-semibold">
-                                        {{ product.name }}
-                                    </p>
-                                    <span
-                                        class="text-destructive shrink-0 text-xs font-semibold"
+                                    No products are out of stock.
+                                </p>
+                                <div v-else class="mt-5 divide-y">
+                                    <div
+                                        v-for="product in dashboard.needs_attention
+                                            .out_of_stock_products"
+                                        :key="product.id"
+                                        class="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
                                     >
-                                        Out of stock
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="p-5">
-                            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                                <div class="flex gap-3">
-                                    <span
-                                        class="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center rounded-md"
-                                    >
-                                        <Boxes
-                                            class="size-5"
-                                            aria-hidden="true"
-                                        />
-                                    </span>
-                                    <div>
-                                        <h3 class="font-semibold">
-                                            Low-stock inventory
-                                        </h3>
-                                        <p
-                                            class="text-muted-foreground mt-1 text-sm"
-                                        >
-                                            Products below their reorder
-                                            threshold.
-                                        </p>
-                                    </div>
-                                </div>
-                                <Button variant="ghost" size="sm" as-child>
-                                    <Link
-                                        :href="
-                                            InventoryController.index({
-                                                query: { stock: 'low_stock' },
-                                            })
-                                        "
-                                    >
-                                        Inventory
-                                        <ArrowRight aria-hidden="true" />
-                                    </Link>
-                                </Button>
-                            </div>
-
-                            <div
-                                v-if="
-                                    dashboard.needs_attention.low_stock_products
-                                        .length === 0
-                                "
-                                class="text-muted-foreground mt-5 flex items-center gap-2 border-t pt-4 text-sm"
-                            >
-                                <CircleAlert
-                                    class="size-4"
-                                    aria-hidden="true"
-                                />
-                                No products are below their reorder level.
-                            </div>
-                            <div v-else class="mt-5 divide-y">
-                                <div
-                                    v-for="product in dashboard.needs_attention
-                                        .low_stock_products"
-                                    :key="product.id"
-                                    class="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
-                                >
-                                    <div class="min-w-0">
-                                        <p class="truncate font-semibold">
+                                        <p class="min-w-0 truncate font-semibold">
                                             {{ product.name }}
                                         </p>
-                                        <p
-                                            v-if="
-                                                product.brand ||
-                                                !product.is_active
-                                            "
-                                            class="text-muted-foreground mt-1 text-xs"
+                                        <span
+                                            class="text-destructive shrink-0 text-xs font-semibold"
                                         >
-                                            {{ product.brand }}
-                                            <span v-if="!product.is_active">
-                                                {{
-                                                    product.brand
-                                                        ? '· Inactive'
-                                                        : 'Inactive'
-                                                }}
-                                            </span>
-                                        </p>
+                                            Out of stock
+                                        </span>
                                     </div>
-                                    <div class="shrink-0 text-right">
-                                        <p
-                                            class="text-primary font-bold tabular-nums"
+                                </div>
+                            </div>
+
+                            <div class="p-5">
+                                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                    <div class="flex gap-3">
+                                        <span
+                                            class="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center rounded-md"
                                         >
-                                            {{ product.quantity }} in stock
-                                        </p>
-                                        <p
-                                            class="text-muted-foreground mt-1 text-xs tabular-nums"
+                                            <Boxes
+                                                class="size-5"
+                                                aria-hidden="true"
+                                            />
+                                        </span>
+                                        <div>
+                                            <h3 class="font-semibold">
+                                                Low-stock inventory
+                                            </h3>
+                                            <p
+                                                class="text-muted-foreground mt-1 text-sm"
+                                            >
+                                                Products below their reorder
+                                                threshold.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <Button variant="ghost" size="sm" as-child>
+                                        <Link
+                                            :href="
+                                                InventoryController.index({
+                                                    query: { stock: 'low_stock' },
+                                                })
+                                            "
                                         >
-                                            Reorder at
-                                            {{ product.reorder_level }}
-                                        </p>
+                                            Inventory
+                                            <ArrowRight aria-hidden="true" />
+                                        </Link>
+                                    </Button>
+                                </div>
+
+                                <div
+                                    v-if="
+                                        dashboard.needs_attention.low_stock_products
+                                            .length === 0
+                                    "
+                                    class="text-muted-foreground mt-5 flex items-center gap-2 border-t pt-4 text-sm"
+                                >
+                                    <CircleAlert
+                                        class="size-4"
+                                        aria-hidden="true"
+                                    />
+                                    No products are below their reorder level.
+                                </div>
+                                <div v-else class="mt-5 divide-y">
+                                    <div
+                                        v-for="product in dashboard.needs_attention
+                                            .low_stock_products"
+                                        :key="product.id"
+                                        class="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
+                                    >
+                                        <div class="min-w-0">
+                                            <p class="truncate font-semibold">
+                                                {{ product.name }}
+                                            </p>
+                                            <p
+                                                v-if="
+                                                    product.brand ||
+                                                    !product.is_active
+                                                "
+                                                class="text-muted-foreground mt-1 text-xs"
+                                            >
+                                                {{ product.brand }}
+                                                <span v-if="!product.is_active">
+                                                    {{
+                                                        product.brand
+                                                            ? '· Inactive'
+                                                            : 'Inactive'
+                                                    }}
+                                                </span>
+                                            </p>
+                                        </div>
+                                        <div class="shrink-0 text-right">
+                                            <p
+                                                class="text-primary font-bold tabular-nums"
+                                            >
+                                                {{ product.quantity }} in stock
+                                            </p>
+                                            <p
+                                                class="text-muted-foreground mt-1 text-xs tabular-nums"
+                                            >
+                                                Reorder at
+                                                {{ product.reorder_level }}
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </DeferredContent>
                 </div>
 
                 <div class="min-w-0">
@@ -473,83 +513,97 @@ defineOptions({
                         </p>
                         <h2 class="text-xl font-semibold">Recent orders</h2>
                     </div>
-                    <div class="border-border bg-card border">
-                        <div
-                            v-if="props.dashboard.recent_orders.length === 0"
-                            class="text-muted-foreground flex min-h-64 flex-col items-center justify-center gap-3 p-8 text-center text-sm"
-                        >
-                            <ReceiptText class="size-7" aria-hidden="true" />
-                            No orders have been placed yet.
-                        </div>
-                        <div v-else class="divide-border divide-y">
-                            <Link
-                                v-for="order in props.dashboard.recent_orders"
-                                :key="order.id"
-                                :href="OrderController.show(order.id)"
-                                class="hover:bg-accent focus-visible:ring-ring block p-4 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                    <DeferredContent
+                        data="dashboard"
+                        label="Loading recent orders…"
+                        error-message="Recent orders could not be loaded."
+                    >
+                        <template #fallback>
+                            <div
+                                aria-hidden="true"
+                                class="border-border bg-card min-h-64 border p-4"
                             >
-                                <div
-                                    class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+                                <ListSkeleton :rows="3" />
+                            </div>
+                        </template>
+                        <div class="border-border bg-card border">
+                            <div
+                                v-if="props.dashboard.recent_orders.length === 0"
+                                class="text-muted-foreground flex min-h-64 flex-col items-center justify-center gap-3 p-8 text-center text-sm"
+                            >
+                                <ReceiptText class="size-7" aria-hidden="true" />
+                                No orders have been placed yet.
+                            </div>
+                            <div v-else class="divide-border divide-y">
+                                <Link
+                                    v-for="order in props.dashboard.recent_orders"
+                                    :key="order.id"
+                                    :href="OrderController.show(order.id)"
+                                    class="hover:bg-accent focus-visible:ring-ring block p-4 transition-colors focus-visible:ring-2 focus-visible:outline-none"
                                 >
-                                    <div class="min-w-0">
-                                        <p class="font-semibold tabular-nums">
-                                            {{ order.reference }}
-                                        </p>
+                                    <div
+                                        class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+                                    >
+                                        <div class="min-w-0">
+                                            <p class="font-semibold tabular-nums">
+                                                {{ order.reference }}
+                                            </p>
+                                            <p
+                                                class="text-muted-foreground mt-1 truncate text-sm"
+                                            >
+                                                {{ order.customer_name }} ·
+                                                {{ order.total_quantity }}
+                                                {{
+                                                    order.total_quantity === 1
+                                                        ? 'unit'
+                                                        : 'units'
+                                                }}
+                                            </p>
+                                        </div>
                                         <p
-                                            class="text-muted-foreground mt-1 truncate text-sm"
+                                            class="shrink-0 font-semibold tabular-nums"
                                         >
-                                            {{ order.customer_name }} ·
-                                            {{ order.total_quantity }}
-                                            {{
-                                                order.total_quantity === 1
-                                                    ? 'unit'
-                                                    : 'units'
-                                            }}
+                                            {{ formatCurrency(order.total) }}
                                         </p>
                                     </div>
-                                    <p
-                                        class="shrink-0 font-semibold tabular-nums"
+                                    <div
+                                        class="mt-3 flex flex-wrap items-center gap-2"
                                     >
-                                        {{ formatCurrency(order.total) }}
-                                    </p>
-                                </div>
-                                <div
-                                    class="mt-3 flex flex-wrap items-center gap-2"
-                                >
-                                    <Badge
-                                        variant="outline"
-                                        :class="
-                                            orderStatusBadgeClass(
-                                                order.status.value,
-                                            )
-                                        "
-                                    >
-                                        {{ order.status.label }}
-                                    </Badge>
-                                    <Badge
-                                        variant="outline"
-                                        :class="
-                                            orderStatusBadgeClass(
-                                                order.payment_status.value,
-                                            )
-                                        "
-                                    >
-                                        Payment
-                                        {{ order.payment_status.label }}
-                                    </Badge>
-                                    <span
-                                        class="text-muted-foreground ml-auto flex items-center gap-1 text-xs"
-                                    >
-                                        <Clock3
-                                            class="size-3.5"
-                                            aria-hidden="true"
-                                        />
-                                        {{ formatDate(order.created_at) }}
-                                    </span>
-                                </div>
-                            </Link>
+                                        <Badge
+                                            variant="outline"
+                                            :class="
+                                                orderStatusBadgeClass(
+                                                    order.status.value,
+                                                )
+                                            "
+                                        >
+                                            {{ order.status.label }}
+                                        </Badge>
+                                        <Badge
+                                            variant="outline"
+                                            :class="
+                                                orderStatusBadgeClass(
+                                                    order.payment_status.value,
+                                                )
+                                            "
+                                        >
+                                            Payment
+                                            {{ order.payment_status.label }}
+                                        </Badge>
+                                        <span
+                                            class="text-muted-foreground ml-auto flex items-center gap-1 text-xs"
+                                        >
+                                            <Clock3
+                                                class="size-3.5"
+                                                aria-hidden="true"
+                                            />
+                                            {{ formatDate(order.created_at) }}
+                                        </span>
+                                    </div>
+                                </Link>
+                            </div>
                         </div>
-                    </div>
+                    </DeferredContent>
                 </div>
             </section>
 

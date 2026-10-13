@@ -22,6 +22,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { formatCurrency } from '@/lib/currency';
 import { index as cartIndex } from '@/routes/cart';
@@ -436,7 +437,26 @@ defineOptions({
                                     </p>
                                 </template>
                             </DeliveryAddressFields>
-                            <p v-if="quoteLoading" role="status" class="text-muted-foreground text-sm">Refreshing delivery estimate…</p>
+                            <div
+                                v-if="quoteLoading && !selectedQuote"
+                                role="status"
+                            >
+                                <span class="sr-only">
+                                    Refreshing delivery estimate…
+                                </span>
+                                <div
+                                    data-slot="delivery-quote-skeleton"
+                                    aria-hidden="true"
+                                    class="border-border bg-secondary/40 grid gap-2 border p-4"
+                                >
+                                    <Skeleton class="h-5 w-3/4" />
+                                    <Skeleton class="h-5 w-2/3" />
+                                    <Skeleton class="h-5 w-1/2" />
+                                    <Skeleton class="h-5 w-3/4" />
+                                    <Skeleton class="h-10 w-full" />
+                                    <Skeleton class="h-10 w-full" />
+                                </div>
+                            </div>
                             <div
                                 v-if="quoteNotice && !quoteLoading && !selectedQuote"
                                 class="border-border bg-secondary/40 grid gap-1 border p-4 text-sm"

@@ -13,6 +13,7 @@ use App\Repositories\Catalog\ProductCatalogRepository;
 use App\Services\CatalogProductPresenter;
 use App\Services\Recommendation\RecordCustomerSearch;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -44,7 +45,7 @@ class ProductCatalogController extends Controller
             );
         }
 
-        $products = $this->productCatalogRepository->paginate($filters)
+        $products = fn (): LengthAwarePaginator => $this->productCatalogRepository->paginate($filters)
             ->through(fn (Product $product): array => $this->catalogProductPresenter->present($product));
 
         $recommendationViewData = null;

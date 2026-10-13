@@ -179,7 +179,8 @@ test('exports restore saved selections and exclude snapshotted LBC fees without 
     $this->actingAs($administrator)->get(route('administration.reports.sales', $filters))
         ->assertSessionHas($key, $filters)
         ->assertInertia(fn (Assert $page) => $page->where('kpis.total_revenue', '200.00')->where('timeline.revenue', [200]));
-    $this->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page->where('dashboard.kpis.recorded_revenue', '200.00'));
+    $this->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
+        ->loadDeferredProps('dashboard', fn (Assert $page) => $page->where('dashboard.kpis.recorded_revenue', '200.00')));
 
     $response = $this->get(route('administration.reports.sales.'.$format, ['page' => 2]))->assertSessionHas($key, $filters);
 

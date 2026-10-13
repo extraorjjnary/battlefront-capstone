@@ -24,8 +24,21 @@ class DashboardController extends Controller
 
         if ($user->isAdministrator()) {
             return Inertia::render('Dashboard/Administration', [
-                'dashboard' => $dashboardService->administration(),
+                'dashboard' => Inertia::defer(fn (): array => $dashboardService->administration(), 'dashboard', rescue: true),
             ]);
+        }
+
+        $recommendationsEnabled = $user->can('use-recommendations') && $user->personalized_recommendations_enabled;
+        $recommendationViewData = null;
+        $resolveRecommendations = function () use (&$recommendationViewData, $user, $buildRecommendationViewData): array {
+            return $recommendationViewData ??= $buildRecommendationViewData($user, hideWhenPersonalizationDisabled: true);
+        };
+        $recommendationProps = $recommendationsEnabled ? [] : $resolveRecommendations();
+
+        if ($recommendationsEnabled) {
+            foreach (['recommendations', 'is_personalized', 'has_featured_fallback', 'guest_recommendation_scope'] as $key) {
+                $recommendationProps[$key] = Inertia::defer(fn (): mixed => $resolveRecommendations()[$key], 'recommendations', rescue: true);
+            }
         }
 
         return Inertia::render('Dashboard/Customer', [
@@ -38,8 +51,9 @@ class DashboardController extends Controller
                     ->where('has_visited_dashboard', false)
                     ->update(['has_visited_dashboard' => true]) === 1;
             },
-            'dashboard' => $dashboardService->customer($user),
-            ...$buildRecommendationViewData($user, hideWhenPersonalizationDisabled: true),
+            'dashboard' => Inertia::defer(fn (): array => $dashboardService->customer($user), 'dashboard', rescue: true),
+            'recommendations_enabled' => $recommendationsEnabled,
+            ...$recommendationProps,
         ]);
     }
 }

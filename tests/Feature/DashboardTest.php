@@ -140,19 +140,21 @@ test('customers receive only their authoritative shopping and order summary', fu
         ->component('Dashboard/Customer')
         ->where('is_first_visit', true)
         ->where('auth.can.accessAdministration', false)
-        ->where('dashboard.summary.cart_items', 2)
-        ->where('dashboard.summary.cart_units', 5)
-        ->where('dashboard.summary.active_orders', 1)
-        ->where('dashboard.summary.total_orders', 2)
-        ->where('dashboard.latest_order.reference', $latestOrder->reference)
-        ->where('dashboard.latest_order.status.value', OrderStatus::Processing->value)
-        ->where('dashboard.latest_order.status.label', 'Processing')
-        ->where('dashboard.latest_order.item_count', 2)
-        ->where('dashboard.latest_order.total_quantity', 5)
-        ->where('dashboard.latest_order.total', '2450.75')
-        ->missing('dashboard.kpis')
-        ->missing('dashboard.needs_attention')
-        ->missing('dashboard.recent_orders'));
+        ->missing('dashboard')
+        ->loadDeferredProps('dashboard', fn (Assert $page) => $page
+            ->where('dashboard.summary.cart_items', 2)
+            ->where('dashboard.summary.cart_units', 5)
+            ->where('dashboard.summary.active_orders', 1)
+            ->where('dashboard.summary.total_orders', 2)
+            ->where('dashboard.latest_order.reference', $latestOrder->reference)
+            ->where('dashboard.latest_order.status.value', OrderStatus::Processing->value)
+            ->where('dashboard.latest_order.status.label', 'Processing')
+            ->where('dashboard.latest_order.item_count', 2)
+            ->where('dashboard.latest_order.total_quantity', 5)
+            ->where('dashboard.latest_order.total', '2450.75')
+            ->missing('dashboard.kpis')
+            ->missing('dashboard.needs_attention')
+            ->missing('dashboard.recent_orders')));
 });
 
 test('administrators receive authoritative operational dashboard data', function () {
@@ -221,29 +223,32 @@ test('administrators receive authoritative operational dashboard data', function
     $response->assertInertia(fn (Assert $page) => $page
         ->component('Dashboard/Administration')
         ->where('auth.can.accessAdministration', true)
-        ->where('dashboard.kpis.recorded_revenue', '3500.50')
-        ->where('dashboard.kpis.recorded_sales', 2)
-        ->where('dashboard.kpis.pending_orders', 1)
-        ->where('dashboard.kpis.processing_orders', 1)
-        ->where('dashboard.kpis.low_stock_products', 1)
-        ->where('dashboard.kpis.out_of_stock_products', 1)
-        ->where('dashboard.needs_attention.pending_payment_reviews', 1)
-        ->has('dashboard.needs_attention.payment_orders', 1)
-        ->where('dashboard.needs_attention.payment_orders.0.reference', $pendingOrder->reference)
-        ->where('dashboard.needs_attention.payment_orders.0.total', '1250.00')
-        ->has('dashboard.needs_attention.low_stock_products', 1)
-        ->where('dashboard.needs_attention.low_stock_products.0.id', $lowStockProduct->id)
-        ->where('dashboard.needs_attention.low_stock_products.0.quantity', 5)
-        ->has('dashboard.needs_attention.out_of_stock_products', 1)
-        ->where('dashboard.needs_attention.out_of_stock_products.0.id', $outOfStockProduct->id)
-        ->where('dashboard.needs_attention.out_of_stock_products.0.quantity', 0)
-        ->has('dashboard.recent_orders', 5)
-        ->where('dashboard.recent_orders.0.reference', $pendingOrder->reference)
-        ->where('dashboard.recent_orders.0.item_count', 2)
-        ->where('dashboard.recent_orders.0.total_quantity', 4)
-        ->missing('dashboard.summary')
-        ->missing('dashboard.latest_order')
-        ->missing('is_first_visit'));
+        ->missing('is_first_visit')
+        ->missing('dashboard')
+        ->loadDeferredProps('dashboard', fn (Assert $page) => $page
+            ->where('dashboard.kpis.recorded_revenue', '3500.50')
+            ->where('dashboard.kpis.recorded_sales', 2)
+            ->where('dashboard.kpis.pending_orders', 1)
+            ->where('dashboard.kpis.processing_orders', 1)
+            ->where('dashboard.kpis.low_stock_products', 1)
+            ->where('dashboard.kpis.out_of_stock_products', 1)
+            ->where('dashboard.needs_attention.pending_payment_reviews', 1)
+            ->has('dashboard.needs_attention.payment_orders', 1)
+            ->where('dashboard.needs_attention.payment_orders.0.reference', $pendingOrder->reference)
+            ->where('dashboard.needs_attention.payment_orders.0.total', '1250.00')
+            ->has('dashboard.needs_attention.low_stock_products', 1)
+            ->where('dashboard.needs_attention.low_stock_products.0.id', $lowStockProduct->id)
+            ->where('dashboard.needs_attention.low_stock_products.0.quantity', 5)
+            ->has('dashboard.needs_attention.out_of_stock_products', 1)
+            ->where('dashboard.needs_attention.out_of_stock_products.0.id', $outOfStockProduct->id)
+            ->where('dashboard.needs_attention.out_of_stock_products.0.quantity', 0)
+            ->has('dashboard.recent_orders', 5)
+            ->where('dashboard.recent_orders.0.reference', $pendingOrder->reference)
+            ->where('dashboard.recent_orders.0.item_count', 2)
+            ->where('dashboard.recent_orders.0.total_quantity', 4)
+            ->missing('dashboard.summary')
+            ->missing('dashboard.latest_order')
+            ->missing('is_first_visit')));
 
     $this->assertDatabaseHas('users', ['id' => $administrator->id, 'has_visited_dashboard' => false]);
 });
@@ -257,13 +262,14 @@ test('customers receive stable empty dashboard data', function () {
 
     $response->assertInertia(fn (Assert $page) => $page
         ->component('Dashboard/Customer')
-        ->where('dashboard.summary', [
-            'cart_items' => 0,
-            'cart_units' => 0,
-            'active_orders' => 0,
-            'total_orders' => 0,
-        ])
-        ->where('dashboard.latest_order', null));
+        ->loadDeferredProps('dashboard', fn (Assert $page) => $page
+            ->where('dashboard.summary', [
+                'cart_items' => 0,
+                'cart_units' => 0,
+                'active_orders' => 0,
+                'total_orders' => 0,
+            ])
+            ->where('dashboard.latest_order', null)));
 });
 
 test('administrators receive stable empty dashboard data', function () {
@@ -275,19 +281,20 @@ test('administrators receive stable empty dashboard data', function () {
 
     $response->assertInertia(fn (Assert $page) => $page
         ->component('Dashboard/Administration')
-        ->where('dashboard.kpis', [
-            'recorded_revenue' => '0.00',
-            'recorded_sales' => 0,
-            'pending_orders' => 0,
-            'processing_orders' => 0,
-            'low_stock_products' => 0,
-            'out_of_stock_products' => 0,
-        ])
-        ->where('dashboard.needs_attention.pending_payment_reviews', 0)
-        ->has('dashboard.needs_attention.payment_orders', 0)
-        ->has('dashboard.needs_attention.low_stock_products', 0)
-        ->has('dashboard.needs_attention.out_of_stock_products', 0)
-        ->has('dashboard.recent_orders', 0));
+        ->loadDeferredProps('dashboard', fn (Assert $page) => $page
+            ->where('dashboard.kpis', [
+                'recorded_revenue' => '0.00',
+                'recorded_sales' => 0,
+                'pending_orders' => 0,
+                'processing_orders' => 0,
+                'low_stock_products' => 0,
+                'out_of_stock_products' => 0,
+            ])
+            ->where('dashboard.needs_attention.pending_payment_reviews', 0)
+            ->has('dashboard.needs_attention.payment_orders', 0)
+            ->has('dashboard.needs_attention.low_stock_products', 0)
+            ->has('dashboard.needs_attention.out_of_stock_products', 0)
+            ->has('dashboard.recent_orders', 0)));
 });
 
 test('dashboard stock warnings ignore inactive records while the inventory ledger retains them', function (int $quantity, string $status) {
@@ -303,9 +310,10 @@ test('dashboard stock warnings ignore inactive records while the inventory ledge
     }
 
     $this->actingAs($administrator)->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
-        ->where("dashboard.kpis.{$status}_products", 1)
-        ->has("dashboard.needs_attention.{$status}_products", 1)
-        ->where("dashboard.needs_attention.{$status}_products.0.id", $active->id));
+        ->loadDeferredProps('dashboard', fn (Assert $page) => $page
+            ->where("dashboard.kpis.{$status}_products", 1)
+            ->has("dashboard.needs_attention.{$status}_products", 1)
+            ->where("dashboard.needs_attention.{$status}_products.0.id", $active->id)));
     $this->get(route('administration.inventory.index', ['stock' => $status]))->assertInertia(fn (Assert $page) => $page
         ->where('products.total', 4));
 })->with(['inclusive low stock' => [5, 'low_stock'], 'out of stock' => [0, 'out_of_stock']]);
@@ -321,10 +329,11 @@ test('historical seeding preserves operational dashboard stock warnings', functi
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
 
     $this->actingAs($administrator)->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
-        ->where('dashboard.kpis.low_stock_products', 1)
-        ->where('dashboard.kpis.out_of_stock_products', 1)
-        ->has('dashboard.needs_attention.low_stock_products', 1)
-        ->has('dashboard.needs_attention.out_of_stock_products', 1));
+        ->loadDeferredProps('dashboard', fn (Assert $page) => $page
+            ->where('dashboard.kpis.low_stock_products', 1)
+            ->where('dashboard.kpis.out_of_stock_products', 1)
+            ->has('dashboard.needs_attention.low_stock_products', 1)
+            ->has('dashboard.needs_attention.out_of_stock_products', 1)));
     $this->get(route('administration.inventory.index'))->assertInertia(fn (Assert $page) => $page
         ->where('products.total', 15)
         ->where('low_stock_count', 1)

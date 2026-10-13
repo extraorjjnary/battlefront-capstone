@@ -9,6 +9,9 @@ import {
 } from "@lucide/vue";
 import { computed, ref, watch } from "vue";
 import ProductCard from "@/components/catalog/ProductCard.vue";
+import DeferredContent from "@/components/DeferredContent.vue";
+import ProductCardSkeleton from "@/components/ProductCardSkeleton.vue";
+import RecommendationSkeleton from "@/components/RecommendationSkeleton.vue";
 import RecommendationSection from "@/components/recommendations/RecommendationSection.vue";
 import StorefrontHeader from "@/components/StorefrontHeader.vue";
 import { useDebouncedSearch } from "@/composables/useDebouncedSearch";
@@ -28,8 +31,8 @@ const props = defineProps({
     products: { type: Object, required: true },
     filters: { type: Object, required: true },
     filter_options: { type: Object, required: true },
-    featured_products: { type: Array, default: () => [] },
     recommendations: { type: Array, default: () => [] },
+    recommendations_enabled: { type: Boolean, default: true },
     is_personalized: { type: Boolean, default: false },
     has_featured_fallback: { type: Boolean, default: false },
 });
@@ -61,10 +64,10 @@ const tagPlaceholder = computed(() =>
 );
 const catalogReloadProps = [
     "products",
-    "featured_products",
     "filters",
     "filter_options",
     "recommendations",
+    "recommendations_enabled",
     "is_personalized",
     "has_featured_fallback",
     "guest_recommendation_scope",
@@ -99,31 +102,8 @@ const isDiscoveryView = computed(
             (value) => value === "all",
         ),
 );
-const showFeatured = computed(
-    () => isDiscoveryView.value && props.featured_products.length > 0,
-);
-const visibleRecommendations = computed(() => {
-    const featuredIds = new Set(
-        showFeatured.value ? props.featured_products.map((product) => product.id) : [],
-    );
-    return props.recommendations.filter(
-        (recommendation) => !featuredIds.has(recommendation.product.id),
-    );
-});
 const showRecommendations = computed(
-    () => isDiscoveryView.value && visibleRecommendations.value.length > 0,
-);
-const recommendationIsPersonalized = computed(() =>
-    visibleRecommendations.value.some((recommendation) =>
-        recommendation.reasons?.some(
-            (reason) => !["popular_with_customers", "featured_fallback"].includes(reason.code),
-        ),
-    ),
-);
-const recommendationHasFeaturedFallback = computed(() =>
-    visibleRecommendations.value.some((recommendation) =>
-        recommendation.reasons?.some((reason) => reason.code === "featured_fallback"),
-    ),
+    () => isDiscoveryView.value && props.recommendations.length > 0,
 );
 
 function selectedValue(value) {
@@ -267,45 +247,40 @@ watch(
                 </div>
             </section>
 
-            <section
-                v-if="showFeatured"
-                class="mt-8"
-                aria-labelledby="featured-products-heading"
-            >
-                <h2 id="featured-products-heading" class="text-2xl font-bold tracking-tight">
-                    Featured Products
-                </h2>
-                <p class="text-muted-foreground mt-2 text-sm">
-                    Selected by Battlefront, with current stock available.
-                </p>
-                <div class="mt-4 grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
-                    <ProductCard
-                        v-for="product in featured_products"
-                        :key="product.id"
-                        :product="product"
+            <div v-if="recommendations_enabled && isDiscoveryView" class="mt-8">
+                <DeferredContent
+                    :data="[
+                        'recommendations',
+                        'is_personalized',
+                        'has_featured_fallback',
+                        'guest_recommendation_scope',
+                    ]"
+                    label="Loading product recommendations…"
+                    error-message="Product recommendations could not be loaded."
+                >
+                    <template #fallback>
+                        <RecommendationSkeleton />
+                    </template>
+                    <RecommendationSection
+                        v-if="showRecommendations"
+                        :recommendations="recommendations"
+                        placement="catalog"
+                        :title="
+                            is_personalized
+                                ? 'Recommended for you'
+                                : has_featured_fallback
+                                  ? 'Popular and featured products'
+                                  : 'Popular products'
+                        "
+                        :description="
+                            is_personalized
+                                ? isAuthenticated
+                                    ? 'Suggestions based on your recent browsing, cart, and completed purchases.'
+                                    : 'Suggestions based on your recent browsing in this browser.'
+                                : 'Popular and featured picks with current Sagay stock.'
+                        "
                     />
-                </div>
-            </section>
-
-            <div v-if="showRecommendations" class="mt-8">
-                <RecommendationSection
-                    :recommendations="visibleRecommendations"
-                    placement="catalog"
-                    :title="
-                        recommendationIsPersonalized
-                            ? 'Recommended for you'
-                            : recommendationHasFeaturedFallback
-                              ? 'Popular and featured products'
-                              : 'Popular products'
-                    "
-                    :description="
-                        recommendationIsPersonalized
-                            ? isAuthenticated
-                                ? 'Suggestions based on your recent browsing, cart, and completed purchases.'
-                                : 'Suggestions based on your recent browsing in this browser.'
-                            : 'Popular and featured picks with current Sagay stock.'
-                    "
-                />
+                </DeferredContent>
             </div>
 
             <div class="border-border mt-8 border-t pt-8">
@@ -527,13 +502,22 @@ watch(
                         :product="product"
                     />
                     <template #next="{ loading, hasMore }">
-                        <p
+                        <div
                             v-if="loading"
                             role="status"
-                            class="text-muted-foreground col-span-full mt-6 text-center text-sm"
+                            class="col-span-full"
                         >
-                            Loading more products...
-                        </p>
+                            <span class="sr-only">Loading more products…</span>
+                            <div
+                                class="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4"
+                            >
+                                <ProductCardSkeleton
+                                    v-for="card in 4"
+                                    :key="card"
+                                    :class="card === 3 ? 'hidden lg:flex' : card === 4 ? 'hidden xl:flex' : ''"
+                                />
+                            </div>
+                        </div>
                         <p
                             v-else-if="!hasMore"
                             class="text-muted-foreground col-span-full mt-6 text-center text-sm"

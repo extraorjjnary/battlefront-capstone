@@ -52,17 +52,19 @@ test('guests see popular completed-order products and customers see purchase-bas
     $this->get(route('products.index'))
         ->assertInertia(fn (Assert $page) => $page
             ->component('Products/Index')
-            ->where('is_personalized', false)
-            ->has('recommendations', 2)
-            ->where('recommendations.0.reasons.0.code', 'popular_with_customers'));
+            ->loadDeferredProps('recommendations', fn (Assert $page) => $page
+                ->where('is_personalized', false)
+                ->has('recommendations', 2)
+                ->where('recommendations.0.reasons.0.code', 'popular_with_customers')));
 
     $this->actingAs($customer)->get(route('products.index'))
         ->assertInertia(fn (Assert $page) => $page
             ->component('Products/Index')
-            ->where('is_personalized', true)
-            ->has('recommendations', 1)
-            ->where('recommendations.0.product.id', $companion->id)
-            ->where('recommendations.0.reasons.0.code', 'bought_with_purchase_history'));
+            ->loadDeferredProps('recommendations', fn (Assert $page) => $page
+                ->where('is_personalized', true)
+                ->has('recommendations', 1)
+                ->where('recommendations.0.product.id', $companion->id)
+                ->where('recommendations.0.reasons.0.code', 'bought_with_purchase_history')));
 });
 
 test('customers see recommendations based on products in their cart', function () {
@@ -105,8 +107,9 @@ test('guest catalog recommendations are empty when no eligible fallback exists',
     $this->get(route('products.index'))
         ->assertInertia(fn (Assert $page) => $page
             ->component('Products/Index')
-            ->where('is_personalized', false)
-            ->where('recommendations', []));
+            ->loadDeferredProps('recommendations', fn (Assert $page) => $page
+                ->where('is_personalized', false)
+                ->where('recommendations', [])));
 });
 
 test('customers without recommendation signals see a non-personalized empty state', function () {
@@ -115,9 +118,10 @@ test('customers without recommendation signals see a non-personalized empty stat
     $this->actingAs($customer)->get(route('dashboard'))
         ->assertInertia(fn (Assert $page) => $page
             ->component('Dashboard/Customer')
-            ->where('is_personalized', false)
-            ->where('has_featured_fallback', false)
-            ->where('recommendations', []));
+            ->loadDeferredProps('recommendations', fn (Assert $page) => $page
+                ->where('is_personalized', false)
+                ->where('has_featured_fallback', false)
+                ->where('recommendations', [])));
 });
 
 test('home page omits recommendation data even when eligible products exist', function (bool $authenticated) {
@@ -204,10 +208,11 @@ test('customer dashboard receives a concise behavioral selection', function () {
     $this->actingAs($customer)->get(route('dashboard'))
         ->assertInertia(fn (Assert $page) => $page
             ->component('Dashboard/Customer')
-            ->where('is_personalized', true)
-            ->has('recommendations', 4)
-            ->where('recommendations.0.product.id', $match->id)
-            ->where('recommendations.0.reasons.0.code', 'matched_recent_searches'));
+            ->loadDeferredProps('recommendations', fn (Assert $page) => $page
+                ->where('is_personalized', true)
+                ->has('recommendations', 4)
+                ->where('recommendations.0.product.id', $match->id)
+                ->where('recommendations.0.reasons.0.code', 'matched_recent_searches')));
 });
 
 test('administrator dashboard does not receive customer recommendation data', function () {
@@ -232,13 +237,20 @@ test('default guest catalog uses retained browser history after a search', funct
         ->get(route('products.index', ['q' => 'RTX 5070']))
         ->assertInertia(fn (Assert $page) => $page->where('recommendations', []));
 
-    $this->get(route('products.index'))
-        ->assertInertia(fn (Assert $page) => $page
-            ->where('is_personalized', true)
-            ->has('recommendations', 1)
-            ->where('recommendations.0.product.id', $product->id)
-            ->where('recommendations.0.reasons.0.code', 'matched_recent_searches')
-            ->where('guest_recommendation_scope', hash('sha256', 'dismissals:'.$profile->token_hash)));
+    $initial = $this->get(route('products.index'));
+    $initial->assertInertia(fn (Assert $page) => $page->missing('recommendations'));
+
+    $this->withHeaders([
+        'X-Inertia' => 'true',
+        'X-Inertia-Version' => $initial->viewData('page')['version'],
+        'X-Inertia-Partial-Component' => 'Products/Index',
+        'X-Inertia-Partial-Data' => 'recommendations,is_personalized,has_featured_fallback,guest_recommendation_scope',
+    ])->get(route('products.index'))
+        ->assertJsonPath('props.is_personalized', true)
+        ->assertJsonCount(1, 'props.recommendations')
+        ->assertJsonPath('props.recommendations.0.product.id', $product->id)
+        ->assertJsonPath('props.recommendations.0.reasons.0.code', 'matched_recent_searches')
+        ->assertJsonPath('props.guest_recommendation_scope', hash('sha256', 'dismissals:'.$profile->token_hash));
 
     $this->assertDatabaseHas('customer_searches', ['guest_recommendation_profile_id' => $profile->id, 'query' => 'rtx 5070']);
 });
@@ -267,8 +279,8 @@ test('explicit catalog intent suppresses recommendations and clearing restores s
 
     $this->get(route('products.index'))
         ->assertInertia(fn (Assert $page) => $page
-            ->has('recommendations', 1)
-            ->where('products.total', 1));
+            ->where('products.total', 1)
+            ->loadDeferredProps('recommendations', fn (Assert $page) => $page->has('recommendations', 1)));
 })->with(['q', 'category_id', 'brand', 'tag_id'])->with(['guest' => false, 'customer' => true]);
 
 test('catalog recommendations do not change normal counts pagination or scroll responses', function () {
@@ -279,10 +291,10 @@ test('catalog recommendations do not change normal counts pagination or scroll r
 
     $initial = $this->get(route('products.index'));
     $initial->assertInertia(fn (Assert $page) => $page
-        ->has('recommendations', 4)
         ->has('products.data', 12)
         ->where('products.total', 13)
-        ->where('products.data.0.name', 'Product 01'));
+        ->where('products.data.0.name', 'Product 01')
+        ->loadDeferredProps('recommendations', fn (Assert $page) => $page->has('recommendations', 4)));
 
     $this->withHeaders([
         'X-Inertia' => 'true',
@@ -363,9 +375,10 @@ test('saving personalization off hides shopping discovery sections until reenabl
 
     foreach (['dashboard', 'products.index'] as $routeName) {
         $this->get(route($routeName))->assertInertia(fn (Assert $page) => $page
-            ->where('is_personalized', true)
-            ->where('recommendations.0.product.id', $match->id)
-            ->where('recommendations.0.reasons.0.code', 'matched_recent_searches'));
+            ->loadDeferredProps('recommendations', fn (Assert $page) => $page
+                ->where('is_personalized', true)
+                ->where('recommendations.0.product.id', $match->id)
+                ->where('recommendations.0.reasons.0.code', 'matched_recent_searches')));
     }
 });
 
@@ -406,11 +419,12 @@ test('enabled discovery sections retain featured fallback when browsing signals 
 
     $this->actingAs($customer)->get(route($routeName))
         ->assertInertia(fn (Assert $page) => $page
-            ->where('is_personalized', false)
-            ->where('has_featured_fallback', true)
-            ->has('recommendations', 1)
-            ->where('recommendations.0.product.id', $featured->id)
-            ->where('recommendations.0.reasons.0.code', 'featured_fallback'));
+            ->loadDeferredProps('recommendations', fn (Assert $page) => $page
+                ->where('is_personalized', false)
+                ->where('has_featured_fallback', true)
+                ->has('recommendations', 1)
+                ->where('recommendations.0.product.id', $featured->id)
+                ->where('recommendations.0.reasons.0.code', 'featured_fallback')));
 })->with(['dashboard', 'products.index']);
 
 test('catalog resolves recommendation data once and skips ranking for product-only scrolling', function () {
@@ -422,6 +436,11 @@ test('catalog resolves recommendation data once and skips ranking for product-on
 
     $initial = $this->actingAs($customer)->get(route('products.index'));
 
+    expect(collect(DB::getQueryLog())->filter(
+        static fn (array $query): bool => str_contains($query['query'], 'customer_searches'),
+    ))->toBeEmpty();
+    $initial->assertInertia(fn (Assert $page) => $page
+        ->loadDeferredProps('recommendations', fn (Assert $page) => $page->has('recommendations', 1)));
     $searchQueries = collect(DB::getQueryLog())->filter(
         static fn (array $query): bool => str_contains($query['query'], 'customer_searches'),
     );
@@ -452,12 +471,13 @@ test('catalog query resets return current filters and recommendation state for s
         'X-Inertia' => 'true',
         'X-Inertia-Version' => $initial->viewData('page')['version'],
         'X-Inertia-Partial-Component' => 'Products/Index',
-        'X-Inertia-Partial-Data' => 'products,filters,filter_options,recommendations,is_personalized,has_featured_fallback,guest_recommendation_scope',
+        'X-Inertia-Partial-Data' => 'products,filters,filter_options,recommendations,recommendations_enabled,is_personalized,has_featured_fallback,guest_recommendation_scope',
         'X-Inertia-Reset' => 'products',
     ]);
 
     $this->get(route('products.index', ['q' => 'Laptop']))
         ->assertJsonPath('props.filters.q', 'Laptop')
+        ->assertJsonPath('props.recommendations_enabled', false)
         ->assertJsonPath('props.products.total', 1)
         ->assertJsonPath('props.recommendations', [])
         ->assertJsonPath('props.is_personalized', false)
@@ -466,6 +486,7 @@ test('catalog query resets return current filters and recommendation state for s
     $this->get(route('products.index'))
         ->assertJsonPath('url', '/products')
         ->assertJsonPath('props.filters.q', null)
+        ->assertJsonPath('props.recommendations_enabled', true)
         ->assertJsonPath('props.products.total', 2)
         ->assertJsonCount(2, 'props.recommendations')
         ->assertJsonPath('props.is_personalized', true)

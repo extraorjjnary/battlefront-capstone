@@ -3,6 +3,7 @@ import 'leaflet/dist/leaflet.css';
 
 import { MapPinned } from '@lucide/vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const props = defineProps({
     branches: {
@@ -165,6 +166,7 @@ onBeforeUnmount(() => {
                     class="h-96 w-full"
                     :class="mapState === 'unavailable' ? 'opacity-20' : ''"
                     aria-label="Map of approved Battlefront branch locations"
+                    :aria-busy="mapState === 'loading'"
                 />
 
                 <div
@@ -172,7 +174,11 @@ onBeforeUnmount(() => {
                     class="bg-card/90 absolute inset-0 z-10 flex items-center justify-center"
                     role="status"
                 >
-                    <p class="text-muted-foreground text-sm">
+                    <Skeleton
+                        class="absolute inset-0 rounded-none"
+                        aria-hidden="true"
+                    />
+                    <p class="text-muted-foreground relative text-sm">
                         Loading branch map…
                     </p>
                 </div>
