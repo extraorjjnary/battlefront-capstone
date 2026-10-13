@@ -821,11 +821,12 @@ Generate and retain a device-installation UUID in the mobile app; use it as `{de
 ```json
 {
     "expo_push_token": "ExpoPushToken[client_obtained_token]",
-    "platform": "android"
+    "platform": "android",
+    "notification_channel": "order-updates-v2"
 }
 ```
 
-`platform` is required and is `android` or `ios`. Tokens must use a nonempty `ExpoPushToken[...]` or `ExponentPushToken[...]` format and be at most 255 characters. Use Expo's actual project/device token; do not substitute an FCM/APNs token or bearer token. No provider credentials are passed by the client. Invalid fields return 422; malformed device UUID routes return 404.
+`platform` is required and is `android` or `ios`. `notification_channel` is optional; updated Android clients send `order-updates-v2` after creating that channel. Older clients omit it and continue using the default channel. Tokens must use a nonempty `ExpoPushToken[...]` or `ExponentPushToken[...]` format and be at most 255 characters. Use Expo's actual project/device token; do not substitute an FCM/APNs token or bearer token. No provider credentials are passed by the client. Invalid fields return 422; malformed device UUID routes return 404.
 
 Registration returns `{"data":{"id":1,"device_id":"<installation-uuid>","platform":"android","is_active":true,"updated_at":"<ISO timestamp>"}}`. Account/session ownership comes from bearer authentication, never submitted IDs. Raw push tokens and session identifiers are not returned. Repeated identical registration is idempotent; changed token/session creates a new registration version.
 
@@ -844,7 +845,7 @@ php artisan queue:work database --queue=notifications,default --timeout=30 --tri
 
 The migrations add Laravel history, device registrations and delivery records; there is no historical backfill. Database history persists immediately after business commit without waiting for the worker. Push and persistence retries explicitly use the asynchronous database connection even when the application's default queue is sync. Workers must process delayed jobs. Rebuild deployment event caches and restart workers after deploying notification classes.
 
-Push text is generic: “An update is available. Open Battlefront to view your order.” Its `data` contains `notification_id`, `order_id` and `deep_link`; it contains no proof URLs, addresses, amounts or personal/payment details. Client receipt/tapping a push must not mutate order/payment/shipment business state. Refresh history/count when opening the app and after read actions; push availability does not establish read state.
+Push text is generic: “An update is available. Open Battlefront to view your order.” Its `data` contains `notification_id`, `order_id` and `deep_link`; it contains no proof URLs, addresses, amounts or personal/payment details. Expo's `channelId` is sent only to Android registrations that advertised the new channel. Client receipt/tapping a push must not mutate order/payment/shipment business state. Refresh history/count when opening the app and after read actions; push availability does not establish read state.
 
 The adapter checks send tickets and receipts about 15 minutes later; absent receipts are rechecked within 24 hours of acceptance. Confirmed `DeviceNotRegistered` deactivates the matching registration; old feedback cannot disable a refreshed device. Connection/429/5xx/malformed-response failures use bounded retries. Other provider errors retain tokens unless confirmed unusable. Inspect sanitized notification diagnostics and failed queue jobs for recovery; do not log raw credentials or provider bodies.
 

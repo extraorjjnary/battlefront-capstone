@@ -12,12 +12,13 @@ class ExpoPushAdapter
     /** @param array<string, mixed> $metadata
      * @return array{status: 'ok', id: string}|array{status: 'error', error_code: string}
      */
-    public function send(string $token, array $metadata): array
+    public function send(string $token, array $metadata, ?string $channelId = null): array
     {
         $result = $this->request('send', [
             'to' => $token, 'title' => 'Battlefront order update',
             'body' => 'An update is available. Open Battlefront to view your order.',
-            'sound' => 'default', 'data' => $metadata,
+            'sound' => 'default', 'priority' => 'high', 'data' => $metadata,
+            ...($channelId === null ? [] : ['channelId' => $channelId]),
         ]);
         if ($result['status'] === 'error') {
             return $result;
@@ -80,6 +81,11 @@ class ExpoPushAdapter
     {
         $client = Http::acceptJson()->asJson()->connectTimeout(3)->timeout(10);
         $accessToken = config('services.expo.access_token');
+        $caBundle = config('services.expo.ca_bundle');
+
+        if (is_string($caBundle) && $caBundle !== '') {
+            $client = $client->withOptions(['verify' => $caBundle]);
+        }
 
         return is_string($accessToken) && $accessToken !== '' ? $client->withToken($accessToken) : $client;
     }
