@@ -12,7 +12,7 @@ use InvalidArgumentException;
 /** @phpstan-import-type DeliveryQuote from DeliveryRules */
 class DeliveryQuotePresenter
 {
-    public const ESTIMATE_NOTICE = 'Battlefront estimates, not live LBC quotations or tracking. Delivery dates are provisional. Prepaid orders are subject to payment verification; COD payment is collected upon delivery. This does not book or approve an LBC shipment.';
+    public const ESTIMATE_NOTICE = 'Battlefront demonstration estimates, not official LBC rates or verified production shipping charges. New Negros Occidental rates use straight-line OSM boundary-centroid proxies, not storefront or road distances. Delivery dates are provisional; prepaid orders require payment verification. This does not book or approve an LBC shipment.';
 
     public function __construct(private readonly DeliveryRules $deliveryRules) {}
 
@@ -34,6 +34,7 @@ class DeliveryQuotePresenter
 
         return [
             ...$quote,
+            'order_placement_allowed' => true,
             'zone' => [
                 'rule_id' => $zone['rule_id'],
                 'rules_version' => $zone['rules_version'],
@@ -76,8 +77,8 @@ class DeliveryQuotePresenter
             'assumption_label' => $order->delivery_assumption_label,
             'pricing_configured' => $pricingConfigured,
             'shipping_profile' => $order->shipping_profile->value,
-            'base_fee' => $order->delivery_base_fee,
-            'handling_surcharge' => $order->handling_surcharge,
+            'base_fee' => $pricingConfigured ? $order->delivery_base_fee : null,
+            'handling_surcharge' => $pricingConfigured ? $order->handling_surcharge : null,
             'delivery_fee' => $order->delivery_fee,
             'preparation_days' => $shipment?->preparation_days,
             'transit_min_days' => $shipment?->transit_min_days,

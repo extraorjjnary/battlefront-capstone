@@ -69,12 +69,21 @@
                     }
                 },
                 {
-                    "name": "Makati zero-fee unconfigured route",
+                    "name": "Negros Occidental Bago city-code quote",
+                    "request": {
+                        "method": "GET",
+                        "header": [{ "key": "Accept", "value": "application/json" }],
+                        "url": "{{base_url}}/checkout/delivery-quote?delivery_city_code=1804502000&cart_item_ids[]={{cart_item_id}}",
+                        "description": "New configured Negros Occidental route. The server validates the full city/barangay hierarchy and returns the configured Battlefront demo estimate, payment methods, carrier and provisional relative ETA. Do not calculate or submit a client-side fee; shipment/order placement independently recomputes and snapshots the estimate."
+                    }
+                },
+                {
+                    "name": "Makati unpriced route quote",
                     "request": {
                         "method": "GET",
                         "header": [{ "key": "Accept", "value": "application/json" }],
                         "url": "{{base_url}}/checkout/delivery-quote?delivery_city_code=1380300000&cart_item_ids[]={{cart_item_id}}",
-                        "description": "Valid address without configured pricing: HTTP 200, available=true, pricing_configured=false, delivery_fee=0.00, no ETA/carrier, and GCash/Maya/COD eligibility. Submit product subtotal only; COD collects only that subtotal, and this does not create an LBC booking."
+                        "description": "Valid address without configured pricing: HTTP 200 quote response with pricing_configured=false, order_placement_allowed=true, payment_methods=[gcash,maya,cod], no ETA/carrier, and a 0.00 absent-rate placeholder. Orders can be placed for product subtotal only; this is not free shipping or a delivery quotation. No automatic Shipment is created. Delivery arrangements and any applicable charge must be confirmed separately; an administrator can then register a manual Shipment."
                     }
                 }
             ]
@@ -1644,7 +1653,7 @@
                             "host": ["{{base_url}}"],
                             "path": ["orders"]
                         },
-                        "description": "Select a local JPEG/PNG/WebP image <=5 MB for GCash/Maya. Delivery requires one canonical delivery_destination from checkout quotes plus a separate detailed delivery_address. For pickup, disable BOTH destination and address fields. Never submit quote/pricing/ETA fields. Server recalculates and snapshots delivery fees/relative ETA; payment remains pending manual verification. Do not manually set Content-Type. Repeat cart_item_ids[] text fields for multiple/all selected items. Selected products alone determine subtotal, handling and ETA; unselected items remain after success.",
+                        "description": "Select a local JPEG/PNG/WebP image <=5 MB for GCash/Maya. Delivery requires one original canonical destination alias or, for structured nationwide addresses, the selected full city code plus its geography fields and detailed address. For pickup, disable BOTH destination and address fields. Never submit quote/pricing/ETA fields. Server recalculates and snapshots delivery fees/relative ETA; payment remains pending manual verification. Do not manually set Content-Type. Repeat cart_item_ids[] text fields for multiple/all selected items. Selected products alone determine subtotal, handling and ETA; unselected items remain after success.",
                         "body": {
                             "mode": "formdata",
                             "formdata": [
@@ -1724,7 +1733,7 @@
                                     "host": ["{{base_url}}"],
                                     "path": ["orders"]
                                 },
-                                "description": "Select a local JPEG/PNG/WebP image <=5 MB for GCash/Maya. Delivery requires one canonical delivery_destination from checkout quotes plus a separate detailed delivery_address. For pickup, disable BOTH destination and address fields. Never submit quote/pricing/ETA fields. Server recalculates and snapshots delivery fees/relative ETA; payment remains pending manual verification. Do not manually set Content-Type. Repeat cart_item_ids[] text fields for multiple/all selected items. Selected products alone determine subtotal, handling and ETA; unselected items remain after success.",
+                                "description": "Select a local JPEG/PNG/WebP image <=5 MB for GCash/Maya. Delivery requires one original canonical destination alias or, for structured nationwide addresses, the selected full city code plus its geography fields and detailed address. For pickup, disable BOTH destination and address fields. Never submit quote/pricing/ETA fields. Server recalculates and snapshots delivery fees/relative ETA; payment remains pending manual verification. Do not manually set Content-Type. Repeat cart_item_ids[] text fields for multiple/all selected items. Selected products alone determine subtotal, handling and ETA; unselected items remain after success.",
                                 "body": {
                                     "mode": "formdata",
                                     "formdata": [

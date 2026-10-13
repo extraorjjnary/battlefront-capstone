@@ -65,7 +65,11 @@ function formatDeliveryDate(value) {
 
 const availablePaymentMethods = computed(() =>
     props.paymentMethods.filter((method) =>
-        method.available_for.includes(fulfillmentMethod.value) && (fulfillmentMethod.value !== 'delivery' || !selectedQuote.value?.payment_methods || selectedQuote.value.payment_methods.includes(method.value)),
+        method.available_for.includes(fulfillmentMethod.value) &&
+        (fulfillmentMethod.value !== 'delivery' ||
+            (selectedQuote.value?.order_placement_allowed !== false &&
+                (!selectedQuote.value?.payment_methods ||
+                    selectedQuote.value.payment_methods.includes(method.value)))),
     ),
 );
 const selectedPaymentMethod = computed(() =>
@@ -130,7 +134,9 @@ async function refreshQuote() {
 }
 watch([deliveryDestination, fulfillmentMethod], refreshQuote);
 watch(availablePaymentMethods, (methods) => {
-    if (!methods.some((method) => method.value === paymentMethod.value) && methods.length) choosePayment(methods[0].value);
+    if (!methods.some((method) => method.value === paymentMethod.value)) {
+        choosePayment(methods[0]?.value ?? '');
+    }
 });
 
 defineOptions({
@@ -432,7 +438,7 @@ defineOptions({
                             </DeliveryAddressFields>
                             <p v-if="quoteLoading" role="status" class="text-muted-foreground text-sm">Refreshing delivery estimate…</p>
                             <div
-                                v-if="quoteNotice && !quoteLoading"
+                                v-if="quoteNotice && !quoteLoading && !selectedQuote"
                                 class="border-border bg-secondary/40 grid gap-1 border p-4 text-sm"
                                 role="status"
                             >
@@ -474,16 +480,18 @@ defineOptions({
                                     "
                                 >
                                     <p class="font-semibold">
-                                        Delivery fee not configured ·
+                                        No delivery estimate configured ·
                                         {{
                                             selectedQuote.destination_label ??
                                             selectedQuote.destination
                                         }}
                                     </p>
                                     <p class="leading-6">
-                                        No delivery fee is included. You may
-                                        place the order and pay the product
-                                        subtotal only.
+                                        You can place this order for the product
+                                        subtotal. No delivery fee or ETA is
+                                        included; Battlefront must confirm the
+                                        delivery arrangement and any applicable
+                                        charge separately.
                                     </p>
                                     <p
                                         class="text-muted-foreground text-xs leading-5"
@@ -630,10 +638,10 @@ defineOptions({
                                         false
                                     "
                                 >
-                                    Only the product subtotal will be collected
-                                    upon delivery. No delivery fee is included,
-                                    and this order does not create or confirm an
-                                    LBC booking.
+                                    Only the product subtotal is payable upon
+                                    delivery. No delivery fee or LBC collection
+                                    arrangement is included; delivery
+                                    arrangements must be confirmed separately.
                                 </template>
                                 <template v-else>
                                 The total COD amount includes your products and
@@ -663,10 +671,10 @@ defineOptions({
                                         false
                                     "
                                 >
-                                    Pay
-                                    {{ formatCurrency(selectedQuote.total) }} to
-                                    Battlefront for the product subtotal only.
-                                    No delivery fee or LBC booking is included.
+                                    The amount shown covers the product
+                                    subtotal only; no delivery fee is included.
+                                    Any delivery arrangement and charge must
+                                    be confirmed separately.
                                 </template>
                                 <template v-else>
                                     Pay
@@ -850,7 +858,9 @@ defineOptions({
                             <dt class="text-muted-foreground">Delivery fee</dt>
                             <dd class="font-semibold tabular-nums">
                                 {{
-                                    selectedQuote
+                                    selectedQuote?.pricing_configured === false
+                                        ? 'Not quoted'
+                                        : selectedQuote
                                         ? formatCurrency(
                                               selectedQuote.delivery_fee,
                                           )
@@ -865,14 +875,22 @@ defineOptions({
                         >
                             <dt class="font-semibold">
                                 {{
-                                    isCod
+                                    selectedQuote?.pricing_configured === false
+                                        ? isCod
+                                            ? 'Product subtotal payable upon delivery'
+                                            : 'Product subtotal payable'
+                                        : isCod
                                         ? 'Total COD amount payable'
                                         : 'Final total'
                                 }}
                             </dt>
                             <dd class="text-2xl font-bold tabular-nums">
                                 {{
-                                    selectedQuote
+                                    selectedQuote?.pricing_configured === false
+                                        ? formatCurrency(
+                                              selectedQuote.product_subtotal,
+                                          )
+                                        : selectedQuote
                                         ? formatCurrency(selectedQuote.total)
                                         : '—'
                                 }}
@@ -902,7 +920,10 @@ defineOptions({
                         type="submit"
                         class="w-full"
                         :disabled="
-                            processing || !selectedQuote || !cart.items.length
+                            processing ||
+                            !selectedQuote ||
+                            !cart.items.length ||
+                            !paymentMethod
                         "
                     >
                         <Spinner v-if="processing" />

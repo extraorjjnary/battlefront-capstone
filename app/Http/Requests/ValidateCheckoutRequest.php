@@ -143,16 +143,15 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
                     return;
                 }
                 $this->checkGeography($validator, 'delivery');
-                if ($validator->errors()->hasAny(['delivery_destination', 'delivery_city_code', 'delivery_region_code', 'delivery_province_code', 'payment_method'])) {
+                if ($validator->errors()->hasAny(['delivery_destination', 'delivery_city_code', 'delivery_region_code', 'delivery_province_code'])) {
                     return;
                 }
                 $paymentMethod = PaymentMethod::tryFrom($this->string('payment_method')->toString());
-                if ($paymentMethod === null || ! $paymentMethod->isAvailableFor(FulfillmentMethod::Delivery)) {
-                    return;
-                }
                 try {
                     $zone = app(DeliveryRules::class)->zone($this->string('delivery_destination')->toString());
-                    if (! in_array($paymentMethod->value, $zone['payment_methods'], true)) {
+                    if ($paymentMethod !== null
+                        && $paymentMethod->isAvailableFor(FulfillmentMethod::Delivery)
+                        && ! in_array($paymentMethod->value, $zone['payment_methods'], true)) {
                         $validator->errors()->add('payment_method', 'This payment method is unavailable for the selected delivery route.');
                     }
                 } catch (DomainException $exception) {

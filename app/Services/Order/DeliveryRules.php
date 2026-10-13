@@ -63,6 +63,26 @@ class DeliveryRules
                 }
                 $zone = [...$legacy, ...$zone];
             }
+            if (isset($zone['distance_band'])) {
+                $distanceBandName = $zone['distance_band'];
+                $distanceBands = Config::array('battlefront.delivery.negros_occidental_distance_bands');
+                $distanceProxies = Config::array('battlefront.delivery.negros_occidental_distance_proxies');
+                $distanceBand = is_string($distanceBandName) ? ($distanceBands[$distanceBandName] ?? null) : null;
+                $distanceProxy = $distanceProxies[$city['code']] ?? null;
+
+                if (! is_array($distanceBand) || ! is_array($distanceProxy)
+                    || ($distanceProxy['distance_band'] ?? null) !== $distanceBandName
+                    || ! is_numeric($distanceProxy['distance_km'] ?? null)
+                    || ! is_int($distanceBand['minimum_exclusive_km'] ?? null)
+                    || ! is_int($distanceBand['maximum_inclusive_km'] ?? null)
+                    || $distanceProxy['distance_km'] <= $distanceBand['minimum_exclusive_km']
+                    || $distanceProxy['distance_km'] > $distanceBand['maximum_inclusive_km']) {
+                    break;
+                }
+
+                $zone = [...$distanceBand, ...$zone];
+                unset($zone['distance_band'], $zone['minimum_exclusive_km'], $zone['maximum_inclusive_km']);
+            }
             if (! is_string($zone['base_fee'] ?? null) || preg_match('/\A[0-9]{1,10}\.[0-9]{2}\z/', $zone['base_fee']) !== 1
                 || ! is_int($zone['transit_min_days'] ?? null) || ! is_int($zone['transit_max_days'] ?? null)
                 || $zone['transit_min_days'] < 0 || $zone['transit_max_days'] < $zone['transit_min_days']

@@ -92,7 +92,7 @@ test('nationwide quotes discard stale responses and use server payment eligibili
     }
 });
 
-test('unconfigured delivery addresses can proceed without a delivery fee or logistics estimate', async () => {
+test('unconfigured delivery addresses allow subtotal-only checkout without a quoted ETA', async () => {
     const scope = Vue.effectScope();
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async () => ({
@@ -104,23 +104,23 @@ test('unconfigured delivery addresses can proceed without a delivery fee or logi
                     destination: '1380300000',
                     destination_label: 'City of Makati',
                     pricing_configured: false,
+                    order_placement_allowed: true,
                     payment_methods: ['gcash', 'maya', 'cod'],
                     product_subtotal: '100.00',
                     delivery_fee: '0.00',
                     total: '100.00',
-                    notice: 'Delivery fee not configured.',
-                    assumption_label:
-                        'No LBC quotation or booking exists.',
+                    notice: 'No delivery estimate is configured. Any delivery arrangement and charge must be confirmed separately.',
+                    assumption_label: 'The 0.00 placeholder is not a free-delivery offer or an LBC quotation.',
                 },
             },
         }),
     });
 
     try {
-        const render = scope.run(() =>
+        const page = scope.run(() =>
             loadPage(true).setup(checkoutProps(), { expose() {} }),
         );
-        const root = () => render({}, []);
+        const root = () => page({}, []);
         findNode(
             root(),
             (node) =>
@@ -140,24 +140,16 @@ test('unconfigured delivery addresses can proceed without a delivery fee or logi
         await Vue.nextTick();
 
         let html = await renderToString(root());
-        assert.match(html, /Delivery fee not configured/);
-        assert.match(html, /pay the product\s+subtotal only/);
-        assert.match(html, /No LBC quotation or booking exists/);
-        assert.match(html, /No delivery fee or LBC booking is included/);
+        assert.match(html, /No delivery estimate configured/);
+        assert.match(html, /delivery arrangement and any applicable charge separately/);
+        assert.match(html, /0\.00 placeholder is not a free-delivery offer/);
+        assert.match(html, /value="gcash"/);
+        assert.match(html, /value="cod"/);
+        assert.doesNotMatch(html, /Manual delivery quotation required|Request a delivery quotation before ordering/);
         assert.doesNotMatch(html, /pays the carrier at\s+dispatch/);
         assert.doesNotMatch(html, /Refresh quote|Retry quote/);
+        assert.doesNotMatch(html, /Not quoted<\/dd>[\s\S]*?disabled/);
         assert.match(html, /Place order<\/button>/);
-        assert.doesNotMatch(html, /Manual quotation required/);
-        findNode(
-            root(),
-            (node) =>
-                node.props?.name === 'payment_method' &&
-                node.props?.value === 'cod',
-        ).props.onChange();
-        html = await renderToString(root());
-        assert.match(html, /Only the product subtotal will be collected\s+upon delivery/);
-        assert.match(html, /No delivery fee is included/);
-        assert.doesNotMatch(html, /configured demo delivery fee/);
     } finally {
         scope.stop();
         globalThis.fetch = originalFetch;

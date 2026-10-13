@@ -65,9 +65,13 @@ Orders retain their purchase-time human-readable address and all previous commer
 
 ## Configured demonstration coverage and product handling
 
-Sagay City is the single origin. `battlefront.delivery.zones` resolves city rules before province rules before region rules. Specific disabled or incomplete rules stop resolution and reject delivery; they do not fall through to broader coverage. Each enabled rule requires a decimal-string `base_fee`, nonnegative integer `transit_min_days`/`transit_max_days`, and explicitly allowed `payment_methods` from `gcash`, `maya`, `cod`. Legacy city rules reference the existing `destinations` table. Province/region configuration is currently empty. Do not add nationwide prices without approved values.
+Sagay City is the single origin. `battlefront.delivery.zones` resolves city rules before province rules before region rules. Specific disabled or incomplete rules stop resolution and reject delivery; they do not fall through to broader coverage. Each enabled rule requires a decimal-string `base_fee`, nonnegative integer `transit_min_days`/`transit_max_days`, and explicitly allowed `payment_methods` from `gcash`, `maya`, `cod`. The original 12 named routes remain the bounded v1 compatibility list; the 20 new Negros Occidental localities are priced through their full PSGC city codes and the shared live quote endpoint. Province/region configuration remains empty.
 
-All amounts and day ranges below are **Battlefront-configured demonstration estimates, not official LBC quotations or transit guarantees**:
+### Negros Occidental coverage count and preservation
+
+The bundled Q1 2026 PSGC registry contains **31 cities/municipalities with province code `1804500000`**. Eleven already had configured Negros Occidental city rates, leaving **exactly 20 uncovered provincial localities**. Bacolod City (`1830200000`) is a separate highly urbanized city with a null province parent; its existing route remains supported and is not counted in the 31. The 20 newly covered localities contain **362 barangays**. Their city codes, official names, and barangays are validated by the same nationwide PSGC service.
+
+All amounts and day ranges below are **Battlefront demonstration estimates, not official LBC quotations or transit guarantees**. Existing rates and transit estimates are preserved exactly; new rates are configurable, proxy-derived demonstration values only, and must not be used as verified production shipping charges.
 
 | Routes | Base fee (PHP) | Transit days |
 | --- | --- | --- |
@@ -82,9 +86,51 @@ All amounts and day ranges below are **Battlefront-configured demonstration esti
 | Talisay City | 240.00 | 1–2 |
 | Bacolod City | 250.00 | 1–2 |
 
-All 12 explicitly support GCash, Maya and COD demonstrations. Every other valid nationwide destination may submit GCash, Maya or COD checkout with a server-authoritative `0.00` delivery fee. These orders include the product subtotal only, expose no transit/calendar estimate, and create no LBC shipment because third-party logistics are not configured. Their immutable metadata records `pricing_status=not_configured`, the accepted geography, eligible methods, and the no-fee/logistics assumption. For COD on these routes, only the product subtotal is due upon delivery; no delivery fee or LBC collection arrangement is represented.
+### New Negros Occidental distance estimates
 
-The quote endpoint is `GET /checkout/delivery-quote` (web) or `GET /api/v1/checkout/delivery-quote` (mobile), with owned selected `cart_item_ids[]` and `delivery_city_code`. A configured route returns `{data:{available:true,quote:{pricing_configured:true,...}}}`. An unconfigured valid route returns `{data:{available:true,quote:{pricing_configured:false,delivery_fee:"0.00",total:<product subtotal>,carrier:null,estimated_delivery_start:null,estimated_delivery_end:null,...}}}`. Explicitly disabled or malformed configured rules return `{data:{available:false,quote:null,notice}}`. Placement independently rechecks current configuration and payment eligibility under its existing transaction; preview results never authorize a client fee.
+The method uses the Haversine great-circle distance on verified OSM administrative-boundary centroids. It uses Sagay City's OSM boundary centroid (relation `11491048`, `10.8960681, 123.4154617`) as the fixed calculation origin; it does **not** claim a Battlefront storefront pin. For reproducibility, use Earth radius `6,371 km`, round the resulting distance to the nearest `0.1 km`, then assign the interval `(minimum, maximum]` below. The pricing bands are held in `battlefront.delivery.negros_occidental_distance_bands`; each city-code rule selects a band, while the reviewed coordinate, relation ID, rounded distance, and band are recorded in `battlefront.delivery.negros_occidental_distance_proxies`.
+
+These are administrative-boundary centroids used only as geographic proxies. They are **not actual storefront locations, town centers, road distances, travel times, or official LBC pricing inputs**. OSM relation centroids can move when mapped boundaries change. OSM data is © OpenStreetMap contributors and licensed under ODbL 1.0. The OSM/Nominatim relation lookup pattern is [Nominatim lookup](https://nominatim.openstreetmap.org/lookup?osm_ids=R11491048&format=jsonv2); substitute the relation ID in the table for each locality. OSM attribution does not imply LBC endorsement.
+
+The bands were reviewed against the unchanged configured provincial references with OSM boundary centroids: Sagay 0.0 km / PHP 80, Escalante 11.0 km / PHP 100, Cadiz 13.7 km / PHP 120, Toboso 22.6 km / PHP 140, Manapla 32.6 km / PHP 160, Calatrava 34.2 km / PHP 180, Victorias 37.6 km / PHP 180, San Carlos 45.6 km / PHP 220, E.B. Magalona 47.4 km / PHP 200, Silay 49.2 km / PHP 220, and Talisay 52.0 km / PHP 240. These reference fees are intentionally not normalized or recalculated. Bacolod's PHP 250 / 1–2-day HUC route is also unchanged; it is excluded from spatial calibration because the available point was not a verified OSM boundary centroid. New bands use modest fixed increments, not a fit claimed to model actual courier costs.
+
+| Distance interval from Sagay proxy (km) | Base estimate (PHP) | Demo transit days | Calibration / use |
+| --- | ---: | --- | --- |
+| (30, 45] | 180.00 | 1–2 | Around the unchanged PHP 160–180 references at 32.6–37.6 km |
+| (45, 60] | 220.00 | 1–2 | Around the unchanged PHP 200–240 references at 45.6–52.0 km |
+| (60, 100] | 280.00 | 2–3 | First conservative outward step beyond configured references |
+| (100, 125] | 320.00 | 2–3 | One further distance tier |
+| (125, 155] | 360.00 | 3–4 | One further distance tier |
+| (155, 180] | 400.00 | 3–4 | Longest reviewed proxy distances in the proposed coverage |
+
+| Destination (PSGC name) | Full locality code | Barangays | OSM relation | Boundary centroid (lat, lon) | Great-circle km | Band | Base fee (PHP) | Transit days |
+| --- | --- | ---: | ---: | --- | ---: | --- | ---: | --- |
+| Binalbagan | 1804503000 | 16 | 11525661 | 10.1937474, 122.8587743 | 99.0 | (60, 100] | 280.00 | 2–3 |
+| Candoni | 1804506000 | 9 | 3740498 | 9.8306756, 122.6429611 | 145.5 | (125, 155] | 360.00 | 3–4 |
+| Cauayan | 1804507000 | 25 | 3740499 | 9.9733632, 122.6260198 | 134.1 | (125, 155] | 360.00 | 3–4 |
+| City of Bago | 1804502000 | 24 | 11366393 | 10.5376299, 122.8352802 | 74.9 | (60, 100] | 280.00 | 2–3 |
+| City of Himamaylan | 1804510000 | 19 | 11525214 | 10.0992841, 122.8705390 | 106.8 | (100, 125] | 320.00 | 2–3 |
+| City of Kabankalan | 1804515000 | 32 | 3740502 | 9.9888817, 122.8134501 | 120.5 | (100, 125] | 320.00 | 2–3 |
+| City of La Carlota | 1804516000 | 14 | 11984373 | 10.4268649, 122.9208074 | 75.1 | (60, 100] | 280.00 | 2–3 |
+| City of Sipalay | 1804527000 | 17 | 3740505 | 9.7491266, 122.4040602 | 168.8 | (155, 180] | 400.00 | 3–4 |
+| Hinigaran | 1804511000 | 24 | 12599665 | 10.2713832, 122.8519909 | 92.8 | (60, 100] | 280.00 | 2–3 |
+| Hinoba-an | 1804512000 | 13 | 3740500 | 9.6021766, 122.4670994 | 177.4 | (155, 180] | 400.00 | 3–4 |
+| Ilog | 1804513000 | 15 | 3740501 | 10.0242067, 122.7691808 | 120.0 | (100, 125] | 320.00 | 2–3 |
+| Isabela | 1804514000 | 30 | 18527747 | 10.2047969, 122.9892506 | 89.9 | (60, 100] | 280.00 | 2–3 |
+| La Castellana | 1804517000 | 13 | 17749026 | 10.3230498, 123.0187418 | 77.1 | (60, 100] | 280.00 | 2–3 |
+| Moises Padilla | 1804519000 | 15 | 18491788 | 10.2708302, 123.0733691 | 78.9 | (60, 100] | 280.00 | 2–3 |
+| Murcia | 1804520000 | 23 | 11366415 | 10.6066483, 123.0404676 | 52.1 | (45, 60] | 220.00 | 1–2 |
+| Pontevedra | 1804521000 | 20 | 12716470 | 10.3751168, 122.8668210 | 83.4 | (60, 100] | 280.00 | 2–3 |
+| Pulupandan | 1804522000 | 20 | 12245305 | 10.5192005, 122.8034563 | 78.9 | (60, 100] | 280.00 | 2–3 |
+| Salvador Benedicto | 1804532000 | 7 | 12717917 | 10.5770770, 123.2203670 | 41.4 | (30, 45] | 180.00 | 1–2 |
+| San Enrique | 1804525000 | 10 | 12599666 | 10.4196780, 122.8495462 | 81.4 | (60, 100] | 280.00 | 2–3 |
+| Valladolid | 1804530000 | 16 | 12599678 | 10.4615480, 122.8234493 | 80.7 | (60, 100] | 280.00 | 2–3 |
+
+The nearest new locality is Salvador Benedicto at 41.4 proxy km; the farthest is Hinoba-an at 177.4 proxy km. Nearby cases were reviewed: Isabela/Hinigaran (89.9/92.8 km) share one band; Ilog/Kabankalan (120.0/120.5 km) also share one band, avoiding a sharp fee change for a half-kilometer proxy difference. No new locality exceeds the documented 180 km maximum. The resulting rates are suitable only for reproducible capstone demonstrations, not as verified production charges.
+
+All 32 configured routes (the original 12 plus the 20 new city-code rules) explicitly support GCash, Maya and COD demonstrations. Other valid nationwide destinations can place product-subtotal-only orders using the server's `0.00` placeholder, with GCash/Maya/COD payment eligibility; they are marked `pricing_configured=false` and do not receive a carrier, ETA, or automatically created Shipment. The placeholder is not a delivery price, free-shipping offer, or LBC quotation. No delivery fee is included; delivery arrangements and any applicable charge must be confirmed separately. An administrator may register a manual Shipment after confirming the arrangement. Profile addresses can still be saved for any valid locality. Existing historical unconfigured-route orders and all persisted amounts/metadata remain readable and are never repriced.
+
+The quote endpoint is `GET /checkout/delivery-quote` (web) or `GET /api/v1/checkout/delivery-quote` (mobile), with owned selected `cart_item_ids[]` and `delivery_city_code`. A configured route returns `{data:{available:true,quote:{pricing_configured:true,order_placement_allowed:true,...}}}`. An unconfigured valid route returns `{data:{available:true,quote:{pricing_configured:false,order_placement_allowed:true,delivery_fee:"0.00",payment_methods:["gcash","maya","cod"],carrier:null,estimated_delivery_start:null,estimated_delivery_end:null,...}}}`; `0.00` is only the absent-rate placeholder, not an offer or confirmed delivery charge. Product subtotal is the only amount in the placed order; no automatic Shipment is created. Explicitly disabled or malformed configured rules return `{data:{available:false,quote:null,notice}}`. Placement independently rechecks current configuration and payment eligibility under its existing transaction; preview results never authorize a client fee.
 
 | Profile | Once-per-order surcharge (PHP) | Preparation days |
 | --- | --- | --- |
@@ -98,7 +144,7 @@ The highest profile in the selected cart applies once. Delivery fee = configured
 
 `php artisan catalog:classify-shipping --no-interaction` previews the mapping; `--apply` applies eligible reviewed rows in locked transactions. New catalog inserts receive eligible initial classifications; reimports preserve existing profiles. Administrators can change or explicitly confirm each profile in the existing product form; `shipping_profile_source=manual` protects that choice, including a confirmed Standard assignment. Apply the migration before running the command.
 
-For configured routes, GCash/Maya pay the full total to Battlefront's configured wallet with existing manual proof verification; Battlefront is assumed to arrange shipment and pay the carrier at dispatch. For unconfigured routes, GCash/Maya pay the product subtotal only and the order makes no carrier booking or delivery-price promise. Configured-route COD assumes collect-both product payment and delivery fee, pending branch confirmation. Unconfigured-route COD collects product subtotal only and carries no LBC booking or carrier-collection claim. Existing COD operational confirmation rules remain unchanged. Pickup cash/card workflows have zero delivery fees. Sales revenue remains product subtotal only. No carrier settlement or reconciliation module is introduced. The full operational confirmation notice appears only in Sagay branch information; the standard estimated-rate disclaimer accompanies configured shipping quotes.
+For configured routes, GCash/Maya pay the full order total to Battlefront's configured wallet with existing manual proof verification; Battlefront is assumed to arrange shipment and pay the carrier at dispatch. Configured-route COD keeps its existing collect-both product payment and delivery-fee demonstration assumption, pending branch confirmation. For unconfigured destinations, GCash/Maya pay the product subtotal with proof and COD collects the product subtotal only; no delivery fee is included, and delivery arrangements and any applicable charge must be confirmed separately. These orders do not automatically create a Shipment or promise an ETA; an administrator can register a manual Shipment after confirming the arrangement. Historical orders retain their original payment and delivery snapshots. Existing COD operational confirmation rules remain unchanged. Pickup cash/card workflows have zero delivery fees. Sales revenue remains product subtotal only. No carrier settlement or reconciliation module is introduced. The full operational confirmation notice appears only in Sagay branch information; the estimate disclaimer accompanies configured shipping quotes.
 
 ## Updating the bundle
 

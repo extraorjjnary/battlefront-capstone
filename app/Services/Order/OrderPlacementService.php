@@ -222,8 +222,12 @@ class OrderPlacementService
                 'shipping_profile' => $quote['shipping_profile'] ?? null,
                 'handling_surcharge' => $quote['handling_surcharge'] ?? null,
                 'delivery_origin_city' => $quote['origin_city'] ?? null,
-                'delivery_is_demo' => $quote['is_demo'] ?? null,
-                'delivery_assumption_label' => $quote['assumption_label'] ?? null,
+                'delivery_is_demo' => $zone === null
+                    ? null
+                    : ($zone['configured'] ? ($quote['is_demo'] ?? null) : false),
+                'delivery_assumption_label' => $zone !== null && ! $zone['configured']
+                    ? Config::string('battlefront.delivery.unconfigured_route.assumption_label')
+                    : ($quote['assumption_label'] ?? null),
                 'status' => OrderStatus::Pending,
                 'payment_status' => PaymentStatus::Pending,
                 'payment_method' => $checkout['payment_method'],

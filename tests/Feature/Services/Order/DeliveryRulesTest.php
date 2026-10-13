@@ -32,7 +32,7 @@ test('all configured destinations resolve approved fees and transit ranges witho
         'origin_city' => 'Sagay City',
         'destination' => $destination,
         'is_demo' => true,
-        'assumption_label' => 'Battlefront-configured demonstration estimates, not official LBC quotations.',
+        'assumption_label' => 'Battlefront demonstration estimates. New Negros Occidental rates use OSM administrative-boundary centroids as straight-line proxies; they are not official LBC rates or verified production shipping charges.',
         'pricing_configured' => true,
         'shipping_profile' => 'standard',
         'base_fee' => $baseFee,
@@ -65,6 +65,76 @@ test('destination listing contains exactly the supported destinations', function
         'Sagay City', 'Escalante City', 'Cadiz City', 'Toboso', 'Manapla', 'Calatrava',
         'Victorias City', 'E.B. Magalona', 'San Carlos City', 'Silay City', 'Talisay City', 'Bacolod City',
     ]);
+});
+
+test('new Negros Occidental destinations use their reviewed centroid distance bands', function (
+    string $cityCode,
+    string $distance,
+    string $distanceBand,
+    string $baseFee,
+    int $transitMinimum,
+    int $transitMaximum,
+) {
+    $rules = app(DeliveryRules::class);
+    $product = Product::factory()->standard()->make(['category_id' => 1]);
+    $zone = $rules->zone($cityCode);
+    $quote = $rules->quote(FulfillmentMethod::Delivery, $cityCode, [$product]);
+    /** @var array{latitude: float, longitude: float, ...} $origin */
+    $origin = config('battlefront.delivery.negros_occidental_distance_method.origin');
+    /** @var array{latitude: float, longitude: float, ...} $proxy */
+    $proxy = config("battlefront.delivery.negros_occidental_distance_proxies.{$cityCode}");
+    /** @var int $earthRadiusKm */
+    $earthRadiusKm = config('battlefront.delivery.negros_occidental_distance_method.earth_radius_km');
+    $toRadians = static fn (float $degrees): float => deg2rad($degrees);
+    $latitudeDelta = $toRadians($proxy['latitude'] - $origin['latitude']);
+    $longitudeDelta = $toRadians($proxy['longitude'] - $origin['longitude']);
+    $haversine = sin($latitudeDelta / 2) ** 2
+        + cos($toRadians($origin['latitude'])) * cos($toRadians($proxy['latitude'])) * sin($longitudeDelta / 2) ** 2;
+    $calculatedDistance = 2 * $earthRadiusKm * asin(sqrt($haversine));
+
+    expect(config("battlefront.delivery.negros_occidental_distance_proxies.{$cityCode}.distance_km"))->toBe((float) $distance);
+    expect(round($calculatedDistance, 1))->toBe((float) $distance);
+    expect(config("battlefront.delivery.negros_occidental_distance_proxies.{$cityCode}.distance_band"))->toBe($distanceBand);
+    expect($zone['configured'])->toBeTrue();
+    expect($zone['base_fee'])->toBe($baseFee);
+    expect($zone['transit_min_days'])->toBe($transitMinimum);
+    expect($zone['transit_max_days'])->toBe($transitMaximum);
+    expect($zone['payment_methods'])->toBe(['gcash', 'maya', 'cod']);
+    expect($quote)->pricing_configured->toBeTrue()
+        ->base_fee->toBe($baseFee)
+        ->delivery_fee->toBe($baseFee)
+        ->transit_min_days->toBe($transitMinimum)
+        ->transit_max_days->toBe($transitMaximum)
+        ->eta_min_days->toBe($transitMinimum + 1)
+        ->eta_max_days->toBe($transitMaximum + 1);
+})->with([
+    'Binalbagan' => ['1804503000', '99.0', 'km_60_100', '280.00', 2, 3],
+    'Candoni' => ['1804506000', '145.5', 'km_125_155', '360.00', 3, 4],
+    'Cauayan' => ['1804507000', '134.1', 'km_125_155', '360.00', 3, 4],
+    'City of Bago' => ['1804502000', '74.9', 'km_60_100', '280.00', 2, 3],
+    'City of Himamaylan' => ['1804510000', '106.8', 'km_100_125', '320.00', 2, 3],
+    'City of Kabankalan' => ['1804515000', '120.5', 'km_100_125', '320.00', 2, 3],
+    'City of La Carlota' => ['1804516000', '75.1', 'km_60_100', '280.00', 2, 3],
+    'City of Sipalay' => ['1804527000', '168.8', 'km_155_180', '400.00', 3, 4],
+    'Hinigaran' => ['1804511000', '92.8', 'km_60_100', '280.00', 2, 3],
+    'Hinoba-an' => ['1804512000', '177.4', 'km_155_180', '400.00', 3, 4],
+    'Ilog' => ['1804513000', '120.0', 'km_100_125', '320.00', 2, 3],
+    'Isabela' => ['1804514000', '89.9', 'km_60_100', '280.00', 2, 3],
+    'La Castellana' => ['1804517000', '77.1', 'km_60_100', '280.00', 2, 3],
+    'Moises Padilla' => ['1804519000', '78.9', 'km_60_100', '280.00', 2, 3],
+    'Murcia' => ['1804520000', '52.1', 'km_45_60', '220.00', 1, 2],
+    'Pontevedra' => ['1804521000', '83.4', 'km_60_100', '280.00', 2, 3],
+    'Pulupandan' => ['1804522000', '78.9', 'km_60_100', '280.00', 2, 3],
+    'Salvador Benedicto' => ['1804532000', '41.4', 'km_30_45', '180.00', 1, 2],
+    'San Enrique' => ['1804525000', '81.4', 'km_60_100', '280.00', 2, 3],
+    'Valladolid' => ['1804530000', '80.7', 'km_60_100', '280.00', 2, 3],
+]);
+
+test('a missing or inconsistent centroid band fails closed', function () {
+    config(['battlefront.delivery.negros_occidental_distance_proxies.1804520000.distance_band' => 'km_60_100']);
+
+    expect(fn () => app(DeliveryRules::class)->zone('1804520000'))
+        ->toThrow(DomainException::class, 'Delivery is unavailable for this location.');
 });
 
 test('unsupported and missing destinations fail deterministically', function (?string $destination) {
