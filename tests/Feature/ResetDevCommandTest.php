@@ -252,9 +252,9 @@ test('reset restores the complete real catalog with historical sales only when r
         } else {
             Storage::disk('local')->assertMissing($coveragePath);
         }
-        $this->assertDatabaseCount('users', $withHistory ? 33 : 32);
+        $this->assertDatabaseCount('users', 32);
         expect(User::query()->where('email', 'like', 'demo.customer%@example.test')->count())->toBe(30);
-        expect(User::query()->where('email', 'historical-sales@example.test')->exists())->toBe($withHistory);
+        expect(User::query()->where('email', 'historical-sales@example.test')->exists())->toBeFalse();
         expect(Product::query()->where('is_catalog_imported', false)->count())->toBe(0);
         expect(Product::where('product_code', 'like', 'DEVHIST40%')->exists())->toBeFalse();
         $this->assertDatabaseHas('users', ['email' => 'admin@example.com']);
@@ -350,10 +350,10 @@ test('reset seeds thirty demonstration customers with either history option with
     expect($result)->toBe(0);
     expect(Artisan::output())->toContain('30 demonstration customer accounts seeded.', 'Development reset completed.')
         ->not->toContain('customer123');
-    $this->assertDatabaseCount('users', $withHistory ? 33 : 32);
+    $this->assertDatabaseCount('users', 32);
     expect(User::query()->where('email', 'like', 'demo.customer%@example.test')->count())->toBe(30);
-    expect(User::query()->where('email', 'historical-sales@example.test')->exists())->toBe($withHistory);
+    expect(User::query()->where('email', 'historical-sales@example.test')->exists())->toBeFalse();
     $this->assertDatabaseHas('users', ['email' => 'admin@example.com', 'role' => 'administrator']);
     $this->assertDatabaseHas('users', ['email' => 'test@example.com', 'role' => 'customer']);
-    expect(User::query()->where('email', 'like', 'demo.customer%@example.test')->whereHas('orders')->exists())->toBeFalse();
+    expect(User::query()->where('email', 'like', 'demo.customer%@example.test')->whereHas('orders')->count())->toBe($withHistory ? 30 : 0);
 })->with([false, true]);

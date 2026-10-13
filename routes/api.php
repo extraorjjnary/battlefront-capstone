@@ -14,6 +14,8 @@ use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\PushDeviceController;
 use App\Http\Controllers\Api\V1\RecommendationController;
+use App\Http\Controllers\DeliveryLocationController;
+use App\Http\Controllers\DeliveryQuoteController;
 use App\Http\Controllers\RecommendationInteractionController;
 use App\Http\Middleware\AuthorizeApiChatbot;
 use App\Http\Middleware\AuthorizeApiRecommendations;
@@ -87,6 +89,8 @@ Route::prefix('v1')
 
             // checkout preview
             Route::get('checkout', [CheckoutController::class, 'show'])->name('checkout.show');
+            Route::get('delivery-locations', [DeliveryLocationController::class, 'index'])->name('delivery-locations.index');
+            Route::get('checkout/delivery-quote', [DeliveryQuoteController::class, 'show'])->name('checkout.delivery-quote.show');
 
             // orders
             Route::get('orders', [OrderController::class, 'index'])->name('orders.index');

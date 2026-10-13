@@ -1,8 +1,11 @@
 <?php
 
 use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Enums\ShipmentArrangement;
 use App\Enums\ShipmentStatus;
+use App\Enums\ShippingProfile;
 use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -33,6 +36,44 @@ function advanceShipmentForTest(Order $order, ShipmentStatus $target): void
     while ($order->refresh()->shipment->status !== $target) {
         $processing->updateShipmentStatus($order, $order->shipment->status->next());
     }
+}
+
+function unconfiguredShipmentTestOrder(
+    PaymentMethod $paymentMethod = PaymentMethod::GCash,
+    OrderStatus $status = OrderStatus::Pending,
+    PaymentStatus $paymentStatus = PaymentStatus::Pending,
+): Order {
+    return Order::factory()->delivery()->create([
+        'recipient_name' => 'Manual Shipment Customer',
+        'product_subtotal' => '100.00',
+        'delivery_destination' => 'City of Makati',
+        'delivery_base_fee' => '0.00',
+        'shipping_profile' => ShippingProfile::Standard,
+        'handling_surcharge' => '0.00',
+        'delivery_fee' => '0.00',
+        'delivery_origin_city' => 'Sagay City',
+        'delivery_is_demo' => false,
+        'delivery_quote_metadata' => [
+            'pricing_status' => 'not_configured',
+            'payment_methods' => ['gcash', 'maya', 'cod'],
+        ],
+        'delivery_assumption_label' => 'No delivery fee is included; no LBC quotation or booking exists.',
+        'total_amount' => '100.00',
+        'status' => $status,
+        'payment_status' => $paymentStatus,
+        'payment_method' => $paymentMethod,
+        'payment_proof_path' => $paymentMethod->requiresPaymentProof()
+            ? 'payment-proofs/manual-shipment-'.$paymentMethod->value.'.png'
+            : null,
+    ]);
+}
+
+function manualShipmentPayload(array $overrides = []): array
+{
+    return array_merge([
+        'arrangement_confirmed' => true,
+        'carrier' => 'lbc',
+    ], $overrides);
 }
 
 test('administrators advance the full manual lifecycle and complete one sale without deducting stock', function () {
@@ -368,3 +409,271 @@ test('customer mobile API has no shipment mutation endpoint', function (string $
 
     expect($order->refresh()->shipment->getAttributes())->toBe($before);
 })->with(['status', 'reference']);
+
+test('administrators register a manual shipment without changing commercial snapshots', function () {
+    $order = unconfiguredShipmentTestOrder();
+    $administrator = User::factory()->administrator()->create();
+    $originalCommercialSnapshot = [
+        $order->product_subtotal,
+        $order->delivery_fee,
+        $order->total_amount,
+        $order->delivery_quote_metadata,
+    ];
+
+    $this->actingAs($administrator)
+        ->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload([
+            'tracking_reference' => 'LBC-BOOKING-REFERENCE',
+            'eta_min_days' => 2,
+            'eta_max_days' => 5,
+            'delivery_fee' => '250.00',
+            'total_amount' => '350.00',
+        ]))
+        ->assertSessionHasNoErrors()
+        ->assertInertiaFlash('toast.message', 'Manual LBC shipment recorded. The order amount remains unchanged.');
+
+    $shipment = $order->refresh()->shipment;
+    expect($shipment)
+        ->arrangement_type->toBe(ShipmentArrangement::Manual)
+        ->carrier->toBe('lbc')
+        ->status->toBe(ShipmentStatus::AwaitingPreparation)
+        ->tracking_reference->toBe('LBC-BOOKING-REFERENCE')
+        ->preparation_days->toBeNull()
+        ->transit_min_days->toBeNull()
+        ->transit_max_days->toBeNull()
+        ->eta_min_days->toBe(2)
+        ->eta_max_days->toBe(5)
+        ->eta_anchor_date->toBeNull()
+        ->estimated_delivery_start->toBeNull();
+    expect([
+        $order->product_subtotal,
+        $order->delivery_fee,
+        $order->total_amount,
+        $order->delivery_quote_metadata,
+    ])->toBe($originalCommercialSnapshot);
+    expect($order->user->notifications()->sole()->data['event'])->toBe('shipment.manual_created');
+    $this->assertDatabaseCount('shipments', 1);
+    $this->assertDatabaseCount('sales', 0);
+});
+
+test('manual shipment setup leaves unknown estimates null through preparation', function () {
+    $order = unconfiguredShipmentTestOrder(
+        paymentMethod: PaymentMethod::GCash,
+        status: OrderStatus::Processing,
+        paymentStatus: PaymentStatus::Verified,
+    );
+    $administrator = User::factory()->administrator()->create();
+
+    $this->actingAs($administrator)
+        ->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload())
+        ->assertSessionHasNoErrors();
+
+    $this->patch(route('administration.orders.shipment.status.update', $order), ['status' => 'preparing'])
+        ->assertSessionHasNoErrors();
+
+    $shipment = $order->refresh()->shipment;
+    expect($shipment)->status->toBe(ShipmentStatus::Preparing)
+        ->eta_min_days->toBeNull()
+        ->eta_max_days->toBeNull()
+        ->eta_anchor_date->toBeNull()
+        ->eta_timezone->toBeNull()
+        ->estimated_delivery_start->toBeNull()
+        ->estimated_delivery_end->toBeNull();
+    expect($order->user->notifications()->pluck('data')->pluck('event')->all())
+        ->toBe(['shipment.manual_created', 'shipment.preparing']);
+});
+
+test('manual shipment setup rejects duplicate and ineligible orders without side effects', function (string $scenario) {
+    $order = match ($scenario) {
+        'configured delivery' => Order::factory()->withDeliverySnapshot()->create(),
+        'legacy delivery' => Order::factory()->delivery()->create(),
+        'pickup' => Order::factory()->create(),
+        'duplicate' => unconfiguredShipmentTestOrder(),
+        'rejected payment' => unconfiguredShipmentTestOrder(
+            paymentMethod: PaymentMethod::GCash,
+            paymentStatus: PaymentStatus::Rejected,
+        ),
+    };
+    $administrator = User::factory()->administrator()->create();
+    $this->actingAs($administrator);
+
+    if ($scenario === 'duplicate') {
+        $this->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload())
+            ->assertSessionHasNoErrors();
+    }
+
+    $this->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload())
+        ->assertSessionHasErrors('carrier');
+
+    if ($scenario === 'duplicate') {
+        expect($order->refresh()->shipment)->not->toBeNull();
+    } else {
+        expect($order->refresh()->shipment)->toBeNull();
+    }
+    $this->assertDatabaseCount('shipments', $scenario === 'duplicate' ? 1 : 0);
+    $this->assertDatabaseCount('notifications', $scenario === 'duplicate' ? 1 : 0);
+})->with([
+    'configured delivery' => ['configured delivery'],
+    'legacy delivery' => ['legacy delivery'],
+    'pickup' => ['pickup'],
+    'rejected payment' => ['rejected payment'],
+    'duplicate' => ['duplicate'],
+]);
+
+test('manual shipment input requires explicit LBC confirmation and complete valid estimates', function (array $overrides, string $field) {
+    $order = unconfiguredShipmentTestOrder();
+
+    $this->actingAs(User::factory()->administrator()->create())
+        ->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload($overrides))
+        ->assertSessionHasErrors($field);
+
+    expect($order->refresh()->shipment)->toBeNull();
+    expect($order->user->notifications()->count())->toBe(0);
+})->with([
+    'arrangement not confirmed' => [['arrangement_confirmed' => false], 'arrangement_confirmed'],
+    'unsupported carrier' => [['carrier' => 'other carrier'], 'carrier'],
+    'minimum without maximum' => [['eta_min_days' => 2], 'eta_max_days'],
+    'maximum without minimum' => [['eta_max_days' => 2], 'eta_min_days'],
+    'reversed estimate range' => [['eta_min_days' => 5, 'eta_max_days' => 2], 'eta_max_days'],
+    'negative estimate' => [['eta_min_days' => -1, 'eta_max_days' => 2], 'eta_min_days'],
+    'tracking reference too long' => [['tracking_reference' => str_repeat('x', 256)], 'tracking_reference'],
+]);
+
+test('manual shipment registration is administrator-only', function (string $access) {
+    $order = unconfiguredShipmentTestOrder();
+    $response = $this->post(
+        route('administration.orders.shipment.manual.store', $order),
+        manualShipmentPayload(),
+    );
+
+    if ($access === 'administrator') {
+        $this->actingAs(User::factory()->administrator()->create())
+            ->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload())
+            ->assertSessionHasNoErrors();
+
+        return;
+    }
+
+    if ($access === 'customer') {
+        $this->actingAs($order->user);
+        $response = $this->post(
+            route('administration.orders.shipment.manual.store', $order),
+            manualShipmentPayload(),
+        );
+        $response->assertForbidden();
+    } else {
+        $response->assertRedirectToRoute('login');
+    }
+
+    $this->assertDatabaseCount('shipments', 0);
+})->with(['guest', 'customer', 'administrator']);
+
+test('manual GCash and Maya shipments require verified payment and complete once', function (PaymentMethod $method) {
+    Storage::fake('local');
+    $order = unconfiguredShipmentTestOrder($method);
+    Storage::disk('local')->put($order->payment_proof_path, 'proof');
+    $inventory = Inventory::factory()->create(['quantity' => 5]);
+    OrderItem::factory()->for($order)->for($inventory->product)->create([
+        'quantity' => 2,
+        'price_at_time' => '50.00',
+    ]);
+    $administrator = User::factory()->administrator()->create();
+    $this->actingAs($administrator);
+
+    $this->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload([
+        'eta_min_days' => 1,
+        'eta_max_days' => 3,
+    ]))->assertSessionHasNoErrors();
+
+    $this->patch(route('administration.orders.shipment.status.update', $order), ['status' => 'preparing'])
+        ->assertSessionHasErrors('status');
+    expect($order->refresh()->shipment)->status->toBe(ShipmentStatus::AwaitingPreparation);
+    $this->assertDatabaseCount('sales', 0);
+
+    $this->patch(route('administration.orders.payment-status.update', $order), [
+        'payment_status' => 'verified',
+        'manual_verification_confirmed' => true,
+    ])->assertSessionHasNoErrors();
+    $this->patch(route('administration.orders.status.update', $order), ['status' => 'processing'])
+        ->assertSessionHasNoErrors();
+    $this->patch(route('administration.orders.status.update', $order), ['status' => 'completed'])
+        ->assertSessionHasErrors('status');
+    expect($order->refresh()->shipment)->status->toBe(ShipmentStatus::AwaitingPreparation);
+    $this->assertDatabaseCount('sales', 0);
+
+    foreach (['preparing', 'ready_for_dispatch', 'handed_to_lbc', 'in_transit', 'out_for_delivery', 'delivered'] as $status) {
+        $this->patch(route('administration.orders.shipment.status.update', $order), ['status' => $status])
+            ->assertSessionHasNoErrors();
+    }
+
+    expect($order->refresh())->status->toBe(OrderStatus::Completed)
+        ->payment_status->toBe(PaymentStatus::Verified)
+        ->delivery_fee->toBe('0.00')
+        ->total_amount->toBe('100.00');
+    expect($order->shipment)->status->toBe(ShipmentStatus::Delivered);
+    expect($order->sale)->amount->toBe('100.00');
+    expect($inventory->refresh()->quantity)->toBe(5);
+    $this->assertDatabaseCount('sales', 1);
+    $this->patch(route('administration.orders.shipment.status.update', $order), ['status' => 'delivered'])
+        ->assertSessionHasErrors('status');
+    $this->assertDatabaseCount('sales', 1);
+})->with([PaymentMethod::GCash, PaymentMethod::Maya]);
+
+test('manual shipment cancellation is blocked after handoff to LBC', function () {
+    $order = unconfiguredShipmentTestOrder(
+        paymentMethod: PaymentMethod::GCash,
+        status: OrderStatus::Processing,
+        paymentStatus: PaymentStatus::Verified,
+    );
+    $this->actingAs(User::factory()->administrator()->create());
+    $this->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload())
+        ->assertSessionHasNoErrors();
+    foreach (['preparing', 'ready_for_dispatch', 'handed_to_lbc'] as $status) {
+        $this->patch(route('administration.orders.shipment.status.update', $order), ['status' => $status])
+            ->assertSessionHasNoErrors();
+    }
+
+    $this->patch(route('administration.orders.status.update', $order), ['status' => 'cancelled'])
+        ->assertSessionHasErrors('status');
+
+    expect($order->refresh())->status->toBe(OrderStatus::Processing);
+    expect($order->shipment)->status->toBe(ShipmentStatus::HandedToLbc);
+    $this->assertDatabaseCount('sales', 0);
+});
+
+test('manual COD delivery still waits for explicit collection confirmation', function () {
+    $order = unconfiguredShipmentTestOrder(
+        paymentMethod: PaymentMethod::Cod,
+        status: OrderStatus::Pending,
+        paymentStatus: PaymentStatus::Pending,
+    );
+    $inventory = Inventory::factory()->create(['quantity' => 5]);
+    OrderItem::factory()->for($order)->for($inventory->product)->create([
+        'quantity' => 2,
+        'price_at_time' => '50.00',
+    ]);
+    $this->actingAs(User::factory()->administrator()->create());
+    $this->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload())
+        ->assertSessionHasNoErrors();
+    $this->patch(route('administration.orders.status.update', $order), ['status' => 'processing'])
+        ->assertSessionHasNoErrors();
+
+    foreach (['preparing', 'ready_for_dispatch', 'handed_to_lbc', 'in_transit', 'out_for_delivery', 'delivered'] as $status) {
+        $this->patch(route('administration.orders.shipment.status.update', $order), ['status' => $status])
+            ->assertSessionHasNoErrors();
+    }
+
+    expect($order->refresh())->status->toBe(OrderStatus::Processing)
+        ->payment_status->toBe(PaymentStatus::Pending)
+        ->delivery_fee->toBe('0.00')
+        ->total_amount->toBe('100.00');
+    $this->assertDatabaseCount('sales', 0);
+    $this->post(route('administration.orders.cod-collection.store', $order), [
+        'cod_collection_confirmed' => true,
+    ])->assertSessionHasNoErrors();
+
+    expect($order->refresh())->status->toBe(OrderStatus::Completed)
+        ->payment_status->toBe(PaymentStatus::Verified);
+    expect($order->sale)->amount->toBe('100.00');
+    expect($inventory->refresh()->quantity)->toBe(5);
+    $this->assertDatabaseCount('sales', 1);
+});

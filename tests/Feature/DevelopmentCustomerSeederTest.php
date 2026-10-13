@@ -139,13 +139,12 @@ test('demonstration customer seeding rejects other environments without writes',
     expect(DB::table('users')->get()->all())->toEqual($before);
 })->with(['production', 'staging']);
 
-test('demonstration customer seeding preserves historical account ownership transactions and inventory', function () {
+test('demonstration customer seeding preserves distributed historical ownership transactions and inventory', function () {
     Storage::fake('local');
     $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00'));
     HistoricalSalesCatalogFixtures::createProducts();
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
-    $historical = User::query()->where('email', 'historical-sales@example.test')->sole();
-    $accountBefore = $historical->getRawOriginal();
+    $accountsBefore = DB::table('users')->orderBy('id')->get()->all();
     $tables = ['categories', 'products', 'inventories', 'orders', 'order_items', 'sales', 'shipments', 'product_tag'];
     $before = [];
     foreach ($tables as $table) {
@@ -157,11 +156,11 @@ test('demonstration customer seeding preserves historical account ownership tran
     $this->seed(DevelopmentCustomerSeeder::class);
     $this->seed(DevelopmentCustomerSeeder::class);
 
-    expect($historical->refresh()->getRawOriginal())->toBe($accountBefore);
+    expect(DB::table('users')->orderBy('id')->get()->all())->toEqual($accountsBefore);
     foreach ($tables as $table) {
         expect(DB::table($table)->orderBy('id')->get()->all())->toEqual($before[$table]);
     }
     expect(Storage::disk('local')->get($coveragePath))->toBe($coverageBefore);
-    $this->assertDatabaseCount('users', 31);
+    $this->assertDatabaseCount('users', 30);
     $this->assertDatabaseCount('notifications', 0);
 });

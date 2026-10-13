@@ -290,7 +290,9 @@ test('reimport updates the verified reorder level without resetting quantity or 
         $first = app(RealCatalogImportService::class)->execute($mapping, $manifest);
         $product = Product::query()->where('product_code', '00123')->firstOrFail();
         expect($product->shipping_profile)->toBe(ShippingProfile::Standard);
-        $product->update(['shipping_profile' => ShippingProfile::Fragile]);
+        $product->shipping_profile = ShippingProfile::Fragile;
+        $product->shipping_profile_source = 'manual';
+        $product->save();
         $product->inventory()->update(['quantity' => 2, 'reorder_level' => 7]);
         $administratorProduct = Product::factory()->create();
         $administratorInventory = $administratorProduct->inventory()->create([
@@ -308,6 +310,7 @@ test('reimport updates the verified reorder level without resetting quantity or 
             ->and($product->inventory->quantity)->toBe(2)
             ->and($product->inventory->reorder_level)->toBe(3)
             ->and($product->shipping_profile)->toBe(ShippingProfile::Fragile)
+            ->and($product->shipping_profile_source)->toBe('manual')
             ->and($product->tags->pluck('name')->sort()->values()->all())->toBe(['Gaming', 'Mid-Range', 'Productivity']);
         expect($administratorInventory->refresh()->quantity)->toBe(9);
         expect($administratorInventory->reorder_level)->toBe(4);

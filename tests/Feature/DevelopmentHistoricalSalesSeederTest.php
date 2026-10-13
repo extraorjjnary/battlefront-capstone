@@ -20,6 +20,7 @@ use App\Services\Cart\CartService;
 use App\Services\Order\DeliveryRules;
 use App\Services\Order\OrderPlacementService;
 use Carbon\CarbonImmutable;
+use Database\Seeders\DevelopmentCustomerSeeder;
 use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -58,11 +59,14 @@ test('historical transactions reference existing imported identities without cha
 
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
 
-    $customer = User::where('email', 'historical-sales@example.test')->sole();
-    expect($customer->name)->toBe('Historical Sales Development Account');
-    expect($customer->role)->toBe(UserRole::Customer);
-    expect(Hash::check('password', $customer->password))->toBeTrue();
-    expect($customer->orders()->count())->toBeBetween(150, 300);
+    $customers = User::whereIn('email', array_keys(DevelopmentCustomerSeeder::accounts()))->withCount('orders')->get();
+    expect($customers)->toHaveCount(30);
+    foreach ($customers as $customer) {
+        expect($customer->role)->toBe(UserRole::Customer);
+        expect(Hash::check('customer123', $customer->password))->toBeTrue();
+        expect($customer->orders_count)->toBeGreaterThan(0);
+    }
+    $this->assertDatabaseMissing('users', ['email' => 'historical-sales@example.test']);
     expect($administrator->orders()->count())->toBe(0);
     foreach (['products', 'inventories', 'categories', 'product_tag'] as $table) {
         expect(historicalSalesDatabaseSnapshot()[$table])->toEqual($before[$table]);
@@ -87,8 +91,9 @@ test('historical orders and sales use coherent completed mixed fulfillment snaps
         expect($sale->sale_date->day)->toBeBetween(2, 28);
         expect($order->created_at->hour)->toBeBetween(9, 17);
         expect($order->created_at->toDateString())->toBe($sale->sale_date->toDateString());
-        expect($order->recipient_name)->toMatch('/^Demonstration Historical Sales '.$sale->sale_date->format('Y-m').' V3 0[1-7]$/');
-        expect($order->user->email)->toBe('historical-sales@example.test');
+        expect($order->development_fixture_key)->toMatch('/^historical-sales:V4:'.$sale->sale_date->format('Y-m').':0[1-7]$/');
+        expect($order->recipient_name)->toBe($order->user->name);
+        expect($order->user->email)->toBeIn(array_keys(DevelopmentCustomerSeeder::accounts()));
         expect($order->status)->toBe(OrderStatus::Completed);
         expect($order->payment_status)->toBe(PaymentStatus::Verified);
         expect($order->payment_method->isAvailableFor($order->fulfillment_method))->toBeTrue();
@@ -133,10 +138,11 @@ test('historical orders and sales use coherent completed mixed fulfillment snaps
         }
         expect($order->product_subtotal)->toBe($subtotal);
         expect($order->total_amount)->toBe(bcadd($subtotal, $order->delivery_fee, 2));
-        expect($sale->amount)->toBe($order->total_amount);
+        expect($sale->amount)->toBe($subtotal);
     }
     expect(OrderItem::sum('quantity'))->toBe(1944);
-    expect(bcadd((string) Sale::sum('amount'), '0', 2))->toBe('838450.00');
+    expect(bcadd((string) Sale::sum('amount'), '0', 2))->toBe('829300.00');
+    expect(bcadd((string) Order::sum('total_amount'), '0', 2))->toBe('838450.00');
 });
 
 test('calendar variations retain known quantities and transaction totals', function () {
@@ -148,7 +154,7 @@ test('calendar variations retain known quantities and transaction totals', funct
     foreach (['2022-10', '2022-11', '2023-02', '2026-09'] as $month) {
         $observations[$month] = [
             array_map(fn ($product) => $product->orderItems()->whereHas('order.sale', fn ($query) => $query->whereBetween('sale_date', [$month.'-01', $month.'-28']))->sum('quantity'), array_values($products)),
-            Sale::whereBetween('sale_date', [$month.'-01', $month.'-28'])->orderBy('sale_date')->pluck('amount')->all(),
+            Order::whereHas('sale', fn ($query) => $query->whereBetween('sale_date', [$month.'-01', $month.'-28']))->orderBy('created_at')->pluck('total_amount')->all(),
         ];
     }
     expect($observations)->toBe([
@@ -226,9 +232,7 @@ test('damaged delivery or payment snapshots stop without reconciling any existin
     match ($problem) {
         'payment method' => $order->update(['payment_method' => PaymentMethod::Cash]),
         'payment evidence' => $order->update(['payment_proof_path' => 'payment-proofs/unrelated.png']),
-        'delivery fee' => DB::table('orders')->where('id', $order->id)->update([
-            'delivery_base_fee' => '0.00', 'handling_surcharge' => '0.00', 'delivery_fee' => '0.00', 'total_amount' => $order->product_subtotal,
-        ]),
+        'fee-inclusive sale' => $order->sale->update(['amount' => $order->total_amount]),
         'missing address' => DB::table('orders')->where('id', $order->id)->update(['delivery_address' => null]),
         'missing base fee' => DB::table('orders')->where('id', $order->id)->update([
             'delivery_destination' => null, 'delivery_base_fee' => null, 'shipping_profile' => null, 'handling_surcharge' => null,
@@ -244,11 +248,11 @@ test('damaged delivery or payment snapshots stop without reconciling any existin
     $before = historicalSalesDatabaseSnapshot();
 
     expect(fn () => $this->seed(DevelopmentHistoricalSalesSeeder::class))
-        ->toThrow(RuntimeException::class, 'battlefront:reset-dev --with-sales-history manually');
+        ->toThrow(RuntimeException::class, 'Separate approval is required');
 
     expect(historicalSalesDatabaseSnapshot())->toEqual($before);
     Storage::disk('local')->assertMissing(config('forecasting.development_manifest'));
-})->with(['payment method', 'payment evidence', 'delivery fee', 'missing address', 'missing base fee', 'missing shipment', 'shipment status', 'tracking evidence', 'invented milestone', 'missing timestamp']);
+})->with(['payment method', 'payment evidence', 'fee-inclusive sale', 'missing address', 'missing base fee', 'missing shipment', 'shipment status', 'tracking evidence', 'invented milestone', 'missing timestamp']);
 
 test('historical delivery configuration failures roll back customer orders sales and shipments', function () {
     HistoricalSalesCatalogFixtures::createProducts();
@@ -265,9 +269,11 @@ test('historical delivery configuration failures roll back customer orders sales
 test('repeated seeding preserves snapshots and unrelated transactions even on selected products', function () {
     $products = HistoricalSalesCatalogFixtures::createProducts();
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
-    $customer = User::where('email', 'historical-sales@example.test')->sole();
+    $customer = User::where('email', 'demo.customer01@example.test')->sole();
+    $customer->update(['appearance' => 'dark', 'personalized_recommendations_enabled' => false, 'default_delivery_address' => 'My saved address']);
+    $fixture = $customer->orders()->firstOrFail();
     $unrelatedSale = Sale::factory()->for(Order::factory()->for($customer)->state([
-        'recipient_name' => 'Unrelated customer order', 'created_at' => '2025-02-10 12:30:00',
+        'recipient_name' => $customer->name, 'created_at' => $fixture->created_at,
     ]))->create();
     OrderItem::factory()->for($unrelatedSale->order)->for($products['10003'])->create(['quantity' => 1]);
     $products['10003']->update(['price' => '3000.00', 'discount_price' => '2500.00', 'is_active' => false]);
@@ -280,7 +286,7 @@ test('repeated seeding preserves snapshots and unrelated transactions even on se
 
     expect(historicalSalesDatabaseSnapshot())->toEqual($before);
     expect(Storage::disk('local')->get(config('forecasting.development_manifest')))->toBe($coverageBefore);
-    expect($products['10003']->orderItems()->whereHas('order', fn ($query) => $query->where('recipient_name', 'like', 'Demonstration Historical Sales %'))->pluck('price_at_time')->unique()->all())->toBe(['2800.00']);
+    expect($products['10003']->orderItems()->whereHas('order', fn ($query) => $query->whereNotNull('development_fixture_key'))->pluck('price_at_time')->unique()->all())->toBe(['2800.00']);
 });
 
 test('historical seeding retains imported customer catalog and cart eligibility', function () {
@@ -350,10 +356,10 @@ test('missing or nonimported selected products stop before customer and transact
 
 test('reserved customer collisions roll back all historical writes', function () {
     HistoricalSalesCatalogFixtures::createProducts();
-    User::factory()->administrator()->create(['email' => 'historical-sales@example.test']);
+    User::factory()->administrator()->create(['email' => 'demo.customer30@example.test']);
     $before = historicalSalesDatabaseSnapshot();
 
-    expect(fn () => $this->seed(DevelopmentHistoricalSalesSeeder::class))->toThrow(RuntimeException::class, 'battlefront:reset-dev --with-sales-history manually');
+    expect(fn () => $this->seed(DevelopmentHistoricalSalesSeeder::class))->toThrow(RuntimeException::class, 'Customer demonstration identity conflicts');
 
     expect(historicalSalesDatabaseSnapshot())->toEqual($before);
 });
@@ -374,7 +380,7 @@ test('operational coverage cannot be supplemented with synthetic transactions fo
     Storage::disk('local')->assertMissing(config('forecasting.development_manifest'));
 });
 
-test('legacy products or historical transactions require a manual reset without any cleanup', function (string $legacy) {
+test('legacy products or historical transactions require separate approval without any cleanup', function (string $legacy) {
     HistoricalSalesCatalogFixtures::createProducts();
     if ($legacy === 'product') {
         Product::factory()->create(['product_code' => 'DEVHIST40STABLE']);
@@ -387,13 +393,13 @@ test('legacy products or historical transactions require a manual reset without 
     Storage::disk('local')->put(config('forecasting.development_manifest'), 'legacy declaration');
     $before = historicalSalesDatabaseSnapshot();
 
-    expect(fn () => $this->seed(DevelopmentHistoricalSalesSeeder::class))->toThrow(RuntimeException::class, 'battlefront:reset-dev --with-sales-history manually');
+    expect(fn () => $this->seed(DevelopmentHistoricalSalesSeeder::class))->toThrow(RuntimeException::class, 'Separate approval is required');
 
     expect(historicalSalesDatabaseSnapshot())->toEqual($before);
     expect(Storage::disk('local')->get(config('forecasting.development_manifest')))->toBe('legacy declaration');
 })->with(['product', 'quarterly', 'transaction']);
 
-test('an earlier fixture stops with manual reset instructions without changing records or coverage', function (string $label) {
+test('an earlier fixture stops with approval instructions without changing records or coverage', function (string $label) {
     HistoricalSalesCatalogFixtures::createProducts();
     $customer = User::factory()->customer()->create(['email' => 'historical-sales@example.test']);
     $sale = Sale::factory()->for(Order::factory()->for($customer)->state([
@@ -404,19 +410,21 @@ test('an earlier fixture stops with manual reset instructions without changing r
     $before = historicalSalesDatabaseSnapshot();
 
     expect(fn () => $this->seed(DevelopmentHistoricalSalesSeeder::class))
-        ->toThrow(RuntimeException::class, 'battlefront:reset-dev --with-sales-history manually');
+        ->toThrow(RuntimeException::class, 'Separate approval is required');
 
     expect(historicalSalesDatabaseSnapshot())->toEqual($before);
     expect(Storage::disk('local')->get(config('forecasting.development_manifest')))->toBe('prior declaration');
-})->with(['Demonstration Historical Sales 2022-10 A', 'Demonstration Historical Sales 2022-10 V2 01']);
+})->with(['Demonstration Historical Sales 2022-10 A', 'Demonstration Historical Sales 2022-10 V2 01', 'Demonstration Historical Sales 2022-10 V3 01']);
 
 test('ambiguous or damaged owned history blocks reseeding and rollover without deleting anything', function (string $problem) {
     HistoricalSalesCatalogFixtures::createProducts();
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
     $order = Order::with(['items', 'sale'])->oldest()->firstOrFail();
     match ($problem) {
-        'duplicate order' => Order::factory()->create(['user_id' => $order->user_id, 'recipient_name' => $order->recipient_name, 'created_at' => $order->created_at]),
-        'foreign customer' => Order::factory()->create(['recipient_name' => $order->recipient_name]),
+        'fixture key' => DB::table('orders')->where('id', $order->id)->update(['development_fixture_key' => 'historical-sales:V4:2022-10:99']),
+        'foreign customer' => DB::table('orders')->where('id', $order->id)->update(['user_id' => User::factory()->customer()->create()->id]),
+        'wrong demo customer' => DB::table('orders')->where('id', $order->id)->update(['user_id' => User::where('email', 'demo.customer01@example.test')->sole()->id]),
+        'unrecognized version' => DB::table('orders')->where('id', $order->id)->update(['development_fixture_key' => 'historical-sales:V5:2022-10:01']),
         'duplicate item' => OrderItem::factory()->for($order)->create(['product_id' => $order->items->first()->product_id]),
         'unrelated item' => OrderItem::factory()->for($order)->create(),
         'missing item' => $order->items->first()->delete(),
@@ -432,11 +440,11 @@ test('ambiguous or damaged owned history blocks reseeding and rollover without d
     $this->travelTo(CarbonImmutable::parse('2027-01-15'));
     $before = historicalSalesDatabaseSnapshot();
 
-    expect(fn () => $this->seed(DevelopmentHistoricalSalesSeeder::class))->toThrow(RuntimeException::class, 'battlefront:reset-dev --with-sales-history manually');
+    expect(fn () => $this->seed(DevelopmentHistoricalSalesSeeder::class))->toThrow(RuntimeException::class, 'Separate approval is required');
 
     expect(historicalSalesDatabaseSnapshot())->toEqual($before);
     Storage::disk('local')->assertMissing(config('forecasting.development_manifest'));
-})->with(['duplicate order', 'foreign customer', 'duplicate item', 'unrelated item', 'missing item', 'quantity', 'sale amount', 'sale date', 'missing sale', 'status', 'payment', 'label', 'timestamp']);
+})->with(['fixture key', 'foreign customer', 'wrong demo customer', 'unrecognized version', 'duplicate item', 'unrelated item', 'missing item', 'quantity', 'sale amount', 'sale date', 'missing sale', 'status', 'payment', 'label', 'timestamp']);
 
 test('a failure partway through transaction generation rolls back all database changes', function () {
     HistoricalSalesCatalogFixtures::createProducts();
@@ -496,31 +504,34 @@ test('history includes only completed months before the quarter in the applicati
     'application ahead of UTC' => ['2026-09-30 16:00:00', 'Asia/Shanghai', '2022-10', '2026-09'],
 ]);
 
-test('quarter rollover prunes only owned expired history and retains overlapping snapshots and inventory', function (string $nextReference, string $expectedStart, string $expectedEnd) {
+test('quarter rollover retains every existing record while preparing only the requested history window', function (string $nextReference, string $expectedStart, string $expectedEnd) {
     $products = HistoricalSalesCatalogFixtures::createProducts();
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
-    $customer = User::where('email', 'historical-sales@example.test')->sole();
+    $customer = User::where('email', 'demo.customer01@example.test')->sole();
     $unrelatedSale = Sale::factory()->for(Order::factory()->for($customer)->state(['recipient_name' => 'Unrelated customer order', 'created_at' => '2025-02-10 12:30:00']))->create();
     OrderItem::factory()->for($unrelatedSale->order)->for($products['10003'])->create();
     $unrelated = $unrelatedSale->fresh()->load('order.items')->toArray();
-    $originals = Order::with(['items', 'sale'])->where('id', '!=', $unrelatedSale->order_id)->get()->keyBy('recipient_name');
+    $originals = Order::with(['items', 'sale', 'shipment'])->whereNotNull('development_fixture_key')->get()->keyBy('development_fixture_key');
     $inventoryBefore = DB::table('inventories')->orderBy('id')->get()->all();
     $catalogBefore = DB::table('products')->orderBy('id')->get()->all();
     $this->travelTo(CarbonImmutable::parse($nextReference));
 
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
 
-    $sales = Sale::where('id', '!=', $unrelatedSale->id)->orderBy('sale_date')->get();
+    $sales = Sale::where('id', '!=', $unrelatedSale->id)->where('sale_date', '>=', $expectedStart.'-01')
+        ->where('sale_date', '<', CarbonImmutable::parse($expectedEnd.'-01')->addMonth()->toDateString())->orderBy('sale_date')->get();
     expect($sales->count())->toBeBetween(150, 300);
     expect($sales->first()->sale_date->format('Y-m'))->toBe($expectedStart);
     expect($sales->last()->sale_date->format('Y-m'))->toBe($expectedEnd);
-    $orders = Order::with(['items', 'sale'])->where('id', '!=', $unrelatedSale->order_id)->get();
+    $orders = Order::with(['items', 'sale', 'shipment'])->whereNotNull('development_fixture_key')->get()->keyBy('development_fixture_key');
     expect($orders->flatMap->items->count())->toBeGreaterThan(720);
-    foreach ($orders as $order) {
-        if (isset($originals[$order->recipient_name])) {
-            expect($order->toArray())->toBe($originals[$order->recipient_name]->toArray());
-        }
+    foreach ($originals as $key => $original) {
+        expect($orders->has($key))->toBeTrue();
+        expect($orders[$key]->toArray())->toBe($original->toArray());
     }
+    $manifest = json_decode(Storage::disk('local')->get(config('forecasting.development_manifest')), true, flags: JSON_THROW_ON_ERROR);
+    expect($manifest['products']['10003']['start'])->toBe($expectedStart.'-01');
+    expect($manifest['products']['10003']['end_exclusive'])->toBe(CarbonImmutable::parse($expectedEnd.'-01')->addMonth()->toDateString());
     expect($unrelatedSale->fresh()->load('order.items')->toArray())->toBe($unrelated);
     expect(DB::table('inventories')->orderBy('id')->get()->all())->toEqual($inventoryBefore);
     expect(DB::table('products')->orderBy('id')->get()->all())->toEqual($catalogBefore);
@@ -532,3 +543,125 @@ test('quarter rollover prunes only owned expired history and retains overlapping
     'beyond entire window' => ['2031-04-15', '2027-04', '2031-03'],
     'backward reference' => ['2025-04-15', '2021-04', '2025-03'],
 ]);
+
+test('customer assignment follows calendar identities rather than database creation order', function () {
+    HistoricalSalesCatalogFixtures::createProducts();
+    foreach (array_reverse(DevelopmentCustomerSeeder::accounts(), true) as $email => $name) {
+        User::factory()->customer()->create(['email' => $email, 'name' => $name, 'password' => 'customer123']);
+    }
+
+    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+
+    $owners = Order::with('user')->whereBetween('created_at', ['2022-10-01', '2022-10-31'])
+        ->orderBy('development_fixture_key')->get()->mapWithKeys(fn (Order $order): array => [$order->development_fixture_key => $order->user->email])->all();
+    expect($owners)->toBe([
+        'historical-sales:V4:2022-10:01' => 'demo.customer28@example.test',
+        'historical-sales:V4:2022-10:02' => 'demo.customer29@example.test',
+        'historical-sales:V4:2022-10:03' => 'demo.customer30@example.test',
+        'historical-sales:V4:2022-10:04' => 'demo.customer01@example.test',
+    ]);
+    expect(User::whereHas('orders')->count())->toBe(30);
+    $before = historicalSalesDatabaseSnapshot();
+
+    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+
+    expect(historicalSalesDatabaseSnapshot())->toEqual($before);
+});
+
+test('historical seeding completes a partial roster without changing existing accounts or legitimate history', function () {
+    $products = HistoricalSalesCatalogFixtures::createProducts();
+    $customer = User::factory()->customer()->create([
+        'email' => 'demo.customer01@example.test', 'name' => 'Miguel Santos', 'password' => 'customer123',
+        'appearance' => 'dark', 'default_delivery_address' => 'My saved address', 'personalized_recommendations_enabled' => false,
+    ]);
+    $retiredAccount = User::factory()->customer()->create(['email' => 'historical-sales@example.test']);
+    $legitimateSale = Sale::factory()->for(Order::factory()->for($retiredAccount))->create();
+    OrderItem::factory()->for($legitimateSale->order)->for($products['10003'])->create();
+    $usersBefore = DB::table('users')->orderBy('id')->get();
+    $orderBefore = $legitimateSale->fresh()->load('order.items')->toArray();
+
+    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+
+    expect(DB::table('users')->whereIn('id', $usersBefore->pluck('id'))->orderBy('id')->get()->all())->toEqual($usersBefore->all());
+    expect($legitimateSale->fresh()->load('order.items')->toArray())->toBe($orderBefore);
+    expect($customer->orders()->count())->toBeGreaterThan(0);
+    expect(User::whereIn('email', array_keys(DevelopmentCustomerSeeder::accounts()))->whereHas('orders')->count())->toBe(30);
+    $this->assertDatabaseCount('users', 31);
+});
+
+test('every demo customer sees only their historical orders on the web', function () {
+    HistoricalSalesCatalogFixtures::createProducts();
+    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+
+    foreach (User::orderBy('email')->get() as $customer) {
+        $orders = $customer->orders()->orderByDesc('created_at')->orderByDesc('id')->get();
+        $response = $this->actingAs($customer)->get(route('orders.index'));
+        $response->assertInertia(fn (Assert $page) => $page->where('orders.total', $orders->count()));
+        expect(collect($response->inertiaProps('orders.data'))->pluck('id')->all())->toBe($orders->take(10)->pluck('id')->all());
+        $this->get(route('orders.show', $orders->first()))->assertInertia(fn (Assert $page) => $page
+            ->where('order.recipient.name', $customer->name)
+            ->where('order.status.value', 'completed')
+            ->missing('order.development_fixture_key'));
+        $foreign = Order::where('user_id', '!=', $customer->id)->firstOrFail();
+        $this->get(route('orders.show', $foreign))->assertNotFound();
+    }
+});
+
+test('every demo customer sees only their historical orders through the mobile API', function () {
+    HistoricalSalesCatalogFixtures::createProducts();
+    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+
+    foreach (User::orderBy('email')->get() as $index => $customer) {
+        $orders = $customer->orders()->orderByDesc('created_at')->orderByDesc('id')->get();
+        $this->app['auth']->forgetGuards();
+        $this->withServerVariables(['REMOTE_ADDR' => '192.0.2.'.($index + 1)])
+            ->withToken($customer->createToken('Demo phone')->plainTextToken);
+        $response = $this->getJson(route('api.v1.orders.index'))->assertOk()->assertJsonPath('meta.total', $orders->count());
+        expect(collect($response->json('data'))->pluck('id')->all())->toBe($orders->take(10)->pluck('id')->all());
+        $this->getJson(route('api.v1.orders.show', $orders->first()))->assertOk()
+            ->assertJsonPath('data.recipient.name', $customer->name)
+            ->assertJsonPath('data.status.value', 'completed')
+            ->assertJsonMissingPath('data.development_fixture_key');
+        $foreign = Order::where('user_id', '!=', $customer->id)->firstOrFail();
+        $this->getJson(route('api.v1.orders.show', $foreign))->assertNotFound();
+    }
+});
+
+test('legacy quarterly fixtures cannot run outside testing or replace a used identity', function (string $environment) {
+    User::factory()->customer()->create(['email' => 'historical-sales@example.test']);
+    $before = historicalSalesDatabaseSnapshot();
+    $this->app->instance('env', $environment);
+
+    expect(fn () => $this->artisan('db:seed', [
+        '--class' => LegacyQuarterlySalesFixtures::class, '--force' => true, '--no-interaction' => true,
+    ])->run())->toThrow(RuntimeException::class, 'No existing records were changed');
+
+    expect(historicalSalesDatabaseSnapshot())->toEqual($before);
+    Storage::disk('local')->assertMissing(config('forecasting.development_manifest'));
+})->with(['testing', 'local', 'production', 'staging']);
+
+test('pending fixture schema stops seeding safely and its migration preserves existing orders', function () {
+    HistoricalSalesCatalogFixtures::createProducts();
+    $ordinaryOrder = Order::factory()->create();
+    $ordinaryBefore = $ordinaryOrder->refresh()->getRawOriginal();
+    $migration = require database_path('migrations/2026_10_13_035739_add_development_fixture_key_to_orders_table.php');
+    $migration->down();
+    $before = historicalSalesDatabaseSnapshot();
+    $path = config('forecasting.development_manifest');
+    Storage::disk('local')->put($path, 'existing declaration');
+
+    expect(fn () => $this->seed(DevelopmentHistoricalSalesSeeder::class))
+        ->toThrow(RuntimeException::class, 'requires the reviewed development fixture key schema migration');
+
+    expect(historicalSalesDatabaseSnapshot())->toEqual($before);
+    expect(Storage::disk('local')->get($path))->toBe('existing declaration');
+
+    $migration->up();
+
+    expect(collect($ordinaryOrder->refresh()->getRawOriginal())->sortKeys()->all())
+        ->toBe(collect($ordinaryBefore)->sortKeys()->all());
+    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    expect(collect($ordinaryOrder->refresh()->getRawOriginal())->sortKeys()->all())
+        ->toBe(collect($ordinaryBefore)->sortKeys()->all());
+    $this->assertDatabaseCount('orders', 260);
+});

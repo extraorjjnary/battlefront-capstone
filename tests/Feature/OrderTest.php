@@ -16,6 +16,7 @@ test('the order schema follows the approved ERD and checkout amendments', functi
         'id',
         'user_id',
         'recipient_name',
+        'development_fixture_key',
         'contact_number',
         'fulfillment_method',
         'delivery_address',
@@ -28,6 +29,7 @@ test('the order schema follows the approved ERD and checkout amendments', functi
         'delivery_origin_city',
         'delivery_is_demo',
         'delivery_assumption_label',
+        'delivery_quote_metadata',
         'total_amount',
         'status',
         'payment_status',
@@ -178,4 +180,48 @@ test('customers with historical orders cannot be deleted', function () {
 
     expect(fn () => $order->user->delete())->toThrow(QueryException::class);
     $this->assertModelExists($order);
+});
+
+test('fixture identities are private unique and optional for ordinary orders', function () {
+    $key = 'historical-sales:V4:2022-10:01';
+    $fixture = Order::factory()->create(['development_fixture_key' => $key]);
+    $ordinary = Order::factory()->create();
+    $secondOrdinary = Order::factory()->create();
+
+    expect($fixture->toArray())->not->toHaveKey('development_fixture_key');
+    expect($ordinary->development_fixture_key)->toBeNull();
+    expect($secondOrdinary->development_fixture_key)->toBeNull();
+    expect(fn () => Order::factory()->create(['development_fixture_key' => $key]))->toThrow(QueryException::class);
+    $this->assertDatabaseCount('orders', 3);
+});
+
+test('ordinary mass assignment cannot claim a fixture identity', function () {
+    $order = Order::factory()->create();
+
+    $order->fill(['development_fixture_key' => 'historical-sales:V4:2022-10:01'])->save();
+
+    expect($order->refresh()->development_fixture_key)->toBeNull();
+});
+
+test('persisted fixture identities cannot be removed renamed or assigned later', function (?string $original, ?string $replacement) {
+    $order = Order::factory()->create(['development_fixture_key' => $original]);
+
+    expect(fn () => $order->forceFill(['development_fixture_key' => $replacement])->save())
+        ->toThrow(DomainException::class, 'fixture identities cannot be changed');
+
+    expect($order->refresh()->development_fixture_key)->toBe($original);
+})->with([
+    'removed' => ['historical-sales:V4:2022-10:01', null],
+    'renamed' => ['historical-sales:V4:2022-10:01', 'historical-sales:V4:2022-10:02'],
+    'claimed' => [null, 'historical-sales:V4:2022-10:01'],
+]);
+
+test('fixture identity migration refuses rollback while records depend on it', function () {
+    $order = Order::factory()->create(['development_fixture_key' => 'historical-sales:V4:2022-10:01']);
+    $migration = require database_path('migrations/2026_10_13_035739_add_development_fixture_key_to_orders_table.php');
+
+    expect(fn () => $migration->down())->toThrow(RuntimeException::class, 'Cannot discard retained development fixture identities');
+
+    $this->assertModelExists($order);
+    expect($order->refresh()->development_fixture_key)->toBe('historical-sales:V4:2022-10:01');
 });

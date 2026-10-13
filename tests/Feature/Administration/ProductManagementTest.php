@@ -492,7 +492,7 @@ test('product images reject invalid file types and files larger than 5 MB', func
     ],
 ]);
 
-test('administrators can update product details and synchronize tags while preserving shipping assignments', function () {
+test('administrators can update product details tags and shipping assignments', function () {
     $administrator = User::factory()->administrator()->create();
     $oldCategory = Category::factory()->create();
     $newCategory = Category::factory()->inactive()->create();
@@ -526,7 +526,8 @@ test('administrators can update product details and synchronize tags while prese
     expect($product->name)->toBe('Updated product name')
         ->and($product->category->is($newCategory))->toBeTrue()
         ->and($product->is_active)->toBeFalse()
-        ->and($product->shipping_profile)->toBe(ShippingProfile::Bulky)
+        ->and($product->shipping_profile)->toBe(ShippingProfile::Standard)
+        ->and($product->shipping_profile_source)->toBe('manual')
         ->and($product->tags->modelKeys())->toBe([$newTag->id]);
     $this->assertDatabaseMissing('product_tag', [
         'product_id' => $product->id,

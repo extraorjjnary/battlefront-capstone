@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\Shipment;
 use App\Models\User;
 use App\Services\Cart\CartService;
+use App\Services\Order\PsgcDeliveryLocations;
 use Carbon\Carbon;
 use Database\Seeders\BranchSeeder;
 use Illuminate\Http\UploadedFile;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Inertia\Testing\AssertableInertia as Assert;
 
 /** @return array{customer: User, product: Product, stock: Inventory} */
 function deliveryCheckoutCart(ShippingProfile $profile = ShippingProfile::Standard): array
@@ -76,7 +78,7 @@ test('web and mobile checkout expose equivalent quotes for all destination fees 
             ->eta_min_days->toBe($preparation + $minimum)->eta_max_days->toBe($preparation + $maximum)
             ->carrier->toBe('lbc')->origin_city->toBe('Sagay City')->is_demo->toBeTrue()
             ->eta_anchor_date->toBe('2026-12-30')->eta_timezone->toBe('UTC');
-        expect($quotes[$index]['notice'])->toContain('not live LBC quotations or tracking', 'subject to payment verification');
+        expect($quotes[$index]['notice'])->toContain('not official LBC rates', 'prepaid orders require payment verification');
     }
     expect($quotes[0]['estimated_delivery_start'])->toBe(match ($profile) {
         ShippingProfile::Standard => '2026-12-31', ShippingProfile::Fragile => '2027-01-01', ShippingProfile::Bulky => '2027-01-02',
@@ -111,6 +113,81 @@ test('checkout calendar windows use the configured timezone across leap days', f
         ->assertJsonPath('data.delivery_quotes.0.estimated_delivery_start', '2028-02-29')
         ->assertJsonPath('data.delivery_quotes.11.estimated_delivery_end', '2028-03-02');
 });
+
+test('new Negros delivery estimate is shared by web and mobile quotes and order placement', function (string $channel) {
+    Storage::fake('local');
+    ['customer' => $customer, 'stock' => $stock] = deliveryCheckoutCart();
+    $cityCode = '1804502000';
+    $barangayCode = app(PsgcDeliveryLocations::class)->cityBarangays($cityCode)[0]['code'];
+    $query = [
+        'cart_item_ids' => $customer->cart->items->modelKeys(),
+        'delivery_city_code' => $cityCode,
+    ];
+    $token = $customer->createToken('Phone')->plainTextToken;
+
+    $webQuote = $this->actingAs($customer)->getJson(route('checkout.delivery-quote.show', $query))->assertOk();
+    $apiQuote = $this->withToken($token)
+        ->getJson('/api/v1/checkout/delivery-quote?'.http_build_query($query))->assertOk();
+
+    expect($apiQuote->json('data'))->toBe($webQuote->json('data'));
+    $apiQuote->assertJsonPath('data.quote.destination_label', 'City of Bago')
+        ->assertJsonPath('data.quote.pricing_configured', true)
+        ->assertJsonPath('data.quote.order_placement_allowed', true)
+        ->assertJsonPath('data.quote.base_fee', '280.00')
+        ->assertJsonPath('data.quote.delivery_fee', '280.00')
+        ->assertJsonPath('data.quote.total', '298.66')
+        ->assertJsonPath('data.quote.payment_methods', ['gcash', 'maya', 'cod'])
+        ->assertJsonPath('data.quote.transit_min_days', 2)
+        ->assertJsonPath('data.quote.transit_max_days', 3);
+
+    $submission = deliveryCheckoutSubmission($customer->cart->items->modelKeys(), [
+        'delivery_destination' => $cityCode,
+        'delivery_region_code' => '1800000000',
+        'delivery_province_code' => '1804500000',
+        'delivery_city_code' => $cityCode,
+        'delivery_barangay_code' => $barangayCode,
+        'delivery_address_details' => '12 Example Street',
+        'payment_method' => 'cod',
+    ]);
+    unset($submission['payment_proof']);
+    $response = $this->withToken($token)->post(
+        $channel === 'web' ? route('orders.store') : '/api/v1/orders',
+        $submission,
+    );
+    $order = Order::sole();
+
+    if ($channel === 'web') {
+        $response->assertRedirectToRoute('orders.show', $order)->assertSessionHasNoErrors();
+    } else {
+        $response->assertCreated()
+            ->assertJsonPath('data.delivery_quote.base_fee', '280.00')
+            ->assertJsonPath('data.delivery_quote.transit_min_days', 2);
+    }
+    expect($order)->delivery_destination->toBe('City of Bago')
+        ->product_subtotal->toBe('18.66')
+        ->delivery_base_fee->toBe('280.00')
+        ->delivery_fee->toBe('280.00')
+        ->total_amount->toBe('298.66');
+    expect($order->delivery_quote_metadata['city_code'])->toBe($cityCode);
+    expect($order->shipment)->carrier->toBe('lbc')
+        ->transit_min_days->toBe(2)
+        ->transit_max_days->toBe(3);
+    expect($stock->refresh()->quantity)->toBe(8);
+    $this->assertDatabaseCount('shipments', 1);
+
+    $customerDetail = $this->withToken($token)->getJson('/api/v1/orders/'.$order->id)->assertOk()
+        ->assertJsonPath('data.delivery_quote.destination', 'City of Bago')
+        ->assertJsonPath('data.delivery_quote.base_fee', '280.00');
+    $webDetail = $this->actingAs($customer)->get(route('orders.show', $order))->assertOk();
+    expect($customerDetail->json('data.delivery_quote'))->toBe($webDetail->inertiaProps('order.delivery_quote'));
+    $administrator = User::factory()->administrator()->create();
+    $this->actingAs($administrator)->get(route('administration.orders.show', $order))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('order.delivery_quote.destination', 'City of Bago')
+            ->where('order.delivery_quote.base_fee', '280.00')
+            ->where('order.delivery_quote.transit_min_days', 2));
+})->with(['web', 'api']);
 
 test('delivery placement snapshots each profile through the shared web and mobile boundaries', function (string $channel, ShippingProfile $profile, string $fee, string $total, int $preparation) {
     Storage::fake('local');

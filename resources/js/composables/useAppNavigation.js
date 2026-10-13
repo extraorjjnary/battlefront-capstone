@@ -1,12 +1,13 @@
 import {
     Boxes,
-    ChartNoAxesCombined,
+    ChartColumn,
     LayoutDashboard,
     MapPin,
     MessageSquareText,
     PackageSearch,
     ReceiptText,
     ShoppingCart,
+    TrendingUp,
     UsersRound,
     UserRound,
 } from '@lucide/vue';
@@ -75,12 +76,12 @@ export function useAppNavigation() {
             items.push({
                 title: 'Sales reports',
                 href: SalesReportController.index(),
-                icon: ChartNoAxesCombined,
+                icon: ChartColumn,
             });
             items.push({
                 title: 'Forecasting',
                 href: ForecastingController.index(),
-                icon: ChartNoAxesCombined,
+                icon: TrendingUp,
             });
             items.push({
                 title: 'Customers',

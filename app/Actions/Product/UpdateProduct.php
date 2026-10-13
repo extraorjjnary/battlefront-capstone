@@ -42,7 +42,13 @@ class UpdateProduct
                 if ($storedImage !== null) {
                     $attributes['image_path'] = $storedImage['path'];
                 }
-                $lockedProduct->update($attributes);
+                $profileReviewed = isset($attributes['shipping_profile']) && ($lockedProduct->shipping_profile->value !== $attributes['shipping_profile'] || ($attributes['shipping_profile_reviewed'] ?? false));
+                unset($attributes['shipping_profile_reviewed']);
+                $lockedProduct->fill($attributes);
+                if ($profileReviewed) {
+                    $lockedProduct->shipping_profile_source = 'manual';
+                }
+                $lockedProduct->save();
                 $lockedProduct->tags()->sync($tagIds);
 
                 if ($storedImage !== null && $storedImage['path'] !== $oldImagePath) {

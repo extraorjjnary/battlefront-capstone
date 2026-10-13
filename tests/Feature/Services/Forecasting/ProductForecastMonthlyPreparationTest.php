@@ -240,7 +240,7 @@ test('does not change observations with customer identity price stock or catalog
     $product = $products['10003'];
     $service = app(ProductForecastPreparationService::class);
     $before = $service->prepareMonthly($product);
-    User::where('email', 'historical-sales@example.test')->sole()->update(['name' => 'Changed customer identity']);
+    User::where('email', 'like', 'demo.customer%@example.test')->get()->each(fn (User $customer) => $customer->update(['name' => 'Changed customer identity']));
     $product->orderItems()->with('order')->each(function (OrderItem $item) {
         $item->order->forceFill(['created_at' => '2026-12-01'])->save();
         $item->update(['price_at_time' => '9999.99']);

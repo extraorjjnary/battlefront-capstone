@@ -220,7 +220,7 @@ defineOptions({
                                 :model-value="selectAllState"
                                 @update:model-value="selectAll($event === true)"
                             />
-                            <Label for="select-all-cart-items"
+                            <Label for="select-all-cart-items" class="min-h-11 md:min-h-0"
                                 >Select all</Label
                             >
                             <span

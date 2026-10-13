@@ -21,7 +21,7 @@ class PlaceCustomerOrder
     ) {}
 
     /**
-     * @param  array{cart_item_ids: list<int>, recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address?: string|null, delivery_destination: string|null, payment_method: string}  $validated
+     * @param  array{cart_item_ids: list<int>, recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address?: string|null, delivery_destination: string|null, payment_method: string, delivery_address_components?: array<string, mixed>|null}  $validated
      */
     public function execute(User $customer, array $validated, ?UploadedFile $paymentProof): Order
     {
@@ -38,6 +38,7 @@ class PlaceCustomerOrder
                 'contact_number' => $validated['contact_number'],
                 'fulfillment_method' => FulfillmentMethod::from($validated['fulfillment_method']),
                 'delivery_address' => $validated['delivery_address'] ?? null,
+                'delivery_address_components' => $validated['delivery_address_components'] ?? null,
                 'payment_method' => $paymentMethod,
                 'payment_proof_path' => $paymentProofPath,
             ];
@@ -54,12 +55,16 @@ class PlaceCustomerOrder
         } catch (DomainException $exception) {
             $this->deletePaymentProof->execute($paymentProofPath);
 
-            if ($exception->getMessage() !== 'Unsupported delivery destination.') {
+            if (! in_array($exception->getMessage(), [
+                'Unsupported delivery destination.',
+                'Delivery is unavailable for this location.',
+            ], strict: true) && ! str_starts_with($exception->getMessage(), 'Shipping quotation required.')) {
                 throw $exception;
             }
 
             throw ValidationException::withMessages([
-                'delivery_destination' => 'Select a supported delivery destination.',
+                'delivery_destination' => $exception->getMessage() === 'Unsupported delivery destination.'
+                    ? 'Select a supported delivery destination.' : $exception->getMessage(),
             ]);
         } catch (Throwable $exception) {
             $this->deletePaymentProof->execute($paymentProofPath);

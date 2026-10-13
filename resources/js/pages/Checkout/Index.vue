@@ -13,7 +13,8 @@ import {
     Truck,
     Upload,
 } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { show as deliveryQuoteShow } from '@/routes/checkout/delivery-quote';
 import { store as storeOrder } from '@/actions/App/Http/Controllers/OrderController';
 import DeliveryAddressFields from '@/components/DeliveryAddressFields.vue';
 import InputError from '@/components/InputError.vue';
@@ -44,10 +45,15 @@ const deliveryAddress = ref({ ...props.deliveryAddressPrefill });
 const deliveryDestination = computed(
     () => deliveryAddress.value.delivery_destination,
 );
+const liveQuote = ref(null);
+const quoteNotice = ref('');
+const quoteError = ref('');
+const quoteLoading = ref(false);
+let quoteVersion = 0;
 const selectedQuote = computed(() =>
     fulfillmentMethod.value === 'pickup'
         ? props.pickupQuote
-        : props.deliveryQuotes.find(
+        : /^\d{10}$/.test(deliveryDestination.value) ? (liveQuote.value?.destination === deliveryDestination.value ? liveQuote.value : null) : props.deliveryQuotes.find(
               (quote) => quote.destination === deliveryDestination.value,
           ),
 );
@@ -59,7 +65,11 @@ function formatDeliveryDate(value) {
 
 const availablePaymentMethods = computed(() =>
     props.paymentMethods.filter((method) =>
-        method.available_for.includes(fulfillmentMethod.value),
+        method.available_for.includes(fulfillmentMethod.value) &&
+        (fulfillmentMethod.value !== 'delivery' ||
+            (selectedQuote.value?.order_placement_allowed !== false &&
+                (!selectedQuote.value?.payment_methods ||
+                    selectedQuote.value.payment_methods.includes(method.value)))),
     ),
 );
 const selectedPaymentMethod = computed(() =>
@@ -81,6 +91,7 @@ function chooseFulfillment(value) {
             ...deliveryAddress.value,
             delivery_destination: '',
             delivery_barangay_code: '',
+            delivery_city_code: '', delivery_region_code: '', delivery_province_code: '',
         };
     }
 
@@ -89,7 +100,7 @@ function chooseFulfillment(value) {
             (method) => method.value === paymentMethod.value,
         )
     ) {
-        paymentMethod.value = availablePaymentMethods.value[0].value;
+        paymentMethod.value = availablePaymentMethods.value[0]?.value ?? '';
     }
 }
 
@@ -97,6 +108,36 @@ function choosePayment(value) {
     paymentMethod.value = value;
     paymentProofKey.value += 1;
 }
+
+async function refreshQuote() {
+    const destination = deliveryDestination.value;
+    const fulfillment = fulfillmentMethod.value;
+    const version = ++quoteVersion;
+    liveQuote.value = null;
+    quoteNotice.value = '';
+    quoteError.value = '';
+    quoteLoading.value = false;
+    if (fulfillment !== 'delivery' || !/^\d{10}$/.test(destination)) return;
+    quoteLoading.value = true;
+    try {
+        const response = await fetch(deliveryQuoteShow.url({ query: { delivery_city_code: destination, cart_item_ids: props.cart.items.map((item) => item.id) } }), { headers: { Accept: 'application/json' } });
+        if (!response.ok) throw new Error('Unable to refresh the delivery quote. Please retry.');
+        const { data } = await response.json();
+        if (version !== quoteVersion) return;
+        liveQuote.value = data.quote;
+        quoteNotice.value = data.notice ?? '';
+    } catch (error) {
+        if (version === quoteVersion) quoteError.value = error.message;
+    } finally {
+        if (version === quoteVersion) quoteLoading.value = false;
+    }
+}
+watch([deliveryDestination, fulfillmentMethod], refreshQuote);
+watch(availablePaymentMethods, (methods) => {
+    if (!methods.some((method) => method.value === paymentMethod.value)) {
+        choosePayment(methods[0]?.value ?? '');
+    }
+});
 
 defineOptions({
     layout: {
@@ -377,6 +418,7 @@ defineOptions({
                             class="grid gap-5"
                         >
                             <DeliveryAddressFields
+                                nationwide
                                 v-model="deliveryAddress"
                                 :locations="deliveryLocations"
                                 :errors="errors"
@@ -394,15 +436,79 @@ defineOptions({
                                     </p>
                                 </template>
                             </DeliveryAddressFields>
+                            <p v-if="quoteLoading" role="status" class="text-muted-foreground text-sm">Refreshing delivery estimate…</p>
+                            <div
+                                v-if="quoteNotice && !quoteLoading && !selectedQuote"
+                                class="border-border bg-secondary/40 grid gap-1 border p-4 text-sm"
+                                role="status"
+                            >
+                                <p class="font-semibold">
+                                    Delivery unavailable
+                                </p>
+                                <p class="text-muted-foreground leading-6">
+                                    Battlefront cannot accept a delivery order
+                                    for this location at this time.
+                                </p>
+                                <p class="text-muted-foreground text-xs leading-5">
+                                    {{ quoteNotice }}
+                                </p>
+                            </div>
+                            <p
+                                v-if="quoteError"
+                                role="alert"
+                                class="text-destructive text-sm"
+                            >
+                                {{ quoteError }}
+                            </p>
+                            <button
+                                v-if="quoteError && !quoteLoading"
+                                type="button"
+                                class="justify-self-start text-sm underline"
+                                @click="refreshQuote"
+                            >
+                                Retry quote
+                            </button>
                             <div
                                 v-if="selectedQuote"
                                 class="border-border bg-secondary/40 grid gap-2 border p-4 text-sm"
                                 aria-live="polite"
                             >
+                                <template
+                                    v-if="
+                                        selectedQuote.pricing_configured ===
+                                        false
+                                    "
+                                >
+                                    <p class="font-semibold">
+                                        No delivery estimate configured ·
+                                        {{
+                                            selectedQuote.destination_label ??
+                                            selectedQuote.destination
+                                        }}
+                                    </p>
+                                    <p class="leading-6">
+                                        You can place this order for the product
+                                        subtotal. No delivery fee or ETA is
+                                        included; Battlefront must confirm the
+                                        delivery arrangement and any applicable
+                                        charge separately.
+                                    </p>
+                                    <p
+                                        class="text-muted-foreground text-xs leading-5"
+                                    >
+                                        {{ selectedQuote.notice }}
+                                    </p>
+                                    <p
+                                        class="text-muted-foreground text-xs leading-5"
+                                    >
+                                        {{ selectedQuote.assumption_label }}
+                                    </p>
+                                </template>
+                                <template v-else>
                                 <p class="font-semibold">
                                     {{ selectedQuote.carrier.toUpperCase() }}
                                     delivery estimate ·
-                                    {{ selectedQuote.destination }}
+                                    {{ selectedQuote.destination_label ?? selectedQuote.destination }}
                                 </p>
                                 <p>
                                     {{ selectedQuote.packing_expectation }} ·
@@ -453,6 +559,7 @@ defineOptions({
                                 >
                                     {{ selectedQuote.assumption_label }}
                                 </p>
+                                </template>
                             </div>
                         </div>
                     </section>
@@ -495,9 +602,7 @@ defineOptions({
                                     :value="method.value"
                                     :checked="paymentMethod === method.value"
                                     :disabled="
-                                        !method.available_for.includes(
-                                            fulfillmentMethod,
-                                        )
+                                        !availablePaymentMethods.some((available) => available.value === method.value)
                                     "
                                     @change="choosePayment(method.value)"
                                 />
@@ -527,12 +632,25 @@ defineOptions({
                         <Alert v-if="isCod">
                             <AlertTitle>Pay upon delivery</AlertTitle>
                             <AlertDescription>
+                                <template
+                                    v-if="
+                                        selectedQuote?.pricing_configured ===
+                                        false
+                                    "
+                                >
+                                    Only the product subtotal is payable upon
+                                    delivery. No delivery fee or LBC collection
+                                    arrangement is included; delivery
+                                    arrangements must be confirmed separately.
+                                </template>
+                                <template v-else>
                                 The total COD amount includes your products and
                                 the configured demo delivery fee. Payment will
                                 be collected upon delivery; no advance payment
                                 or payment proof is required. Battlefront
                                 manually arranges delivery. This selection does
                                 not book or approve COD with LBC.
+                                </template>
                             </AlertDescription>
                         </Alert>
 
@@ -540,6 +658,33 @@ defineOptions({
                             v-if="requiresPaymentProof"
                             class="border-border bg-secondary/40 grid gap-4 border p-4"
                         >
+                            <p
+                                v-if="
+                                    fulfillmentMethod === 'delivery' &&
+                                    selectedQuote
+                                "
+                                class="text-sm leading-6"
+                            >
+                                <template
+                                    v-if="
+                                        selectedQuote.pricing_configured ===
+                                        false
+                                    "
+                                >
+                                    The amount shown covers the product
+                                    subtotal only; no delivery fee is included.
+                                    Any delivery arrangement and charge must
+                                    be confirmed separately.
+                                </template>
+                                <template v-else>
+                                    Pay
+                                    {{ formatCurrency(selectedQuote.total) }} to
+                                    Battlefront, including the product subtotal
+                                    and estimated delivery fee. Battlefront
+                                    arranges shipment and pays the carrier at
+                                    dispatch.
+                                </template>
+                            </p>
                             <div class="grid gap-4">
                                 <div
                                     class="flex items-start justify-between gap-4"
@@ -713,11 +858,15 @@ defineOptions({
                             <dt class="text-muted-foreground">Delivery fee</dt>
                             <dd class="font-semibold tabular-nums">
                                 {{
-                                    selectedQuote
+                                    selectedQuote?.pricing_configured === false
+                                        ? 'Not quoted'
+                                        : selectedQuote
                                         ? formatCurrency(
                                               selectedQuote.delivery_fee,
                                           )
-                                        : 'Select destination'
+                                        : quoteNotice
+                                          ? 'Unavailable'
+                                          : 'Select destination'
                                 }}
                             </dd>
                         </div>
@@ -726,14 +875,22 @@ defineOptions({
                         >
                             <dt class="font-semibold">
                                 {{
-                                    isCod
+                                    selectedQuote?.pricing_configured === false
+                                        ? isCod
+                                            ? 'Product subtotal payable upon delivery'
+                                            : 'Product subtotal payable'
+                                        : isCod
                                         ? 'Total COD amount payable'
                                         : 'Final total'
                                 }}
                             </dt>
                             <dd class="text-2xl font-bold tabular-nums">
                                 {{
-                                    selectedQuote
+                                    selectedQuote?.pricing_configured === false
+                                        ? formatCurrency(
+                                              selectedQuote.product_subtotal,
+                                          )
+                                        : selectedQuote
                                         ? formatCurrency(selectedQuote.total)
                                         : '—'
                                 }}
@@ -763,12 +920,21 @@ defineOptions({
                         type="submit"
                         class="w-full"
                         :disabled="
-                            processing || !selectedQuote || !cart.items.length
+                            processing ||
+                            !selectedQuote ||
+                            !cart.items.length ||
+                            !paymentMethod
                         "
                     >
                         <Spinner v-if="processing" />
                         <BadgeCheck v-else aria-hidden="true" />
-                        {{ processing ? 'Placing order...' : 'Place order' }}
+                        {{
+                            processing
+                                ? 'Placing order...'
+                                : quoteNotice && !selectedQuote
+                                  ? 'Delivery unavailable'
+                                  : 'Place order'
+                        }}
                     </Button>
 
                     <p

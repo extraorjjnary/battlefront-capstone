@@ -28,7 +28,7 @@ test('the snapshot migration preserves pre-revision orders without reconstructin
 
 test('shipment persistence stores manual milestones and ETA without copied handling profile or location columns', function () {
     expect(Schema::getColumnListing('shipments'))->toEqualCanonicalizing([
-        'id', 'order_id', 'carrier', 'status', 'preparation_days',
+        'id', 'order_id', 'carrier', 'arrangement_type', 'status', 'preparation_days',
         'transit_min_days', 'transit_max_days', 'eta_min_days', 'eta_max_days',
         'tracking_reference', 'handed_to_carrier_at', 'delivered_at', 'created_at', 'updated_at',
         'preparing_at', 'ready_for_dispatch_at', 'in_transit_at', 'out_for_delivery_at', 'cancelled_at',
@@ -95,11 +95,15 @@ test('rollback refuses to discard saved delivery quotes or shipments', function 
 test('empty shipment migration rolls back cleanly and can be reapplied', function () {
     config(['battlefront.delivery.destinations.Sagay City.transit_min_days' => 1]);
     $migration = require database_path('migrations/2026_10_07_160343_create_shipments_table.php');
+    $manualShipmentMigration = require database_path('migrations/2026_10_13_102101_allow_manual_shipments_for_unconfigured_delivery_orders.php');
 
+    $manualShipmentMigration->down();
     $migration->down();
     expect(Schema::hasTable('shipments'))->toBeFalse();
     $migration->up();
+    $manualShipmentMigration->up();
 
     $shipment = Shipment::factory()->create();
-    expect($shipment->status->value)->toBe('awaiting_preparation');
+    expect($shipment)->status->value->toBe('awaiting_preparation')
+        ->arrangement_type->value->toBe('configured_rate');
 });

@@ -2,10 +2,12 @@
 
 namespace App\Http\Requests;
 
+use App\Concerns\ValidatesDeliveryGeography;
 use App\Enums\FulfillmentMethod;
 use App\Enums\PaymentMethod;
 use App\Services\Order\DeliveryRules;
 use App\Services\Order\PsgcDeliveryLocations;
+use DomainException;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Enum;
@@ -13,10 +15,19 @@ use Illuminate\Validation\Validator;
 
 class ValidateCheckoutRequest extends CheckoutPreviewRequest
 {
+    use ValidatesDeliveryGeography;
+
+    protected function prepareForValidation(): void
+    {
+        if ($this->filled('delivery_city_code') && ! $this->has('delivery_destination')) {
+            $this->merge(['delivery_destination' => $this->input('delivery_city_code')]);
+        }
+    }
+
     /**
      * Return the validated checkout fields shared by web and API placement.
      *
-     * @return array{cart_item_ids: list<int>, recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address: string|null, delivery_destination: string|null, payment_method: string}
+     * @return array{cart_item_ids: list<int>, recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address: string|null, delivery_destination: string|null, payment_method: string, delivery_address_components: array<string, mixed>|null}
      */
     public function checkoutData(): array
     {
@@ -37,6 +48,8 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
             'contact_number' => $this->string('contact_number')->toString(),
             'fulfillment_method' => $this->string('fulfillment_method')->toString(),
             'delivery_address' => $deliveryAddress,
+            'delivery_address_components' => $this->input('fulfillment_method') === 'delivery' && $this->usesStructuredAddress()
+                ? app(PsgcDeliveryLocations::class)->components($this->string('delivery_destination')->toString(), $this->string('delivery_barangay_code')->toString(), $this->string('delivery_address_details')->toString()) : null,
             'delivery_destination' => $this->filled('delivery_destination')
                 ? $this->string('delivery_destination')->toString()
                 : null,
@@ -62,6 +75,7 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
 
         return [
             ...parent::rules(),
+            ...$this->geographyRules('delivery', $isDelivery && $this->usesNationwideAddress('delivery'), $isPickup),
             'recipient_name' => ['bail', 'required', 'string', 'max:255'],
             'contact_number' => ['bail', 'required', 'string', 'max:20'],
             'fulfillment_method' => ['bail', 'required', new Enum(FulfillmentMethod::class)],
@@ -71,7 +85,11 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
                 Rule::prohibitedIf($this->input('fulfillment_method') === FulfillmentMethod::Pickup->value),
                 'nullable',
                 'string',
-                Rule::in(array_keys(app(DeliveryRules::class)->destinations())),
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! is_string($value) || (! preg_match('/\A[0-9]{10}\z/', $value) && ! array_key_exists($value, app(DeliveryRules::class)->destinations()))) {
+                        $fail('Select a supported delivery destination.');
+                    }
+                },
             ],
             'delivery_address' => [
                 'bail',
@@ -121,9 +139,29 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
     {
         return [
             function (Validator $validator): void {
+                if ($this->input('fulfillment_method') !== 'delivery') {
+                    return;
+                }
+                $this->checkGeography($validator, 'delivery');
+                if ($validator->errors()->hasAny(['delivery_destination', 'delivery_city_code', 'delivery_region_code', 'delivery_province_code'])) {
+                    return;
+                }
+                $paymentMethod = PaymentMethod::tryFrom($this->string('payment_method')->toString());
+                try {
+                    $zone = app(DeliveryRules::class)->zone($this->string('delivery_destination')->toString());
+                    if ($paymentMethod !== null
+                        && $paymentMethod->isAvailableFor(FulfillmentMethod::Delivery)
+                        && ! in_array($paymentMethod->value, $zone['payment_methods'], true)) {
+                        $validator->errors()->add('payment_method', 'This payment method is unavailable for the selected delivery route.');
+                    }
+                } catch (DomainException $exception) {
+                    $validator->errors()->add('delivery_destination', $exception->getMessage());
+                }
+            },
+            function (Validator $validator): void {
                 if ($this->input('fulfillment_method') !== FulfillmentMethod::Delivery->value
                     || ! $this->usesStructuredAddress()
-                    || $validator->errors()->hasAny(['delivery_destination', 'delivery_barangay_code', 'delivery_address_details'])) {
+                    || $validator->errors()->hasAny(['delivery_destination', 'delivery_barangay_code', 'delivery_address_details', 'delivery_city_code', 'delivery_region_code', 'delivery_province_code'])) {
                     return;
                 }
 
@@ -200,6 +238,6 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
     private function usesStructuredAddress(): bool
     {
         return ! $this->routeIs('api.v1.orders.store')
-            || $this->hasAny(['delivery_barangay_code', 'delivery_address_details']);
+            || $this->hasAny(['delivery_barangay_code', 'delivery_address_details']) || $this->usesNationwideAddress('delivery');
     }
 }

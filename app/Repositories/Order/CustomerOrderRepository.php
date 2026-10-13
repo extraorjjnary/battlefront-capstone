@@ -50,6 +50,7 @@ class CustomerOrderRepository
                 'delivery_origin_city',
                 'delivery_is_demo',
                 'delivery_assumption_label',
+                'delivery_quote_metadata',
                 'total_amount',
                 'status',
                 'payment_status',

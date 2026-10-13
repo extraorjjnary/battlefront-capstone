@@ -40,7 +40,7 @@ function formatCivilDate(value) {
                 />
                 <div>
                     <p class="text-muted-foreground text-sm">
-                        {{ shipment.carrier.toUpperCase() }} delivery
+                        {{ shipment.arrangement.label }}
                     </p>
                     <h2 class="font-semibold">Shipment progress</h2>
                 </div>
@@ -75,7 +75,7 @@ function formatCivilDate(value) {
                     <dt class="text-muted-foreground">Delivery destination</dt>
                     <dd class="mt-1 font-medium">{{ quote.destination }}</dd>
                 </div>
-                <div v-if="quote">
+                <div v-if="quote?.pricing_configured">
                     <dt class="text-muted-foreground">Delivery fee</dt>
                     <dd class="mt-1 font-medium tabular-nums">
                         {{ formatCurrency(quote.delivery_fee) }}
@@ -83,6 +83,19 @@ function formatCivilDate(value) {
                     <dd class="text-muted-foreground mt-1 text-xs">
                         Base {{ formatCurrency(quote.base_fee) }} + handling
                         {{ formatCurrency(quote.handling_surcharge) }}
+                    </dd>
+                </div>
+                <div v-else-if="quote">
+                    <dt class="text-muted-foreground">
+                        Delivery fee in order total
+                    </dt>
+                    <dd class="mt-1 font-medium tabular-nums">
+                        {{ formatCurrency(quote.delivery_fee) }}
+                    </dd>
+                    <dd class="text-muted-foreground mt-1 text-xs leading-5">
+                        No delivery rate was configured or added to the order.
+                        This manual arrangement does not change its saved
+                        total.
                     </dd>
                 </div>
                 <div>
@@ -122,17 +135,32 @@ function formatCivilDate(value) {
                         </dd>
                     </template>
                     <template v-else>
-                        <dd v-if="quote" class="mt-1 font-medium">
-                            {{ quote.eta_min_days
+                        <dd
+                            v-if="shipment.eta.min_days !== null"
+                            class="mt-1 font-medium"
+                        >
+                            {{ shipment.eta.min_days
                             }}<template
-                                v-if="quote.eta_max_days !== quote.eta_min_days"
-                                >–{{ quote.eta_max_days }}</template
+                                v-if="
+                                    shipment.eta.max_days !==
+                                    shipment.eta.min_days
+                                "
+                                >–{{ shipment.eta.max_days }}</template
                             >
                             calendar days from the start of preparation.
                         </dd>
-                        <dd class="text-muted-foreground mt-1 text-xs">
-                            Calendar dates are not recorded until preparation
+                        <dd
+                            v-if="shipment.eta.min_days !== null"
+                            class="text-muted-foreground mt-1 text-xs"
+                        >
+                            Calendar dates are recorded when preparation
                             starts.
+                        </dd>
+                        <dd
+                            v-else
+                            class="text-muted-foreground mt-1 text-sm"
+                        >
+                            No delivery estimate has been provided.
                         </dd>
                     </template>
                 </div>
@@ -144,7 +172,7 @@ function formatCivilDate(value) {
                         {{ shipment.tracking_reference }}
                     </dd>
                 </div>
-                <div v-if="quote">
+                <div v-if="quote?.pricing_configured">
                     <dt class="text-muted-foreground">Packing</dt>
                     <dd class="mt-1">{{ quote.packing_expectation }}</dd>
                     <dd

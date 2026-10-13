@@ -131,6 +131,8 @@ const productViewRecommendationsEnabled = ref(
                     :value="defaultAddressAction"
                 />
                 <DeliveryAddressFields
+                    nationwide
+                    @hydrate="defaultAddress = $event"
                     :model-value="defaultAddress"
                     @update:model-value="updateDefaultAddress"
                     :locations="props.deliveryLocations"

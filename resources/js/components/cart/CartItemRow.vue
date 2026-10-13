@@ -98,7 +98,7 @@ const availabilityCopy = computed(() => {
                 :model-value="selected"
                 @update:model-value="emit('update:selected', $event === true)"
             />
-            <Label :for="`select-cart-item-${item.id}`">
+            <Label :for="`select-cart-item-${item.id}`" class="min-h-11 md:min-h-0">
                 Select {{ item.product.name }} for checkout
             </Label>
         </div>
@@ -176,13 +176,13 @@ const availabilityCopy = computed(() => {
             </Alert>
 
             <div
-                class="border-border mt-5 flex flex-col gap-4 border-t pt-5 md:flex-row md:items-start md:justify-between"
+                class="border-border mt-5 flex flex-col gap-4 border-t pt-5 lg:flex-row lg:items-start lg:justify-between"
             >
                 <Form
                     v-bind="update.form(item.id)"
                     :error-bag="`updateCartItem${item.id}`"
                     :options="{ preserveScroll: true }"
-                    class="grid gap-3 sm:grid-cols-[8rem_auto] sm:items-start"
+                    class="grid gap-3 lg:grid-cols-[8rem_auto] lg:items-start"
                     v-slot="{ errors, processing }"
                 >
                     <div class="grid gap-2">
@@ -224,7 +224,7 @@ const availabilityCopy = computed(() => {
                     <Button
                         type="submit"
                         variant="outline"
-                        class="sm:mt-7"
+                        class="lg:mt-7"
                         :disabled="!canUpdate || processing"
                     >
                         <Spinner v-if="processing" />
@@ -235,7 +235,7 @@ const availabilityCopy = computed(() => {
 
                 <Dialog v-model:open="removeDialogOpen">
                     <DialogTrigger as-child>
-                        <Button variant="ghost" class="md:mt-7">
+                        <Button variant="ghost" class="lg:mt-7">
                             <Trash2 aria-hidden="true" />
                             Remove
                         </Button>

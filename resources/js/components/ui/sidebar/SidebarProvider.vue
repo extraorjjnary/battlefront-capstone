@@ -12,7 +12,7 @@ const props = defineProps({
 });
 const emits = defineEmits(['update:open']);
 const sidebarCookieName = getSidebarCookieName(usePage().props.auth.user?.id);
-const isMobile = useMediaQuery("(max-width: 768px)");
+const isMobile = useMediaQuery("(width < 48rem)");
 const openMobile = ref(false);
 const open = useVModel(props, "open", emits, {
     defaultValue: props.defaultOpen ?? false,

@@ -9,6 +9,7 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
+use App\Enums\ShipmentArrangement;
 use App\Enums\ShipmentStatus;
 use App\Enums\UserRole;
 use App\Models\Order;
@@ -123,6 +124,87 @@ class OrderProcessingService
         return $order->shipment?->status->next();
     }
 
+    public function canCreateManualShipment(Order $order): bool
+    {
+        return $order->fulfillment_method === FulfillmentMethod::Delivery
+            && ($order->delivery_quote_metadata['pricing_status'] ?? null) === 'not_configured'
+            && $order->delivery_fee === '0.00'
+            && $order->product_subtotal !== null
+            && bccomp($order->total_amount, $order->product_subtotal, 2) === 0
+            && in_array($order->status, [OrderStatus::Pending, OrderStatus::Processing], strict: true)
+            && $order->payment_status !== PaymentStatus::Rejected
+            && $order->shipment === null;
+    }
+
+    public function createManualShipment(
+        Order $order,
+        string $carrier,
+        ?string $trackingReference,
+        ?int $etaMinimumDays,
+        ?int $etaMaximumDays,
+        bool $arrangementConfirmed,
+    ): Shipment {
+        return DB::transaction(function () use (
+            $order,
+            $carrier,
+            $trackingReference,
+            $etaMinimumDays,
+            $etaMaximumDays,
+            $arrangementConfirmed,
+        ): Shipment {
+            $lockedOrder = Order::query()
+                ->whereKey($order->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+            $shipment = $lockedOrder->shipment()->lockForUpdate()->first();
+            $lockedOrder->setRelation('shipment', $shipment);
+
+            if (! $arrangementConfirmed) {
+                throw ValidationException::withMessages([
+                    'arrangement_confirmed' => 'Confirm that LBC has accepted the manual shipping arrangement.',
+                ]);
+            }
+
+            if (! $this->canCreateManualShipment($lockedOrder)) {
+                throw ValidationException::withMessages([
+                    'carrier' => 'Manual shipments are available only for eligible, unconfigured delivery orders without an existing shipment.',
+                ]);
+            }
+
+            $normalizedCarrier = mb_strtolower(trim($carrier));
+            if ($normalizedCarrier !== 'lbc') {
+                throw ValidationException::withMessages([
+                    'carrier' => 'This manual shipment workflow requires an explicitly arranged LBC delivery.',
+                ]);
+            }
+
+            if (
+                ($etaMinimumDays === null) !== ($etaMaximumDays === null)
+                || ($etaMinimumDays !== null && ($etaMinimumDays < 0 || $etaMaximumDays < $etaMinimumDays))
+            ) {
+                throw ValidationException::withMessages([
+                    'eta_min_days' => 'Enter both estimated delivery day values, or leave both blank when no estimate is available.',
+                ]);
+            }
+
+            $shipment = $lockedOrder->shipment()->create([
+                'arrangement_type' => ShipmentArrangement::Manual,
+                'carrier' => $normalizedCarrier,
+                'status' => ShipmentStatus::AwaitingPreparation,
+                'preparation_days' => null,
+                'transit_min_days' => null,
+                'transit_max_days' => null,
+                'eta_min_days' => $etaMinimumDays,
+                'eta_max_days' => $etaMaximumDays,
+                'tracking_reference' => $this->normalizeTrackingReference($trackingReference),
+            ]);
+
+            $this->notifications->afterCommit($lockedOrder, 'shipment.manual_created');
+
+            return $shipment;
+        }, attempts: 3);
+    }
+
     public function canUpdateShipmentReference(Order $order): bool
     {
         $shipment = $order->shipment;
@@ -153,7 +235,11 @@ class OrderProcessingService
             }
 
             $changes = ['status' => $status, $status->timestampColumn() => now()];
-            if ($status === ShipmentStatus::Preparing) {
+            if (
+                $status === ShipmentStatus::Preparing
+                && $shipment->eta_min_days !== null
+                && $shipment->eta_max_days !== null
+            ) {
                 $anchor = CarbonImmutable::now(config('app.timezone'))->startOfDay();
                 $changes += [
                     'eta_anchor_date' => $anchor->toDateString(),

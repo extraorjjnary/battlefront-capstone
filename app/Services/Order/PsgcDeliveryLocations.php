@@ -19,10 +19,150 @@ use RuntimeException;
  */
 class PsgcDeliveryLocations
 {
+    public const VERSION = '2026-03-31.v2';
+
+    /** Compatibility aliases are geography identifiers, independent of delivery coverage. */
+    public const LEGACY_DESTINATIONS = [
+        'Sagay City', 'Escalante City', 'Cadiz City', 'Toboso', 'Manapla', 'Calatrava',
+        'Victorias City', 'E.B. Magalona', 'San Carlos City', 'Silay City', 'Talisay City', 'Bacolod City',
+    ];
+
+    /** @var array<string, mixed>|null */
+    private ?array $geography = null;
+
+    /** @var array<string, array<string, mixed>> */
+    private array $citiesByCode = [];
+
+    /** @var array<string, list<array<string, mixed>>> */
+    private array $regionalBarangays = [];
+
+    /** @return array<string, mixed> */
+    public function geography(): array
+    {
+        if ($this->geography !== null) {
+            return $this->geography;
+        }
+        $data = json_decode(File::get(resource_path('data/psgc-nationwide-'.self::VERSION.'.json')), true, flags: JSON_THROW_ON_ERROR);
+        if (! is_array($data) || ($data['schema_version'] ?? null) !== 2 || ($data['version'] ?? null) !== self::VERSION) {
+            throw new RuntimeException('The nationwide PSGC dataset has an unsupported schema.');
+        }
+        foreach (['regions', 'provinces', 'cities'] as $level) {
+            if (! is_array($data[$level] ?? null) || ! array_is_list($data[$level])) {
+                throw new RuntimeException('Invalid nationwide PSGC hierarchy.');
+            }
+            $codes = [];
+            foreach ($data[$level] as $record) {
+                if (! is_array($record) || ! $this->isNamedCode($record) || isset($codes[$record['code']])) {
+                    throw new RuntimeException('Invalid or duplicate nationwide PSGC code.');
+                }
+                $codes[$record['code']] = true;
+            }
+        }
+        foreach ([...$data['provinces'], ...$data['cities']] as $record) {
+            if (! in_array($record['region_code'] ?? null, array_column($data['regions'], 'code'), true)) {
+                throw new RuntimeException('Invalid PSGC region parent.');
+            }
+            if (array_key_exists('province_code', $record) && $record['province_code'] !== null) {
+                $parents = array_filter($data['provinces'], fn (array $province): bool => $province['code'] === $record['province_code'] && $province['region_code'] === $record['region_code']);
+                if (count($parents) !== 1) {
+                    throw new RuntimeException('Invalid PSGC province parent.');
+                }
+            }
+        }
+        $this->citiesByCode = array_column($data['cities'], null, 'code');
+
+        return $this->geography = $data;
+    }
+
+    /** @return array<string, mixed> */
+    public function city(string $code): array
+    {
+        $this->geography();
+        if (isset($this->citiesByCode[$code])) {
+            return $this->citiesByCode[$code];
+        }
+        throw new DomainException('Select a valid Philippine city or municipality.');
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function lookup(string $level, ?string $parent = null): array
+    {
+        $data = $this->geography();
+        if ($level === 'regions') {
+            return $data['regions'];
+        }
+        if ($level === 'city') {
+            return [$this->city($parent ?? '')];
+        }
+        if ($level === 'barangays') {
+            return $this->cityBarangays($parent ?? '');
+        }
+        if (! in_array($parent, array_column($data['regions'], 'code'), true)
+            && ! in_array($parent, array_column($data['provinces'], 'code'), true)) {
+            throw new DomainException('Select a valid PSGC parent.');
+        }
+        if ($level === 'provinces') {
+            if (! in_array($parent, array_column($data['regions'], 'code'), true)) {
+                throw new DomainException('Select a valid PSGC region.');
+            }
+
+            return array_values(array_filter($data['provinces'], fn (array $record): bool => $record['region_code'] === $parent));
+        }
+        if ($level === 'cities') {
+            return array_values(array_filter($data['cities'], fn (array $record): bool => $record['province_code'] === $parent
+                || ($record['region_code'] === $parent && $record['province_code'] === null)));
+        }
+        throw new DomainException('Select a valid PSGC level.');
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function cityBarangays(string $code): array
+    {
+        $city = $this->city($code);
+        $region = $city['region_code'];
+        if (! isset($this->regionalBarangays[$region])) {
+            $data = json_decode(File::get(resource_path('data/psgc-barangays-'.self::VERSION.'-'.$region.'.json')), true, flags: JSON_THROW_ON_ERROR);
+            if (! is_array($data) || ($data['version'] ?? null) !== self::VERSION || ($data['region_code'] ?? null) !== $region || ! is_array($data['barangays'] ?? null) || ! array_is_list($data['barangays'])) {
+                throw new RuntimeException('Invalid PSGC barangay partition.');
+            }
+            $seen = [];
+            foreach ($data['barangays'] as $record) {
+                if (! is_array($record) || ! $this->isNamedCode($record) || ! is_string($record['city_code'] ?? null) || isset($seen[$record['code']])) {
+                    throw new RuntimeException('Invalid or duplicate PSGC barangay.');
+                }
+                $parent = $this->city($record['city_code']);
+                $prefix = $parent['code'] === '1380600000' ? 5 : 7;
+                if ($parent['region_code'] !== $region || substr($record['code'], 0, $prefix) !== substr($parent['code'], 0, $prefix)) {
+                    throw new RuntimeException('Invalid PSGC barangay parent.');
+                }
+                $seen[$record['code']] = true;
+            }
+            $this->regionalBarangays[$region] = $data['barangays'];
+        }
+
+        return array_values(array_filter($this->regionalBarangays[$region], fn (array $record): bool => $record['city_code'] === $code));
+    }
+
+    /** @return array<string, string> */
+    public function hierarchyErrors(string $region, ?string $province, string $cityCode): array
+    {
+        try {
+            $city = $this->city($cityCode);
+        } catch (DomainException) {
+            return ['city_code' => 'Select a valid city or municipality.'];
+        }
+        if ($city['region_code'] !== $region) {
+            return ['region_code' => 'The selected city does not belong to this region.'];
+        }
+        if ($city['province_code'] !== ($province === '' ? null : $province)) {
+            return ['province_code' => 'Select the correct province, or no province for an independent locality.'];
+        }
+
+        return [];
+    }
+
     /** @var list<DeliveryLocation>|null */
     private ?array $locations = null;
-
-    public function __construct(private readonly DeliveryRules $deliveryRules) {}
 
     /** @return list<DeliveryLocation> */
     public function destinations(): array
@@ -80,7 +220,7 @@ class PsgcDeliveryLocations
             $locations[$location['destination']] = $location;
         }
 
-        $supported = array_keys($this->deliveryRules->destinations());
+        $supported = self::LEGACY_DESTINATIONS;
 
         if (count($locations) !== count($supported) || array_diff($supported, array_keys($locations)) !== []) {
             throw new RuntimeException('The local PSGC dataset must match the configured delivery coverage.');
@@ -92,7 +232,24 @@ class PsgcDeliveryLocations
     /** @return DeliveryLocation */
     public function destination(string $destination): array
     {
-        $this->deliveryRules->destination($destination);
+        if (preg_match('/\A[0-9]{10}\z/', $destination) === 1) {
+            $city = $this->city($destination);
+            $province = null;
+            foreach ($this->geography()['provinces'] as $candidate) {
+                if ($candidate['code'] === $city['province_code']) {
+                    $province = ['code' => $candidate['code'], 'name' => $candidate['name']];
+                }
+            }
+
+            return [
+                'destination' => $city['destination'], 'code' => $city['code'], 'name' => $city['name'],
+                'type' => $city['type'], 'city_class' => $city['city_class'], 'province' => $province,
+                'barangays' => array_map(fn (array $barangay): array => ['code' => $barangay['code'], 'name' => $barangay['name']], $this->cityBarangays($destination)),
+            ];
+        }
+        if (! in_array($destination, self::LEGACY_DESTINATIONS, true)) {
+            throw new DomainException('Unsupported delivery destination.');
+        }
 
         foreach ($this->destinations() as $location) {
             if ($location['destination'] === $destination) {
@@ -130,7 +287,7 @@ class PsgcDeliveryLocations
             throw new InvalidArgumentException('Enter the house, building, street, or landmark details.');
         }
 
-        $parts = [$details, $barangay['name'], $destination];
+        $parts = [$details, $barangay['name'], $location['destination']];
 
         if ($location['province'] !== null) {
             $parts[] = $location['province']['name'];
@@ -178,7 +335,7 @@ class PsgcDeliveryLocations
             && is_string($components['barangay_code'] ?? null)
             && is_string($components['details'] ?? null)
             && trim($components['details']) !== ''
-            && array_key_exists($components['destination'], $this->deliveryRules->destinations())
+            && (in_array($components['destination'], self::LEGACY_DESTINATIONS, true) || $this->knownCity($components['destination']))
             && $this->destination($components['destination'])['code'] === $components['city_code']
             && $this->addressErrors($components['destination'], $components['barangay_code'], $components['details']) === []) {
             return [
@@ -230,6 +387,17 @@ class PsgcDeliveryLocations
     {
         return is_string($record['code'] ?? null) && preg_match('/\A[0-9]{10}\z/', $record['code']) === 1
             && is_string($record['name'] ?? null) && trim($record['name']) !== '';
+    }
+
+    private function knownCity(string $code): bool
+    {
+        try {
+            $this->city($code);
+
+            return true;
+        } catch (DomainException) {
+            return false;
+        }
     }
 
     private function normalizeName(string $name): string

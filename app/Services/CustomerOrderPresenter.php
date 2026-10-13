@@ -131,6 +131,10 @@ class CustomerOrderPresenter
         }
 
         if ($order->payment_method === PaymentMethod::Cod) {
+            if (($order->delivery_quote_metadata['pricing_status'] ?? null) === 'not_configured') {
+                return 'The product subtotal is payable upon delivery. No delivery fee is included, and no LBC booking or carrier collection arrangement is represented.';
+            }
+
             if ($order->payment_status === PaymentStatus::Verified) {
                 return 'Battlefront has manually confirmed that LBC collected your COD payment.';
             }

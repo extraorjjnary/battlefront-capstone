@@ -301,7 +301,10 @@ onBeforeUnmount(() => {
             You have hidden these suggestions. Browse the catalog for more
             products.
         </p>
-        <div v-else class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div
+            v-else
+            class="mt-5 grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4"
+        >
             <article
                 v-for="(recommendation, index) in visibleRecommendations"
                 :key="recommendation.product.id"
@@ -318,18 +321,19 @@ onBeforeUnmount(() => {
                     class="focus-visible:ring-ring block focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                     :aria-label="`View ${recommendation.product.name}`"
                 >
-                    <div class="aspect-3/2 overflow-hidden">
+                    <div class="aspect-square overflow-hidden sm:aspect-3/2">
                         <ProductImage
                             :image-url="recommendation.product.image_url"
                             :product-name="recommendation.product.name"
+                            class="lg:[&_img]:object-cover"
                         />
                     </div>
                 </Link>
 
-                <div class="flex flex-1 flex-col gap-3 p-4">
+                <div class="flex flex-1 flex-col gap-2 p-2.5 sm:gap-3 sm:p-4">
                     <div class="min-w-0">
                         <p
-                            class="text-muted-foreground text-xs font-semibold tracking-wide uppercase"
+                            class="text-muted-foreground text-xs font-semibold tracking-wide wrap-anywhere uppercase"
                         >
                             {{ recommendation.product.category.name }}
                         </p>
@@ -342,7 +346,7 @@ onBeforeUnmount(() => {
                                     index + 1,
                                 )
                             "
-                            class="focus-visible:ring-ring mt-1 block rounded-sm text-base leading-snug font-bold focus-visible:ring-2 focus-visible:outline-none"
+                            class="focus-visible:ring-ring mt-1 line-clamp-2 rounded-sm text-sm leading-snug font-bold wrap-anywhere focus-visible:ring-2 focus-visible:outline-none sm:block sm:line-clamp-none sm:text-base"
                         >
                             {{ recommendation.product.name }}
                         </Link>
@@ -362,9 +366,11 @@ onBeforeUnmount(() => {
                             :discount-price="
                                 recommendation.product.discount_price
                             "
+                            compact
                         />
                         <StockAvailability
                             :inventory="recommendation.product.inventory"
+                            class="max-w-full [&_svg]:shrink-0"
                         />
                     </div>
 

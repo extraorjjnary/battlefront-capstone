@@ -363,6 +363,24 @@ function submitReplacementProof() {
                             v-if="order.delivery_quote && !order.shipment"
                             class="border-border mt-5 grid gap-2 border-t pt-4 text-sm"
                         >
+                            <template
+                                v-if="
+                                    order.delivery_quote.pricing_configured ===
+                                    false
+                                "
+                            >
+                                <p class="font-semibold">
+                                    Delivery fee not configured ·
+                                    {{ order.delivery_quote.destination }}
+                                </p>
+                                <p class="text-muted-foreground text-xs leading-5">
+                                    {{ order.delivery_quote.notice }}
+                                </p>
+                                <p class="text-muted-foreground text-xs leading-5">
+                                    {{ order.delivery_quote.assumption_label }}
+                                </p>
+                            </template>
+                            <template v-else>
                             <p class="font-semibold">
                                 {{ order.delivery_quote.carrier.toUpperCase() }}
                                 · {{ order.delivery_quote.destination }}
@@ -393,6 +411,7 @@ function submitReplacementProof() {
                             >
                                 {{ order.delivery_quote.assumption_label }}
                             </p>
+                            </template>
                         </div>
                     </section>
 

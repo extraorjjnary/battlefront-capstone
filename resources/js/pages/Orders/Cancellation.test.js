@@ -173,6 +173,32 @@ test('customer detail shows cancellation only for server-eligible orders', async
     assert.doesNotMatch(hidden, /Cancel order/);
 });
 
+test('customer detail labels an unconfigured zero-fee delivery without showing an LBC estimate', async () => {
+    const loaded = loadPage('./Show.vue', true);
+    const html = await renderToString(
+        Vue.h(
+            loaded.component,
+            orderProps({
+                fulfillment: { value: 'delivery', label: 'Delivery' },
+                product_subtotal: '100.00',
+                delivery_fee: '0.00',
+                total: '100.00',
+                delivery_quote: {
+                    pricing_configured: false,
+                    destination: 'City of Makati',
+                    notice: 'Delivery fee not configured.',
+                    assumption_label: 'No LBC quotation or booking exists.',
+                },
+            }),
+        ),
+    );
+
+    assert.match(html, /Delivery fee not configured/);
+    assert.match(html, /City of Makati/);
+    assert.match(html, /No LBC quotation or booking exists/);
+    assert.doesNotMatch(html, /Estimated preparation and transit/);
+});
+
 test('customer cancellation requires confirmation and prevents duplicate submissions', () => {
     const scope = Vue.effectScope();
     try {
@@ -280,6 +306,27 @@ test('admin handoff feedback does not describe a processing order as terminal or
     assert.doesNotMatch(html, /terminal state/);
     assert.doesNotMatch(html, /Move order to/);
     assert.doesNotMatch(html, /Cancellation remains available/);
+});
+
+test('admin detail flags unconfigured delivery logistics without offering LBC tracking', async () => {
+    const loaded = loadPage('../Administration/Orders/Show.vue', true);
+    const props = orderProps({
+        fulfillment: { value: 'delivery', label: 'Delivery' },
+        delivery_quote: {
+            pricing_configured: false,
+            assumption_label: 'No LBC quotation or booking exists.',
+        },
+        shipment: null,
+    });
+
+    const html = await renderToString(
+        Vue.h(loaded.component, { order: props.order }),
+    );
+
+    assert.match(html, /Delivery pricing and logistics not configured/);
+    assert.match(html, /product subtotal only/);
+    assert.match(html, /Coordinate its\s+fulfillment separately/);
+    assert.doesNotMatch(html, /Shipment progress/);
 });
 
 test('admin cancelled orders hide payment decisions and cancellation confirmation preserves verified payment wording', async () => {

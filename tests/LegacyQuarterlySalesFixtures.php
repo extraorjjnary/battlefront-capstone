@@ -10,16 +10,24 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\User;
-use App\Repositories\Reporting\SalesHistoryCoverageRepository;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 
 /** Retain quarterly sales observations for reporting regression tests. */
 class LegacyQuarterlySalesFixtures extends Seeder
 {
     public function run(): void
     {
+        if (! App::environment('testing')) {
+            throw new RuntimeException('Legacy quarterly fixtures are test-only. No existing records were changed.');
+        }
+        if (User::query()->where('email', 'historical-sales@example.test')->exists()) {
+            throw new RuntimeException('Legacy quarterly fixtures require an unused test identity. No existing records were changed.');
+        }
+
         $end = CarbonImmutable::now(config('app.timezone'))->startOfQuarter();
         $start = $end->subQuarters(8);
         $customer = User::firstOrCreate(['email' => 'historical-sales@example.test'], [
@@ -56,10 +64,6 @@ class LegacyQuarterlySalesFixtures extends Seeder
                 'source_kind' => 'synthetic_development', 'sales_scope' => 'development_fixture_transactions',
             ];
         }
-        $customer->orders()->each(function (Order $order): void {
-            $order->sale()->delete();
-            $order->delete();
-        });
         foreach (range(0, 7) as $index) {
             $quarter = $start->addQuarters($index);
             foreach ([$quarter, $quarter->endOfQuarter()] as $boundary => $date) {
@@ -85,56 +89,5 @@ class LegacyQuarterlySalesFixtures extends Seeder
             }
         }
         Storage::disk('local')->put(config('forecasting.development_manifest'), json_encode(['version' => 1, 'products' => $entries], JSON_THROW_ON_ERROR));
-    }
-
-    /** Isolate accepted quarterly consumer behavior while the real repository becomes monthly-only. */
-    public static function bindCoverage(): void
-    {
-        $mock = \Mockery::mock(SalesHistoryCoverageRepository::class)->makePartial();
-        app()->instance(SalesHistoryCoverageRepository::class, $mock);
-        $mock->shouldReceive('forProductCode')->andReturnUsing(function (string $code): ?array {
-            $operational = config('forecasting.operational_coverage', []);
-            $contents = Storage::disk('local')->get(config('forecasting.development_manifest'));
-            $development = app()->environment(['local', 'testing']) && $contents !== null ? (json_decode($contents, true)['products'] ?? []) : [];
-            if (isset($operational[$code], $development[$code])) {
-                return null;
-            }
-            $entry = $operational[$code] ?? $development[$code] ?? null;
-            if (! is_array($entry) || ($entry['timezone'] ?? null) !== config('app.timezone')
-                || ! in_array($entry['source_kind'] ?? null, ['operational_prepared', 'synthetic_development'], true)
-                || ! in_array($entry['sales_scope'] ?? null, ['all_sagay_sales', 'captured_system_transactions', 'development_fixture_transactions'], true)) {
-                return null;
-            }
-            foreach (['start', 'end_exclusive'] as $key) {
-                if (! self::quarterDate($entry[$key] ?? null)) {
-                    return null;
-                }
-            }
-            $gaps = $entry['unavailable_quarters'] ?? [];
-            if ($entry['start'] > $entry['end_exclusive'] || ! is_array($gaps) || (array_key_exists('unavailable_quarters', $entry) && $entry['unavailable_quarters'] === null)) {
-                return null;
-            }
-            foreach ($gaps as $gap) {
-                if (! self::quarterDate($gap) || $gap < $entry['start'] || $gap >= $entry['end_exclusive']) {
-                    return null;
-                }
-            }
-
-            return $entry;
-        });
-    }
-
-    private static function quarterDate(mixed $date): bool
-    {
-        if (! is_string($date) || preg_match('/^\d{4}-\d{2}-\d{2}$/D', $date) !== 1) {
-            return false;
-        }
-        try {
-            $parsed = CarbonImmutable::createFromFormat('!Y-m-d', $date, config('app.timezone'));
-
-            return $parsed !== null && $parsed->toDateString() === $date && $parsed->equalTo($parsed->startOfQuarter());
-        } catch (\Throwable) {
-            return false;
-        }
     }
 }

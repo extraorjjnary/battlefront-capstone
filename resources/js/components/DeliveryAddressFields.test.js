@@ -19,6 +19,74 @@ function fieldProps(overrides = {}) {
     };
 }
 
+function nationwideFields(address = {}) {
+    const props = Vue.reactive(fieldProps({ nationwide: true, modelValue: { ...emptyDeliveryAddress(), ...address } }));
+    const scope = Vue.effectScope();
+    const fields = scope.run(() => loadAddressComponent('../components/DeliveryAddressFields.vue').setup(props, {
+        expose() {}, emit: (_, value) => { props.modelValue = value; },
+    }));
+    return { props, fields, scope };
+}
+
+test('nationwide selectors clear descendants and discard stale location responses', async (t) => {
+    const pending = [];
+    t.mock.method(globalThis, 'fetch', (url) => new Promise((resolve) => pending.push({ url, resolve })));
+    const { props, fields, scope } = nationwideFields({ delivery_destination: '1804523000', delivery_barangay_code: '1804523018' });
+    try {
+        const oldRequest = fields.updateRegion('1800000000');
+        assert.equal(props.modelValue.delivery_destination, '');
+        assert.equal(props.modelValue.delivery_barangay_code, '');
+        const newRequest = fields.updateRegion('1300000000');
+        const reply = (request, locations) => request.resolve({ ok: true, json: async () => ({ data: { locations } }) });
+        reply(pending[2], []);
+        reply(pending[3], [{ code: '1380300000', name: 'City of Makati' }]);
+        await newRequest;
+        reply(pending[0], [{ code: '1804500000', name: 'Negros Occidental' }]);
+        reply(pending[1], [{ code: '1830200000', name: 'City of Bacolod' }]);
+        await oldRequest;
+        assert.equal(fields.regionCode.value, '1300000000');
+        assert.deepEqual(fields.provinces.value, []);
+        assert.equal(fields.cities.value[0].code, '1380300000');
+    } finally { scope.stop(); }
+});
+
+test('nationwide saved address hydration loads only its parents and barangays', async (t) => {
+    const requested = [];
+    t.mock.method(globalThis, 'fetch', async (url) => {
+        const query = new URL(url, 'https://example.test').searchParams;
+        requested.push(query.get('level'));
+        const locations = {
+            regions: [{ code: '1800000000', name: 'Negros Island Region' }],
+            city: [{ code: '1804523000', name: 'City of Sagay', region_code: '1800000000', province_code: '1804500000' }],
+            provinces: [{ code: '1804500000', name: 'Negros Occidental' }],
+            cities: [{ code: '1804523000', name: 'City of Sagay' }],
+            barangays: [{ code: '1804523018', name: 'Poblacion I' }],
+        }[query.get('level')];
+        return { ok: true, json: async () => ({ data: { locations } }) };
+    });
+    const { props, fields, scope } = nationwideFields({ delivery_destination: 'Sagay City', delivery_barangay_code: '1804523018', delivery_address_details: '12 Mabini' });
+    try {
+        await fields.initialize();
+        assert.equal(props.modelValue.delivery_city_code, '1804523000');
+        assert.equal(props.modelValue.delivery_region_code, '1800000000');
+        assert.equal(props.modelValue.delivery_barangay_code, '1804523018');
+        assert.equal(props.modelValue.delivery_address_details, '12 Mabini');
+        assert.deepEqual(requested, ['regions', 'city', 'provinces', 'cities', 'barangays']);
+    } finally { scope.stop(); }
+});
+
+test('location lookup failures expose retry state without restoring old children', async (t) => {
+    t.mock.method(globalThis, 'fetch', async () => ({ ok: false }));
+    const { props, fields, scope } = nationwideFields();
+    try {
+        await fields.updateRegion('1300000000');
+        assert.match(fields.loadError.value, /retry/);
+        assert.equal(fields.loading.value, false);
+        assert.equal(props.modelValue.delivery_city_code, '');
+        assert.deepEqual(fields.cities.value, []);
+    } finally { scope.stop(); }
+});
+
 test('shared address fields populate all 12 locality lists and reset barangay on city changes', () => {
     const scope = Vue.effectScope();
     try {

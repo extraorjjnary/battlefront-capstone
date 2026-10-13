@@ -3,7 +3,7 @@
 namespace App\Http\Requests\Settings;
 
 use App\Concerns\ProfileValidationRules;
-use App\Services\Order\DeliveryRules;
+use App\Concerns\ValidatesDeliveryGeography;
 use App\Services\Order\PsgcDeliveryLocations;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -13,6 +13,14 @@ use Illuminate\Validation\Validator;
 class ProfileUpdateRequest extends FormRequest
 {
     use ProfileValidationRules;
+    use ValidatesDeliveryGeography;
+
+    protected function prepareForValidation(): void
+    {
+        if ($this->filled('default_delivery_city_code') && ! $this->has('default_delivery_destination')) {
+            $this->merge(['default_delivery_destination' => $this->input('default_delivery_city_code')]);
+        }
+    }
 
     /**
      * Get the validation rules that apply to the request.
@@ -33,7 +41,12 @@ class ProfileUpdateRequest extends FormRequest
         ];
         $rules['default_delivery_destination'] = [
             Rule::excludeIf(! $canManageAddress || $addressAction !== 'save'),
-            'bail', 'required', 'string', Rule::in(array_keys(app(DeliveryRules::class)->destinations())),
+            'bail', 'required', 'string',
+            function (string $attribute, mixed $value, \Closure $fail): void {
+                if (! is_string($value) || (! preg_match('/\A[0-9]{10}\z/', $value) && ! in_array($value, PsgcDeliveryLocations::LEGACY_DESTINATIONS, true))) {
+                    $fail('Select a supported delivery destination.');
+                }
+            },
         ];
         $rules['default_delivery_barangay_code'] = [
             Rule::excludeIf(! $canManageAddress || $addressAction !== 'save'),
@@ -59,7 +72,7 @@ class ProfileUpdateRequest extends FormRequest
             'boolean',
         ];
 
-        return $rules;
+        return [...$rules, ...$this->geographyRules('default_delivery', $canManageAddress && $addressAction === 'save' && $this->usesNationwideAddress('default_delivery'))];
     }
 
     /** @return list<callable(Validator): void> */
@@ -67,10 +80,15 @@ class ProfileUpdateRequest extends FormRequest
     {
         return [
             function (Validator $validator): void {
+                if ($this->user()->can('use-customer-cart') && $this->addressAction() === 'save') {
+                    $this->checkGeography($validator, 'default_delivery');
+                }
+            },
+            function (Validator $validator): void {
                 if (! $this->user()->can('use-customer-cart') || $this->addressAction() !== 'save'
                     || $validator->errors()->hasAny([
                         'default_delivery_address_action', 'default_delivery_destination',
-                        'default_delivery_barangay_code', 'default_delivery_address_details',
+                        'default_delivery_barangay_code', 'default_delivery_address_details', 'default_delivery_city_code', 'default_delivery_region_code', 'default_delivery_province_code',
                     ])) {
                     return;
                 }
@@ -92,6 +110,7 @@ class ProfileUpdateRequest extends FormRequest
         $data = $this->safe()->except([
             'default_delivery_address_action', 'default_delivery_destination',
             'default_delivery_barangay_code', 'default_delivery_address_details',
+            'default_delivery_city_code', 'default_delivery_region_code', 'default_delivery_province_code',
         ]);
 
         if (! $this->user()->can('use-customer-cart')) {

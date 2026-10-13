@@ -112,10 +112,10 @@ defineOptions({
                     Operations summary
                 </h2>
                 <dl
-                    class="border-border bg-card grid border sm:grid-cols-2 lg:grid-cols-5"
+                    class="border-border bg-card grid border sm:grid-cols-2 xl:grid-cols-5"
                 >
                     <div
-                        class="border-border border-b p-5 sm:border-r lg:border-b-0"
+                        class="border-border border-b p-5 sm:border-r xl:border-b-0"
                     >
                         <dt class="text-muted-foreground text-sm">
                             Recorded product revenue
@@ -138,7 +138,7 @@ defineOptions({
                         </p>
                     </div>
                     <div
-                        class="border-border border-b p-5 sm:border-r-0 lg:border-r lg:border-b-0"
+                        class="border-border border-b p-5 sm:border-r-0 xl:border-r xl:border-b-0"
                     >
                         <dt class="text-muted-foreground text-sm">
                             Pending orders
@@ -177,7 +177,7 @@ defineOptions({
                         </p>
                     </div>
                     <div
-                        class="border-destructive/50 bg-destructive/5 border-t p-5 sm:col-span-2 lg:col-span-1 lg:border-t-0 lg:border-l"
+                        class="border-destructive/50 bg-destructive/5 border-t p-5 sm:col-span-2 xl:col-span-1 xl:border-t-0 xl:border-l"
                     >
                         <dt class="text-destructive text-sm font-semibold">
                             Out-of-stock products
@@ -198,8 +198,8 @@ defineOptions({
                 class="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)]"
                 aria-labelledby="needs-attention-heading"
             >
-                <div>
-                    <div class="mb-4 flex items-end justify-between gap-4">
+                <div class="min-w-0">
+                    <div class="mb-4 flex flex-wrap items-end justify-between gap-4">
                         <div>
                             <p class="text-muted-foreground text-sm">
                                 Operational queue
@@ -221,7 +221,7 @@ defineOptions({
 
                     <div class="border-border bg-card border">
                         <div class="border-border border-b p-5">
-                            <div class="flex items-start justify-between gap-4">
+                            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                 <div class="flex gap-3">
                                     <span
                                         class="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center rounded-md"
@@ -299,7 +299,7 @@ defineOptions({
                         <div
                             class="border-destructive/40 bg-destructive/5 border-b p-5"
                         >
-                            <div class="flex items-start justify-between gap-4">
+                            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                 <div class="flex gap-3">
                                     <span
                                         class="bg-destructive/10 text-destructive flex size-10 shrink-0 items-center justify-center rounded-md"
@@ -370,7 +370,7 @@ defineOptions({
                         </div>
 
                         <div class="p-5">
-                            <div class="flex items-start justify-between gap-4">
+                            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                 <div class="flex gap-3">
                                     <span
                                         class="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center rounded-md"
@@ -466,7 +466,7 @@ defineOptions({
                     </div>
                 </div>
 
-                <div>
+                <div class="min-w-0">
                     <div class="mb-4">
                         <p class="text-muted-foreground text-sm">
                             Latest activity
@@ -489,7 +489,7 @@ defineOptions({
                                 class="hover:bg-accent focus-visible:ring-ring block p-4 transition-colors focus-visible:ring-2 focus-visible:outline-none"
                             >
                                 <div
-                                    class="flex items-start justify-between gap-4"
+                                    class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
                                 >
                                     <div class="min-w-0">
                                         <p class="font-semibold tabular-nums">

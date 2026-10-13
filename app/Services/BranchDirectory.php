@@ -8,7 +8,7 @@ use App\Models\Branch;
  * @phpstan-type BranchReference array{
  *     id: int, name: string, address: string|null, city: string,
  *     contact_number: string|null, latitude: float|null, longitude: float|null,
- *     email: string|null, operating_hours: string, is_operational: bool
+ *     email: string|null, operating_hours: string, is_operational: bool, operational_notice: string|null
  * }
  */
 class BranchDirectory
@@ -51,6 +51,10 @@ class BranchDirectory
             'email' => $branch->email,
             'operating_hours' => $branch->operating_hours,
             'is_operational' => $branch->is_operational,
+            'operational_notice' => $branch->is_operational
+                && $branch->city === config('battlefront.operational_branch_city')
+                    ? config('battlefront.sagay_cod_notice')
+                    : null,
         ];
     }
 }

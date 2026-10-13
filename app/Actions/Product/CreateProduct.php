@@ -27,6 +27,7 @@ class CreateProduct
     public function execute(array $attributes, array $tagIds, ?UploadedFile $image): Product
     {
         $attributes['name'] = CatalogName::normalize($attributes['name']);
+        unset($attributes['shipping_profile_reviewed']);
         for ($attempt = 0; $attempt < 5; $attempt++) {
             $attributes['product_code'] = 'ADMIN'.Str::ulid();
             $storedImage = null;
@@ -35,6 +36,10 @@ class CreateProduct
             try {
                 return DB::transaction(function () use ($attributes, $tagIds, $image, &$storedImage, &$productId): Product {
                     $product = Product::query()->create($attributes);
+                    if (isset($attributes['shipping_profile'])) {
+                        $product->shipping_profile_source = 'manual';
+                        $product->save();
+                    }
                     $productId = $product->id;
                     $storedImage = $this->storeProductImage->execute($image, $productId);
                     if ($storedImage !== null) {

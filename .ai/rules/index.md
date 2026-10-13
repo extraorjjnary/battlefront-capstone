@@ -22,6 +22,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Services/Order/**,app/Actions/{Checkout,Order}/**,app/Models/Product.php,config/battlefront.php | .ai/rules/checkout-order-models.md |
 | app/Services/Order/**,app/Enums/PaymentMethod.php,app/Models/Order.php,app/Http/Controllers/Administration/Order*,resources/js/pages/{Checkout,Orders,Administration/Orders}/** | .ai/rules/checkout-orders-administration-orders.md |
 | config/battlefront.php,app/Http/Controllers/CheckoutController.php,resources/js/pages/Checkout/** | .ai/rules/checkout.md |
+| database/seeders/DevelopmentHistoricalSalesSeeder.php,app/Console/Commands/ResetDevCommand.php,database/seeders/DevelopmentCustomerSeeder.php | .ai/rules/commands-seeders.md |
 | database/seeders/DevelopmentHistoricalSalesSeeder.php,app/Console/Commands/ResetDevCommand.php, database/seeders/DevelopmentCustomerSeeder.php,app/Console/Commands/ResetDevCommand.php | .ai/rules/commands.md |
 | app/Models/Inventory.php,app/Repositories/Inventory/**,app/Actions/Chatbot/Context/ResolveProductContext.php,resources/js/components/catalog/StockAvailability.vue | .ai/rules/components-catalog.md |
 | app/Actions/Chatbot/**,app/Services/Chatbot/**,resources/js/components/chatbot/** | .ai/rules/components-chatbot.md |
@@ -33,6 +34,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/Forecasting/** | .ai/rules/forecasting.md |
 | ** | .ai/rules/general.md |
 | app/Http/Controllers/** | .ai/rules/http-controllers.md |
+| app/Services/Order/**,app/Services/CustomerOrderPresenter.php,app/Http/Requests/ValidateCheckoutRequest.php,config/battlefront.php,resources/js/pages/Checkout/**,docs/*API*,docs/PSGC_DELIVERY_DATA.md | .ai/rules/http-requests-js-pages-checkout.md |
 | app/Services/Dashboard/**,app/Repositories/Inventory/** | .ai/rules/inventory.md |
 | app/Http/Controllers/BranchController.php,resources/js/pages/Branches/**,resources/js/components/BranchMap.vue | .ai/rules/js-components.md |
 | app/Actions/{Checkout,Order}/**,app/Http/Requests/ValidateCheckoutRequest.php,app/Services/DeliveryQuotePresenter.php,resources/js/pages/Checkout/** | .ai/rules/js-pages-checkout.md |
@@ -43,7 +45,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | database/migrations/** | .ai/rules/migrations.md |
 | app/Services/Order/**,app/Models/Shipment.php,resources/js/pages/**/Orders/** | .ai/rules/models-js-pages-orders.md |
 | config/**,database/seeders/**,app/Models/Branch.php,resources/js/** | .ai/rules/models-js.md |
-| app/Models/**,database/migrations/**, app/Models/{Order,OrderItem}.php,database/migrations/*_create_order*_table.php | .ai/rules/models-migrations.md |
+| app/Models/**,database/migrations/**, app/Models/{Order,OrderItem}.php,database/migrations/*_create_order*_table.php, app/Models/Order.php,database/migrations/*development_fixture_key*,tests/LegacyQuarterlySalesFixtures.php | .ai/rules/models-migrations.md |
 | app/Models/Product.php,app/Repositories/Catalog/** | .ai/rules/models-repositories-catalog.md |
 | database/migrations/**,app/Models/** | .ai/rules/models.md |
 | resources/js/lib/orderStatus.js,resources/js/pages/{Administration/Orders,Orders}/** | .ai/rules/orders-orders.md |
@@ -52,8 +54,11 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/{Cart,Checkout,Order,Inventory}/**,app/Services/{Cart,Order}/**,app/Http/Controllers/OrderController.php,resources/js/pages/Checkout/** | .ai/rules/pages-checkout.md |
 | app/Models/Order.php,app/Http/Controllers/OrderController.php,resources/js/pages/Orders/** | .ai/rules/pages-orders.md |
 | resources/js/app.js,resources/js/pages/** | .ai/rules/pages.md |
+| app/Services/RealCatalogImportService.php,app/Services/CatalogShippingClassification.php,app/Actions/Product/** | .ai/rules/product.md |
 | app/Repositories/Reporting/**,app/Services/{Reporting,Dashboard}/**,app/Actions/Order/RecordCompletedOrderSale.php,resources/js/pages/{Administration/Reports,Dashboard}/**,resources/views/reports/** | .ai/rules/reports.md |
 | app/Http/Requests/ProductCatalogIndexRequest.php,app/Repositories/Catalog/** | .ai/rules/repositories-catalog.md |
+| app/Services/Order/**,app/Actions/Checkout/**,app/Http/Requests/ValidateCheckoutRequest.php,config/battlefront.php,resources/data/psgc-*.json | .ai/rules/requests-data.md |
+| app/Services/Order/**,app/Actions/Checkout/**,app/Http/Requests/ValidateCheckoutRequest.php,config/battlefront.php,resources/js/pages/Checkout/**,docs/*API*,docs/PSGC_DELIVERY_DATA.md | .ai/rules/requests-js-pages-checkout.md |
 | routes/api.php,app/Http/Controllers/Api/**,app/Http/Resources/** | .ai/rules/resources.md |
 | app/Actions/Chatbot/**,database/seeders/DevelopmentChatbotKnowledgeSeeder.php | .ai/rules/seeders.md |
 | app/Services/Chatbot/** | .ai/rules/services-chatbot.md |

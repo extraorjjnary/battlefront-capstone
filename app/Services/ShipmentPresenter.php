@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
+use App\Enums\ShipmentArrangement;
 use App\Enums\ShipmentStatus;
 use App\Models\Order;
 use App\Models\Shipment;
@@ -25,14 +26,22 @@ class ShipmentPresenter
 
         return [
             'carrier' => $shipment->carrier,
+            'arrangement' => [
+                'value' => $shipment->arrangement_type->value,
+                'label' => $shipment->arrangement_type->label(),
+            ],
             'status' => ['value' => $status->value, 'label' => $status->label()],
             'tracking_reference' => filled($shipment->tracking_reference) ? $shipment->tracking_reference : null,
             'eta' => [
                 'anchor_date' => $shipment->eta_anchor_date?->toDateString(),
                 'timezone' => $shipment->eta_timezone,
+                'min_days' => $shipment->eta_min_days,
+                'max_days' => $shipment->eta_max_days,
                 'estimated_delivery_start' => $shipment->estimated_delivery_start?->toDateString(),
                 'estimated_delivery_end' => $shipment->estimated_delivery_end?->toDateString(),
-                'notice' => 'Battlefront estimate from the start of preparation; arrival is not guaranteed.',
+                'notice' => $shipment->arrangement_type === ShipmentArrangement::Manual
+                    ? 'Administrator-entered estimate from the start of preparation; arrival is not guaranteed.'
+                    : 'Battlefront estimate from the start of preparation; arrival is not guaranteed.',
             ],
             'timeline' => $this->timeline($shipment),
             'notice' => self::NOTICE,

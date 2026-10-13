@@ -11,6 +11,7 @@ use App\Http\Controllers\Administration\InventoryController;
 use App\Http\Controllers\Administration\NotificationController as AdministrationNotificationController;
 use App\Http\Controllers\Administration\OrderCodCollectionController;
 use App\Http\Controllers\Administration\OrderController as AdministrationOrderController;
+use App\Http\Controllers\Administration\OrderManualShipmentController;
 use App\Http\Controllers\Administration\OrderPaymentProofController;
 use App\Http\Controllers\Administration\OrderPaymentStatusController;
 use App\Http\Controllers\Administration\OrderPickupConfirmationController;
@@ -26,6 +27,8 @@ use App\Http\Controllers\CartItemController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DeliveryLocationController;
+use App\Http\Controllers\DeliveryQuoteController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\NotificationController as CustomerNotificationController;
 use App\Http\Controllers\OrderCancellationController;
@@ -97,7 +100,11 @@ Route::middleware(['auth', 'can:use-customer-cart'])
     ->group(function () {
         Route::get('/', [CheckoutController::class, 'index'])
             ->name('index');
+        Route::get('delivery-quote', [DeliveryQuoteController::class, 'show'])->name('delivery-quote.show');
     });
+
+Route::get('delivery-locations', [DeliveryLocationController::class, 'index'])
+    ->middleware(['auth', 'can:use-customer-cart', 'throttle:120,1'])->name('delivery-locations.index');
 
 // customer orders
 Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {
@@ -177,6 +184,8 @@ Route::middleware(['auth', 'can:access-administration'])
             ->only(['index', 'show']);
         Route::patch('orders/{order}/status', [OrderStatusController::class, 'update'])
             ->name('orders.status.update');
+        Route::post('orders/{order}/shipment/manual', [OrderManualShipmentController::class, 'store'])
+            ->name('orders.shipment.manual.store');
         Route::patch('orders/{order}/shipment/status', [OrderShipmentStatusController::class, 'update'])
             ->name('orders.shipment.status.update');
         Route::patch('orders/{order}/shipment/reference', [OrderShipmentReferenceController::class, 'update'])

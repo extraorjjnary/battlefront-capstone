@@ -1,17 +1,19 @@
 # Local PSGC delivery locations
 
-Battlefront bundles geographic reference data in `resources/data/psgc-delivery-2026-03-31.v1.json`. Setup needs no installation, migration, geographic tables, or network access. `PsgcDeliveryLocations` reads this file; `DeliveryRules` alone determines delivery coverage, fees, shipping profiles, and estimates.
+Battlefront bundles nationwide geographic reference data in `resources/data/psgc-nationwide-2026-03-31.v2.json` and 18 regional `psgc-barangays-2026-03-31.v2-*.json` partitions. The registry contains **18 regions, 82 provinces and 1,642 cities/municipalities**; the partitions contain **42,010 barangays**. `PsgcDeliveryLocations` validates addresses locally; `DeliveryRules` alone determines delivery coverage, fees, shipping profiles, payment eligibility and estimates. Nationwide address selection does not enable nationwide automatic checkout.
+
+The original `psgc-delivery-2026-03-31.v1.json` remains a bounded compatibility payload for existing consumers and conservative legacy address matching. Geography requires no tables or runtime network access. The shipping-review/quote-metadata migration is required for the enhanced product and order persistence.
 
 ## Source and version
 
 - Publisher: Philippine Statistics Authority (PSA), [Philippine Standard Geographic Code](https://psa.gov.ph/classification/psgc/).
-- Data release: **Q1 2026, as of 31 March 2026**. Local schema version: **1**.
-- Prepared on **12 October 2026** from the [PSA-derived psgc-rb data](https://github.com/alkevintan/psgc-rb/tree/279ffe1918c2fd28206c2153f6c5c2d8280fb9f3/data).
+- Data release: **Q1 2026, as of 31 March 2026**. Nationwide local schema version: **2**; retained compatibility schema: **1**.
+- Prepared on **13 October 2026** from the [PSA-derived psgc-rb data](https://github.com/alkevintan/psgc-rb/tree/279ffe1918c2fd28206c2153f6c5c2d8280fb9f3/data).
 - Pinned revision: `279ffe1918c2fd28206c2153f6c5c2d8280fb9f3`.
-- Source file Git blob hashes: cities/municipalities `250aba0b930310650a0816fffd31a103ffb2bef8`; barangays `49f9fa82420187596178ee958855ec7fd4cf4710`.
+- Source file Git blob hashes: regions `4b7efc1bc611f7a365027fb2b359c2a4eb36d03e`; provinces `41452fd6dff02c71a2f840ad78bd9944c2bd372f`; cities/municipalities `250aba0b930310650a0816fffd31a103ffb2bef8`; barangays `49f9fa82420187596178ee958855ec7fd4cf4710`.
 - The official Q2 2026 workbook was located, but its direct download returned a Cloudflare 403 in the preparation environment. This bundle deliberately identifies the obtainable Q1 release; it is not labeled as the latest release.
 
-Only 12 destination records and their **300 barangays** are retained. Original official codes and names are preserved. Destination keys remain Battlefront's exact configured strings; for example, `E.B. Magalona` maps to official `Enrique B. Magalona`.
+Official string codes and names are retained nationwide. The following **12 configured delivery routes** and their **300 barangays** also remain available in the compatibility payload. Destination aliases remain Battlefront's exact configured strings; for example, `E.B. Magalona` maps to official `Enrique B. Magalona`.
 
 | Destination key | Full locality code | Barangays |
 | --- | --- | --- |
@@ -34,11 +36,17 @@ The mirror's `city_municipality_code` truncates barangay parent codes to six dig
 
 Bacolod is a [highly urbanized city](https://psa.gov.ph/classification/psgc/hucs), code `1830200000`, in Negros Island Region. It has no administrative province parent in the normalized data. The other supported cities/municipalities have Negros Occidental, code `1804500000`, as their province. Fixed delivery coverage still includes Bacolod.
 
-Barangays are sorted naturally by official name, then code. Codes remain strings; source population, income, coordinates, and nationwide records are omitted. The JSON contains source metadata, a schema version, and explicit parent membership through each destination's barangay list. No runtime external PSGC API is used.
+The mirror includes 14 Manila districts among its locality rows. These are retained as district metadata under the actual City of Manila (`1380600000`), with 897 barangays, rather than presented as separate cities. NCR has 17 city/municipality records and no province selector requirement. HUCs, Isabela City and the BARMM Special Geographic Area localities retain null administrative province parents; a null province does not by itself mean HUC. Negros Island Region (`1800000000`) contains Negros Occidental, Negros Oriental and Siquijor; Bacolod remains independent of an administrative province.
+
+Barangays are sorted naturally by official name, then code. Population, income and coordinates are omitted. Codes, region/province/city membership, attribution and release metadata are retained. No runtime external PSGC API is used.
 
 ## Checkout and compatibility
 
-Inertia checkout receives `deliveryLocations` and `deliveryAddressPrefill`. Mobile receives the same data as additive `data.delivery_locations` and `data.delivery_address_prefill` through its existing checkout preview. No additional lookup request is required.
+Inertia checkout and customer profile settings use cascading Region → Province/Administrative Area (when applicable) → City/Municipality → Barangay → Street/House/Landmark fields. Independent localities appear in a no-province administrative area option. Changing a parent clears descendants; stale asynchronous responses cannot restore old choices. Failed lookups expose retry guidance.
+
+Existing checkout preview `deliveryLocations`/`data.delivery_locations` and prefill fields retain their bounded v1 contracts. Updated clients lazily request authenticated local `GET /delivery-locations` (web) or `GET /api/v1/delivery-locations` (bearer customer). Send `level=regions`, `provinces&parent_code=<region>`, `cities&parent_code=<province>` or `<region>` for independent localities, `city&parent_code=<city>` for hydration, and `barangays&parent_code=<city>`. Responses are `{data:{version,locations}}`. Codes are strings; unknown or invalid parents return 422. The complete dataset is never sent to checkout.
+
+New structured submissions include `delivery_region_code`, nullable `delivery_province_code`, `delivery_city_code`, `delivery_barangay_code` and `delivery_address_details`. The city code can be used as `delivery_destination`, or that field can be omitted and resolved from the city code. Parent-child membership and any supplied destination alias are checked server-side. Profile fields use the `default_delivery_` prefix. Valid unpriced nationwide addresses may be saved as customer defaults.
 
 Structured delivery sends the existing canonical `delivery_destination`, a `delivery_barangay_code` string, and `delivery_address_details`. Laravel verifies coverage, barangay membership, and nonblank details, then composes the order's existing `delivery_address` snapshot. The assembled string must fit 255 Unicode characters; it is never truncated. Supplied assembled addresses are ignored in structured mode.
 
@@ -47,23 +55,106 @@ Examples:
 - Sagay: `12 Mabini Street, Poblacion I, Sagay City, Negros Occidental`.
 - Bacolod: `12 Lizares Street, Barangay 13, Bacolod City`.
 
-Web delivery requires structured fields. Existing mobile clients may continue sending `delivery_destination` and their original `delivery_address` when both new fields are absent. Sending either new field opts into complete structured validation, even if that field is null or empty. Pickup requires no address and prohibits nonempty delivery fields.
+Web delivery uses nationwide structured fields. Existing mobile clients may continue sending an original configured destination alias and `delivery_address` when structured fields are absent, or the original v1 barangay/details contract. Sending any nationwide parent field or a code destination opts into complete nationwide hierarchy validation. Pickup requires no address and prohibits nonempty delivery fields.
 
 Customer Profile Settings uses the same shared address fields as checkout. A nullable `users.default_delivery_address_components` JSON column saves the canonical destination, server-resolved full city code, barangay code, and detailed street text. The existing `default_delivery_address` string remains the readable compatibility representation. Profile saves require all three valid fields, and explicit clearing clears both representations. Checkout reads valid saved components directly and never updates either profile field.
 
 Existing free-text addresses remain untouched by the additive migration. Conservative prefill recognizes exact comma-delimited canonical/official city suffixes and known barangay names, accepting case differences and explicit `Brgy.`/`Barangay` prefixes. It removes a trailing `Negros Occidental` label when parsing older addresses, including Bacolod. It never guesses a barangay. A confidently matched city may prefill independently; barangay/details prefill only when both the barangay and remaining detail text are unambiguous. Uncertain saved text remains visible as an escaped reference. Unrelated profile saves use `default_delivery_address_action=keep`, retaining even partially recognizable legacy defaults. Customer edits use `save`; explicit removal uses `clear`. Legacy mobile free-text updates remain supported and refresh or clear stale components using the same conservative matcher.
 
-Orders retain their purchase-time human-readable snapshot without new order columns. The profile JSON column is customer metadata, not a geographic table. Existing shipment snapshots, order history, and fee calculations are unchanged. Apply the profile-components migration before deploying profile saving; rollback refuses to drop populated component data.
+Orders retain their purchase-time human-readable address and all previous commercial/Shipment snapshots. Nullable `orders.delivery_quote_metadata` adds accepted codes, dataset/rule versions, payment eligibility/assumption and structured address components for new quotes; historical rows remain null and are never repriced. Apply the profile-components and shipping-review/quote-metadata migrations before deployment; rollback refuses to discard populated metadata.
+
+## Configured demonstration coverage and product handling
+
+Sagay City is the single origin. `battlefront.delivery.zones` resolves city rules before province rules before region rules. Specific disabled or incomplete rules stop resolution and reject delivery; they do not fall through to broader coverage. Each enabled rule requires a decimal-string `base_fee`, nonnegative integer `transit_min_days`/`transit_max_days`, and explicitly allowed `payment_methods` from `gcash`, `maya`, `cod`. The original 12 named routes remain the bounded v1 compatibility list; the 20 new Negros Occidental localities are priced through their full PSGC city codes and the shared live quote endpoint. Province/region configuration remains empty.
+
+### Negros Occidental coverage count and preservation
+
+The bundled Q1 2026 PSGC registry contains **31 cities/municipalities with province code `1804500000`**. Eleven already had configured Negros Occidental city rates, leaving **exactly 20 uncovered provincial localities**. Bacolod City (`1830200000`) is a separate highly urbanized city with a null province parent; its existing route remains supported and is not counted in the 31. The 20 newly covered localities contain **362 barangays**. Their city codes, official names, and barangays are validated by the same nationwide PSGC service.
+
+All amounts and day ranges below are **Battlefront demonstration estimates, not official LBC quotations or transit guarantees**. Existing rates and transit estimates are preserved exactly; new rates are configurable, proxy-derived demonstration values only, and must not be used as verified production shipping charges.
+
+| Routes | Base fee (PHP) | Transit days |
+| --- | --- | --- |
+| Sagay City | 80.00 | 0–1 |
+| Escalante City | 100.00 | 1 |
+| Cadiz City | 120.00 | 1 |
+| Toboso | 140.00 | 1 |
+| Manapla | 160.00 | 1 |
+| Calatrava, Victorias City | 180.00 | 1 |
+| E.B. Magalona | 200.00 | 1–2 |
+| San Carlos City, Silay City | 220.00 | 1–2 |
+| Talisay City | 240.00 | 1–2 |
+| Bacolod City | 250.00 | 1–2 |
+
+### New Negros Occidental distance estimates
+
+The method uses the Haversine great-circle distance on verified OSM administrative-boundary centroids. It uses Sagay City's OSM boundary centroid (relation `11491048`, `10.8960681, 123.4154617`) as the fixed calculation origin; it does **not** claim a Battlefront storefront pin. For reproducibility, use Earth radius `6,371 km`, round the resulting distance to the nearest `0.1 km`, then assign the interval `(minimum, maximum]` below. The pricing bands are held in `battlefront.delivery.negros_occidental_distance_bands`; each city-code rule selects a band, while the reviewed coordinate, relation ID, rounded distance, and band are recorded in `battlefront.delivery.negros_occidental_distance_proxies`.
+
+These are administrative-boundary centroids used only as geographic proxies. They are **not actual storefront locations, town centers, road distances, travel times, or official LBC pricing inputs**. OSM relation centroids can move when mapped boundaries change. OSM data is © OpenStreetMap contributors and licensed under ODbL 1.0. The OSM/Nominatim relation lookup pattern is [Nominatim lookup](https://nominatim.openstreetmap.org/lookup?osm_ids=R11491048&format=jsonv2); substitute the relation ID in the table for each locality. OSM attribution does not imply LBC endorsement.
+
+The bands were reviewed against the unchanged configured provincial references with OSM boundary centroids: Sagay 0.0 km / PHP 80, Escalante 11.0 km / PHP 100, Cadiz 13.7 km / PHP 120, Toboso 22.6 km / PHP 140, Manapla 32.6 km / PHP 160, Calatrava 34.2 km / PHP 180, Victorias 37.6 km / PHP 180, San Carlos 45.6 km / PHP 220, E.B. Magalona 47.4 km / PHP 200, Silay 49.2 km / PHP 220, and Talisay 52.0 km / PHP 240. These reference fees are intentionally not normalized or recalculated. Bacolod's PHP 250 / 1–2-day HUC route is also unchanged; it is excluded from spatial calibration because the available point was not a verified OSM boundary centroid. New bands use modest fixed increments, not a fit claimed to model actual courier costs.
+
+| Distance interval from Sagay proxy (km) | Base estimate (PHP) | Demo transit days | Calibration / use |
+| --- | ---: | --- | --- |
+| (30, 45] | 180.00 | 1–2 | Around the unchanged PHP 160–180 references at 32.6–37.6 km |
+| (45, 60] | 220.00 | 1–2 | Around the unchanged PHP 200–240 references at 45.6–52.0 km |
+| (60, 100] | 280.00 | 2–3 | First conservative outward step beyond configured references |
+| (100, 125] | 320.00 | 2–3 | One further distance tier |
+| (125, 155] | 360.00 | 3–4 | One further distance tier |
+| (155, 180] | 400.00 | 3–4 | Longest reviewed proxy distances in the proposed coverage |
+
+| Destination (PSGC name) | Full locality code | Barangays | OSM relation | Boundary centroid (lat, lon) | Great-circle km | Band | Base fee (PHP) | Transit days |
+| --- | --- | ---: | ---: | --- | ---: | --- | ---: | --- |
+| Binalbagan | 1804503000 | 16 | 11525661 | 10.1937474, 122.8587743 | 99.0 | (60, 100] | 280.00 | 2–3 |
+| Candoni | 1804506000 | 9 | 3740498 | 9.8306756, 122.6429611 | 145.5 | (125, 155] | 360.00 | 3–4 |
+| Cauayan | 1804507000 | 25 | 3740499 | 9.9733632, 122.6260198 | 134.1 | (125, 155] | 360.00 | 3–4 |
+| City of Bago | 1804502000 | 24 | 11366393 | 10.5376299, 122.8352802 | 74.9 | (60, 100] | 280.00 | 2–3 |
+| City of Himamaylan | 1804510000 | 19 | 11525214 | 10.0992841, 122.8705390 | 106.8 | (100, 125] | 320.00 | 2–3 |
+| City of Kabankalan | 1804515000 | 32 | 3740502 | 9.9888817, 122.8134501 | 120.5 | (100, 125] | 320.00 | 2–3 |
+| City of La Carlota | 1804516000 | 14 | 11984373 | 10.4268649, 122.9208074 | 75.1 | (60, 100] | 280.00 | 2–3 |
+| City of Sipalay | 1804527000 | 17 | 3740505 | 9.7491266, 122.4040602 | 168.8 | (155, 180] | 400.00 | 3–4 |
+| Hinigaran | 1804511000 | 24 | 12599665 | 10.2713832, 122.8519909 | 92.8 | (60, 100] | 280.00 | 2–3 |
+| Hinoba-an | 1804512000 | 13 | 3740500 | 9.6021766, 122.4670994 | 177.4 | (155, 180] | 400.00 | 3–4 |
+| Ilog | 1804513000 | 15 | 3740501 | 10.0242067, 122.7691808 | 120.0 | (100, 125] | 320.00 | 2–3 |
+| Isabela | 1804514000 | 30 | 18527747 | 10.2047969, 122.9892506 | 89.9 | (60, 100] | 280.00 | 2–3 |
+| La Castellana | 1804517000 | 13 | 17749026 | 10.3230498, 123.0187418 | 77.1 | (60, 100] | 280.00 | 2–3 |
+| Moises Padilla | 1804519000 | 15 | 18491788 | 10.2708302, 123.0733691 | 78.9 | (60, 100] | 280.00 | 2–3 |
+| Murcia | 1804520000 | 23 | 11366415 | 10.6066483, 123.0404676 | 52.1 | (45, 60] | 220.00 | 1–2 |
+| Pontevedra | 1804521000 | 20 | 12716470 | 10.3751168, 122.8668210 | 83.4 | (60, 100] | 280.00 | 2–3 |
+| Pulupandan | 1804522000 | 20 | 12245305 | 10.5192005, 122.8034563 | 78.9 | (60, 100] | 280.00 | 2–3 |
+| Salvador Benedicto | 1804532000 | 7 | 12717917 | 10.5770770, 123.2203670 | 41.4 | (30, 45] | 180.00 | 1–2 |
+| San Enrique | 1804525000 | 10 | 12599666 | 10.4196780, 122.8495462 | 81.4 | (60, 100] | 280.00 | 2–3 |
+| Valladolid | 1804530000 | 16 | 12599678 | 10.4615480, 122.8234493 | 80.7 | (60, 100] | 280.00 | 2–3 |
+
+The nearest new locality is Salvador Benedicto at 41.4 proxy km; the farthest is Hinoba-an at 177.4 proxy km. Nearby cases were reviewed: Isabela/Hinigaran (89.9/92.8 km) share one band; Ilog/Kabankalan (120.0/120.5 km) also share one band, avoiding a sharp fee change for a half-kilometer proxy difference. No new locality exceeds the documented 180 km maximum. The resulting rates are suitable only for reproducible capstone demonstrations, not as verified production charges.
+
+All 32 configured routes (the original 12 plus the 20 new city-code rules) explicitly support GCash, Maya and COD demonstrations. Other valid nationwide destinations can place product-subtotal-only orders using the server's `0.00` placeholder, with GCash/Maya/COD payment eligibility; they are marked `pricing_configured=false` and do not receive a carrier, ETA, or automatically created Shipment. The placeholder is not a delivery price, free-shipping offer, or LBC quotation. No delivery fee is included; delivery arrangements and any applicable charge must be confirmed separately. An administrator may register a manual Shipment after confirming the arrangement. Profile addresses can still be saved for any valid locality. Existing historical unconfigured-route orders and all persisted amounts/metadata remain readable and are never repriced.
+
+The quote endpoint is `GET /checkout/delivery-quote` (web) or `GET /api/v1/checkout/delivery-quote` (mobile), with owned selected `cart_item_ids[]` and `delivery_city_code`. A configured route returns `{data:{available:true,quote:{pricing_configured:true,order_placement_allowed:true,...}}}`. An unconfigured valid route returns `{data:{available:true,quote:{pricing_configured:false,order_placement_allowed:true,delivery_fee:"0.00",payment_methods:["gcash","maya","cod"],carrier:null,estimated_delivery_start:null,estimated_delivery_end:null,...}}}`; `0.00` is only the absent-rate placeholder, not an offer or confirmed delivery charge. Product subtotal is the only amount in the placed order; no automatic Shipment is created. Explicitly disabled or malformed configured rules return `{data:{available:false,quote:null,notice}}`. Placement independently rechecks current configuration and payment eligibility under its existing transaction; preview results never authorize a client fee.
+
+| Profile | Once-per-order surcharge (PHP) | Preparation days |
+| --- | --- | --- |
+| Standard | 0.00 | 1 |
+| Fragile | 50.00 | 2 |
+| Bulky | 100.00 | 3 |
+
+The highest profile in the selected cart applies once. Delivery fee = configured destination base fee + that surcharge; final total = product subtotal + delivery fee. No valuation, insurance, weight/dimension or live carrier pricing is implemented.
+
+`catalog-shipping-profiles.v1.json` reviews all 654 imported identities: 93 clear Standard accessories, 93 Fragile items (including actual displays, motherboards, graphics cards and explicit laptops), 46 Bulky items (including cases, clear desktop systems, printers and chairs), and 422 uncertain identities requiring administrator review. Uncertain items retain their existing profile rather than receiving an invented assignment. Accessory brackets are not classified as fragile displays. Mapping application requires an exact code/name/category match, an imported product, current Standard and no review source. Existing non-Standard/manual/source-tagged assignments are preserved.
+
+`php artisan catalog:classify-shipping --no-interaction` previews the mapping; `--apply` applies eligible reviewed rows in locked transactions. New catalog inserts receive eligible initial classifications; reimports preserve existing profiles. Administrators can change or explicitly confirm each profile in the existing product form; `shipping_profile_source=manual` protects that choice, including a confirmed Standard assignment. Apply the migration before running the command.
+
+For configured routes, GCash/Maya pay the full order total to Battlefront's configured wallet with existing manual proof verification; Battlefront is assumed to arrange shipment and pay the carrier at dispatch. Configured-route COD keeps its existing collect-both product payment and delivery-fee demonstration assumption, pending branch confirmation. For unconfigured destinations, GCash/Maya pay the product subtotal with proof and COD collects the product subtotal only; no delivery fee is included, and delivery arrangements and any applicable charge must be confirmed separately. These orders do not automatically create a Shipment or promise an ETA; an administrator can register a manual Shipment after confirming the arrangement. Historical orders retain their original payment and delivery snapshots. Existing COD operational confirmation rules remain unchanged. Pickup cash/card workflows have zero delivery fees. Sales revenue remains product subtotal only. No carrier settlement or reconciliation module is introduced. The full operational confirmation notice appears only in Sagay branch information; the estimate disclaimer accompanies configured shipping quotes.
 
 ## Updating the bundle
 
 1. Find a verified PSA quarterly publication or a properly licensed mirror that explicitly identifies its PSA release. Retrieve the source during development/setup, never during checkout.
-2. Pin the mirror revision or official publication URL and retain source hashes. Download nationwide source files into a temporary working directory only. For this source, use the raw URLs under the pinned revision above for `data/cities_municipalities.json` and `data/barangays.json`. GitHub's blob endpoint can also retrieve the barangay file by its recorded hash when the contents endpoint omits files over 1 MB.
-3. Resolve exactly the 12 configured destination keys to verified full locality codes. Start with the mappings above, review official renamings/reclassifications, and stop if any mapping cannot be verified. Never guess a replacement code or name.
-4. For each locality, select barangays using full codes with matching seven-digit locality prefixes. Preserve official names and full string codes. Do not copy the mirror's truncated parent metadata. Sort names with JavaScript `localeCompare(otherName, 'en', { numeric: true })`, breaking ties by code.
-5. Preserve the JSON shape, update release/date/source/license metadata, and write a new versioned filename. Update the reader's file reference and the frontend test's data reference. Review geographic changes and all 12 expected barangay counts; coverage/pricing keys and values must remain unchanged.
+2. Pin the mirror revision or official publication URL and retain source hashes. Download `regions.json`, `provinces.json`, `cities_municipalities.json` and `barangays.json` into a temporary working directory only. For this release, use the raw URLs under the pinned revision above. GitHub's blob endpoint can retrieve large files.
+3. Reproduce the current bundle with `node database/PrepareNationwidePsgc.mjs <source-directory>`. The transformer checks all four pinned Git blob hashes and expected counts before writing registry/partitions. Different source bytes require a reviewed source/version update; never bypass hash verification.
+4. Review full-code parents, NCR/HUC/Manila/SGA/NIR exceptions and all 12 aliases. Never import truncated mirror parent fields or guess replacement identities. Validate unique string codes and every barangay parent.
+5. For a new release, update source/license metadata and versioned filenames/reader references together. Review geographic changes separately from approved delivery configuration; a data refresh cannot silently enable routes or rewrite historical addresses.
 6. Run the focused PSGC service, checkout, mobile compatibility, and frontend address tests. Existing orders must remain readable without looking up current geography.
-7. Retain applicable notices and attribution below. Deploy the validated JSON with application code. No installation or database change is required.
+7. Retain applicable notices and attribution below. Deploy validated JSON with application code; geographic refreshes do not require tables or runtime downloads.
 
 Do not update this bundle automatically on a schedule. Geographic updates are reviewed source changes and cannot expand delivery eligibility.
 

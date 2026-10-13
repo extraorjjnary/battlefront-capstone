@@ -197,6 +197,9 @@ class RealCatalogImportService
                     }
                     $product->is_catalog_imported = true;
                     $product->save();
+                    if ($isNew) {
+                        app(CatalogShippingClassification::class)->apply($product);
+                    }
 
                     $inventory = Inventory::query()->firstOrCreate(
                         ['product_id' => $product->id],

@@ -31,7 +31,8 @@ use InvalidArgumentException;
  * @phpstan-type CheckoutData array{
  *     cart_item_ids: list<int>,
  *     recipient_name: string, contact_number: string, fulfillment_method: FulfillmentMethod,
- *     delivery_address: string|null, payment_method: PaymentMethod, payment_proof_path: string|null
+ *     delivery_address: string|null, payment_method: PaymentMethod, payment_proof_path: string|null,
+ *     delivery_address_components?: array<string, mixed>|null
  * }
  */
 class OrderPlacementService
@@ -186,6 +187,10 @@ class OrderPlacementService
             $quote = $deliveryDestination !== null
                 ? $this->deliveryRules->quote(FulfillmentMethod::Delivery, $deliveryDestination, $products)
                 : null;
+            $zone = $deliveryDestination !== null ? $this->deliveryRules->zone($deliveryDestination) : null;
+            if ($zone !== null && ! in_array($checkout['payment_method']->value, $zone['payment_methods'], true)) {
+                throw ValidationException::withMessages(['payment_method' => 'This payment method is unavailable for the selected delivery route.']);
+            }
             $deliveryFee = $quote['delivery_fee'] ?? '0.00';
             $finalTotal = bcadd($total, $deliveryFee, 2);
 
@@ -202,13 +207,27 @@ class OrderPlacementService
                 'product_subtotal' => $total,
                 'delivery_fee' => $deliveryFee,
                 'total_amount' => $finalTotal,
-                'delivery_destination' => $quote['destination'] ?? null,
+                'delivery_destination' => $zone['destination'] ?? null,
+                'delivery_quote_metadata' => $zone !== null ? [
+                    'city_code' => $zone['city_code'], 'province_code' => $zone['province_code'], 'region_code' => $zone['region_code'],
+                    'dataset_version' => PsgcDeliveryLocations::VERSION, 'rule_id' => $zone['rule_id'], 'rules_version' => $zone['rules_version'],
+                    'pricing_status' => $zone['configured'] ? 'configured_estimate' : 'not_configured',
+                    'payment_methods' => $zone['payment_methods'],
+                    'address_components' => $checkout['delivery_address_components'] ?? null,
+                    'payment_assumption' => Config::string(($zone['configured']
+                        ? 'battlefront.delivery.payment_assumptions.'
+                        : 'battlefront.delivery.unconfigured_route.payment_assumptions.').$checkout['payment_method']->value),
+                ] : null,
                 'delivery_base_fee' => $quote['base_fee'] ?? null,
                 'shipping_profile' => $quote['shipping_profile'] ?? null,
                 'handling_surcharge' => $quote['handling_surcharge'] ?? null,
                 'delivery_origin_city' => $quote['origin_city'] ?? null,
-                'delivery_is_demo' => $quote['is_demo'] ?? null,
-                'delivery_assumption_label' => $quote['assumption_label'] ?? null,
+                'delivery_is_demo' => $zone === null
+                    ? null
+                    : ($zone['configured'] ? ($quote['is_demo'] ?? null) : false),
+                'delivery_assumption_label' => $zone !== null && ! $zone['configured']
+                    ? Config::string('battlefront.delivery.unconfigured_route.assumption_label')
+                    : ($quote['assumption_label'] ?? null),
                 'status' => OrderStatus::Pending,
                 'payment_status' => PaymentStatus::Pending,
                 'payment_method' => $checkout['payment_method'],
@@ -228,7 +247,7 @@ class OrderPlacementService
                 );
             }
 
-            if ($quote !== null) {
+            if ($quote !== null && $zone['configured'] === true) {
                 $order->shipment()->create([
                     'carrier' => Config::string('battlefront.delivery.carrier'),
                     'status' => ShipmentStatus::AwaitingPreparation,
