@@ -1,7 +1,6 @@
 <script setup>
-import { Head, InfiniteScroll, Link, router, usePage } from "@inertiajs/vue3";
+import { Head, InfiniteScroll, router, usePage } from "@inertiajs/vue3";
 import {
-    ArrowRight,
     Boxes,
     PackageSearch,
     Search,
@@ -9,15 +8,10 @@ import {
     X,
 } from "@lucide/vue";
 import { computed, ref, watch } from "vue";
-import ProductImage from "@/components/catalog/ProductImage.vue";
-import ProductPrice from "@/components/catalog/ProductPrice.vue";
-import StockAvailability from "@/components/catalog/StockAvailability.vue";
+import ProductCard from "@/components/catalog/ProductCard.vue";
 import RecommendationSection from "@/components/recommendations/RecommendationSection.vue";
 import StorefrontHeader from "@/components/StorefrontHeader.vue";
 import { useDebouncedSearch } from "@/composables/useDebouncedSearch";
-import { useProductPrefetch } from "@/composables/useProductPrefetch";
-import { rememberCatalogVisit } from "@/lib/catalogReturn";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,12 +22,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { index as productIndex, show as productShow } from "@/routes/products";
+import { index as productIndex } from "@/routes/products";
 
 const props = defineProps({
     products: { type: Object, required: true },
     filters: { type: Object, required: true },
     filter_options: { type: Object, required: true },
+    featured_products: { type: Array, default: () => [] },
     recommendations: { type: Array, default: () => [] },
     is_personalized: { type: Boolean, default: false },
     has_featured_fallback: { type: Boolean, default: false },
@@ -44,6 +39,7 @@ const isAuthenticated = computed(() => Boolean(page.props.auth?.user));
 const categoryId = ref(String(props.filters.category_id ?? "all"));
 const brand = ref(props.filters.brand ?? "all");
 const tagId = ref(String(props.filters.tag_id ?? "all"));
+const sort = ref(props.filters.sort ?? "featured");
 const categoryPlaceholder = computed(() =>
     categoryId.value !== "all" &&
     !props.filter_options.categories.some(
@@ -63,9 +59,9 @@ const tagPlaceholder = computed(() =>
         ? "Selected tag unavailable"
         : "All tags",
 );
-const { prefetchProduct, cancelProductPrefetch } = useProductPrefetch();
 const catalogReloadProps = [
     "products",
+    "featured_products",
     "filters",
     "filter_options",
     "recommendations",
@@ -89,20 +85,45 @@ const hasSearch = computed(() => Boolean(props.filters.q));
 const hasSearchInput = computed(() => Boolean(search.value.trim()));
 const hasAppliedFilters = computed(() =>
     ["category_id", "brand", "tag_id"].some(
-        (filter) => props.filters[filter] !== null,
+        (filter) => props.filters[filter] != null,
     ),
 );
 const hasActiveQuery = computed(
     () => hasSearch.value || hasAppliedFilters.value,
 );
-const showRecommendations = computed(
+const isDiscoveryView = computed(
     () =>
-        props.recommendations.length > 0 &&
         !hasActiveQuery.value &&
         !hasSearchInput.value &&
         [categoryId.value, brand.value, tagId.value].every(
             (value) => value === "all",
         ),
+);
+const showFeatured = computed(
+    () => isDiscoveryView.value && props.featured_products.length > 0,
+);
+const visibleRecommendations = computed(() => {
+    const featuredIds = new Set(
+        showFeatured.value ? props.featured_products.map((product) => product.id) : [],
+    );
+    return props.recommendations.filter(
+        (recommendation) => !featuredIds.has(recommendation.product.id),
+    );
+});
+const showRecommendations = computed(
+    () => isDiscoveryView.value && visibleRecommendations.value.length > 0,
+);
+const recommendationIsPersonalized = computed(() =>
+    visibleRecommendations.value.some((recommendation) =>
+        recommendation.reasons?.some(
+            (reason) => !["popular_with_customers", "featured_fallback"].includes(reason.code),
+        ),
+    ),
+);
+const recommendationHasFeaturedFallback = computed(() =>
+    visibleRecommendations.value.some((recommendation) =>
+        recommendation.reasons?.some((reason) => reason.code === "featured_fallback"),
+    ),
 );
 
 function selectedValue(value) {
@@ -114,6 +135,7 @@ function appliedFilters() {
         category_id: props.filters.category_id ?? undefined,
         brand: props.filters.brand ?? undefined,
         tag_id: props.filters.tag_id ?? undefined,
+        sort: props.filters.sort === "featured" ? undefined : props.filters.sort,
     };
 }
 
@@ -122,6 +144,7 @@ function selectedFilters() {
         category_id: selectedValue(categoryId.value),
         brand: selectedValue(brand.value),
         tag_id: selectedValue(tagId.value),
+        ...(sort.value === "featured" ? {} : { sort: sort.value }),
     };
 }
 
@@ -129,7 +152,7 @@ function filtersAreCurrent() {
     const selected = selectedFilters();
     const applied = appliedFilters();
 
-    return Object.keys(selected).every(
+    return ["category_id", "brand", "tag_id", "sort"].every(
         (filter) =>
             String(selected[filter] ?? "") === String(applied[filter] ?? ""),
     );
@@ -141,6 +164,10 @@ function updateFilters() {
     }
 
     cancelPendingSearch();
+    const sortChanged = sort.value !== (props.filters.sort ?? "featured");
+    if (sortChanged) {
+        router.cancelAll({ prefetch: false });
+    }
 
     router.visit(
         productIndex({
@@ -152,7 +179,7 @@ function updateFilters() {
         {
             preserveScroll: false,
             preserveState: true,
-            replace: true,
+            replace: !sortChanged,
             reset: ["products"],
             only: catalogReloadProps,
         },
@@ -166,7 +193,19 @@ function clearFilters() {
     tagId.value = "all";
 }
 
-watch([categoryId, brand, tagId], updateFilters);
+watch([categoryId, brand, tagId, sort], updateFilters);
+watch(
+    () => props.filters,
+    (filters) => {
+        cancelPendingSearch();
+        categoryId.value = String(filters.category_id ?? "all");
+        brand.value = filters.brand ?? "all";
+        tagId.value = String(filters.tag_id ?? "all");
+        sort.value = filters.sort ?? "featured";
+        search.value = filters.q ?? "";
+    },
+    { flush: "sync" },
+);
 </script>
 
 <template>
@@ -196,11 +235,12 @@ watch([categoryId, brand, tagId], updateFilters);
                     >
                         <PackageSearch class="size-5" aria-hidden="true" />
                     </div>
-                    <p
+                    <h1
+                        id="catalog-heading"
                         class="text-primary text-xs font-bold tracking-[0.2em] uppercase"
                     >
                         Customer catalog
-                    </p>
+                    </h1>
                     <p
                         class="text-muted-foreground mt-4 max-w-2xl text-base leading-7"
                     >
@@ -227,19 +267,39 @@ watch([categoryId, brand, tagId], updateFilters);
                 </div>
             </section>
 
+            <section
+                v-if="showFeatured"
+                class="mt-8"
+                aria-labelledby="featured-products-heading"
+            >
+                <h2 id="featured-products-heading" class="text-2xl font-bold tracking-tight">
+                    Featured Products
+                </h2>
+                <p class="text-muted-foreground mt-2 text-sm">
+                    Selected by Battlefront, with current stock available.
+                </p>
+                <div class="mt-4 grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
+                    <ProductCard
+                        v-for="product in featured_products"
+                        :key="product.id"
+                        :product="product"
+                    />
+                </div>
+            </section>
+
             <div v-if="showRecommendations" class="mt-8">
                 <RecommendationSection
-                    :recommendations="recommendations"
+                    :recommendations="visibleRecommendations"
                     placement="catalog"
                     :title="
-                        is_personalized
+                        recommendationIsPersonalized
                             ? 'Recommended for you'
-                            : has_featured_fallback
+                            : recommendationHasFeaturedFallback
                               ? 'Popular and featured products'
                               : 'Popular products'
                     "
                     :description="
-                        is_personalized
+                        recommendationIsPersonalized
                             ? isAuthenticated
                                 ? 'Suggestions based on your recent browsing, cart, and completed purchases.'
                                 : 'Suggestions based on your recent browsing in this browser.'
@@ -419,7 +479,7 @@ watch([categoryId, brand, tagId], updateFilters);
             </section>
 
             <section class="mt-8" aria-labelledby="product-list-heading">
-                <div class="mb-6 flex items-end justify-between gap-6">
+                <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
                     <div>
                         <p
                             class="text-primary text-xs font-bold tracking-[0.18em] uppercase"
@@ -432,6 +492,19 @@ watch([categoryId, brand, tagId], updateFilters);
                         >
                             Browse the catalog
                         </h2>
+                    </div>
+                    <div class="grid w-full gap-2 sm:ml-auto sm:w-52">
+                        <Label id="catalog-sort-label" for="catalog-sort">Sort by</Label>
+                        <Select v-model="sort">
+                            <SelectTrigger id="catalog-sort" aria-labelledby="catalog-sort-label" class="w-full">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="featured">Featured First</SelectItem>
+                                <SelectItem value="price_asc">Price: Low to High</SelectItem>
+                                <SelectItem value="price_desc">Price: High to Low</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                     <p
                         v-if="products.total"
@@ -448,88 +521,11 @@ watch([categoryId, brand, tagId], updateFilters);
                     :buffer="300"
                     class="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4"
                 >
-                    <Link
+                    <ProductCard
                         v-for="product in products.data"
                         :key="product.id"
-                        :href="productShow(product.id)"
-                        @pointerenter="
-                            prefetchProduct($event, productShow(product.id))
-                        "
-                        @pointerleave="cancelProductPrefetch"
-                        @pointercancel="cancelProductPrefetch"
-                        @pointerdown="cancelProductPrefetch"
-                        @click.capture="
-                            cancelProductPrefetch();
-                            rememberCatalogVisit($event, product.id);
-                        "
-                        class="border-border bg-card focus-visible:ring-ring group hover:border-primary/60 flex min-h-full min-w-0 flex-col overflow-hidden border transition-colors focus-visible:ring-2 focus-visible:outline-none"
-                    >
-                        <div
-                            class="aspect-square overflow-hidden sm:aspect-3/2"
-                        >
-                            <ProductImage
-                                :image-url="product.image_url"
-                                :product-name="product.name"
-                                contain
-                                class="transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none [&_img]:size-[98%] lg:[&_img]:size-full lg:[&_img]:object-cover"
-                            />
-                        </div>
-
-                        <article
-                            class="flex min-w-0 flex-1 flex-col gap-2 p-2.5 sm:gap-3 sm:p-4"
-                        >
-                            <div class="flex flex-wrap items-center gap-2">
-                                <Badge
-                                    variant="secondary"
-                                    class="max-w-full wrap-anywhere whitespace-normal"
-                                >
-                                    {{ product.category.name }}
-                                </Badge>
-                                <Badge v-if="product.is_featured">
-                                    Featured
-                                </Badge>
-                            </div>
-
-                            <div>
-                                <p
-                                    v-if="product.brand"
-                                    class="text-muted-foreground truncate text-xs font-semibold tracking-wide uppercase"
-                                >
-                                    {{ product.brand }}
-                                </p>
-                                <h3
-                                    class="mt-1 line-clamp-2 text-sm leading-snug font-bold tracking-tight wrap-anywhere sm:text-lg"
-                                >
-                                    {{ product.name }}
-                                </h3>
-                                <p
-                                    v-if="product.description"
-                                    class="text-muted-foreground mt-2 hidden text-sm leading-6 sm:line-clamp-2"
-                                >
-                                    {{ product.description }}
-                                </p>
-                            </div>
-
-                            <div class="mt-auto flex flex-col gap-3">
-                                <ProductPrice
-                                    :price="product.price"
-                                    :discount-price="product.discount_price"
-                                    compact
-                                />
-                                <div
-                                    class="flex flex-wrap items-end justify-between gap-2"
-                                >
-                                    <StockAvailability
-                                        :inventory="product.inventory"
-                                    />
-                                    <ArrowRight
-                                        class="text-muted-foreground hidden size-4 shrink-0 transition-transform group-hover:translate-x-1 motion-reduce:transition-none sm:block"
-                                        aria-hidden="true"
-                                    />
-                                </div>
-                            </div>
-                        </article>
-                    </Link>
+                        :product="product"
+                    />
                     <template #next="{ loading, hasMore }">
                         <p
                             v-if="loading"

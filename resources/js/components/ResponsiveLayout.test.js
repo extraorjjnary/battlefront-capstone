@@ -220,7 +220,8 @@ test('responsive shopping layouts remain usable in a real browser', {
     await t.test('catalog has two mobile columns with readable prices and responsive image fitting', async () => {
         for (const customer of [false, true]) {
             await browser.show('Products/Index', { products: { data: Array.from({ length: 8 }, (_, index) => ({ ...product, id: index + 1 })), total: 8, current_page: 1, last_page: 1, next_page_url: null, prev_page_url: null },
-                filters: {}, filter_options: { categories: [], brands: [], tags: [] }, recommendations: [] }, customer);
+                filters: { sort: 'featured' }, filter_options: { categories: [], brands: [], tags: [] }, recommendations: [],
+                featured_products: Array.from({ length: 4 }, (_, index) => ({ ...product, id: index + 20 })) }, customer);
             for (const width of widths) {
                 await browser.resize(width);
                 await assertFits(browser, `catalog ${width}`);
@@ -228,10 +229,24 @@ test('responsive shopping layouts remain usable in a real browser', {
                     const cards = [...document.querySelector('#product-list-heading').closest('section').querySelectorAll('a')];
                     const price = cards[0].querySelector('article > div:last-child');
                     return { columns: cards.filter(card => Math.abs(card.getBoundingClientRect().top-cards[0].getBoundingClientRect().top)<2).length,
+                        featuredColumns: (() => {
+                            const featured = [...document.querySelector('#featured-products-heading').closest('section').querySelectorAll('a')];
+                            return featured.filter(card => Math.abs(card.getBoundingClientRect().top-featured[0].getBoundingClientRect().top)<2).length;
+                        })(),
+                        featuredInteractions: [...document.querySelector('#featured-products-heading').closest('section').querySelectorAll('a')]
+                            .every(card => card.getAttribute('href')?.includes('/products/') && card.textContent.includes('Low stock')),
+                        sortFits: (() => {
+                            const control = document.querySelector('#catalog-sort');
+                            const rect = control.getBoundingClientRect();
+                            return rect.left >= 0 && rect.right <= innerWidth && control.getAttribute('aria-labelledby')?.includes('catalog-sort-label');
+                        })(),
                         priceFits: price.scrollWidth <= price.clientWidth + 1, imageFits: getComputedStyle(cards[0].querySelector('img')).objectFit === 'contain',
                         descriptionHidden: getComputedStyle(cards[0].querySelector('h3 + p')).display === 'none' };
                 })()`);
                 assert.equal(result.columns, width < 1024 ? 2 : width < 1280 ? 3 : 4, `catalog columns at ${width}`);
+                assert.equal(result.featuredColumns, result.columns, `featured columns at ${width}`);
+                assert.equal(result.featuredInteractions, true, 'Featured products retain navigation and qualitative stock badges');
+                assert.equal(result.sortFits, true, `labeled sort control fits at ${width}`);
                 assert.equal(result.priceFits, true, `catalog price fits at ${width}`);
                 assert.equal(result.imageFits, width < 1024, 'Catalog photography uses containment on mobile and fills the desktop frame');
                 assert.equal(result.descriptionHidden, width < 640, 'Mobile cards reserve space for names, prices and stock');

@@ -32,6 +32,9 @@ class ProductCatalogController extends Controller
         BuildRecommendationViewData $buildRecommendationViewData,
     ): Response {
         $filters = $request->filters();
+        $hasDiscoveryFilters = collect($filters)
+            ->only(['q', 'category_id', 'brand', 'tag_id'])
+            ->contains(static fn (mixed $value): bool => $value !== null);
 
         if (! $request->prefetch() && $request->integer('page', 1) === 1) {
             $recordCustomerSearch->record(
@@ -45,12 +48,12 @@ class ProductCatalogController extends Controller
             ->through(fn (Product $product): array => $this->catalogProductPresenter->present($product));
 
         $recommendationViewData = null;
-        $resolveRecommendations = function () use (&$recommendationViewData, $filters, $request, $buildRecommendationViewData): array {
+        $resolveRecommendations = function () use (&$recommendationViewData, $hasDiscoveryFilters, $request, $buildRecommendationViewData): array {
             if ($recommendationViewData !== null) {
                 return $recommendationViewData;
             }
 
-            if (collect($filters)->contains(static fn (mixed $value): bool => $value !== null)) {
+            if ($hasDiscoveryFilters) {
                 return $recommendationViewData = [
                     'recommendations' => [],
                     'is_personalized' => false,
@@ -68,14 +71,23 @@ class ProductCatalogController extends Controller
             );
         };
 
+        $user = $request->user();
+        $recommendationsEnabled = ! $hasDiscoveryFilters && (! $user instanceof User
+            || ($user->can('use-recommendations') && $user->personalized_recommendations_enabled));
+        $recommendationProps = $recommendationsEnabled ? [] : $resolveRecommendations();
+
+        if ($recommendationsEnabled) {
+            foreach (['recommendations', 'is_personalized', 'has_featured_fallback', 'guest_recommendation_scope'] as $key) {
+                $recommendationProps[$key] = Inertia::defer(fn (): mixed => $resolveRecommendations()[$key], 'recommendations', rescue: true);
+            }
+        }
+
         return Inertia::render('Products/Index', [
             'products' => Inertia::scroll($products),
             'filters' => $filters,
             'filter_options' => fn (): array => $this->productCatalogRepository->filterOptions(),
-            'recommendations' => fn (): array => $resolveRecommendations()['recommendations'],
-            'is_personalized' => fn (): bool => $resolveRecommendations()['is_personalized'],
-            'has_featured_fallback' => fn (): bool => $resolveRecommendations()['has_featured_fallback'],
-            'guest_recommendation_scope' => fn (): ?string => $resolveRecommendations()['guest_recommendation_scope'],
+            'recommendations_enabled' => $recommendationsEnabled,
+            ...$recommendationProps,
         ]);
     }
 

@@ -80,7 +80,7 @@ function loadComponent(
                     },
                 },
                 usePage: () => page,
-                router,
+                router: { cancelAll() {}, ...router },
             },
             '@/routes': {
                 dashboard: route,
@@ -165,6 +165,11 @@ function loadComponent(
             )(modules),
         };
     }
+    if (path !== '../catalog/ProductCard.vue') {
+        modules['@/components/catalog/ProductCard.vue'] = {
+            default: loadComponent('../catalog/ProductCard.vue', { authenticated }),
+        };
+    }
     const { descriptor } = parse(
         readFileSync(new URL(path, import.meta.url), 'utf8'),
     );
@@ -203,8 +208,15 @@ function catalogProps(overrides = {}) {
         },
         filters: { q: null, category_id: null, brand: null, tag_id: null },
         filter_options: { categories: [], brands: [], tags: [] },
+        featured_products: [],
         recommendations: [
-            { product: { id: 99, name: 'Behavioral suggestion' } },
+            {
+                product: { id: 99, name: 'Behavioral suggestion' },
+                reasons: [{
+                    code: overrides.is_personalized === false ? 'featured_fallback' : 'matched_recent_searches',
+                    value: 'Recommendation reason',
+                }],
+            },
         ],
         is_personalized: true,
         has_featured_fallback: false,
@@ -586,4 +598,146 @@ test('profile settings explain disabled discovery sections and remaining context
         html,
         /id="personalized-recommendations-enabled"[^>]*checked/,
     );
+});
+
+
+test('catalog renders curated products before distinct recommendations with shared product cards', async () => {
+    const props = catalogProps();
+    props.featured_products = [{ ...props.products.data[0], id: 77, name: 'Curated hardware', is_featured: true }];
+    props.recommendations.unshift({ product: props.featured_products[0], reasons: [{ code: 'matched_recent_searches' }] });
+    const html = await renderToString(Vue.h(loadComponent('../../pages/Products/Index.vue'), props));
+    assert.match(html, /<h1 id="catalog-heading"/);
+    assert.ok(html.indexOf('Featured Products') < html.indexOf('Recommended for you'));
+    assert.ok(html.indexOf('Recommended for you') < html.indexOf('All products'));
+    assert.equal(html.split('href="/products/77"').length - 1, 1);
+    assert.ok(html.includes('href="/products/77"'));
+    assert.match(html, /Featured/);
+    assert.match(html, /grid-cols-2/);
+    assert.match(html, /Sort by/);
+    for (const label of ['Featured First', 'Price: Low to High', 'Price: High to Low']) assert.ok(html.includes(label));
+    assert.match(html, /Ordinary catalog product/);
+});
+
+test('empty featured and fully overlapping recommendation sections leave no empty block', async () => {
+    const props = catalogProps();
+    let html = await renderToString(Vue.h(loadComponent('../../pages/Products/Index.vue'), props));
+    assert.doesNotMatch(html, /featured-products-heading/);
+    props.featured_products = [{ ...props.products.data[0], id: 99 }];
+    html = await renderToString(Vue.h(loadComponent('../../pages/Products/Index.vue'), props));
+    assert.match(html, /featured-products-heading/);
+    assert.doesNotMatch(html, /data-placement="catalog"|Recommended for you/);
+});
+
+for (const [filter, value] of Object.entries({ q: 'Atlas', category_id: 7, brand: 'Atlas', tag_id: 8 })) {
+    test('featured showcase stays hidden during ' + filter + ' filtering even with stale props', async () => {
+        const props = catalogProps();
+        props.featured_products = [props.products.data[0]];
+        props.filters[filter] = value;
+        const html = await renderToString(Vue.h(loadComponent('../../pages/Products/Index.vue'), props));
+        assert.doesNotMatch(html, /featured-products-heading/);
+    });
+}
+
+test('featured visibility follows pending intent and ignores recommendation preferences and sorting', () => {
+    const props = Vue.reactive(catalogProps({ recommendations: [], is_personalized: false }));
+    props.featured_products = [props.products.data[0]];
+    const scope = Vue.effectScope();
+    try {
+        const component = loadComponent('../../pages/Products/Index.vue', { inlineTemplate: false });
+        const state = scope.run(() => component.setup(props, { expose() {} }));
+        assert.equal(state.showFeatured.value, true);
+        state.search.value = 'Atlas';
+        assert.equal(state.showFeatured.value, false);
+        state.search.value = '';
+        state.brand.value = 'Atlas';
+        assert.equal(state.showFeatured.value, false);
+        state.brand.value = 'all';
+        state.sort.value = 'price_desc';
+        assert.equal(state.showFeatured.value, true);
+    } finally { scope.stop(); }
+});
+
+test('recommendation headings describe remaining reasons after showcase deduplication', async () => {
+    const props = catalogProps();
+    props.featured_products = [{ ...props.products.data[0], id: 99 }];
+    props.recommendations.push({ product: { id: 88, name: 'Popular hardware' }, reasons: [{ code: 'popular_with_customers' }] });
+    const html = await renderToString(Vue.h(loadComponent('../../pages/Products/Index.vue'), props));
+    assert.match(html, /Popular products/);
+    assert.doesNotMatch(html, /Recommended for you/);
+    assert.equal(props.recommendations.length, 2);
+});
+
+test('sort changes preserve query selections cancel pending search and reset accumulated products', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const requests = [];
+    const cancellations = [];
+    const props = Vue.reactive(catalogProps({ filters: { q: 'Part', category_id: 7, brand: 'Atlas', tag_id: 8, sort: 'featured' } }));
+    const scope = Vue.effectScope();
+    t.after(() => scope.stop());
+    const component = loadComponent('../../pages/Products/Index.vue', {
+        inlineTemplate: false, realSearch: true,
+        router: { visit: (route, options) => requests.push({ route, options }), cancelAll: (options) => cancellations.push(options) },
+    });
+    const state = scope.run(() => component.setup(props, { expose() {} }));
+    state.search.value = 'Latest Part';
+    await Vue.nextTick();
+    state.sort.value = 'price_asc';
+    await Vue.nextTick();
+    t.mock.timers.tick(400);
+    assert.equal(requests.length, 1);
+    const query = new URL(requests[0].route.url, 'http://example.test').searchParams;
+    assert.equal(query.get('q'), 'Latest Part');
+    assert.equal(query.get('category_id'), '7');
+    assert.equal(query.get('brand'), 'Atlas');
+    assert.equal(query.get('tag_id'), '8');
+    assert.equal(query.get('sort'), 'price_asc');
+    assert.equal(query.has('page'), false);
+    assert.deepEqual(cancellations, [{ prefetch: false }]);
+    assert.deepEqual(requests[0].options.reset, ['products']);
+    assert.equal(requests[0].options.replace, false);
+    assert.ok(requests[0].options.only.includes('featured_products'));
+
+    props.filters = { ...props.filters, q: 'Latest Part', sort: 'price_asc' };
+    await Vue.nextTick();
+    state.clearFilters();
+    await Vue.nextTick();
+    assert.equal(new URL(requests[1].route.url, 'http://example.test').searchParams.get('sort'), 'price_asc');
+    props.filters = { q: 'Latest Part', category_id: null, brand: null, tag_id: null, sort: 'price_asc' };
+    await Vue.nextTick();
+    state.clearSearch();
+    await Vue.nextTick();
+    assert.equal(requests[2].route.url, '/products?sort=price_asc');
+});
+
+test('restored server filters synchronize every control without redundant visits', async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const requests = [];
+    const props = Vue.reactive(catalogProps({ filters: { q: 'Latest', category_id: null, brand: null, tag_id: null, sort: 'price_desc' } }));
+    const scope = Vue.effectScope();
+    t.after(() => scope.stop());
+    const component = loadComponent('../../pages/Products/Index.vue', {
+        inlineTemplate: false, realSearch: true,
+        router: { visit: (...args) => requests.push(args) },
+    });
+    const state = scope.run(() => component.setup(props, { expose() {} }));
+    assert.equal(state.sort.value, 'price_desc');
+    props.filters = { q: 'Previous', category_id: 7, brand: 'Atlas', tag_id: 8, sort: 'price_asc' };
+    await Vue.nextTick();
+    t.mock.timers.tick(400);
+    assert.equal(state.sort.value, 'price_asc');
+    assert.equal(state.search.value, 'Previous');
+    assert.equal(state.categoryId.value, '7');
+    assert.equal(state.brand.value, 'Atlas');
+    assert.equal(state.tagId.value, '8');
+    assert.equal(requests.length, 0);
+    props.filters = { q: null, category_id: null, brand: null, tag_id: null, sort: 'featured' };
+    await Vue.nextTick();
+    state.sort.value = 'price_desc';
+    await Vue.nextTick();
+    assert.equal(requests[0][0].url, '/products?sort=price_desc');
+    props.filters = { ...props.filters, sort: 'price_desc' };
+    await Vue.nextTick();
+    state.sort.value = 'featured';
+    await Vue.nextTick();
+    assert.equal(requests[1][0].url, '/products');
 });

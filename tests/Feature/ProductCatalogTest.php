@@ -501,7 +501,7 @@ test('web catalog ignores mobile inputs while preserving filters pagination and 
     $response = $this->get(route('products.index', [...$filters, ...$mobileFilters]));
 
     $response->assertOk()->assertSessionHasNoErrors();
-    expect($response->inertiaProps('filters'))->toBe($filters);
+    expect($response->inertiaProps('filters'))->toBe([...$filters, 'sort' => 'featured']);
     expect($response->inertiaProps('products'))->toBe($baseline->inertiaProps('products'));
     expect($response->inertiaProps('filter_options'))->toBe($baseline->inertiaProps('filter_options'));
 
@@ -527,13 +527,13 @@ test('web catalog ignores mobile inputs while preserving filters pagination and 
         ->assertJsonPath('props.products.total', 0)
         ->assertJsonPath('scrollProps.products.reset', true);
 })->with([
-    'valid mobile inputs with ascending sort' => [[
-        'category_ids' => [999999], 'min_price' => '2000', 'max_price' => '3000', 'sort' => 'price_asc',
+    'mobile category and price inputs' => [[
+        'category_ids' => [999999], 'min_price' => '2000', 'max_price' => '3000',
     ]],
-    'valid price and descending sort inputs' => [[
-        'min_price' => '0', 'max_price' => '0', 'sort' => 'price_desc',
+    'zero price inputs' => [[
+        'min_price' => '0', 'max_price' => '0',
     ]],
     'malformed mobile inputs' => [[
-        'category_ids' => 'invalid', 'min_price' => ['invalid'], 'max_price' => '-1', 'sort' => 'unsupported',
+        'category_ids' => 'invalid', 'min_price' => ['invalid'], 'max_price' => '-1',
     ]],
 ]);

@@ -32,6 +32,8 @@ class ProductCatalogIndexRequest extends FormRequest
         ];
 
         if (! $this->routeIs('api.v1.products.index')) {
+            $filters['sort'] = $this->validated('sort') ?? 'featured';
+
             return $filters;
         }
 
@@ -71,6 +73,7 @@ class ProductCatalogIndexRequest extends FormRequest
             'brand' => ['nullable', 'string', 'max:255'],
             'tag_id' => ['nullable', 'integer', 'exists:tags,id'],
             'page' => ['nullable', 'integer', 'min:1'],
+            'sort' => ['nullable', Rule::in(['featured', 'price_asc', 'price_desc'])],
         ];
 
         if (! $this->routeIs('api.v1.products.index')) {
@@ -92,7 +95,6 @@ class ProductCatalogIndexRequest extends FormRequest
             'bail', 'nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99',
             Rule::when($this->filled('min_price'), 'gte:min_price'),
         ];
-        $rules['sort'] = ['nullable', Rule::in(['featured', 'price_asc', 'price_desc'])];
 
         return $rules;
     }
