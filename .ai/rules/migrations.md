@@ -19,3 +19,6 @@ The earlier EXT-6 deferral is superseded by the approved order rule in models-mi
 
 ## Limit retired chatbot preset deletion to the approved cleanup
 The approved chatbot preset cleanup is a narrow exception to legacy knowledge retention: delete only inactive, unchanged resolver-owned development presets identified by frozen complete fingerprints in a new forward-only migration. Preserve active and edited/custom knowledge and current FAQs; do not edit the prior FAQ refinement migration or recreate deleted IDs on rollback.
+
+## Preserve SQLite constraint triggers during column changes
+Laravel SQLite column changes rebuild the table and discard custom triggers. Preserve or reinstall the affected application's constraint triggers after change(), in both upgrade and rollback paths, and verify constraint rejection after the rebuild. Delivery assumption labels retain complete synthetic and quote notices as nullable text; rollback must refuse labels exceeding the original 255-character limit.

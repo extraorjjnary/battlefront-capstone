@@ -110,7 +110,7 @@ test('historical orders and sales use coherent completed mixed fulfillment snaps
             expect($order->delivery_address)->toContain('Demonstration address only', $order->delivery_destination);
             expect($order->delivery_is_demo)->toBeTrue();
             expect($order->delivery_origin_city)->toBe('Sagay City');
-            expect($order->delivery_assumption_label)->toContain('Synthetic historical delivery', 'no payment evidence or carrier milestones retained');
+            expect($order->delivery_assumption_label)->toBe('Synthetic historical delivery; no payment evidence or carrier milestones retained. '.$quote['assumption_label']);
             expect($order->delivery_base_fee)->toBe($quote['base_fee']);
             expect($order->handling_surcharge)->toBe($quote['handling_surcharge']);
             expect($order->delivery_fee)->toBe($quote['delivery_fee']);
