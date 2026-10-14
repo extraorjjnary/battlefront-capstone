@@ -11,7 +11,7 @@ use App\Http\Requests\Administration\SaveProductRequest;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\Tag;
-use App\Services\CatalogShippingClassification;
+use App\Services\CatalogProductPresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
@@ -20,6 +20,8 @@ use Inertia\Response;
 
 class ProductController extends Controller
 {
+    public function __construct(private readonly CatalogProductPresenter $presenter) {}
+
     /**
      * Display a listing of the resource.
      */
@@ -46,6 +48,7 @@ class ProductController extends Controller
                 'image_path',
                 'is_featured',
                 'is_active',
+                'shipping_profile',
             ])
             ->with([
                 'category:id,name,is_active',
@@ -95,6 +98,7 @@ class ProductController extends Controller
                 'image_url' => $product->image_url,
                 'is_featured' => $product->is_featured,
                 'is_active' => $product->is_active,
+                'shipping_handling' => $this->presenter->handling($product->shipping_profile),
                 'category' => [
                     'name' => $product->category->name,
                     'is_active' => $product->category->is_active,
@@ -183,6 +187,7 @@ class ProductController extends Controller
                 ]),
                 'image_url' => $product->image_url,
                 'category' => $product->category->only(['name', 'is_active']),
+                'shipping_handling' => $this->presenter->handling($product->shipping_profile),
                 'tags' => $product->tags->map(fn (Tag $tag): array => $tag->only(['id', 'name']))->values(),
                 'inventory' => $product->inventory?->only(['quantity', 'reorder_level']),
                 'stock_status' => match (true) {
@@ -206,8 +211,6 @@ class ProductController extends Controller
             ...$this->productOptions(),
             'product' => [
                 'shipping_profile' => $product->shipping_profile->value,
-                'shipping_profile_source' => $product->shipping_profile_source,
-                'shipping_suggestion' => app(CatalogShippingClassification::class)->suggestion($product),
                 ...$product->only([
                     'id',
                     'product_code',
@@ -265,12 +268,14 @@ class ProductController extends Controller
      *
      * @return array{
      *     categories: Collection<int, Category>,
-     *     tags: Collection<int, Tag>
+     *     tags: Collection<int, Tag>,
+     *     shipping_profiles: list<array{profile: string, label: string, surcharge: string, preparation_days: int}>
      * }
      */
     private function productOptions(): array
     {
         return [
+            'shipping_profiles' => $this->presenter->handlingOptions(),
             'categories' => Category::query()
                 ->select(['id', 'name', 'is_active'])
                 ->orderBy('name')

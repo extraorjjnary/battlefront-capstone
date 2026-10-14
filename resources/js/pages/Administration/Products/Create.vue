@@ -7,6 +7,7 @@ import ProductForm from '@/components/ProductForm.vue';
 defineProps({
     categories: { type: Array, required: true },
     tags: { type: Array, required: true },
+    shipping_profiles: { type: Array, required: true },
 });
 
 defineOptions({
@@ -56,6 +57,8 @@ defineOptions({
             <ProductForm
                 :categories="categories"
                 :tags="tags"
+                :shipping-profiles="shipping_profiles"
+                :show-preparation="false"
                 :form="ProductController.store.form()"
                 submit-label="Create product"
             />

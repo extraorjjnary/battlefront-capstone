@@ -2,6 +2,31 @@
 
 use App\Actions\Product\OptimizeProductImage;
 use Illuminate\Http\UploadedFile;
+use Symfony\Component\Process\Process;
+
+test('optimization succeeds when the PHP system temporary directory is unavailable', function () {
+    $source = UploadedFile::fake()->image('product.png', 320, 240);
+    $process = new Process([
+        PHP_BINARY, '-d', 'sys_temp_dir='.$source->getPathname(), '-r',
+        <<<'PHP'
+        require $argv[1];
+        if (@tmpfile() !== false) {
+            throw new RuntimeException('The regression requires an unavailable temporary directory.');
+        }
+        $result = (new App\Actions\Product\OptimizeProductImage)->execute($argv[2]);
+        $details = getimagesizefromstring($result['bytes']);
+        echo json_encode([$details[0], $details[1], $details['mime'], strlen($result['bytes'])]);
+        PHP,
+        base_path('vendor/autoload.php'), $source->getPathname(),
+    ]);
+
+    $process->run();
+
+    expect($process->isSuccessful())->toBeTrue($process->getErrorOutput());
+    $result = json_decode($process->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+    expect(array_slice($result, 0, 3))->toBe([1024, 1024, 'image/webp']);
+    expect($result[3])->toBeLessThanOrEqual(819200);
+});
 
 test('product sources become size-limited 1024 pixel WebP images', function (string $extension) {
     $source = UploadedFile::fake()->image('product.'.$extension, 320, 240);

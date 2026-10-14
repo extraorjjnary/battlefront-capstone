@@ -24,7 +24,7 @@ class ProductCatalogRepository
             ->customerEligible()
             ->select([
                 'id', 'product_code', 'name', 'description', 'category_id', 'brand',
-                'price', 'discount_price', 'image_path', 'is_featured',
+                'price', 'discount_price', 'image_path', 'is_featured', 'shipping_profile',
             ])
             ->with([
                 'category:id,name',
@@ -200,7 +200,7 @@ class ProductCatalogRepository
             ->customerEligible()
             ->select([
                 'id', 'name', 'description', 'category_id', 'brand',
-                'price', 'discount_price', 'image_path',
+                'price', 'discount_price', 'image_path', 'shipping_profile',
             ])
             ->with([
                 'category:id,name',
@@ -307,7 +307,7 @@ class ProductCatalogRepository
             ->customerEligible()
             ->select([
                 'id', 'name', 'description', 'category_id', 'brand',
-                'price', 'discount_price', 'image_path', 'is_featured',
+                'price', 'discount_price', 'image_path', 'is_featured', 'shipping_profile',
             ])
             ->with([
                 'category:id,name',

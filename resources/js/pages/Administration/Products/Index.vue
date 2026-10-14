@@ -420,6 +420,7 @@ defineOptions({
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
                             <h3 class="font-semibold">{{ product.name }}</h3>
+                            <Badge variant="outline">{{ product.shipping_handling.label }}</Badge>
                             <Badge
                                 :variant="
                                     product.is_active ? 'secondary' : 'outline'
@@ -442,6 +443,21 @@ defineOptions({
                             <span v-if="!product.category.is_active">
                                 (Inactive category)
                             </span>
+                        </p>
+                        <p class="text-muted-foreground mt-2 text-xs">
+                            {{
+                                formatPrice(
+                                    product.shipping_handling.surcharge,
+                                )
+                            }}
+                            additional surcharge per delivery order ·
+                            {{ product.shipping_handling.preparation_days }}
+                            {{
+                                product.shipping_handling.preparation_days === 1
+                                    ? 'day'
+                                    : 'days'
+                            }}
+                            preparation on configured routes
                         </p>
                         <div
                             v-if="product.tags.length > 0"

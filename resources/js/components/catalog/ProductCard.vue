@@ -75,6 +75,12 @@ const { prefetchProduct, cancelProductPrefetch } = useProductPrefetch();
             </div>
 
             <div class="mt-auto flex flex-col gap-3">
+                <p
+                    v-if="['fragile', 'bulky'].includes(product.shipping_profile)"
+                    class="text-muted-foreground text-xs first-letter:uppercase"
+                >
+                    {{ product.shipping_profile }} handling
+                </p>
                 <ProductPrice
                     :price="product.price"
                     :discount-price="product.discount_price"

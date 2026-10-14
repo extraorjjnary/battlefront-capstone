@@ -114,7 +114,10 @@ class ProductCatalogController extends Controller
         $guestProfile = $request->attributes->get('guest_recommendation_profile');
 
         return Inertia::render('Products/Show', [
-            'product' => $this->catalogProductPresenter->present($catalogProduct),
+            'product' => [
+                ...$this->catalogProductPresenter->present($catalogProduct),
+                'shipping_handling' => $this->catalogProductPresenter->handling($catalogProduct->shipping_profile),
+            ],
             'can_record_product_dwell' => $customer instanceof User
                 ? $customer->role === UserRole::Customer
                     && $customer->personalized_recommendations_enabled

@@ -74,6 +74,62 @@ test('a product code edit retains its existing admin image', function () {
     Storage::disk('public')->assertExists($oldPath);
 });
 
+test('administrators replace imported images through a method-spoofed upload without deleting catalog assets', function () {
+    Storage::fake('public');
+    $administrator = User::factory()->administrator()->create();
+    $oldPath = 'products/graphics-card/A001.webp';
+    Storage::disk('public')->put($oldPath, 'catalog bytes');
+    $product = Product::factory()->create(['image_path' => $oldPath, 'is_catalog_imported' => true]);
+
+    $this->actingAs($administrator)->post(route('administration.products.update', $product), [
+        ...imageProductPayload($product),
+        '_method' => 'put',
+        'image' => UploadedFile::fake()->image('replacement.png', 640, 320),
+    ])->assertSessionHasNoErrors()->assertRedirect(route('administration.products.index'));
+
+    expect($product->refresh()->image_path)->toMatch('~^products/admin/'.$product->id.'/[a-f0-9]{64}\\.webp$~');
+    Storage::disk('public')->assertExists($product->image_path);
+    expect(Storage::disk('public')->get($oldPath))->toBe('catalog bytes');
+    $details = getimagesize(Storage::disk('public')->path($product->image_path));
+    expect([$details[0], $details[1], $details['mime']])->toBe([1024, 1024, 'image/webp']);
+});
+
+test('optimization failure during creation leaves no product or image', function () {
+    Storage::fake('public');
+    $administrator = User::factory()->administrator()->create();
+    $source = UploadedFile::fake()->image('large.png');
+    $header = 'IHDR'.pack('NNCCCCC', 10000, 10000, 8, 2, 0, 0, 0);
+    file_put_contents($source->getPathname(), "\x89PNG\r\n\x1a\n".pack('N', 13).$header.pack('N', crc32($header)));
+
+    $this->actingAs($administrator)->post(route('administration.products.store'), [
+        ...imageProductPayload(), 'image' => $source,
+    ])->assertSessionHasErrors(['image' => 'The product image must contain between 1 and 40 million pixels.']);
+
+    $this->assertDatabaseCount('products', 0);
+    expect(Storage::disk('public')->allFiles('products'))->toBe([]);
+});
+
+test('optimization failure during replacement preserves product details and its image', function () {
+    Storage::fake('public');
+    $administrator = User::factory()->administrator()->create();
+    $oldPath = 'products/old.png';
+    Storage::disk('public')->put($oldPath, 'original bytes');
+    $product = Product::factory()->create(['image_path' => $oldPath]);
+    $oldName = $product->name;
+    $source = UploadedFile::fake()->image('large.png');
+    $header = 'IHDR'.pack('NNCCCCC', 10000, 10000, 8, 2, 0, 0, 0);
+    file_put_contents($source->getPathname(), "\x89PNG\r\n\x1a\n".pack('N', 13).$header.pack('N', crc32($header)));
+
+    $this->actingAs($administrator)->post(route('administration.products.update', $product), [
+        ...imageProductPayload($product), '_method' => 'put', 'name' => 'Changed name', 'image' => $source,
+    ])->assertSessionHasErrors(['image' => 'The product image must contain between 1 and 40 million pixels.']);
+
+    expect($product->refresh()->name)->toBe($oldName);
+    expect($product->image_path)->toBe($oldPath);
+    expect(Storage::disk('public')->allFiles('products'))->toBe([$oldPath]);
+    expect(Storage::disk('public')->get($oldPath))->toBe('original bytes');
+});
+
 test('failed product creation removes its new image and rolls back its product', function () {
     Storage::fake('public');
     $payload = imageProductPayload();

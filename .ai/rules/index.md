@@ -4,6 +4,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 
 | Applies to | Rule file |
 | --- | --- |
+| app/Actions/Product/** | .ai/rules/actions-product.md |
 | app/Actions/{Inventory,Order}/**,app/Services/Order/**,app/Http/Controllers/Administration/Order*,resources/js/pages/Administration/Orders/** | .ai/rules/administration-orders.md |
 | app/Http/{Requests,Controllers}/Administration/SalesReport*,resources/js/pages/Administration/Reports/** | .ai/rules/administration-reports.md |
 | app/Models/Product.php,app/Http/Controllers/Administration/ProductController.php,app/Http/Requests/Administration/SaveProductRequest.php | .ai/rules/administration.md |
@@ -66,4 +67,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Console/Commands/**,app/Services/RealCatalogImportService.php,database/PrepareCatalogImageManifest.ps1 | .ai/rules/services.md |
 | app/Services/Order/PsgcDeliveryLocations.php,app/Http/Requests/Settings/ProfileUpdateRequest.php,app/Models/User.php,resources/js/components/DeliveryAddressFields.vue,resources/js/pages/settings/Profile.vue,resources/js/pages/Checkout/Index.vue | .ai/rules/settings-js-pages-checkout.md |
 | routes/settings.php,app/Http/Controllers/Settings/**,resources/js/pages/settings/** | .ai/rules/settings.md |
+| tests/** | .ai/rules/tests.md |
 | app/Services/Notifications/**,app/Services/Order/**,app/Actions/Order/**,app/Jobs/**,app/Http/Controllers/**/*Notification*,app/Http/Controllers/Api/V1/PushDeviceController.php | .ai/rules/v1.md |

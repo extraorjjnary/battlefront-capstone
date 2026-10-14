@@ -9,6 +9,7 @@ defineProps({
     product: { type: Object, required: true },
     categories: { type: Array, required: true },
     tags: { type: Array, required: true },
+    shipping_profiles: { type: Array, required: true },
 });
 
 defineOptions({
@@ -68,6 +69,7 @@ defineOptions({
                 :product="product"
                 :categories="categories"
                 :tags="tags"
+                :shipping-profiles="shipping_profiles"
                 :form="{
                     action: ProductController.update.url(product.id),
                     method: 'post',

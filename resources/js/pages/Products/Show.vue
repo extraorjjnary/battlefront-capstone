@@ -7,6 +7,7 @@ import ProductImage from '@/components/catalog/ProductImage.vue';
 import ProductPrice from '@/components/catalog/ProductPrice.vue';
 import RecommendationSection from '@/components/recommendations/RecommendationSection.vue';
 import StockAvailability from '@/components/catalog/StockAvailability.vue';
+import ShippingHandling from '@/components/catalog/ShippingHandling.vue';
 import StorefrontHeader from '@/components/StorefrontHeader.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -238,6 +239,13 @@ function returnToCatalog() {
                             currently in stock.
                         </p>
                     </div>
+
+                    <ShippingHandling
+                        v-if="product.shipping_handling"
+                        :handling="product.shipping_handling"
+                        :show-preparation="false"
+                        class="mt-6"
+                    />
 
                     <section
                         v-if="hasAvailableStock && canUseCustomerCart"

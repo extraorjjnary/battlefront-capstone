@@ -4,6 +4,7 @@ import { ArrowLeft, PackageSearch, Pencil } from '@lucide/vue';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import PermanentDeletionDialog from '@/components/PermanentDeletionDialog.vue';
 import { Badge } from '@/components/ui/badge';
+import ShippingHandling from '@/components/catalog/ShippingHandling.vue';
 import { Button } from '@/components/ui/button';
 
 defineProps({
@@ -182,6 +183,10 @@ defineOptions({
                             <dd v-else class="mt-1 font-medium">None</dd>
                         </div>
                     </dl>
+                    <ShippingHandling
+                        :handling="product.shipping_handling"
+                        class="border-border mt-5 border-t pt-5"
+                    />
                     <div
                         v-if="product.description"
                         class="border-border mt-5 border-t pt-5 text-sm"

@@ -42,7 +42,6 @@ class SaveProductRequest extends FormRequest
 
         return [
             'shipping_profile' => ['sometimes', 'required', Rule::enum(ShippingProfile::class)],
-            'shipping_profile_reviewed' => ['sometimes', 'boolean'],
             'product_code' => $product instanceof Product ? [
                 'bail', 'required', 'string', 'regex:'.Product::CODE_PATTERN,
                 Rule::unique(Product::class, 'product_code')->ignore($product),

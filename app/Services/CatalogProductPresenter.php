@@ -2,11 +2,31 @@
 
 namespace App\Services;
 
+use App\Enums\ShippingProfile;
 use App\Models\Product;
 use App\Models\Tag;
+use App\Services\Order\DeliveryRules;
 
 class CatalogProductPresenter
 {
+    public function __construct(private readonly DeliveryRules $deliveryRules) {}
+
+    /** @return array{profile: string, label: string, surcharge: string, preparation_days: int} */
+    public function handling(ShippingProfile $profile): array
+    {
+        return [
+            'profile' => $profile->value,
+            'label' => ucfirst($profile->value),
+            ...$this->deliveryRules->handling($profile),
+        ];
+    }
+
+    /** @return list<array{profile: string, label: string, surcharge: string, preparation_days: int}> */
+    public function handlingOptions(): array
+    {
+        return array_map($this->handling(...), ShippingProfile::cases());
+    }
+
     /**
      * Convert an eagerly loaded product into the customer catalog contract.
      *
@@ -19,6 +39,7 @@ class CatalogProductPresenter
      *     discount_price: string|null,
      *     image_url: string|null,
      *     is_featured: bool,
+     *     shipping_profile: string,
      *     category: array{id: int, name: string},
      *     tags: list<array{id: int, name: string}>,
      *     inventory: array{quantity: int|null, status: string}
@@ -44,6 +65,7 @@ class CatalogProductPresenter
             'discount_price' => $product->discount_price,
             'image_url' => $product->image_url,
             'is_featured' => $product->is_featured,
+            'shipping_profile' => $product->shipping_profile->value,
             'category' => [
                 'id' => $product->category->id,
                 'name' => $product->category->name,

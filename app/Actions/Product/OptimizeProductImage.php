@@ -55,9 +55,9 @@ class OptimizeProductImage
 
         unset($source);
 
-        $output = tmpfile();
+        $output = fopen('php://memory', 'w+b');
         if ($output === false) {
-            throw new RuntimeException('A temporary product image file could not be created.');
+            throw new RuntimeException('A temporary product image stream could not be created.');
         }
 
         try {

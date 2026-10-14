@@ -274,7 +274,7 @@ test('reviewed catalog mapping preserves accessories manual choices and reapplic
         expect($product->refresh()->shipping_profile)->toBe($profile);
         expect($service->apply($product))->toBeFalse();
         app(UpdateProduct::class)->execute($product, ['shipping_profile' => 'standard', 'shipping_profile_reviewed' => true], [], null);
-        expect($product->refresh()->shipping_profile_source)->toBe('manual');
+        expect($product->refresh()->shipping_profile_source)->toBe($profile === ShippingProfile::Standard ? CatalogShippingClassification::VERSION : 'manual');
         expect($service->apply($product))->toBeFalse();
     }
 });

@@ -5,6 +5,7 @@ import { computed, onBeforeUnmount, ref } from 'vue';
 import CategoryController from '@/actions/App/Http/Controllers/Administration/CategoryController';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import InputError from '@/components/InputError.vue';
+import { formatCurrency } from '@/lib/currency';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,8 @@ import { Textarea } from '@/components/ui/textarea';
 const props = defineProps({
     categories: { type: Array, required: true },
     tags: { type: Array, required: true },
+    shippingProfiles: { type: Array, required: true },
+    showPreparation: { type: Boolean, default: true },
     product: { type: Object, default: null },
     form: { type: Object, required: true },
     methodOverride: { type: String, default: null },
@@ -33,7 +36,11 @@ const categoryId = ref(
 );
 const isFeatured = ref(props.product?.is_featured ?? false);
 const shippingProfile = ref(props.product?.shipping_profile ?? 'standard');
-const shippingProfileReviewed = ref(false);
+const selectedHandling = computed(() =>
+    props.shippingProfiles.find(
+        (profile) => profile.profile === shippingProfile.value,
+    ),
+);
 const selectedTagIds = ref([...(props.product?.tag_ids ?? [])]);
 const selectedImagePreviewUrl = ref(null);
 const imagePreviewFailed = ref(false);
@@ -99,18 +106,46 @@ function firstTagError(errors) {
             <div class="grid gap-5 md:grid-cols-2">
                 <div class="grid gap-2 md:col-span-2">
                     <Label for="shipping-profile">Shipping handling</Label>
-                    <Select v-model="shippingProfile" @update:model-value="shippingProfileReviewed = true">
-                        <SelectTrigger id="shipping-profile" class="w-full"><SelectValue /></SelectTrigger>
+                    <Select v-model="shippingProfile">
+                        <SelectTrigger
+                            id="shipping-profile"
+                            class="w-full"
+                            aria-describedby="shipping-handling-help"
+                        >
+                            <SelectValue />
+                        </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="standard">Standard</SelectItem>
-                            <SelectItem value="fragile">Fragile — protective packing</SelectItem>
-                            <SelectItem value="bulky">Bulky — additional handling</SelectItem>
+                            <SelectItem
+                                v-for="profile in shippingProfiles"
+                                :key="profile.profile"
+                                :value="profile.profile"
+                            >
+                                {{ profile.label }}
+                            </SelectItem>
                         </SelectContent>
                     </Select>
-                    <input type="hidden" name="shipping_profile" :value="shippingProfile" />
-                    <input type="hidden" name="shipping_profile_reviewed" :value="shippingProfileReviewed ? '1' : '0'" />
-                    <label class="flex items-center gap-2 text-sm"><input v-model="shippingProfileReviewed" type="checkbox" />Confirm this handling profile as reviewed</label>
-                    <p class="text-muted-foreground text-sm">{{ product?.shipping_suggestion?.reason ?? 'Review the product packing requirements.' }} Assignment: {{ product?.shipping_profile_source ?? 'Unreviewed' }}. Handling applies once per order.</p>
+                    <input
+                        type="hidden"
+                        name="shipping_profile"
+                        :value="shippingProfile"
+                    />
+                    <p
+                        v-if="selectedHandling"
+                        id="shipping-handling-help"
+                        class="text-muted-foreground text-sm"
+                    >
+                        {{ formatCurrency(selectedHandling.surcharge) }}
+                        additional handling per delivery order
+                        <template v-if="showPreparation">
+                            · {{ selectedHandling.preparation_days }}
+                            {{
+                                selectedHandling.preparation_days === 1
+                                    ? 'day'
+                                    : 'days'
+                            }}
+                            preparation on configured routes.
+                        </template>
+                    </p>
                     <InputError :message="errors.shipping_profile" />
                 </div>
                 <div v-if="product" class="grid gap-2 md:col-span-2">
