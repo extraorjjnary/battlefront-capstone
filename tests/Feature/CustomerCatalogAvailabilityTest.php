@@ -47,7 +47,7 @@ test('customer catalog availability and stock labels agree at every boundary', f
                 ->where('product.inventory.status', $status)
                 ->where('product.inventory.quantity', $quantity));
         } else {
-            $detail->assertJsonPath('data.inventory', ['status' => $status]);
+            $detail->assertJsonPath('data.inventory', ['quantity' => $quantity, 'status' => $status]);
         }
     } else {
         $detail->assertNotFound();

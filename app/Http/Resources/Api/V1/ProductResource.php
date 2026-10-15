@@ -25,7 +25,10 @@ class ProductResource extends JsonResource
             'is_featured' => $this->resource['is_featured'],
             'category' => $this->resource['category'],
             'tags' => $this->resource['tags'],
-            'inventory' => ['status' => $this->resource['inventory']['status']],
+            'inventory' => [
+                'quantity' => $this->resource['inventory']['quantity'],
+                'status' => $this->resource['inventory']['status'],
+            ],
         ];
     }
 }
