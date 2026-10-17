@@ -297,17 +297,23 @@ test('administrators can initialize missing inventory', function () {
         ->post(route('administration.products.inventory.store', $product), [
             'quantity' => 12,
             'reorder_level' => 4,
+            'reason' => 'Initial physical stock count',
             'product_id' => $otherProduct->id,
         ]);
 
     $response
         ->assertSessionHasNoErrors()
         ->assertRedirect(route('administration.inventory.index'))
-        ->assertInertiaFlash('toast.message', 'Inventory initialized.');
-    $this->assertDatabaseHas('inventories', [
+        ->assertInertiaFlash('toast.message', 'Opening stock submitted for approval.');
+    $this->assertDatabaseMissing('inventories', [
         'product_id' => $product->id,
-        'quantity' => 12,
-        'reorder_level' => 4,
+    ]);
+    $this->assertDatabaseHas('inventory_adjustment_requests', [
+        'product_id' => $product->id,
+        'target_quantity' => 12,
+        'initial_reorder_level' => 4,
+        'status' => 'pending',
+        'reason' => 'Initial physical stock count',
     ]);
     $this->assertDatabaseMissing('inventories', [
         'product_id' => $otherProduct->id,
@@ -347,12 +353,12 @@ test('initializing inventory twice preserves the existing stock values', functio
         ->post(route('administration.products.inventory.store', $inventory->product), [
             'quantity' => 20,
             'reorder_level' => 6,
+            'reason' => 'Attempt duplicate initialization',
         ]);
 
     $response
-        ->assertSessionHasNoErrors()
         ->assertRedirect(route('administration.inventory.index'))
-        ->assertInertiaFlash('toast.message', 'Inventory is already initialized.');
+        ->assertSessionHasErrors(['quantity' => 'Inventory is already initialized.']);
     expect(Inventory::query()->where('product_id', $inventory->product_id)->count())->toBe(1);
     $this->assertDatabaseHas('inventories', [
         'id' => $inventory->id,
@@ -412,7 +418,8 @@ test('administrators can update inventory stock values', function () {
         ->from(route('administration.inventory.index'))
         ->patch(route('administration.inventory.update', $inventory), [
             'quantity' => 24,
-            'reorder_level' => 8,
+            'reorder_level' => 3,
+            'reason' => 'Physical inventory count correction',
             'product_id' => Product::factory()->create()->id,
         ]);
 
@@ -422,8 +429,13 @@ test('administrators can update inventory stock values', function () {
     $this->assertDatabaseHas('inventories', [
         'id' => $inventory->id,
         'product_id' => $inventory->product_id,
-        'quantity' => 24,
-        'reorder_level' => 8,
+        'quantity' => 10,
+        'reorder_level' => 3,
+    ]);
+    $this->assertDatabaseHas('inventory_adjustment_requests', [
+        'product_id' => $inventory->product_id,
+        'target_quantity' => 24,
+        'status' => 'pending',
     ]);
 });
 

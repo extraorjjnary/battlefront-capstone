@@ -35,7 +35,7 @@ class RestoreOrderInventory
                 throw new LogicException('An order item has no inventory record to restore.');
             }
 
-            $this->adjustInventoryStock->increase($inventory, $orderItem->quantity);
+            $this->adjustInventoryStock->increase($inventory, $orderItem->quantity, $order->id);
         }
     }
 }

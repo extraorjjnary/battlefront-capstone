@@ -25,7 +25,21 @@ class SaveProductRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()?->can('access-administration') ?? false;
+        if (! ($this->user()?->can('products.manage') ?? false)) {
+            return false;
+        }
+
+        $product = $this->route('product');
+        if (! $product instanceof Product) {
+            return $this->user()->can('products.price');
+        }
+
+        if ($this->user()->can('products.price')) {
+            return true;
+        }
+
+        return (string) $this->input('price') === (string) $product->price
+            && (string) $this->input('discount_price') === (string) $product->discount_price;
     }
 
     /**

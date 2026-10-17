@@ -48,8 +48,19 @@ class UpdateProduct
                 if ($profileChanged) {
                     $lockedProduct->shipping_profile_source = 'manual';
                 }
+                $changedAttributes = $lockedProduct->getDirty();
+                $before = array_intersect_key($lockedProduct->getOriginal(), $changedAttributes);
                 $lockedProduct->save();
                 $lockedProduct->tags()->sync($tagIds);
+
+                DB::table('audit_logs')->insert([
+                    'actor_id' => auth()->id(),
+                    'action' => 'product.updated',
+                    'subject_type' => 'product',
+                    'subject_id' => $lockedProduct->id,
+                    'changes' => json_encode(['before' => $before, 'after' => $changedAttributes, 'tag_ids' => $tagIds], JSON_THROW_ON_ERROR),
+                    'created_at' => now(),
+                ]);
 
                 if ($storedImage !== null && $storedImage['path'] !== $oldImagePath) {
                     DB::afterCommit(fn () => $this->deleteManagedProductImage->execute($oldImagePath, $lockedProduct->id));

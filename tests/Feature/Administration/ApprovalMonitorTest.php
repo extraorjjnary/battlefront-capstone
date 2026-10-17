@@ -1,0 +1,38 @@
+<?php
+
+use App\Models\User;
+use App\Notifications\ApprovalConcentrationAlert;
+use App\Services\ApprovalMonitor;
+use Illuminate\Support\Facades\DB;
+
+test('the fifth manager approval for the same staff member raises an owner review alert', function () {
+    $staff = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
+    $manager = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'manager')->value('id'),
+    ]);
+    for ($number = 1; $number <= 4; $number++) {
+        DB::table('audit_logs')->insert([
+            'actor_id' => $manager->id, 'action' => 'inventory.adjustment.approved',
+            'subject_type' => 'inventory_adjustment_request', 'subject_id' => $number,
+            'changes' => json_encode(['requester_id' => $staff->id], JSON_THROW_ON_ERROR),
+            'created_at' => now(),
+        ]);
+    }
+
+    app(ApprovalMonitor::class)->afterApproval($manager, $staff->id);
+    $this->assertDatabaseMissing('audit_logs', ['action' => 'approval.concentration_alert']);
+
+    DB::table('audit_logs')->insert([
+        'actor_id' => $manager->id, 'action' => 'damage.decided',
+        'subject_type' => 'damage_report', 'subject_id' => 5,
+        'changes' => json_encode(['requester_id' => $staff->id], JSON_THROW_ON_ERROR),
+        'created_at' => now(),
+    ]);
+    app(ApprovalMonitor::class)->afterApproval($manager, $staff->id);
+    $this->assertDatabaseHas('audit_logs', ['action' => 'approval.concentration_alert', 'subject_id' => $staff->id]);
+
+    $payload = (new ApprovalConcentrationAlert($manager->name, $staff->name, 5))->toArray($manager);
+    expect($payload['body'])->toContain('5 requests')->toContain($staff->name);
+});

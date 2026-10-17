@@ -22,6 +22,7 @@ use App\Services\Order\OrderPlacementService;
 use Carbon\CarbonImmutable;
 use Database\Seeders\DevelopmentCustomerSeeder;
 use Database\Seeders\DevelopmentHistoricalSalesSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
@@ -225,11 +226,11 @@ test('delivery snapshots retain highest product handling and remain immutable af
     expect(historicalSalesDatabaseSnapshot())->toEqual($before);
 });
 
-test('damaged delivery or payment snapshots stop without reconciling any existing history', function (string $problem) {
+test('damaged delivery or payment snapshots are rejected or protected without reconciling history', function (string $problem) {
     HistoricalSalesCatalogFixtures::createProducts();
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
     $order = Order::with('shipment')->where('fulfillment_method', FulfillmentMethod::Delivery)->firstOrFail();
-    match ($problem) {
+    $corruptSnapshot = fn () => match ($problem) {
         'payment method' => $order->update(['payment_method' => PaymentMethod::Cash]),
         'payment evidence' => $order->update(['payment_proof_path' => 'payment-proofs/unrelated.png']),
         'fee-inclusive sale' => $order->sale->update(['amount' => $order->total_amount]),
@@ -245,6 +246,16 @@ test('damaged delivery or payment snapshots stop without reconciling any existin
         'invented milestone' => $order->shipment->update(['handed_to_carrier_at' => $order->created_at]),
         'missing timestamp' => $order->shipment->forceFill(['created_at' => null])->save(),
     };
+    if ($problem === 'fee-inclusive sale') {
+        $before = historicalSalesDatabaseSnapshot();
+        expect($corruptSnapshot)->toThrow(QueryException::class);
+        expect(historicalSalesDatabaseSnapshot())->toEqual($before);
+
+        $this->seed(DevelopmentHistoricalSalesSeeder::class);
+
+        return;
+    }
+    $corruptSnapshot();
     $before = historicalSalesDatabaseSnapshot();
 
     expect(fn () => $this->seed(DevelopmentHistoricalSalesSeeder::class))
@@ -416,11 +427,11 @@ test('an earlier fixture stops with approval instructions without changing recor
     expect(Storage::disk('local')->get(config('forecasting.development_manifest')))->toBe('prior declaration');
 })->with(['Demonstration Historical Sales 2022-10 A', 'Demonstration Historical Sales 2022-10 V2 01', 'Demonstration Historical Sales 2022-10 V3 01']);
 
-test('ambiguous or damaged owned history blocks reseeding and rollover without deleting anything', function (string $problem) {
+test('ambiguous history blocks reseeding and database guards reject protected edits', function (string $problem) {
     HistoricalSalesCatalogFixtures::createProducts();
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
     $order = Order::with(['items', 'sale'])->oldest()->firstOrFail();
-    match ($problem) {
+    $corruptSnapshot = fn () => match ($problem) {
         'fixture key' => DB::table('orders')->where('id', $order->id)->update(['development_fixture_key' => 'historical-sales:V4:2022-10:99']),
         'foreign customer' => DB::table('orders')->where('id', $order->id)->update(['user_id' => User::factory()->customer()->create()->id]),
         'wrong demo customer' => DB::table('orders')->where('id', $order->id)->update(['user_id' => User::where('email', 'demo.customer01@example.test')->sole()->id]),
@@ -437,6 +448,16 @@ test('ambiguous or damaged owned history blocks reseeding and rollover without d
         'label' => $order->update(['recipient_name' => 'Changed label']),
         'timestamp' => $order->forceFill(['created_at' => '2022-10-08 12:00:00'])->save(),
     };
+    if (in_array($problem, ['missing item', 'sale amount', 'sale date', 'missing sale'], true)) {
+        $before = historicalSalesDatabaseSnapshot();
+        expect($corruptSnapshot)->toThrow(QueryException::class);
+        expect(historicalSalesDatabaseSnapshot())->toEqual($before);
+
+        $this->seed(DevelopmentHistoricalSalesSeeder::class);
+
+        return;
+    }
+    $corruptSnapshot();
     $this->travelTo(CarbonImmutable::parse('2027-01-15'));
     $before = historicalSalesDatabaseSnapshot();
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Actions\Recommendation\BuildRecommendationViewData;
 use App\Models\User;
 use App\Services\Dashboard\DashboardService;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -18,11 +19,21 @@ class DashboardController extends Controller
         Request $request,
         DashboardService $dashboardService,
         BuildRecommendationViewData $buildRecommendationViewData,
-    ): Response {
+    ): Response|RedirectResponse {
         /** @var User $user */
         $user = $request->user();
 
         if ($user->isAdministrator()) {
+            if (! $user->is_active || $user->administration_role_id === null) {
+                abort(403);
+            }
+            if ($user->administrationRoleCode() === 'it') {
+                return to_route('administration.team.index');
+            }
+            if (! $user->hasAdministrationPermission('reports.view')) {
+                return to_route('administration.orders.index');
+            }
+
             return Inertia::render('Dashboard/Administration', [
                 'dashboard' => Inertia::defer(fn (): array => $dashboardService->administration(), 'dashboard', rescue: true),
             ]);

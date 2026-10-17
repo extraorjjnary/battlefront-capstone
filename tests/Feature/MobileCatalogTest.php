@@ -111,7 +111,7 @@ test('product detail returns only the mobile catalog fields', function () {
         'image_url' => 'https://assets.example.test/storage/products/atlas.webp',
         'is_featured' => true, 'category' => ['id' => $category->id, 'name' => 'Graphics Cards'],
         'tags' => [['id' => $gaming->id, 'name' => 'Gaming'], ['id' => $performance->id, 'name' => 'Performance']],
-        'inventory' => ['status' => 'low_stock'],
+        'inventory' => ['quantity' => 2, 'status' => 'low_stock'],
     ]]);
 });
 
@@ -122,7 +122,18 @@ test('configured image hosts are preserved on product lists as well as details',
         ->assertJsonPath('data.0.image_url', 'https://assets.example.test/catalog/products/example.webp');
 });
 
-test('available list and detail expose stock status without exact quantities', function (int $quantity, int $reorderLevel, string $status) {
+test('local product images use the current request host when the configured address is stale', function () {
+    config([
+        'app.url' => 'http://192.168.254.108:8000',
+        'filesystems.disks.public.url' => 'http://192.168.254.108:8000/storage',
+    ]);
+    Product::factory()->available()->create(['image_path' => 'products/example.webp']);
+
+    $this->getJson('http://192.168.1.18:8000/api/v1/products')->assertOk()
+        ->assertJsonPath('data.0.image_url', 'http://192.168.1.18:8000/storage/products/example.webp');
+});
+
+test('available list and detail expose exact stock quantity with its status', function (int $quantity, int $reorderLevel, string $status) {
     $product = Product::factory()->create(['image_path' => null, 'brand' => null]);
     if ($quantity !== null) {
         Inventory::factory()->for($product)->create(['quantity' => $quantity, 'reorder_level' => $reorderLevel]);
@@ -130,11 +141,10 @@ test('available list and detail expose stock status without exact quantities', f
 
     $this->get(route('api.v1.products.index'))->assertOk()
         ->assertJsonPath('data.0.id', $product->id)
-        ->assertJsonPath('data.0.inventory', ['status' => $status])
-        ->assertJsonMissingPath('data.0.inventory.quantity')
+        ->assertJsonPath('data.0.inventory', ['quantity' => $quantity, 'status' => $status])
         ->assertJsonMissingPath('data.0.inventory.reorder_level');
     $this->get(route('api.v1.products.show', $product))->assertOk()
-        ->assertJsonPath('data.inventory', ['status' => $status])
+        ->assertJsonPath('data.inventory', ['quantity' => $quantity, 'status' => $status])
         ->assertJsonPath('data.image_url', null)
         ->assertJsonPath('data.brand', null);
 })->with([

@@ -12,7 +12,7 @@ class UserPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->isAdministrator();
+        return $user->hasAdministrationPermission('customers.view');
     }
 
     /**
@@ -20,7 +20,7 @@ class UserPolicy
      */
     public function view(User $user, User $customer): bool
     {
-        return $user->isAdministrator()
+        return $user->hasAdministrationPermission('customers.view')
             && $customer->role === UserRole::Customer;
     }
 

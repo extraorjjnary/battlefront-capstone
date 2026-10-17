@@ -47,6 +47,15 @@ class CreateProduct
                     }
                     $product->tags()->sync($tagIds);
 
+                    DB::table('audit_logs')->insert([
+                        'actor_id' => auth()->id(),
+                        'action' => 'product.created',
+                        'subject_type' => 'product',
+                        'subject_id' => $product->id,
+                        'changes' => json_encode(['product_code' => $product->product_code, 'name' => $product->name], JSON_THROW_ON_ERROR),
+                        'created_at' => now(),
+                    ]);
+
                     return $product;
                 });
             } catch (Throwable $exception) {

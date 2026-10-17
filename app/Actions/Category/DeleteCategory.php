@@ -20,6 +20,14 @@ class DeleteCategory
                     throw ValidationException::withMessages(['deletion' => self::PROTECTED_MESSAGE]);
                 }
 
+                DB::table('audit_logs')->insert([
+                    'actor_id' => auth()->id(),
+                    'action' => 'category.deleted',
+                    'subject_type' => 'category',
+                    'subject_id' => $lockedCategory->id,
+                    'changes' => json_encode(['name' => $lockedCategory->name], JSON_THROW_ON_ERROR),
+                    'created_at' => now(),
+                ]);
                 $lockedCategory->delete();
             }, attempts: 3);
         } catch (QueryException $exception) {

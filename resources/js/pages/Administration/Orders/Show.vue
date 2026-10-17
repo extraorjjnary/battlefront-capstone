@@ -1,5 +1,5 @@
 <script setup>
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import {
     ArrowLeft,
     BadgeCheck,
@@ -16,6 +16,8 @@ import {
 } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import OrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
+import OrderHandlerController from '@/actions/App/Http/Controllers/Administration/OrderHandlerController';
+import CustomerReturnController from '@/actions/App/Http/Controllers/Administration/CustomerReturnController';
 import OrderPaymentProofController from '@/actions/App/Http/Controllers/Administration/OrderPaymentProofController';
 import OrderPaymentStatusController from '@/actions/App/Http/Controllers/Administration/OrderPaymentStatusController';
 import OrderManualShipmentController from '@/actions/App/Http/Controllers/Administration/OrderManualShipmentController';
@@ -54,7 +56,12 @@ import { store as confirmPickup } from '@/routes/administration/orders/pickup-co
 
 const props = defineProps({
     order: { type: Object, required: true },
+    handler_options: { type: Array, default: () => [] },
 });
+
+const handlerForm = useForm({ handler_id: props.order.assigned_handler_id ?? '' });
+const claimForm = useForm({});
+const page = usePage();
 
 const selectedOrderStatus = ref('');
 const orderConfirmationOpen = ref(false);
@@ -395,6 +402,28 @@ defineOptions({
                     </Link>
                 </Button>
             </div>
+        </section>
+
+        <section class="border-border bg-card flex flex-wrap items-end gap-4 border p-5">
+            <div class="min-w-48 flex-1">
+                <p class="font-semibold">Assigned sales handler</p>
+                <p class="text-muted-foreground mt-1 text-sm">{{ order.assigned_handler_name ?? 'Unassigned' }}</p>
+                <p v-if="order.handler_required && !order.assigned_handler_id" class="text-destructive mt-1 text-xs">Assign a handler before completing this order.</p>
+            </div>
+            <form v-if="!order.assigned_handler_id && !['completed', 'cancelled'].includes(order.status.value)" @submit.prevent="claimForm.post(OrderHandlerController.claim(order.id))">
+                <Button type="submit" variant="outline" :disabled="claimForm.processing">Claim order</Button>
+            </form>
+            <form v-if="handler_options.length && page.props.auth.can?.assignOrders" class="flex items-end gap-2" @submit.prevent="handlerForm.patch(OrderHandlerController.assign(order.id))">
+                <div>
+                    <Label for="assigned-handler">Assign handler</Label>
+                    <select id="assigned-handler" v-model="handlerForm.handler_id" class="border-input bg-background mt-1 block h-9 min-w-44 border px-2 text-sm">
+                        <option value="">Select staff</option>
+                        <option v-for="handler in handler_options" :key="handler.id" :value="handler.id">{{ handler.name }}</option>
+                    </select>
+                </div>
+                <Button type="submit" :disabled="!handlerForm.handler_id || handlerForm.processing">Assign</Button>
+            </form>
+            <Link v-if="order.status.value === 'completed'" :href="CustomerReturnController.index({ query: { order_id: order.id } })" class="text-primary text-sm underline">Record return</Link>
         </section>
 
         <div

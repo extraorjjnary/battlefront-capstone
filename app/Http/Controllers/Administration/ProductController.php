@@ -137,6 +137,8 @@ class ProductController extends Controller
      */
     public function create(): Response
     {
+        $this->authorize('products.price');
+
         return Inertia::render('Administration/Products/Create', $this->productOptions());
     }
 
@@ -253,6 +255,7 @@ class ProductController extends Controller
 
     public function destroy(Product $product, DeleteProduct $deleteProduct): RedirectResponse
     {
+        $this->authorize('catalog.delete');
         $deleteProduct->execute($product);
 
         Inertia::flash('toast', [

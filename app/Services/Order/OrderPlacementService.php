@@ -199,6 +199,7 @@ class OrderPlacementService
             }
 
             $order = Order::query()->create([
+                'handler_required' => true,
                 'user_id' => $lockedCustomer->id,
                 'recipient_name' => $checkout['recipient_name'],
                 'contact_number' => $checkout['contact_number'],
@@ -244,6 +245,7 @@ class OrderPlacementService
                 $this->adjustInventoryStock->decrease(
                     $line['inventory'],
                     $line['quantity'],
+                    $order->id,
                 );
             }
 

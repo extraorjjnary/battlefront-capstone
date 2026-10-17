@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Administration;
 
-use App\Actions\Inventory\AdjustInventoryStock;
+use App\Actions\Inventory\RequestInventoryAdjustment;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\InventoryIndexRequest;
 use App\Http\Requests\Administration\UpdateInventoryRequest;
@@ -10,6 +10,9 @@ use App\Models\Inventory;
 use App\Models\Product;
 use App\Repositories\Inventory\InventoryRepository;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -70,26 +73,23 @@ class InventoryController extends Controller
     public function store(
         UpdateInventoryRequest $request,
         Product $product,
-        AdjustInventoryStock $adjustInventoryStock,
+        RequestInventoryAdjustment $adjustment,
     ): RedirectResponse {
-        $inventory = $adjustInventoryStock->initialize(
+        if ($product->inventory()->exists()) {
+            throw ValidationException::withMessages(['quantity' => 'Inventory is already initialized.']);
+        }
+
+        $adjustment->execute(
             $product,
+            $request->user(),
             $request->integer('quantity'),
+            $request->string('reason')->toString(),
             $request->integer('reorder_level'),
         );
 
-        if (! $inventory->wasRecentlyCreated) {
-            Inertia::flash('toast', [
-                'type' => 'error',
-                'message' => __('Inventory is already initialized.'),
-            ]);
-
-            return back();
-        }
-
         Inertia::flash('toast', [
             'type' => 'success',
-            'message' => __('Inventory initialized.'),
+            'message' => __('Opening stock submitted for approval.'),
         ]);
 
         return to_route('administration.inventory.index');
@@ -101,18 +101,48 @@ class InventoryController extends Controller
     public function update(
         UpdateInventoryRequest $request,
         Inventory $inventory,
-        AdjustInventoryStock $adjustInventoryStock,
+        RequestInventoryAdjustment $adjustment,
     ): RedirectResponse {
-        $adjustInventoryStock->set(
-            $inventory,
+        if ($request->integer('reorder_level') !== $inventory->reorder_level) {
+            throw ValidationException::withMessages(['reorder_level' => 'Change the reorder level separately from a stock request.']);
+        }
+
+        $adjustment->execute(
+            $inventory->product,
+            $request->user(),
             $request->integer('quantity'),
-            $request->integer('reorder_level'),
+            $request->string('reason')->toString(),
         );
 
         Inertia::flash('toast', [
             'type' => 'success',
-            'message' => __('Inventory updated.'),
+            'message' => __('Stock change submitted for approval.'),
         ]);
+
+        return back();
+    }
+
+    public function updateReorderLevel(Request $request, Inventory $inventory): RedirectResponse
+    {
+        $validated = $request->validate([
+            'reorder_level' => ['required', 'integer', 'min:0', 'max:4294967295'],
+            'reason' => ['required', 'string', 'min:5', 'max:2000'],
+        ]);
+
+        DB::transaction(function () use ($request, $inventory, $validated): void {
+            $locked = Inventory::query()->whereKey($inventory->id)->lockForUpdate()->firstOrFail();
+            $before = $locked->reorder_level;
+            $locked->update(['reorder_level' => $validated['reorder_level']]);
+            DB::table('audit_logs')->insert([
+                'actor_id' => $request->user()->id,
+                'action' => 'inventory.reorder_level.updated',
+                'subject_type' => 'inventory',
+                'subject_id' => $locked->id,
+                'reason' => $validated['reason'],
+                'changes' => json_encode(['before' => $before, 'after' => $locked->reorder_level], JSON_THROW_ON_ERROR),
+                'created_at' => now(),
+            ]);
+        });
 
         return back();
     }

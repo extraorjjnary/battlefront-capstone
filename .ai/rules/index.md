@@ -53,10 +53,12 @@ Before planning or editing, find the row whose globs match the file's path and r
 | resources/js/lib/orderStatus.js,resources/js/pages/{Administration/Orders,Orders}/** | .ai/rules/orders-orders.md |
 | app/Http/Controllers/OrderController.php,resources/js/pages/Orders/** | .ai/rules/orders.md |
 | app/Http/Controllers/Administration/OrderController.php,resources/js/pages/Administration/Orders/Index.vue | .ai/rules/pages-administration-orders.md |
+| app/{Models/User.php,Services/TeamAccessService.php,Http/Controllers/Administration/TeamController.php},database/**,resources/js/pages/Administration/Team.vue | .ai/rules/pages-administration.md |
 | app/Actions/{Cart,Checkout,Order,Inventory}/**,app/Services/{Cart,Order}/**,app/Http/Controllers/OrderController.php,resources/js/pages/Checkout/** | .ai/rules/pages-checkout.md |
 | app/Models/Order.php,app/Http/Controllers/OrderController.php,resources/js/pages/Orders/** | .ai/rules/pages-orders.md |
 | resources/js/app.js,resources/js/pages/** | .ai/rules/pages.md |
 | app/Services/RealCatalogImportService.php,app/Services/CatalogShippingClassification.php,app/Actions/Product/** | .ai/rules/product.md |
+| routes/web.php,app/Providers/AppServiceProvider.php,resources/js/pages/Administration/Products/**,resources/js/components/CatalogNavigation.vue | .ai/rules/products-js-components.md |
 | app/Repositories/Reporting/**,app/Services/{Reporting,Dashboard}/**,app/Actions/Order/RecordCompletedOrderSale.php,resources/js/pages/{Administration/Reports,Dashboard}/**,resources/views/reports/** | .ai/rules/reports.md |
 | app/Http/Requests/ProductCatalogIndexRequest.php,app/Repositories/Catalog/** | .ai/rules/repositories-catalog.md |
 | app/Services/Order/**,app/Actions/Checkout/**,app/Http/Requests/ValidateCheckoutRequest.php,config/battlefront.php,resources/data/psgc-*.json | .ai/rules/requests-data.md |

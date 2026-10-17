@@ -78,6 +78,7 @@ use Illuminate\Support\Carbon;
     'payment_proof_path',
     'payment_rejection_reason',
     'payment_rejection_note',
+    'handler_required',
 ])]
 #[Hidden(['payment_proof_path', 'development_fixture_key'])]
 class Order extends Model
@@ -186,6 +187,7 @@ class Order extends Model
                 'product_subtotal', 'total_amount', 'delivery_destination', 'delivery_base_fee',
                 'shipping_profile', 'handling_surcharge', 'delivery_fee',
                 'delivery_origin_city', 'delivery_is_demo', 'delivery_assumption_label',
+                'handler_required',
             ])) {
                 throw new DomainException('Placed order commercial snapshots cannot be changed.');
             }
@@ -232,6 +234,7 @@ class Order extends Model
             'payment_status' => PaymentStatus::class,
             'payment_method' => PaymentMethod::class,
             'payment_rejection_reason' => PaymentRejectionReason::class,
+            'handler_required' => 'boolean',
         ];
     }
 }

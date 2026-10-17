@@ -102,7 +102,14 @@ class Product extends Model
                 return asset($this->image_path);
             }
 
-            return Storage::disk('public')->url($this->image_path);
+            $imageUrl = Storage::disk('public')->url($this->image_path);
+            $appUrl = rtrim((string) config('app.url'), '/');
+
+            if (request()->route() !== null && str_starts_with($imageUrl, $appUrl.'/')) {
+                return request()->getSchemeAndHttpHost().substr($imageUrl, strlen($appUrl));
+            }
+
+            return $imageUrl;
         });
     }
 

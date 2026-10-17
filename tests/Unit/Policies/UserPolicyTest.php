@@ -4,10 +4,13 @@ use App\Enums\UserRole;
 use App\Models\User;
 use App\Policies\UserPolicy;
 
-function userWithRole(UserRole $role): User
+function userWithRole(UserRole $role, bool $canViewCustomers = false): User
 {
-    $user = new User;
+    $user = Mockery::mock(User::class)->makePartial();
     $user->role = $role;
+    $user->shouldReceive('hasAdministrationPermission')
+        ->with('customers.view')
+        ->andReturn($canViewCustomers);
 
     return $user;
 }
@@ -18,7 +21,7 @@ test('only administrators can view the customer directory', function (
 ) {
     $policy = new UserPolicy;
 
-    expect($policy->viewAny(userWithRole($role)))->toBe($expected);
+    expect($policy->viewAny(userWithRole($role, $expected)))->toBe($expected);
 })->with([
     'customer' => [UserRole::Customer, false],
     'administrator' => [UserRole::Administrator, true],
@@ -32,7 +35,7 @@ test('only administrators can view customer records', function (
     $policy = new UserPolicy;
 
     expect($policy->view(
-        userWithRole($actorRole),
+        userWithRole($actorRole, $expected),
         userWithRole($recordRole),
     ))->toBe($expected);
 })->with([

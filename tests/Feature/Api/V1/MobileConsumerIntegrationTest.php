@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Order\AssignOrderHandler;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\ShipmentStatus;
@@ -165,6 +166,8 @@ test('placed delivery milestones share read state and owned deep links while log
         'payment_method' => 'gcash', 'payment_proof' => UploadedFile::fake()->image('proof.png'),
     ])->assertCreated();
     $order = Order::sole();
+    $handler = User::factory()->administrator()->create();
+    app(AssignOrderHandler::class)->execute($order, $handler, $handler->id, claimOnly: true);
     $processing = app(OrderProcessingService::class);
     $processing->updatePaymentStatus($order, PaymentStatus::Verified);
     $processing->updateStatus($order, OrderStatus::Processing);

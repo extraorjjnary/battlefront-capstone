@@ -12,8 +12,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Http\Request;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
 /**
@@ -52,7 +55,16 @@ use Laravel\Sanctum\HasApiTokens;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
+
+    private ?int $cachedAdministrationRoleId = null;
+
+    private ?Request $cachedAdministrationRequest = null;
+
+    /** @var list<string> */
+    private array $cachedAdministrationPermissions = [];
+
+    private ?string $cachedAdministrationRoleCode = null;
 
     /**
      * The model's default values for attributes.
@@ -62,6 +74,8 @@ class User extends Authenticatable
     protected $attributes = [
         'appearance' => 'system',
         'role' => 'customer',
+        'is_active' => true,
+        'must_change_password' => false,
         'search_recommendations_enabled' => true,
         'product_view_recommendations_enabled' => true,
         'personalized_recommendations_enabled' => true,
@@ -84,6 +98,8 @@ class User extends Authenticatable
             'product_view_recommendations_enabled' => 'boolean',
             'personalized_recommendations_enabled' => 'boolean',
             'has_visited_dashboard' => 'boolean',
+            'is_active' => 'boolean',
+            'must_change_password' => 'boolean',
         ];
     }
 
@@ -93,6 +109,71 @@ class User extends Authenticatable
     public function isAdministrator(): bool
     {
         return $this->role === UserRole::Administrator;
+    }
+
+    public function hasAdministrationPermission(string $permission): bool
+    {
+        if (! $this->isAdministrator() || ! $this->is_active || $this->administration_role_id === null) {
+            return false;
+        }
+
+        $this->cacheAdministrationRole();
+        $roleCode = $this->administrationRoleCode();
+        if ($roleCode === 'it' && ! in_array($permission, ['users.manage', 'audit.view'], true)) {
+            return false;
+        }
+        if ($permission === 'users.manage' && ! in_array($roleCode, ['owner', 'it'], true)) {
+            return false;
+        }
+        if (in_array($permission, ['permissions.manage', 'audit.export'], true)
+            && $roleCode !== 'owner') {
+            return false;
+        }
+
+        return in_array($permission, $this->cachedAdministrationPermissions, true);
+    }
+
+    public function administrationRoleCode(): ?string
+    {
+        if ($this->administration_role_id === null) {
+            return null;
+        }
+
+        $this->cacheAdministrationRole();
+
+        return $this->cachedAdministrationRoleCode;
+    }
+
+    private function cacheAdministrationRole(): void
+    {
+        $currentRequest = request();
+
+        if ($this->cachedAdministrationRoleId === $this->administration_role_id
+            && $this->cachedAdministrationRequest === $currentRequest) {
+            return;
+        }
+
+        $this->cachedAdministrationRoleId = $this->administration_role_id;
+        $this->cachedAdministrationRequest = $currentRequest;
+        $cacheKey = 'administration-role-permissions:'.$this->administration_role_id;
+        $roleAccess = request()->attributes->get($cacheKey);
+
+        if (! is_array($roleAccess)) {
+            $roleAccess = DB::table('administration_roles as roles')
+                ->leftJoin('administration_role_permissions as grants', 'grants.administration_role_id', '=', 'roles.id')
+                ->leftJoin('administration_permissions as permissions', 'permissions.id', '=', 'grants.administration_permission_id')
+                ->where('roles.id', $this->administration_role_id)
+                ->get(['roles.code as role_code', 'permissions.code as permission_code']);
+
+            request()->attributes->set($cacheKey, [
+                'role_code' => $roleAccess->first()?->role_code,
+                'permissions' => $roleAccess->pluck('permission_code')->filter()->values()->all(),
+            ]);
+            $roleAccess = request()->attributes->get($cacheKey);
+        }
+
+        $this->cachedAdministrationRoleCode = $roleAccess['role_code'];
+        $this->cachedAdministrationPermissions = $roleAccess['permissions'];
     }
 
     /**

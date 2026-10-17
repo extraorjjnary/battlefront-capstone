@@ -1,6 +1,7 @@
 <script setup>
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import { ArrowLeft, PackageSearch, Pencil } from '@lucide/vue';
+import { computed } from 'vue';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import PermanentDeletionDialog from '@/components/PermanentDeletionDialog.vue';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +11,9 @@ import { Button } from '@/components/ui/button';
 defineProps({
     product: { type: Object, required: true },
 });
+const page = usePage();
+const canManageProducts = computed(() => page.props.auth?.can?.manageProducts === true);
+const canDeleteProduct = computed(() => page.props.auth?.can?.deleteCatalog === true);
 
 const currencyFormatter = new Intl.NumberFormat('en-PH', {
     style: 'currency',
@@ -63,13 +67,14 @@ defineOptions({
                 </div>
             </div>
             <div class="flex flex-wrap items-center gap-2">
-                <Button as-child>
+                <Button v-if="canManageProducts" as-child>
                     <Link :href="ProductController.edit(product.id)">
                         <Pencil />
                         Edit product
                     </Link>
                 </Button>
                 <PermanentDeletionDialog
+                    v-if="canDeleteProduct"
                     :name="product.name"
                     :form="ProductController.destroy.form(product.id)"
                     :error-bag="`deleteProduct${product.id}`"

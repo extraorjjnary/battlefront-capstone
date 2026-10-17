@@ -1,5 +1,5 @@
 <script setup>
-import { Form, Head, Link, router } from '@inertiajs/vue3';
+import { Form, Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     Eye,
     Pencil,
@@ -37,6 +37,10 @@ const props = defineProps({
     filters: { type: Object, required: true },
     filter_options: { type: Object, required: true },
 });
+const page = usePage();
+const canManageProducts = computed(() => page.props.auth?.can?.manageProducts === true);
+const canCreateProduct = computed(() => page.props.auth?.can?.priceProducts === true);
+const canDeleteProduct = computed(() => page.props.auth?.can?.deleteCatalog === true);
 
 const categoryId = ref(String(props.filters.category_id ?? 'all'));
 const brand = ref(props.filters.brand ?? 'all');
@@ -185,17 +189,20 @@ defineOptions({
                         <h1
                             class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
                         >
-                            Product management
+                            {{ canManageProducts ? 'Product management' : 'Products' }}
                         </h1>
                         <p
                             class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6"
                         >
-                            Maintain the hardware details, pricing, categories,
-                            and tags used across Battlefront catalog workflows.
+                            {{ canCreateProduct
+                                ? 'Maintain the hardware details, pricing, categories, and tags used across Battlefront catalog workflows.'
+                                : canManageProducts
+                                  ? 'Manage product details, categories, and tags. The owner controls prices.'
+                                  : 'Browse product details, prices, availability, and catalog status.' }}
                         </p>
                     </div>
                 </div>
-                <Button as-child class="shrink-0">
+                <Button v-if="canCreateProduct" as-child class="shrink-0">
                     <Link :href="ProductController.create()">
                         <Plus />
                         Add product
@@ -383,10 +390,12 @@ defineOptions({
                         {{
                             hasActiveQuery
                                 ? 'Try another search term or clear the applied filters.'
-                                : 'Add the first Battlefront catalog product to get started.'
+                                : canCreateProduct
+                                  ? 'Add the first Battlefront catalog product to get started.'
+                                  : 'No product records are available yet.'
                         }}
                     </p>
-                    <Button v-if="!hasActiveQuery" as-child class="mt-5">
+                    <Button v-if="!hasActiveQuery && canCreateProduct" as-child class="mt-5">
                         <Link :href="ProductController.create()">
                             <Plus />
                             Add product
@@ -512,21 +521,21 @@ defineOptions({
                             </Link>
                         </Button>
 
-                        <Button variant="outline" size="sm" as-child>
+                        <Button v-if="canManageProducts" variant="outline" size="sm" as-child>
                             <Link :href="ProductController.edit(product.id)">
                                 <Pencil />
                                 Edit
                             </Link>
                         </Button>
                         <DeactivationDialog
-                            v-if="product.is_active"
+                            v-if="canManageProducts && product.is_active"
                             :name="product.name"
                             :form="ProductActivationController.form(product.id)"
                             description="This product will no longer appear in customer catalog, cart, or recommendation workflows. Its record, category, tags, and inventory are preserved."
                         />
 
                         <Form
-                            v-else
+                            v-else-if="canManageProducts"
                             v-bind="
                                 ProductActivationController.form(product.id)
                             "
@@ -545,6 +554,7 @@ defineOptions({
                             </Button>
                         </Form>
                         <PermanentDeletionDialog
+                            v-if="canDeleteProduct"
                             :name="product.name"
                             :form="ProductController.destroy.form(product.id)"
                             :error-bag="`deleteProduct${product.id}`"

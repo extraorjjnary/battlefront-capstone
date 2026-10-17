@@ -25,6 +25,7 @@ class RecordCompletedOrderSale
         $order->sale()->create([
             'amount' => $subtotal,
             'sale_date' => today(),
+            'handler_id' => $order->assigned_handler_id,
         ]);
     }
 }

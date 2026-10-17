@@ -23,7 +23,8 @@ class NotificationHistory
     public function query(User $user): Builder
     {
         return $user->notifications()->getQuery()
-            ->where('data->audience', $user->isAdministrator() ? 'administrator' : 'customer');
+            ->where('data->audience', $user->isAdministrator() ? 'administrator' : 'customer')
+            ->when($user->isAdministrator() && ! $user->hasAdministrationPermission('orders.view'), fn (Builder $query): Builder => $query->whereRaw('1 = 0'));
     }
 
     public function unreadCount(User $user): int

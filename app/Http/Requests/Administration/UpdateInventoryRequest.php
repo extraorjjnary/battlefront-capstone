@@ -12,7 +12,7 @@ class UpdateInventoryRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()?->can('access-administration') ?? false;
+        return $this->user()?->can('inventory.request') ?? false;
     }
 
     /**
@@ -25,6 +25,7 @@ class UpdateInventoryRequest extends FormRequest
         return [
             'quantity' => ['bail', 'required', 'integer', 'min:0', 'max:4294967295'],
             'reorder_level' => ['bail', 'required', 'integer', 'min:0', 'max:4294967295'],
+            'reason' => ['required', 'string', 'min:5', 'max:2000'],
         ];
     }
 

@@ -11,6 +11,7 @@ test('the inventory schema follows the approved ERD decisions', function () {
         'id',
         'product_id',
         'quantity',
+        'quarantined_quantity',
         'reorder_level',
         'last_updated',
     ]);

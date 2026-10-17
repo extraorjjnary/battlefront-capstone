@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\PasswordUpdateRequest;
-use App\Http\Requests\Settings\TwoFactorAuthenticationRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
@@ -15,13 +14,11 @@ class SecurityController extends Controller
     /**
      * Show the user's security settings page.
      */
-    public function edit(TwoFactorAuthenticationRequest $request): Response
+    public function edit(): Response
     {
-        $props = [
+        return Inertia::render('settings/Security', [
             'passwordRules' => Password::defaults()->toPasswordRulesString(),
-        ];
-
-        return Inertia::render('settings/Security', $props);
+        ]);
     }
 
     /**
@@ -32,6 +29,9 @@ class SecurityController extends Controller
         $request->user()->update([
             'password' => $request->password,
         ]);
+        if ($request->user()->must_change_password) {
+            $request->user()->forceFill(['must_change_password' => false])->save();
+        }
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Password updated.')]);
 

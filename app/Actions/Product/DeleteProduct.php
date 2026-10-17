@@ -12,7 +12,7 @@ use Throwable;
 
 class DeleteProduct
 {
-    public const PROTECTED_MESSAGE = 'This product cannot be deleted because it is referenced by orders, sales, forecasts, historical data, or customer carts. Deactivate the product instead.';
+    public const PROTECTED_MESSAGE = 'This product has linked records in another module and cannot be deleted. Deactivate it instead.';
 
     public function __construct(
         private readonly SalesHistoryCoverageRepository $coverage,
@@ -35,12 +35,28 @@ class DeleteProduct
                 if ($lockedProduct->orderItems()->exists()
                     || $lockedProduct->cartItems()->exists()
                     || $lockedProduct->forecasts()->exists()
+                    || DB::table('customer_product_views')->where('product_id', $lockedProduct->id)->exists()
+                    || DB::table('recommendation_interactions')->where('product_id', $lockedProduct->id)->exists()
+                    || DB::table('inventory_adjustment_requests')->where('product_id', $lockedProduct->id)->exists()
+                    || DB::table('inventory_movements')->where('product_id', $lockedProduct->id)->exists()
+                    || DB::table('damage_reports')->where('product_id', $lockedProduct->id)->exists()
+                    || DB::table('supplier_returns')->where('product_id', $lockedProduct->id)->exists()
                     || $hasHistory) {
                     throw ValidationException::withMessages(['deletion' => self::PROTECTED_MESSAGE]);
                 }
 
                 $imagePath = $lockedProduct->image_path;
+                $lockedProduct->tags()->detach();
                 $lockedProduct->inventory()->delete();
+
+                DB::table('audit_logs')->insert([
+                    'actor_id' => auth()->id(),
+                    'action' => 'product.deleted',
+                    'subject_type' => 'product',
+                    'subject_id' => $lockedProduct->id,
+                    'changes' => json_encode(['product_code' => $lockedProduct->product_code, 'name' => $lockedProduct->name], JSON_THROW_ON_ERROR),
+                    'created_at' => now(),
+                ]);
                 $lockedProduct->delete();
 
                 DB::afterCommit(function () use ($imagePath, $lockedProduct): void {

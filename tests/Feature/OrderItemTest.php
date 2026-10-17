@@ -96,10 +96,10 @@ test('products referenced by order items cannot be deleted', function () {
     $this->assertModelExists($item);
 });
 
-test('deleting an order removes its dependent items', function () {
+test('an order with purchase history cannot be deleted', function () {
     $item = OrderItem::factory()->create();
 
-    $item->order->delete();
+    expect(fn () => $item->order->delete())->toThrow(QueryException::class);
 
-    $this->assertModelMissing($item);
+    $this->assertModelExists($item);
 });

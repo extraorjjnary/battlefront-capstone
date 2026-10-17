@@ -5,6 +5,7 @@ namespace App\Actions\Inventory;
 use App\Models\Inventory;
 use App\Models\Product;
 use DomainException;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 class AdjustInventoryStock
@@ -42,34 +43,59 @@ class AdjustInventoryStock
     /**
      * Increase the current quantity atomically.
      */
-    public function increase(Inventory $inventory, int $amount): Inventory
+    public function increase(Inventory $inventory, int $amount, ?int $orderId = null): Inventory
     {
         $this->ensurePositive($amount);
 
-        Inventory::query()
-            ->whereKey($inventory->getKey())
-            ->increment('quantity', $amount);
+        return DB::transaction(function () use ($inventory, $amount, $orderId): Inventory {
+            Inventory::query()->whereKey($inventory->getKey())->increment('quantity', $amount);
+            $inventory->refresh();
+            $this->recordMovement($inventory, $amount, 'order_cancellation', $orderId);
 
-        return $inventory->refresh();
+            return $inventory;
+        });
     }
 
     /**
      * Decrease the current quantity without allowing overselling.
      */
-    public function decrease(Inventory $inventory, int $amount): Inventory
+    public function decrease(Inventory $inventory, int $amount, ?int $orderId = null): Inventory
     {
         $this->ensurePositive($amount);
 
-        $updatedRows = Inventory::query()
-            ->whereKey($inventory->getKey())
-            ->where('quantity', '>=', $amount)
-            ->decrement('quantity', $amount);
+        return DB::transaction(function () use ($inventory, $amount, $orderId): Inventory {
+            $updatedRows = Inventory::query()
+                ->whereKey($inventory->getKey())
+                ->where('quantity', '>=', $amount)
+                ->decrement('quantity', $amount);
 
-        if ($updatedRows === 0) {
-            throw new DomainException('Insufficient inventory stock.');
-        }
+            if ($updatedRows === 0) {
+                throw new DomainException('Insufficient inventory stock.');
+            }
 
-        return $inventory->refresh();
+            $inventory->refresh();
+            $this->recordMovement($inventory, -$amount, 'order_placement', $orderId);
+
+            return $inventory;
+        });
+    }
+
+    private function recordMovement(Inventory $inventory, int $delta, string $kind, ?int $orderId): void
+    {
+        DB::table('inventory_movements')->insert([
+            'product_id' => $inventory->product_id,
+            'actor_id' => null,
+            'kind' => $kind,
+            'reference_type' => $orderId === null ? null : 'order',
+            'reference_id' => $orderId,
+            'sellable_before' => $inventory->quantity - $delta,
+            'sellable_delta' => $delta,
+            'sellable_after' => $inventory->quantity,
+            'quarantined_before' => $inventory->quarantined_quantity,
+            'quarantined_delta' => 0,
+            'quarantined_after' => $inventory->quarantined_quantity,
+            'created_at' => now(),
+        ]);
     }
 
     /**
