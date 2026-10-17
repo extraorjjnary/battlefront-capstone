@@ -6,6 +6,7 @@ use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class DatabaseSeeder extends Seeder
 {
@@ -31,14 +32,17 @@ class DatabaseSeeder extends Seeder
             ],
         );
 
-        User::query()->updateOrCreate(
+        $administrator = User::query()->firstOrCreate(
             ['email' => 'admin@example.com'],
             [
-                'name' => 'Admin User',
+                'name' => 'IT Administrator',
                 'email_verified_at' => now(),
                 'password' => 'password',
-                'role' => UserRole::Administrator->value,
             ],
         );
+        $administrator->role = UserRole::Administrator;
+        $administrator->administration_role_id = DB::table('administration_roles')->where('code', 'it')->value('id');
+        $administrator->email_verified_at ??= now();
+        $administrator->save();
     }
 }

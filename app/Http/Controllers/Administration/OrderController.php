@@ -7,14 +7,17 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\OrderIndexRequest;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\User;
 use App\Repositories\Order\AdministratorOrderRepository;
 use App\Services\DeliveryQuotePresenter;
 use App\Services\Order\OrderProcessingService;
 use App\Services\ShipmentPresenter;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -132,9 +135,22 @@ class OrderController extends Controller
         $nextShipmentStatus = $processing->nextShipmentStatus($order);
 
         return Inertia::render('Administration/Orders/Show', [
+            'handler_options' => $order->status === OrderStatus::Completed || $order->status === OrderStatus::Cancelled
+                ? []
+                : User::query()->where('role', UserRole::Administrator->value)
+                    ->where('is_active', true)
+                    ->whereIn('administration_role_id', DB::table('administration_role_permissions as grants')
+                        ->join('administration_permissions as permissions', 'permissions.id', '=', 'grants.administration_permission_id')
+                        ->join('administration_roles as roles', 'roles.id', '=', 'grants.administration_role_id')
+                        ->where('permissions.code', 'orders.process')->where('roles.code', '!=', 'it')
+                        ->select('grants.administration_role_id'))
+                    ->orderBy('name')->get(['id', 'name']),
             'order' => [
                 'id' => $order->id,
                 'reference' => $order->reference,
+                'handler_required' => $order->handler_required,
+                'assigned_handler_id' => $order->assigned_handler_id,
+                'assigned_handler_name' => $order->assigned_handler_id === null ? null : User::query()->whereKey($order->assigned_handler_id)->value('name'),
                 'created_at' => $order->created_at->toIso8601String(),
                 'customer' => [
                     'id' => $order->user->id,

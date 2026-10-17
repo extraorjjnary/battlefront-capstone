@@ -12,7 +12,8 @@ test('security page is displayed after password confirmation', function () {
         ->get(route('security.edit'))
         ->assertInertia(fn (Assert $page) => $page
             ->component('settings/Security')
-            ->has('passwordRules'),
+            ->has('passwordRules')
+            ->missing('twoFactor'),
         );
 });
 

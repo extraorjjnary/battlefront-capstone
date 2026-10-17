@@ -16,6 +16,8 @@ test('the order schema follows the approved ERD and checkout amendments', functi
         'id',
         'user_id',
         'recipient_name',
+        'assigned_handler_id',
+        'handler_required',
         'development_fixture_key',
         'contact_number',
         'fulfillment_method',

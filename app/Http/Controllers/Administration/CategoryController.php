@@ -95,6 +95,7 @@ class CategoryController extends Controller
 
     public function destroy(Category $category, DeleteCategory $deleteCategory): RedirectResponse
     {
+        $this->authorize('catalog.delete');
         $deleteCategory->execute($category);
 
         Inertia::flash('toast', [

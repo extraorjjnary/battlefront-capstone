@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
@@ -52,6 +53,7 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'role' => UserRole::Administrator->value,
+            'administration_role_id' => DB::table('administration_roles')->where('code', 'owner')->value('id'),
         ]);
     }
 

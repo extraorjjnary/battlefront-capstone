@@ -16,7 +16,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon $sale_date
  * @property-read Order $order
  */
-#[Fillable(['order_id', 'amount', 'sale_date'])]
+#[Fillable(['order_id', 'amount', 'sale_date', 'handler_id'])]
 class Sale extends Model
 {
     /** @use HasFactory<SaleFactory> */

@@ -75,13 +75,18 @@ test('database sessions retain nullable unconstrained user references', function
     ]);
 });
 
-test('two factor factory state can be built while the feature is disabled', function () {
-    $user = User::factory()->withTwoFactor()->make();
+test('an enrolled account signs in without a two factor challenge while the feature is disabled', function () {
+    $user = User::factory()->administrator()->withTwoFactor()->create();
 
-    expect(Features::enabled(Features::twoFactorAuthentication()))->toBeFalse()
-        ->and($user->two_factor_secret)->not->toBeNull()
-        ->and($user->two_factor_recovery_codes)->not->toBeNull()
-        ->and($user->two_factor_confirmed_at)->not->toBeNull();
+    expect(Features::enabled(Features::twoFactorAuthentication()))->toBeFalse();
+
+    $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
+    ])->assertRedirect(route('dashboard', absolute: false));
+
+    $this->assertAuthenticatedAs($user);
+    $this->get(route('administration.team.index'))->assertOk();
 });
 
 test('users can not authenticate with invalid password', function () {

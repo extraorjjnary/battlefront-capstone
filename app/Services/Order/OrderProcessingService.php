@@ -199,6 +199,8 @@ class OrderProcessingService
                 'tracking_reference' => $this->normalizeTrackingReference($trackingReference),
             ]);
 
+            $this->auditOrderChange($lockedOrder, 'shipment.manual_created', ['shipment_id' => $shipment->id]);
+
             $this->notifications->afterCommit($lockedOrder, 'shipment.manual_created');
 
             return $shipment;
@@ -257,6 +259,7 @@ class OrderProcessingService
             }
 
             $shipment->update($changes);
+            $this->auditOrderChange($lockedOrder, 'shipment.status.updated', ['status' => $status->value]);
 
             if ($status === ShipmentStatus::Delivered && $lockedOrder->payment_method !== PaymentMethod::Cod) {
                 $this->transitionLockedOrder($lockedOrder, OrderStatus::Completed, $shipment);
@@ -280,6 +283,7 @@ class OrderProcessingService
             }
 
             $shipment->update(['tracking_reference' => $this->normalizeTrackingReference($trackingReference)]);
+            $this->auditOrderChange($lockedOrder, 'shipment.reference.updated', ['tracking_reference' => $shipment->tracking_reference]);
 
             return $lockedOrder->refresh();
         }, attempts: 3);
@@ -321,12 +325,18 @@ class OrderProcessingService
             throw ValidationException::withMessages(['status' => 'Complete delivery through the shipment Delivered milestone.']);
         }
 
+        if ($status === OrderStatus::Completed && $order->handler_required && $order->assigned_handler_id === null) {
+            throw ValidationException::withMessages(['status' => 'Assign a responsible staff member before completing this order.']);
+        }
+
         if ($status === OrderStatus::Cancelled) {
             $this->restoreOrderInventory->execute($order);
             $shipment?->update(['status' => ShipmentStatus::Cancelled, 'cancelled_at' => now()]);
         }
 
+        $previousStatus = $order->status->value;
         $order->update(['status' => $status]);
+        $this->auditOrderChange($order, 'order.status.updated', ['before' => $previousStatus, 'after' => $status->value]);
         if ($status === OrderStatus::Cancelled) {
             $this->notifications->afterCommit($order, 'order.cancelled', $cancellationInitiator);
         }
@@ -427,6 +437,8 @@ class OrderProcessingService
                 'payment_rejection_note' => $rejectingWalletPayment ? $normalizedRejectionNote : null,
             ]);
 
+            $this->auditOrderChange($lockedOrder, 'order.payment_status.updated', ['after' => $paymentStatus->value]);
+
             $this->notifications->afterCommit($lockedOrder, 'payment.'.$paymentStatus->value);
 
             return $lockedOrder->refresh();
@@ -492,6 +504,7 @@ class OrderProcessingService
                 'payment_rejection_reason' => null,
                 'payment_rejection_note' => null,
             ]);
+            $this->auditOrderChange($lockedOrder, 'order.payment_status.updated', ['after' => PaymentStatus::Verified->value]);
             $this->transitionLockedOrder($lockedOrder, OrderStatus::Completed, $shipment);
             if ($paymentWasPending) {
                 $this->notifications->afterCommit($lockedOrder, 'payment.verified');
@@ -527,10 +540,24 @@ class OrderProcessingService
                 'payment_rejection_reason' => null,
                 'payment_rejection_note' => null,
             ]);
+            $this->auditOrderChange($lockedOrder, 'order.payment_status.updated', ['after' => PaymentStatus::Verified->value]);
             $this->transitionLockedOrder($lockedOrder, OrderStatus::Completed, $shipment);
             $this->notifications->afterCommit($lockedOrder, 'payment.verified');
 
             return $lockedOrder->refresh();
         }, attempts: 3);
+    }
+
+    /** @param array<string, mixed> $changes */
+    private function auditOrderChange(Order $order, string $action, array $changes): void
+    {
+        DB::table('audit_logs')->insert([
+            'actor_id' => auth()->id(),
+            'action' => $action,
+            'subject_type' => 'order',
+            'subject_id' => $order->id,
+            'changes' => json_encode($changes, JSON_THROW_ON_ERROR),
+            'created_at' => now(),
+        ]);
     }
 }

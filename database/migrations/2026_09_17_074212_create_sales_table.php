@@ -40,7 +40,7 @@ return new class extends Migration
             DB::statement(<<<'SQL'
                 CREATE TRIGGER sales_amount_insert_check
                 BEFORE INSERT ON sales
-                WHEN NEW.amount < 0
+                WHEN CAST(NEW.amount AS NUMERIC) < 0
                 BEGIN
                     SELECT RAISE(ABORT, 'Sale amount cannot be negative.');
                 END
@@ -49,7 +49,7 @@ return new class extends Migration
             DB::statement(<<<'SQL'
                 CREATE TRIGGER sales_amount_update_check
                 BEFORE UPDATE OF amount ON sales
-                WHEN NEW.amount < 0
+                WHEN CAST(NEW.amount AS NUMERIC) < 0
                 BEGIN
                     SELECT RAISE(ABORT, 'Sale amount cannot be negative.');
                 END

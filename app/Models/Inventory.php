@@ -25,6 +25,10 @@ class Inventory extends Model
     /** @use HasFactory<InventoryFactory> */
     use HasFactory;
 
+    protected $attributes = [
+        'quarantined_quantity' => 0,
+    ];
+
     /**
      * The name of the "created at" column.
      *
@@ -79,6 +83,7 @@ class Inventory extends Model
     {
         return [
             'quantity' => 'integer',
+            'quarantined_quantity' => 'integer',
             'reorder_level' => 'integer',
             'last_updated' => 'datetime',
         ];

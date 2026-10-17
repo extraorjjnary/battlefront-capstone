@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\HistoricalSalesCatalogFixtures;
 
-test('administrators can delete unused products and their disposable associations', function (bool $imported) {
+test('linked inventory and activity prevent product deletion', function (bool $imported) {
     Storage::fake('local');
     $administrator = User::factory()->administrator()->create();
     $product = Product::factory()->available()->create(['is_catalog_imported' => $imported]);
@@ -40,14 +40,14 @@ test('administrators can delete unused products and their disposable association
     $unrelated = Product::factory()->available()->create();
 
     $this->actingAs($administrator)->delete(route('administration.products.destroy', $product))
-        ->assertSessionHasNoErrors()->assertRedirect(route('administration.products.index'));
+        ->assertSessionHasErrors(['deletion' => DeleteProduct::PROTECTED_MESSAGE]);
 
-    $this->assertModelMissing($product);
-    $this->assertModelMissing($inventory);
-    $this->assertModelMissing($view);
-    $this->assertModelMissing($guestView);
-    $this->assertModelMissing($interaction);
-    $this->assertDatabaseMissing('product_tag', ['product_id' => $product->id]);
+    $this->assertModelExists($product);
+    $this->assertModelExists($inventory);
+    $this->assertModelExists($view);
+    $this->assertModelExists($guestView);
+    $this->assertModelExists($interaction);
+    $this->assertDatabaseHas('product_tag', ['product_id' => $product->id]);
     $this->assertModelExists($tag);
     $this->assertModelExists($unrelated);
     $this->assertModelExists($unrelated->inventory);
@@ -221,7 +221,7 @@ test('unreadable history metadata refuses deletion without changing product data
 
 test('rollback never removes an owned product image', function () {
     Storage::fake('public');
-    $product = Product::factory()->available()->create(['image_path' => 'products/owned.jpg']);
+    $product = Product::factory()->create(['image_path' => 'products/owned.jpg']);
     Storage::disk('public')->put($product->image_path, 'owned bytes');
     DB::beginTransaction();
 
@@ -233,7 +233,6 @@ test('rollback never removes an owned product image', function () {
     }
 
     $this->assertModelExists($product);
-    $this->assertModelExists($product->inventory);
     Storage::disk('public')->assertExists($product->image_path);
 });
 
@@ -247,17 +246,17 @@ test('image cleanup failure is reported after the deletion remains committed', f
         ->assertSessionHasNoErrors()->assertRedirect(route('administration.products.index'));
 
     $this->assertModelMissing($product);
+    $this->assertDatabaseHas('audit_logs', ['action' => 'product.deleted', 'subject_id' => $product->id]);
     Exceptions::assertReported(RuntimeException::class);
 });
 
 test('unrelated database deletion failures are not disguised as protected references', function () {
-    $product = Product::factory()->available()->create();
+    $product = Product::factory()->create();
     DB::unprepared("CREATE TRIGGER fail_product_delete BEFORE DELETE ON products BEGIN SELECT RAISE(ABORT, 'Storage constraint failure'); END");
 
     expect(fn () => app(DeleteProduct::class)->execute($product))->toThrow(QueryException::class);
 
     $this->assertModelExists($product);
-    $this->assertModelExists($product->inventory);
 });
 
 test('administrators can permanently delete empty active or inactive categories', function (bool $active) {
@@ -268,6 +267,7 @@ test('administrators can permanently delete empty active or inactive categories'
         ->assertSessionHasNoErrors()->assertRedirect(route('administration.categories.index'));
 
     $this->assertModelMissing($category);
+    $this->assertDatabaseHas('audit_logs', ['action' => 'category.deleted', 'subject_id' => $category->id]);
     $this->assertModelExists($otherProduct);
     $this->assertModelExists($otherProduct->category);
 })->with(['active' => true, 'inactive' => false]);

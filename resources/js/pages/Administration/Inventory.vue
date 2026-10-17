@@ -497,30 +497,32 @@ defineOptions({
                             >
                                 Reorder level
                             </Label>
-                            <Input
-                                :id="`reorder-level-${product.inventory.id}`"
-                                name="reorder_level"
-                                type="number"
-                                min="0"
-                                max="4294967295"
-                                step="1"
-                                inputmode="numeric"
-                                :default-value="product.inventory.reorder_level"
-                                :aria-invalid="Boolean(errors.reorder_level)"
-                                required
-                            />
-                            <InputError :message="errors.reorder_level" />
+                            <p :id="`reorder-level-${product.inventory.id}`" class="py-2 text-sm">{{ product.inventory.reorder_level }}</p>
+                            <input type="hidden" name="reorder_level" :value="product.inventory.reorder_level" />
+                        </div>
+
+                        <div class="grid gap-2 sm:col-span-3">
+                            <Label :for="`reason-${product.inventory.id}`">Reason for stock request</Label>
+                            <Input :id="`reason-${product.inventory.id}`" name="reason" required minlength="5" maxlength="2000" />
+                            <InputError :message="errors.reason" />
                         </div>
 
                         <Button class="sm:mt-7" :disabled="processing">
                             <Spinner v-if="processing" />
                             <Save v-else />
-                            Update stock
+                            Request stock change
                         </Button>
                     </Form>
 
+                    <Form v-if="product.inventory && $page.props.auth.can?.approveInventory" v-bind="InventoryController.updateReorderLevel.form(product.inventory.id)" v-slot="{ errors, processing }" class="flex flex-wrap items-end gap-3">
+                        <label class="text-sm">New reorder level<Input name="reorder_level" type="number" min="0" required :default-value="product.inventory.reorder_level" /></label>
+                        <label class="text-sm">Reason<Input name="reason" required minlength="5" maxlength="2000" /></label>
+                        <Button type="submit" variant="outline" :disabled="processing">Update reorder level</Button>
+                        <InputError :message="errors.reorder_level || errors.reason" />
+                    </Form>
+
                     <Form
-                        v-else
+                        v-if="!product.inventory"
                         v-bind="InventoryController.store.form(product.id)"
                         :options="{
                             preserveScroll: true,
@@ -574,10 +576,16 @@ defineOptions({
                             <InputError :message="errors.reorder_level" />
                         </div>
 
+                        <div class="grid gap-2 sm:col-span-3">
+                            <Label :for="`opening-reason-${product.id}`">Reason for opening stock</Label>
+                            <Input :id="`opening-reason-${product.id}`" name="reason" required minlength="5" maxlength="2000" />
+                            <InputError :message="errors.reason" />
+                        </div>
+
                         <Button class="sm:mt-7" :disabled="processing">
                             <Spinner v-if="processing" />
                             <Save v-else />
-                            Initialize inventory
+                            Request opening stock
                         </Button>
                     </Form>
                 </article>
