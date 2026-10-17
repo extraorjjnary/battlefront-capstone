@@ -21,7 +21,7 @@ class HandleDamage
             $beforeSellable = $inventory->quantity;
             $beforeHeld = $inventory->quarantined_quantity;
             $inventory->quantity -= $quantity;
-            $inventory->quarantined_quantity += $quantity;
+            $inventory->quarantined_quantity = max(0, (int) ($inventory->quarantined_quantity + $quantity));
             $inventory->save();
 
             $id = DB::table('damage_reports')->insertGetId([
@@ -65,11 +65,11 @@ class HandleDamage
             $beforeHeld = $inventory->quarantined_quantity;
             if ($disposition === 'release') {
                 $inventory->quantity += $report->quantity;
-                $inventory->quarantined_quantity -= $report->quantity;
+                $inventory->quarantined_quantity = max(0, (int) ($inventory->quarantined_quantity - $report->quantity));
                 $inventory->save();
                 $this->movement($inventory, $reviewer, 'damage_release', 'damage_report', $damageId, $beforeSellable, $beforeHeld);
             } elseif ($disposition === 'write_off') {
-                $inventory->quarantined_quantity -= $report->quantity;
+                $inventory->quarantined_quantity = max(0, (int) ($inventory->quarantined_quantity - $report->quantity));
                 $inventory->save();
                 $this->movement($inventory, $reviewer, 'damage_write_off', 'damage_report', $damageId, $beforeSellable, $beforeHeld);
             } elseif ($disposition === 'supplier_return') {
@@ -120,6 +120,9 @@ class HandleDamage
         ]);
     }
 
+    /**
+     * @param  array<string, mixed>  $changes
+     */
     private function audit(User $actor, string $action, int $id, array $changes, ?string $reason): void
     {
         DB::table('audit_logs')->insert([

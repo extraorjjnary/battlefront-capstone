@@ -34,7 +34,7 @@ class HandleCustomerReturn
             $inventory = Inventory::query()->where('product_id', $item->product_id)->lockForUpdate()->firstOrFail();
             $beforeSellable = $inventory->quantity;
             $beforeHeld = $inventory->quarantined_quantity;
-            $inventory->quarantined_quantity += $quantity;
+            $inventory->quarantined_quantity = max(0, (int) ($inventory->quarantined_quantity + $quantity));
             $inventory->save();
 
             $id = DB::table('customer_returns')->insertGetId([
@@ -77,7 +77,8 @@ class HandleCustomerReturn
 
             $returnItem = DB::table('customer_return_items')->where('customer_return_id', $returnId)->lockForUpdate()->first();
             $originalItem = OrderItem::query()->whereKey($returnItem->order_item_id)->firstOrFail();
-            $maximum = bcmul((string) $returnItem->quantity, $originalItem->price_at_time, 2);
+            $maximum = bcmul($this->decimal((string) $returnItem->quantity), $originalItem->price_at_time, 2);
+            $approvedAmount = $this->decimal($approvedAmount);
             if ($accept && (bccomp($approvedAmount, '0.00', 2) < 0 || bccomp($approvedAmount, $maximum, 2) > 0)) {
                 throw ValidationException::withMessages(['approved_amount' => 'Refund approval exceeds the returned item value.']);
             }
@@ -89,9 +90,9 @@ class HandleCustomerReturn
             $beforeSellable = $inventory->quantity;
             $beforeHeld = $inventory->quarantined_quantity;
             if ($accept && $disposition === 'write_off') {
-                $inventory->quarantined_quantity -= $returnItem->quantity;
+                $inventory->quarantined_quantity = max(0, (int) ($inventory->quarantined_quantity - $returnItem->quantity));
             } elseif ($disposition === 'restock') {
-                $inventory->quarantined_quantity -= $returnItem->quantity;
+                $inventory->quarantined_quantity = max(0, (int) ($inventory->quarantined_quantity - $returnItem->quantity));
                 $inventory->quantity += $returnItem->quantity;
             } elseif ($disposition === 'supplier_return') {
                 if ($supplierId === null || ! DB::table('suppliers')->where('id', $supplierId)->where('is_active', true)->exists()) {
@@ -114,7 +115,7 @@ class HandleCustomerReturn
 
             if ($accept && $disposition !== 'supplier_return') {
                 $inventory->save();
-                $this->movement($inventory, $reviewer, $accept ? 'customer_return_'.$disposition : 'customer_return_rejected', $returnId, $beforeSellable, $beforeHeld);
+                $this->movement($inventory, $reviewer, 'customer_return_'.$disposition, $returnId, $beforeSellable, $beforeHeld);
             }
 
             DB::table('customer_return_items')->where('id', $returnItem->id)->update([
@@ -156,14 +157,14 @@ class HandleCustomerReturn
                 throw ValidationException::withMessages(['handover' => 'Only rejected returns awaiting handover may be returned to the customer.']);
             }
             $item = DB::table('customer_return_items')->where('customer_return_id', $returnId)->first();
-            $productId = OrderItem::query()->findOrFail($item->order_item_id)->product_id;
+            $productId = OrderItem::query()->whereKey($item->order_item_id)->firstOrFail()->product_id;
             $inventory = Inventory::query()->where('product_id', $productId)->lockForUpdate()->firstOrFail();
             if ($inventory->quarantined_quantity < $item->quantity) {
                 throw ValidationException::withMessages(['handover' => 'Received stock is no longer in quarantine.']);
             }
             $beforeSellable = $inventory->quantity;
             $beforeHeld = $inventory->quarantined_quantity;
-            $inventory->quarantined_quantity -= $item->quantity;
+            $inventory->quarantined_quantity = max(0, (int) ($inventory->quarantined_quantity - $item->quantity));
             $inventory->save();
             $this->movement($inventory, $actor, 'customer_return_handed_back', $returnId, $beforeSellable, $beforeHeld);
             DB::table('customer_returns')->where('id', $returnId)->update(['status' => 'rejected', 'updated_at' => now()]);
@@ -178,7 +179,10 @@ class HandleCustomerReturn
             if ($refund === null) {
                 abort(404);
             }
-            $remaining = bcsub($refund->approved_amount, $refund->paid_amount, 2);
+            $approvedAmount = $this->decimal($refund->approved_amount);
+            $paidAmount = $this->decimal($refund->paid_amount);
+            $amount = $this->decimal($amount);
+            $remaining = bcsub($approvedAmount, $paidAmount, 2);
             if (bccomp($amount, '0.00', 2) <= 0 || bccomp($amount, $remaining, 2) > 0) {
                 throw ValidationException::withMessages(['amount' => 'Payment exceeds the unpaid approved refund.']);
             }
@@ -194,7 +198,7 @@ class HandleCustomerReturn
                 'paid_at' => now(),
             ]);
             DB::table('customer_refunds')->where('id', $refundId)->update([
-                'paid_amount' => bcadd($refund->paid_amount, $amount, 2),
+                'paid_amount' => bcadd($paidAmount, $amount, 2),
                 'recorded_by' => $actor->id,
                 'payment_method' => $method,
                 'external_reference' => $externalReference,
@@ -223,6 +227,9 @@ class HandleCustomerReturn
         ]);
     }
 
+    /**
+     * @param  array<string, mixed>  $changes
+     */
     private function audit(User $actor, string $action, int $id, array $changes, ?string $reason): void
     {
         DB::table('audit_logs')->insert([
@@ -234,5 +241,17 @@ class HandleCustomerReturn
             'changes' => json_encode($changes, JSON_THROW_ON_ERROR),
             'created_at' => now(),
         ]);
+    }
+
+    /**
+     * @return numeric-string
+     */
+    private function decimal(string $value): string
+    {
+        if (! is_numeric($value) || ! preg_match('/^-?\d+(?:\.\d+)?$/D', $value)) {
+            throw new \InvalidArgumentException('A valid decimal amount is required.');
+        }
+
+        return $value;
     }
 }

@@ -196,7 +196,7 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
             foreach ($order->items as $item) {
                 $product = $productsById[$item->product_id];
                 $price = $item->price_at_time;
-                if (! is_numeric($price) || $item->quantity !== $plan[$slot][$product->product_code] || bccomp($price, '0', 2) < 0) {
+                if ($item->quantity !== $plan[$slot][$product->product_code] || bccomp($price, '0', 2) < 0) {
                     throw new RuntimeException('Historical sales order items conflict with the demonstration history. '.self::REMEDIATION);
                 }
                 $total = bcadd($total, bcmul($price, (string) $item->quantity, 2), 2);

@@ -37,7 +37,7 @@ class DamageReportController extends Controller
             'quantity' => ['required', 'integer', 'min:1', 'max:4294967295'],
             'reason' => ['required', 'string', 'min:5', 'max:2000'],
         ]);
-        $damage->report(Product::query()->findOrFail($validated['product_id']), $request->user(), $validated['quantity'], $validated['reason']);
+        $damage->report(Product::query()->whereKey($validated['product_id'])->firstOrFail(), $request->user(), $validated['quantity'], $validated['reason']);
 
         return back();
     }

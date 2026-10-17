@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Administration;
 use App\Enums\OrderStatus;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -48,7 +50,7 @@ class CustomerController extends Controller
             ->orderByDesc('id')
             ->paginate(10)
             ->withQueryString()
-            ->through(fn ($order): array => [
+            ->through(fn (Order $order): array => [
                 'id' => $order->id,
                 'reference' => $order->reference,
                 'created_at' => $order->created_at->toIso8601String(),
@@ -57,7 +59,7 @@ class CustomerController extends Controller
                 'product_subtotal' => $order->product_subtotal,
                 'delivery_fee' => $order->delivery_fee,
                 'total_amount' => $order->total_amount,
-                'items' => $order->items->map(fn ($item): array => [
+                'items' => $order->items->map(fn (OrderItem $item): array => [
                     'name' => $item->product->name,
                     'quantity' => $item->quantity,
                     'price_at_time' => $item->price_at_time,

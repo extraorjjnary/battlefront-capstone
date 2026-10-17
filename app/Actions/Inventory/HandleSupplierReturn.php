@@ -23,7 +23,7 @@ class HandleSupplierReturn
             $beforeSellable = $inventory->quantity;
             $beforeHeld = $inventory->quarantined_quantity;
             $inventory->quantity -= $quantity;
-            $inventory->quarantined_quantity += $quantity;
+            $inventory->quarantined_quantity = max(0, (int) ($inventory->quarantined_quantity + $quantity));
             $inventory->save();
 
             $id = DB::table('supplier_returns')->insertGetId([
@@ -68,7 +68,7 @@ class HandleSupplierReturn
                 $beforeSellable = $inventory->quantity;
                 $beforeHeld = $inventory->quarantined_quantity;
                 $inventory->quantity += $return->quantity;
-                $inventory->quarantined_quantity -= $return->quantity;
+                $inventory->quarantined_quantity = max(0, (int) ($inventory->quarantined_quantity - $return->quantity));
                 $inventory->save();
                 $this->movement($inventory, $reviewer, 'supplier_return_released', $id, $beforeSellable, $beforeHeld);
             }
@@ -101,7 +101,7 @@ class HandleSupplierReturn
             }
             $beforeSellable = $inventory->quantity;
             $beforeHeld = $inventory->quarantined_quantity;
-            $inventory->quarantined_quantity -= $return->quantity;
+            $inventory->quarantined_quantity = max(0, (int) ($inventory->quarantined_quantity - $return->quantity));
             $inventory->save();
             $this->movement($inventory, $actor, 'supplier_return_dispatched', $id, $beforeSellable, $beforeHeld);
             DB::table('supplier_returns')->where('id', $id)->update([
@@ -150,6 +150,9 @@ class HandleSupplierReturn
         ]);
     }
 
+    /**
+     * @param  array<string, mixed>  $changes
+     */
     private function audit(User $actor, string $action, int $id, array $changes, ?string $reason): void
     {
         DB::table('audit_logs')->insert([

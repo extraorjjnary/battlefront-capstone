@@ -28,7 +28,7 @@ class DecideInventoryAdjustment
             if (! $reviewer->hasAdministrationPermission('inventory.approve')) {
                 abort(403);
             }
-            $requester = User::query()->findOrFail($request->requester_id);
+            $requester = User::query()->whereKey($request->requester_id)->firstOrFail();
             if (! $requester->is_active) {
                 throw ValidationException::withMessages(['decision' => 'The requester account is inactive.']);
             }
@@ -36,7 +36,7 @@ class DecideInventoryAdjustment
             if ($approve) {
                 $product = Product::query()->whereKey($request->product_id)->lockForUpdate()->firstOrFail();
                 $inventory = $product->inventory()->lockForUpdate()->first();
-                $current = $inventory?->quantity ?? 0;
+                $current = $inventory->quantity ?? 0;
                 if ($current !== (int) $request->observed_quantity) {
                     throw ValidationException::withMessages(['decision' => 'Stock changed after this request. Submit a new request.']);
                 }

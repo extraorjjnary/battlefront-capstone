@@ -31,6 +31,9 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Prepare SQLite database
+        run: touch database/database.sqlite
+
       - name: Setup Application
         run: composer setup
 

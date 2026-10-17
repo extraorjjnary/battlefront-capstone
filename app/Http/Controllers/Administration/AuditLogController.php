@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AuditLogController extends Controller
@@ -34,6 +35,9 @@ class AuditLogController extends Controller
 
         return response()->streamDownload(function () use ($filters): void {
             $output = fopen('php://output', 'w');
+            if ($output === false) {
+                throw new RuntimeException('The audit log export stream could not be opened.');
+            }
             fputcsv($output, ['ID', 'Date', 'Actor', 'Action', 'Subject type', 'Subject ID', 'Reason', 'Changes']);
             foreach ($this->query($filters)->cursor() as $entry) {
                 fputcsv($output, [$entry->id, $entry->created_at, $entry->actor_name, $entry->action, $entry->subject_type, $entry->subject_id, $entry->reason, $entry->changes]);
@@ -42,6 +46,9 @@ class AuditLogController extends Controller
         }, 'audit-log.csv', ['Content-Type' => 'text/csv']);
     }
 
+    /**
+     * @param  array{action?: string|null, actor_id?: int|null}  $filters
+     */
     private function query(array $filters): Builder
     {
         return DB::table('audit_logs')

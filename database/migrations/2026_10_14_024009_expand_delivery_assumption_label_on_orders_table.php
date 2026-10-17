@@ -44,7 +44,9 @@ return new class extends Migration
 
         /** SQLite column changes rebuild the table and discard its application constraint triggers. */
         foreach ($triggers as $sql) {
-            DB::unprepared($sql);
+            if (is_string($sql)) {
+                DB::connection()->getPdo()->exec($sql);
+            }
         }
     }
 };

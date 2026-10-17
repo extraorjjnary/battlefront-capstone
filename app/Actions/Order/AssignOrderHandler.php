@@ -31,7 +31,7 @@ class AssignOrderHandler
             }
 
             $before = $locked->assigned_handler_id;
-            $locked->assigned_handler_id = $handlerId;
+            $locked->assigned_handler_id = $handler->id;
             $locked->save();
             DB::table('audit_logs')->insert([
                 'actor_id' => $actor->id,

@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $order_id
  * @property int $product_id
  * @property int $quantity
- * @property string $price_at_time
+ * @property numeric-string $price_at_time
  * @property-read Order $order
  * @property-read Product $product
  */

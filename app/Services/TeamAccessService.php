@@ -11,6 +11,9 @@ use Illuminate\Validation\ValidationException;
 
 class TeamAccessService
 {
+    /**
+     * @param  array{name: string, email: string, password: string, role: string}  $attributes
+     */
     public function create(User $actor, array $attributes): User
     {
         $this->authorizeRoleChange($actor, null, $attributes['role']);
@@ -71,6 +74,9 @@ class TeamAccessService
         }, attempts: 3);
     }
 
+    /**
+     * @param  list<string>  $codes
+     */
     public function replacePermissions(User $actor, string $role, array $codes): void
     {
         if (in_array($role, ['owner', 'it'], true)) {
@@ -97,10 +103,13 @@ class TeamAccessService
                 ]);
             }
 
-            $this->audit($actor, 'role.permissions.updated', $roleId, ['before' => $before, 'after' => array_values($codes)]);
+            $this->audit($actor, 'role.permissions.updated', $roleId, ['before' => $before, 'after' => $codes]);
         }, attempts: 3);
     }
 
+    /**
+     * @return positive-int
+     */
     private function roleId(string $code): int
     {
         $id = DB::table('administration_roles')->where('code', $code)->value('id');
@@ -108,7 +117,12 @@ class TeamAccessService
             throw ValidationException::withMessages(['role' => 'Unknown administrator role.']);
         }
 
-        return (int) $id;
+        $id = (int) $id;
+        if ($id < 1) {
+            throw ValidationException::withMessages(['role' => 'Unknown administrator role.']);
+        }
+
+        return $id;
     }
 
     private function authorizeRoleChange(User $actor, ?User $target, string $role): void
@@ -124,6 +138,9 @@ class TeamAccessService
         }
     }
 
+    /**
+     * @param  array<string, mixed>  $changes
+     */
     private function audit(User $actor, string $action, int $subjectId, array $changes): void
     {
         DB::table('audit_logs')->insert([

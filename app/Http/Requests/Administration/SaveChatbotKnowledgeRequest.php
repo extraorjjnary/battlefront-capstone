@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Administration;
 
 use App\Actions\Chatbot\ValidateChatbotFaq;
+use App\Models\ChatbotKnowledge;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -38,7 +39,8 @@ class SaveChatbotKnowledgeRequest extends FormRequest
                 return;
             }
             $record = $this->route('chatbotKnowledge');
-            $error = app(ValidateChatbotFaq::class)->execute($this->string('question_pattern')->toString(), $record?->id);
+            $recordId = $record instanceof ChatbotKnowledge ? $record->id : null;
+            $error = app(ValidateChatbotFaq::class)->execute($this->string('question_pattern')->toString(), $recordId);
             if ($error !== null) {
                 $validator->errors()->add('question_pattern', $error);
             }

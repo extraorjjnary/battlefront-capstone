@@ -26,6 +26,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property int $user_id
+ * @property positive-int|null $assigned_handler_id
  * @property string $recipient_name
  * @property string|null $development_fixture_key
  * @property string $contact_number

@@ -20,7 +20,9 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
 /**
- * @property int $id
+ * @property positive-int $id
+ * @property positive-int|null $administration_role_id
+ * @property bool $is_active
  * @property string $name
  * @property string $email
  * @property Carbon|null $email_verified_at

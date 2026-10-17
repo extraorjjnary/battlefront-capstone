@@ -38,20 +38,18 @@ class OptimizeProductImage
         }
 
         $target = imagecreatetruecolor(1024, 1024);
-        if (! $target instanceof GdImage) {
+        if ($target === false) {
             throw new RuntimeException('The optimized image canvas could not be created.');
         }
 
         imagealphablending($target, false);
         imagesavealpha($target, true);
         $cropSize = min($sourceWidth, $sourceHeight);
-        if (! imagecopyresampled(
+        imagecopyresampled(
             $target, $source, 0, 0,
             intdiv($sourceWidth - $cropSize, 2), intdiv($sourceHeight - $cropSize, 2),
             1024, 1024, $cropSize, $cropSize,
-        )) {
-            throw new RuntimeException('The product image could not be resized.');
-        }
+        );
 
         unset($source);
 

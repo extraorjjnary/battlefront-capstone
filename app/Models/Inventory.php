@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id
  * @property int $product_id
  * @property int $quantity
+ * @property int<0, max> $quarantined_quantity
  * @property int $reorder_level
  * @property CarbonInterface $last_updated
  * @property-read Product $product

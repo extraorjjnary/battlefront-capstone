@@ -22,7 +22,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
-use InvalidArgumentException;
 
 class OrderController extends Controller
 {
@@ -213,10 +212,6 @@ class OrderController extends Controller
                 ],
                 'items' => $order->items->map(function (OrderItem $item): array {
                     $unitPrice = $item->price_at_time;
-
-                    if (! is_numeric($unitPrice)) {
-                        throw new InvalidArgumentException('Order item prices must be numeric.');
-                    }
 
                     return [
                         'id' => $item->id,

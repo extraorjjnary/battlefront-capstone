@@ -14,7 +14,7 @@ class RequestInventoryAdjustment
         return DB::transaction(function () use ($product, $requester, $targetQuantity, $reason, $initialReorderLevel): int {
             $lockedProduct = Product::query()->lockForUpdate()->findOrFail($product->id);
             $inventory = $lockedProduct->inventory()->lockForUpdate()->first();
-            $observed = $inventory?->quantity ?? 0;
+            $observed = $inventory->quantity ?? 0;
 
             if ($inventory !== null && $observed === $targetQuantity) {
                 throw ValidationException::withMessages(['quantity' => 'The requested quantity must differ from the current quantity.']);
