@@ -13,16 +13,19 @@ use stdClass;
 class AdministrationWorkQueue
 {
     /** @return LengthAwarePaginator<int, array<string, mixed>> */
-    public function paginate(User $actor): LengthAwarePaginator
+    public function paginate(User $actor, array $filters = []): LengthAwarePaginator
     {
         $queries = [];
 
         if ($actor->can('inventory.view') && $actor->can('inventory.approve')) {
-            $queries[] = $this->entries('inventory_adjustment_requests as work', 'stock_adjustment', 'pending');
+            $queries[] = $this->entries('inventory_adjustment_requests as work', 'stock_adjustment', 'pending')
+                ->where('work.requester_id', '<>', $actor->id);
         }
         if ($actor->can('inventory.view') && $actor->can('returns.approve')) {
-            $queries[] = $this->entries('damage_reports as work', 'damage', 'pending');
-            $queries[] = $this->entries('supplier_returns as work', 'supplier_return', ['pending', 'dispatched', 'rejected_follow_up']);
+            $queries[] = $this->entries('damage_reports as work', 'damage', 'pending')
+                ->where('work.requester_id', '<>', $actor->id);
+            $queries[] = $this->entries('supplier_returns as work', 'supplier_return', ['pending', 'dispatched', 'rejected_follow_up'])
+                ->where('work.requester_id', '<>', $actor->id);
         }
         if ($actor->can('inventory.view') && $actor->can('returns.dispatch')) {
             $queries[] = $this->entries('supplier_returns as work', 'supplier_return', 'approved');
@@ -84,6 +87,9 @@ class AdministrationWorkQueue
         }
 
         return DB::query()->fromSub($combined, 'work_queue')
+            ->when($filters['kind'] ?? null, fn (Builder $query, string $kind): Builder => $query->where('kind', $kind))
+            ->when($filters['responsible'] ?? null, fn (Builder $query, string $responsible): Builder => $query->where('responsible_name', 'like', '%'.$responsible.'%'))
+            ->when($filters['older_than'] ?? null, fn (Builder $query, int $days): Builder => $query->where('created_at', '<', now()->subDays($days)))
             ->orderBy('created_at')->orderBy('kind')->orderBy('id')
             ->paginate(25)->withQueryString()
             ->through(fn (stdClass $entry): array => $this->present($entry));

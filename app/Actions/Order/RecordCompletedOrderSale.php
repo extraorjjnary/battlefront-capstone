@@ -24,7 +24,7 @@ class RecordCompletedOrderSale
 
         $order->sale()->create([
             'amount' => $subtotal,
-            'sale_date' => today(),
+            'sale_date' => today(config('battlefront.timezone')),
             'handler_id' => $order->assigned_handler_id,
         ]);
     }

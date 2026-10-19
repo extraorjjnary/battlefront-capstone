@@ -30,7 +30,7 @@ test('manager sees team sales while staff sees only their own performance', func
         'administration_role_id' => DB::table('administration_roles')->where('code', 'manager')->value('id'),
     ]);
     $order = Order::factory()->create(['total_amount' => '240.00', 'delivery_fee' => '0.00']);
-    $order->sale()->create(['amount' => '240.00', 'sale_date' => today(), 'handler_id' => $staff->id]);
+    $order->sale()->create(['amount' => '240.00', 'sale_date' => today(config('battlefront.timezone')), 'handler_id' => $staff->id]);
 
     $this->actingAs($manager)->get(route('administration.reports.staff'))
         ->assertOk()->assertInertia(fn (Assert $page) => $page->component('Administration/Reports/StaffPerformance')
@@ -53,9 +53,9 @@ test('my sales lists only the signed in handler across all dates and excludes de
     $ownOrder = Order::factory()->withDeliverySnapshot(subtotal: '200.00')->create();
     $ownOrder->sale()->create(['amount' => '260.00', 'sale_date' => '2024-01-05', 'handler_id' => $staff->id]);
     $otherOrder = Order::factory()->create(['total_amount' => '90.00', 'delivery_fee' => '0.00']);
-    $otherOrder->sale()->create(['amount' => '90.00', 'sale_date' => today(), 'handler_id' => $other->id]);
+    $otherOrder->sale()->create(['amount' => '90.00', 'sale_date' => today(config('battlefront.timezone')), 'handler_id' => $other->id]);
     $legacyOrder = Order::factory()->create(['total_amount' => '50.00', 'delivery_fee' => '0.00']);
-    $legacyOrder->sale()->create(['amount' => '50.00', 'sale_date' => today(), 'handler_id' => null]);
+    $legacyOrder->sale()->create(['amount' => '50.00', 'sale_date' => today(config('battlefront.timezone')), 'handler_id' => null]);
 
     $this->actingAs($staff)->get(route('administration.reports.staff'))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('filters.from', null)

@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Reporting;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -64,10 +65,12 @@ class SalesReportRepository
 
     public function attributedSales(?string $from = null, ?string $to = null): Builder
     {
+        $timezone = config('battlefront.timezone');
+
         return $this->recordedSaleQuery(null)
             ->addSelect('sales.order_id', 'sales.handler_id')
-            ->when($from, fn (Builder $query): Builder => $query->whereDate('sales.sale_date', '>=', $from))
-            ->when($to, fn (Builder $query): Builder => $query->whereDate('sales.sale_date', '<=', $to));
+            ->when($from, fn (Builder $query): Builder => $query->whereDate('sales.sale_date', '>=', CarbonImmutable::parse($from, $timezone)->toDateString()))
+            ->when($to, fn (Builder $query): Builder => $query->whereDate('sales.sale_date', '<=', CarbonImmutable::parse($to, $timezone)->toDateString()));
     }
 
     /**

@@ -53,6 +53,12 @@ function salesFixture(empty = false) {
             average_order_value: '200.00',
             total_items_sold: 5,
         },
+        comparison: {
+            from: '2026-08-02',
+            to: '2026-08-31',
+            total_sales: 1,
+            total_revenue: '200.00',
+        },
         timeline: { labels: ['Sep 2026'], sales: [2], revenue: [400] },
         top_products: { ids: [7], labels: ['Ryzen 7'], quantities: [5] },
         categories: {
@@ -84,7 +90,9 @@ function salesFixture(empty = false) {
 
 function salesHarness(t, empty = false) {
     const props = Vue.reactive(salesFixture(empty));
-    const page = Vue.reactive({ props: { errors: {}, auth: { can: { exportReports: true } } } });
+    const page = Vue.reactive({
+        props: { errors: {}, auth: { can: { exportReports: true } } },
+    });
     const visits = [];
     const route = (format) => ({
         url({ query }) {
@@ -256,6 +264,7 @@ test('cross-filter reload refreshes transaction and refund sections with the cha
         'filters',
         'active_filters',
         'kpis',
+        'comparison',
         'timeline',
         'top_products',
         'categories',

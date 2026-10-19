@@ -38,9 +38,15 @@ const props = defineProps({
     filter_options: { type: Object, required: true },
 });
 const page = usePage();
-const canManageProducts = computed(() => page.props.auth?.can?.manageProducts === true);
-const canCreateProduct = computed(() => page.props.auth?.can?.priceProducts === true);
-const canDeleteProduct = computed(() => page.props.auth?.can?.deleteCatalog === true);
+const canManageProducts = computed(
+    () => page.props.auth?.can?.manageProducts === true,
+);
+const canCreateProduct = computed(
+    () => page.props.auth?.can?.priceProducts === true,
+);
+const canDeleteProduct = computed(
+    () => page.props.auth?.can?.deleteCatalog === true,
+);
 
 const categoryId = ref(String(props.filters.category_id ?? 'all'));
 const brand = ref(props.filters.brand ?? 'all');
@@ -189,16 +195,22 @@ defineOptions({
                         <h1
                             class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
                         >
-                            {{ canManageProducts ? 'Product management' : 'Products' }}
+                            {{
+                                canManageProducts
+                                    ? 'Product management'
+                                    : 'Products'
+                            }}
                         </h1>
                         <p
                             class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6"
                         >
-                            {{ canCreateProduct
-                                ? 'Maintain the hardware details, pricing, categories, and tags used across Battlefront catalog workflows.'
-                                : canManageProducts
-                                  ? 'Manage product details, categories, and tags. The owner controls prices.'
-                                  : 'Browse product details, prices, availability, and catalog status.' }}
+                            {{
+                                canCreateProduct
+                                    ? 'Maintain the hardware details, pricing, categories, and tags used across Battlefront catalog workflows.'
+                                    : canManageProducts
+                                      ? 'Manage product details, categories, and tags. The owner controls prices.'
+                                      : 'Browse product details, prices, availability, and catalog status.'
+                            }}
                         </p>
                     </div>
                 </div>
@@ -395,7 +407,11 @@ defineOptions({
                                   : 'No product records are available yet.'
                         }}
                     </p>
-                    <Button v-if="!hasActiveQuery && canCreateProduct" as-child class="mt-5">
+                    <Button
+                        v-if="!hasActiveQuery && canCreateProduct"
+                        as-child
+                        class="mt-5"
+                    >
                         <Link :href="ProductController.create()">
                             <Plus />
                             Add product
@@ -429,7 +445,9 @@ defineOptions({
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
                             <h3 class="font-semibold">{{ product.name }}</h3>
-                            <Badge variant="outline">{{ product.shipping_handling.label }}</Badge>
+                            <Badge variant="outline">{{
+                                product.shipping_handling.label
+                            }}</Badge>
                             <Badge
                                 :variant="
                                     product.is_active ? 'secondary' : 'outline'
@@ -455,9 +473,7 @@ defineOptions({
                         </p>
                         <p class="text-muted-foreground mt-2 text-xs">
                             {{
-                                formatPrice(
-                                    product.shipping_handling.surcharge,
-                                )
+                                formatPrice(product.shipping_handling.surcharge)
                             }}
                             additional surcharge per delivery order ·
                             {{ product.shipping_handling.preparation_days }}
@@ -468,6 +484,26 @@ defineOptions({
                             }}
                             preparation on configured routes
                         </p>
+                        <div
+                            class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs"
+                        >
+                            <span class="text-muted-foreground"
+                                >Storefront:
+                                {{ product.storefront_visibility }}</span
+                            >
+                            <span
+                                v-if="product.inventory"
+                                class="text-muted-foreground"
+                                >Sellable {{ product.inventory.quantity }} ·
+                                Quarantined
+                                {{
+                                    product.inventory.quarantined_quantity
+                                }}</span
+                            >
+                            <span v-else class="text-muted-foreground"
+                                >Stock not initialized</span
+                            >
+                        </div>
                         <div
                             v-if="product.tags.length > 0"
                             class="mt-3 flex flex-wrap gap-1.5"
@@ -521,7 +557,12 @@ defineOptions({
                             </Link>
                         </Button>
 
-                        <Button v-if="canManageProducts" variant="outline" size="sm" as-child>
+                        <Button
+                            v-if="canManageProducts"
+                            variant="outline"
+                            size="sm"
+                            as-child
+                        >
                             <Link :href="ProductController.edit(product.id)">
                                 <Pencil />
                                 Edit

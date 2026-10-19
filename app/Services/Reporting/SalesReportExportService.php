@@ -15,15 +15,21 @@ class SalesReportExportService
 {
     private const HEADERS = ['Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff'];
 
-    public function __construct(private readonly SalesReportService $salesReportService) {}
+    public function __construct(
+        private readonly SalesReportService $salesReportService,
+        private readonly RefundPeriodReport $refundPeriodReport,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $filters
      */
     public function printReport(array $filters): Response
     {
+        $report = $this->salesReportService->document($filters);
+
         return response()->view('reports.sales', [
-            ...$this->salesReportService->document($filters),
+            ...$report,
+            'refundMeasures' => $this->refundPeriodReport->generate($report['filters'], $report['kpis']['total_revenue']),
             'generatedAt' => $this->generatedAt(),
             'print' => true,
         ], 200, self::HEADERS);
@@ -35,6 +41,7 @@ class SalesReportExportService
     public function pdf(array $filters): Response
     {
         $report = $this->salesReportService->document($filters);
+        $report['refundMeasures'] = $this->refundPeriodReport->generate($report['filters'], $report['kpis']['total_revenue']);
         $options = new Options;
         $options->setDefaultFont('DejaVu Sans');
         $options->setIsRemoteEnabled(false);

@@ -55,6 +55,9 @@ test('technical administrators see no business work without business permissions
 
 test('work queue includes damage supplier handover and unpaid refund actions for an owner', function () {
     $owner = User::factory()->administrator()->create();
+    $requester = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $product = Product::factory()->available()->create();
     $order = Order::factory()->create(['status' => 'completed']);
     $itemId = DB::table('order_items')->insertGetId([
@@ -62,7 +65,7 @@ test('work queue includes damage supplier handover and unpaid refund actions for
         'quantity' => 1, 'price_at_time' => '100.00',
     ]);
     DB::table('damage_reports')->insert([
-        'product_id' => $product->id, 'requester_id' => $owner->id,
+        'product_id' => $product->id, 'requester_id' => $requester->id,
         'quantity' => 1, 'status' => 'pending', 'reason' => 'Physical damage identified',
         'created_at' => '2026-10-01 10:00:00', 'updated_at' => '2026-10-01 10:00:00',
     ]);
@@ -71,7 +74,7 @@ test('work queue includes damage supplier handover and unpaid refund actions for
     ]);
     DB::table('supplier_returns')->insert([
         'supplier_id' => $supplierId, 'product_id' => $product->id,
-        'requester_id' => $owner->id, 'quantity' => 1, 'status' => 'rejected_follow_up',
+        'requester_id' => $requester->id, 'quantity' => 1, 'status' => 'rejected_follow_up',
         'reason' => 'Return rejected', 'created_at' => '2026-10-02 10:00:00', 'updated_at' => '2026-10-02 10:00:00',
     ]);
     $handoverId = DB::table('customer_returns')->insertGetId([
@@ -101,6 +104,10 @@ test('work queue includes damage supplier handover and unpaid refund actions for
             ->where('entries.data.2.kind', 'customer_handover')
             ->where('entries.data.2.href', route('administration.customer-returns.index', ['case' => $handoverId]))
             ->where('entries.data.3.kind', 'refund'));
+
+    $this->get(route('administration.work-queue.index', ['kind' => 'damage']))
+        ->assertInertia(fn (Assert $page) => $page->where('entries.total', 1)
+            ->where('entries.data.0.kind', 'damage')->where('filters.kind', 'damage'));
 });
 
 test('work queue links return reviews and refund reconciliation to the correct parent case', function () {

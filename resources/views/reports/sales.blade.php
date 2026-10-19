@@ -60,6 +60,13 @@
     </table>
     <p class="note">Revenue and average order value reflect product sales only and exclude third-party delivery charges. {{ $isFiltered ? 'The selected filters use purchase-time item revenue.' : 'Product revenue uses saved purchase-time order and item subtotals.' }}</p>
 
+    <h2>Refund payments and outstanding balances</h2>
+    <p class="note">Refund payments use payment dates. Gross less refunds is a period measure, not profit. Outstanding balances include approvals and payments through {{ $refundMeasures['cutoff'] }}.</p>
+    <table aria-label="Refund summary">
+        <thead><tr><th>Gross item sales</th><th>Refunds paid in period</th><th>Gross less refunds</th><th>Outstanding approved refunds</th></tr></thead>
+        <tbody><tr><td>{{ $currency($refundMeasures['gross_item_sales']) }}</td><td>{{ $currency($refundMeasures['refund_payments']) }}</td><td>{{ $currency($refundMeasures['gross_less_refunds']) }}</td><td>{{ $currency($refundMeasures['outstanding_at_cutoff']) }}</td></tr></tbody>
+    </table>
+
     @if ($kpis['total_sales'] === 0)
         <p class="empty">No recorded sales match these filters.</p>
     @endif

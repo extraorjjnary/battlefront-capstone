@@ -261,18 +261,42 @@ test('administrator navigation keeps Orders and never receives a Cart badge', as
 });
 
 test('business roles can open the storefront catalog from administration navigation', async () => {
-    const harness = navigationHarness({ administrator: true, catalogRole: true });
+    const harness = navigationHarness({
+        administrator: true,
+        catalogRole: true,
+    });
     const catalog = harness.navigation.mainNavItems.value.find(
-        (item) => item.title === 'Product Catalog',
+        (item) => item.title === 'Products',
     );
 
     assert.equal(toUrl(catalog.href), '/products');
-    assert.equal(harness.navigation.mainNavItems.value.some((item) => item.title === 'Catalog'), false);
+    assert.equal(
+        harness.navigation.mainNavItems.value.some(
+            (item) => item.title === 'Manage products',
+        ),
+        false,
+    );
     assert.doesNotMatch(await harness.render(), /lucide-shopping-cart/);
 
-    const manager = navigationHarness({ administrator: true, catalogRole: true, manageCatalog: true });
-    assert.equal(toUrl(manager.navigation.mainNavItems.value.find((item) => item.title === 'Catalog').href), '/administration');
+    const manager = navigationHarness({
+        administrator: true,
+        catalogRole: true,
+        manageCatalog: true,
+    });
+    assert.equal(
+        toUrl(
+            manager.navigation.mainNavItems.value.find(
+                (item) => item.title === 'Manage products',
+            ).href,
+        ),
+        '/administration',
+    );
 
     const it = navigationHarness({ administrator: true });
-    assert.equal(it.navigation.mainNavItems.value.some((item) => item.title === 'Product Catalog'), false);
+    assert.equal(
+        it.navigation.mainNavItems.value.some(
+            (item) => item.title === 'Products',
+        ),
+        false,
+    );
 });

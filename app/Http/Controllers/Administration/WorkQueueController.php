@@ -12,10 +12,16 @@ class WorkQueueController extends Controller
 {
     public function index(Request $request, AdministrationWorkQueue $queue): Response
     {
-        $request->validate(['page' => ['nullable', 'integer', 'min:1']]);
+        $filters = $request->validate([
+            'page' => ['nullable', 'integer', 'min:1'],
+            'kind' => ['nullable', 'string', 'in:stock_adjustment,damage,supplier_return,customer_handover,refund,refund_reconciliation,customer_return,order'],
+            'responsible' => ['nullable', 'string', 'max:255'],
+            'older_than' => ['nullable', 'integer', 'in:1,7,30'],
+        ]);
 
         return Inertia::render('Administration/WorkQueue', [
-            'entries' => $queue->paginate($request->user()),
+            'entries' => $queue->paginate($request->user(), $filters),
+            'filters' => array_intersect_key($filters, array_flip(['kind', 'responsible', 'older_than'])),
         ]);
     }
 }

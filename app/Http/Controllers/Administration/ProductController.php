@@ -53,6 +53,7 @@ class ProductController extends Controller
             ->with([
                 'category:id,name,is_active',
                 'tags:id,name',
+                'inventory:id,product_id,quantity,quarantined_quantity',
             ])
             ->when(
                 $filters['q'] ?? null,
@@ -98,6 +99,17 @@ class ProductController extends Controller
                 'image_url' => $product->image_url,
                 'is_featured' => $product->is_featured,
                 'is_active' => $product->is_active,
+                'inventory' => $product->inventory === null ? null : [
+                    'quantity' => $product->inventory->quantity,
+                    'quarantined_quantity' => $product->inventory->quarantined_quantity,
+                ],
+                'storefront_visibility' => match (true) {
+                    ! $product->is_active => 'Inactive product',
+                    ! $product->category->is_active => 'Inactive category',
+                    $product->inventory === null => 'Inventory not initialized',
+                    $product->inventory->quantity === 0 => 'Out of stock',
+                    default => 'Visible in storefront',
+                },
                 'shipping_handling' => $this->presenter->handling($product->shipping_profile),
                 'category' => [
                     'name' => $product->category->name,

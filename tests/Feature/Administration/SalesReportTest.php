@@ -347,6 +347,18 @@ test('sales KPIs and product and category reports use sale-backed order records'
         ]));
 });
 
+test('new sale dates follow the configured Philippine business calendar', function () {
+    $this->travelTo('2026-10-19 17:30:00');
+    $order = Order::factory()->withDeliverySnapshot(subtotal: '100.00')->create([
+        'status' => OrderStatus::Completed,
+        'payment_status' => PaymentStatus::Verified,
+    ]);
+
+    app(RecordCompletedOrderSale::class)->execute($order);
+
+    expect($order->sale()->firstOrFail()->sale_date->toDateString())->toBe('2026-10-20');
+});
+
 test('historical and newly recorded sales use product snapshots across reporting periods', function (string $period, array $revenue, array $sales) {
     $this->travelTo('2026-09-03 10:00:00');
     $administrator = User::factory()->administrator()->create();

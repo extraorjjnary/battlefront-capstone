@@ -226,6 +226,18 @@ const chartOptions = {
                     Only forecast-ready products are listed, including inactive
                     products with eligible history.
                 </p>
+                <details class="border-border mt-3 border p-3 text-sm">
+                    <summary class="cursor-pointer font-medium">
+                        Why might a product be missing?
+                    </summary>
+                    <p class="text-muted-foreground mt-2">
+                        A product appears after the system confirms 36 completed
+                        monthly periods with complete eligible sales history.
+                        Missing months, unsuitable history, or unavailable
+                        source data can keep it out of this list. Select a
+                        listed product to see its current readiness details.
+                    </p>
+                </details>
                 <Label for="product-search" class="mt-4 mb-2 block"
                     >Product name or code</Label
                 >
@@ -379,7 +391,11 @@ const chartOptions = {
                         are excluded. Dates use {{ readiness.timezone }}.
                     </p>
                 </div>
-                <form v-if="page.props.auth.can?.manageForecast" class="mt-5 space-y-3" @submit.prevent="generate">
+                <form
+                    v-if="page.props.auth.can?.manageForecast"
+                    class="mt-5 space-y-3"
+                    @submit.prevent="generate"
+                >
                     <InputError :message="form.errors.product_id" />
                     <InputError :message="form.errors.forecast" />
                     <Button
@@ -466,7 +482,9 @@ const chartOptions = {
                     <div>
                         <dt class="text-muted-foreground text-xs">Generated</dt>
                         <dd class="mt-1 font-medium">
-                            {{ generatedTime(result.generated_at) }} ({{ BUSINESS_TIMEZONE }})
+                            {{ generatedTime(result.generated_at) }} ({{
+                                BUSINESS_TIMEZONE
+                            }})
                         </dd>
                     </div>
                 </dl>
@@ -512,7 +530,12 @@ const chartOptions = {
                     >
                         View monthly history
                     </summary>
-                    <div class="mt-3 overflow-x-auto" tabindex="0" role="region" aria-label="Monthly demand history table">
+                    <div
+                        class="mt-3 overflow-x-auto"
+                        tabindex="0"
+                        role="region"
+                        aria-label="Monthly demand history table"
+                    >
                         <table class="w-full text-left text-sm">
                             <caption class="sr-only">
                                 Completed monthly sales used for this generation
@@ -578,7 +601,13 @@ const chartOptions = {
                     >
                 </div>
             </div>
-            <div v-if="forecasts.data.length" class="mt-5 overflow-x-auto" tabindex="0" role="region" aria-label="Saved forecasts table">
+            <div
+                v-if="forecasts.data.length"
+                class="mt-5 overflow-x-auto"
+                tabindex="0"
+                role="region"
+                aria-label="Saved forecasts table"
+            >
                 <table class="w-full min-w-3xl text-left text-sm">
                     <caption class="sr-only">
                         Persisted product demand forecasts

@@ -24,8 +24,10 @@ class AuditLogController extends Controller
             'filters' => $filters,
             'entries' => $this->query($filters)->paginate(25)->withQueryString()
                 ->through(fn (stdClass $entry): array => $presenter->present($entry, $request->user())),
-            'actors' => DB::table('users')->whereIn('id', DB::table('audit_logs')->whereNotNull('actor_id')->select('actor_id'))
-                ->orderBy('name')->orderBy('id')->get(['id', 'name']),
+            'actors' => DB::table('users')->leftJoin('administration_roles', 'administration_roles.id', '=', 'users.administration_role_id')
+                ->whereIn('users.id', DB::table('audit_logs')->whereNotNull('actor_id')->select('actor_id'))
+                ->orderBy('users.name')->orderBy('users.id')
+                ->get(['users.id', 'users.name', 'users.role', 'administration_roles.name as administration_role']),
             'actions' => DB::table('audit_logs')->distinct()->orderBy('action')->pluck('action'),
             'subjectTypes' => DB::table('audit_logs')->distinct()->orderBy('subject_type')->pluck('subject_type'),
         ]);
@@ -78,6 +80,7 @@ class AuditLogController extends Controller
         return $request->validate([
             'action' => ['nullable', 'string', 'max:100'],
             'actor_id' => ['nullable', 'integer', 'min:1'],
+            'actor_type' => ['nullable', 'string', 'in:customer,administrator,system'],
             'subject_type' => ['nullable', 'string', 'max:100'],
             'subject_id' => ['nullable', 'integer', 'min:1'],
             'from' => ['nullable', 'date_format:Y-m-d'],
@@ -93,8 +96,17 @@ class AuditLogController extends Controller
         return DB::table('audit_logs')
             ->leftJoin('users', 'users.id', '=', 'audit_logs.actor_id')
             ->select('audit_logs.*', 'users.name as actor_name')
+            ->addSelect(DB::raw("CASE WHEN audit_logs.actor_id IS NULL OR users.id IS NULL THEN 'system' WHEN users.role = 'administrator' THEN 'administrator' ELSE 'customer' END as actor_type"))
             ->when($filters['action'] ?? null, fn ($query, $action) => $query->where('audit_logs.action', $action))
             ->when($filters['actor_id'] ?? null, fn ($query, $actor) => $query->where('audit_logs.actor_id', $actor))
+            ->when($filters['actor_type'] ?? null, fn ($query, $type) => match ($type) {
+                'system' => $query->where(function (Builder $query): void {
+                    $query->whereNull('audit_logs.actor_id')
+                        ->orWhereNull('users.id');
+                }),
+                'customer' => $query->where('users.role', 'customer'),
+                'administrator' => $query->where('users.role', 'administrator'),
+            })
             ->when($filters['subject_type'] ?? null, fn ($query, $type) => $query->where('audit_logs.subject_type', $type))
             ->when($filters['subject_id'] ?? null, fn ($query, $id) => $query->where('audit_logs.subject_id', $id))
             ->when($filters['from'] ?? null, fn ($query, $from) => $query->where('audit_logs.created_at', '>=', $this->dateBoundary($from)))

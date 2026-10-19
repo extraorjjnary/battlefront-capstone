@@ -163,3 +163,22 @@ test('audit screen and export use the same date actor action and subject filters
         ->assertOk()->streamedContent();
     expect($csv)->toContain('Count verified')->not->toContain('Other item');
 });
+
+test('audit log identifies customer cancellation actors and filters by actor type', function () {
+    $owner = User::factory()->administrator()->create();
+    $customer = User::factory()->customer()->create(['name' => 'Badi Gaming']);
+    DB::table('audit_logs')->insert([
+        'actor_id' => $customer->id,
+        'action' => 'order.status.updated',
+        'subject_type' => 'order',
+        'subject_id' => 28,
+        'changes' => json_encode(['before' => 'pending', 'after' => 'cancelled'], JSON_THROW_ON_ERROR),
+        'created_at' => now(),
+    ]);
+
+    $this->actingAs($owner)->get(route('administration.reports.audit', ['actor_type' => 'customer']))
+        ->assertInertia(fn (Assert $page) => $page->where('entries.total', 1)
+            ->where('entries.data.0.actor_name', 'Badi Gaming')
+            ->where('entries.data.0.actor_type', 'customer')
+            ->where('entries.data.0.action_label', 'Customer cancelled order'));
+});

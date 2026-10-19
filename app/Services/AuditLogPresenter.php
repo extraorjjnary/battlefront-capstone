@@ -28,8 +28,13 @@ class AuditLogPresenter
             'created_at' => CarbonImmutable::parse($entry->created_at, 'UTC')->utc()->toISOString(),
             'actor_id' => $entry->actor_id === null ? null : (int) $entry->actor_id,
             'actor_name' => $entry->actor_name ?? 'System or removed account',
+            'actor_type' => $entry->actor_type,
             'action' => $entry->action,
-            'action_label' => Str::headline(str_replace('.', ' ', $entry->action)),
+            'action_label' => $entry->action === 'order.status.updated'
+                && $entry->actor_type === 'customer'
+                && (json_decode($entry->changes, true)['after'] ?? null) === 'cancelled'
+                    ? 'Customer cancelled order'
+                    : Str::headline(str_replace('.', ' ', $entry->action)),
             'subject_type' => $entry->subject_type,
             'subject_label' => Str::headline(str_replace('_', ' ', $entry->subject_type)),
             'subject_id' => $entry->subject_id === null ? null : (int) $entry->subject_id,

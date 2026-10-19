@@ -65,6 +65,7 @@ ChartJS.register(
 const props = defineProps({
     filters: { type: Object, required: true },
     kpis: { type: Object, required: true },
+    comparison: { type: Object, required: true },
     timeline: { type: Object, required: true },
     top_products: { type: Object, required: true },
     categories: { type: Object, required: true },
@@ -115,7 +116,10 @@ const exportActions = computed(() => {
     ];
 });
 const numberFormatter = new Intl.NumberFormat('en-PH');
-const dateFormatter = new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium' });
+const dateFormatter = new Intl.DateTimeFormat('en-PH', {
+    dateStyle: 'medium',
+    timeZone: 'UTC',
+});
 const presets = [7, 30, 90];
 const hasSales = computed(() => props.kpis.total_sales > 0);
 const hasCrossFilter = computed(
@@ -148,15 +152,17 @@ const kpiCards = computed(() => [
     {
         label: 'Total sales',
         value: numberFormatter.format(props.kpis.total_sales),
-        detail: 'Recorded sale transactions',
+        detail: `${props.comparison.total_sales.toLocaleString('en-PH')} in the previous ${props.comparison.from}–${props.comparison.to}`,
         icon: ReceiptText,
     },
     {
         label: 'Total revenue',
         value: formatCurrency(props.kpis.total_revenue),
-        detail: hasCrossFilter.value
-            ? 'Purchase-time item revenue in this selection'
-            : 'Product sales excluding delivery charges',
+        detail: `${
+            hasCrossFilter.value
+                ? 'Purchase-time item revenue in this selection'
+                : 'Product sales excluding delivery charges'
+        } · ${formatCurrency(props.comparison.total_revenue)} in the previous range`,
         icon: CircleDollarSign,
     },
     {
@@ -362,15 +368,13 @@ const categoryOptions = computed(() => ({
 }));
 
 function parseDate(value) {
-    return new Date(`${value}T00:00:00`);
+    return new Date(`${value}T00:00:00Z`);
 }
 
 function formatDateInput(date) {
-    const localDate = new Date(
-        date.getTime() - date.getTimezoneOffset() * 60_000,
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(
+        date,
     );
-
-    return localDate.toISOString().slice(0, 10);
 }
 
 function submitFilters() {
@@ -457,6 +461,7 @@ function updateCrossFilters(product, category) {
                 'filters',
                 'active_filters',
                 'kpis',
+                'comparison',
                 'timeline',
                 'top_products',
                 'categories',
@@ -482,11 +487,39 @@ function updateCrossFilters(product, category) {
 }
 
 function applyPreset(days) {
-    const end = new Date();
+    const end = new Date(`${formatDateInput(new Date())}T00:00:00Z`);
     const start = new Date(end);
-    start.setDate(start.getDate() - (days - 1));
+    start.setUTCDate(start.getUTCDate() - (days - 1));
     from.value = formatDateInput(start);
     to.value = formatDateInput(end);
+    submitFilters();
+}
+
+function applyCalendarPreset(preset) {
+    const today = formatDateInput(new Date());
+    const [year, month] = today.split('-').map(Number);
+    const monthStart = new Date(Date.UTC(year, month - 1, 1));
+    const previousMonthEnd = new Date(monthStart.getTime() - 86_400_000);
+
+    if (preset === 'today') {
+        from.value = today;
+        to.value = today;
+    } else if (preset === 'this_month') {
+        from.value = formatDateInput(monthStart);
+        to.value = today;
+    } else {
+        from.value = formatDateInput(
+            new Date(
+                Date.UTC(
+                    previousMonthEnd.getUTCFullYear(),
+                    previousMonthEnd.getUTCMonth(),
+                    1,
+                ),
+            ),
+        );
+        to.value = formatDateInput(previousMonthEnd);
+    }
+
     submitFilters();
 }
 
@@ -582,59 +615,208 @@ defineOptions({
             </div>
         </section>
 
-        <section aria-labelledby="refund-measures-heading" class="border-border bg-card border p-5">
-            <h2 id="refund-measures-heading" class="text-xl font-semibold">Sales and refunds by event date</h2>
-            <p class="text-muted-foreground mt-1 text-sm">Sales use sale dates; recorded refund payments use payment dates. The difference is a period measure, not profit. Outstanding balance includes approvals through {{ refund_measures.cutoff }} and payments recorded through that date.</p>
+        <section
+            aria-labelledby="refund-measures-heading"
+            class="border-border bg-card border p-5"
+        >
+            <h2 id="refund-measures-heading" class="text-xl font-semibold">
+                Sales and refunds by event date
+            </h2>
+            <p class="text-muted-foreground mt-1 text-sm">
+                Sales use sale dates; recorded refund payments use payment
+                dates. The difference is a period measure, not profit.
+                Outstanding balance includes approvals through
+                {{ refund_measures.cutoff }} and payments recorded through that
+                date.
+            </p>
             <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div v-for="measure in [
-                    { label: 'Gross item sales', value: refund_measures.gross_item_sales },
-                    { label: 'Recorded refund payments', value: refund_measures.refund_payments },
-                    { label: 'Gross less refunds in period', value: refund_measures.gross_less_refunds },
-                    { label: 'Outstanding approved refunds at cutoff', value: refund_measures.outstanding_at_cutoff },
-                ]" :key="measure.label" class="border-border border p-4">
-                    <p class="text-muted-foreground text-xs">{{ measure.label }}</p>
-                    <p class="mt-2 text-xl font-bold">{{ formatCurrency(measure.value) }}</p>
+                <div
+                    v-for="measure in [
+                        {
+                            label: 'Gross item sales',
+                            value: refund_measures.gross_item_sales,
+                        },
+                        {
+                            label: 'Recorded refund payments',
+                            value: refund_measures.refund_payments,
+                        },
+                        {
+                            label: 'Gross less refunds in period',
+                            value: refund_measures.gross_less_refunds,
+                        },
+                        {
+                            label: 'Outstanding approved refunds at cutoff',
+                            value: refund_measures.outstanding_at_cutoff,
+                        },
+                    ]"
+                    :key="measure.label"
+                    class="border-border border p-4"
+                >
+                    <p class="text-muted-foreground text-xs">
+                        {{ measure.label }}
+                    </p>
+                    <p class="mt-2 text-xl font-bold">
+                        {{ formatCurrency(measure.value) }}
+                    </p>
                 </div>
             </div>
             <h3 class="mt-6 font-semibold">Sale source records</h3>
             <div class="mt-3 space-y-2">
-                <div v-for="sale in sale_transactions.data" :key="sale.id" class="border-border flex flex-wrap items-center justify-between gap-2 border p-3 text-sm">
-                    <div><strong>Sale #{{ sale.id }}</strong> · {{ formatCurrency(sale.product_revenue) }} · {{ sale.sale_date }}</div>
-                    <Link v-if="page.props.auth.can?.viewOrders" :href="OrderController.show(sale.order_id)" class="text-primary underline">Order BF-{{ String(sale.order_id).padStart(6, '0') }}</Link>
-                    <span v-else>Order BF-{{ String(sale.order_id).padStart(6, '0') }}</span>
+                <div
+                    v-for="sale in sale_transactions.data"
+                    :key="sale.id"
+                    class="border-border flex flex-wrap items-center justify-between gap-2 border p-3 text-sm"
+                >
+                    <div>
+                        <strong>Sale #{{ sale.id }}</strong> ·
+                        {{ formatCurrency(sale.product_revenue) }} ·
+                        {{ sale.sale_date }}
+                    </div>
+                    <Link
+                        v-if="page.props.auth.can?.viewOrders"
+                        :href="OrderController.show(sale.order_id)"
+                        class="text-primary underline"
+                        >Order BF-{{
+                            String(sale.order_id).padStart(6, '0')
+                        }}</Link
+                    >
+                    <span v-else
+                        >Order BF-{{
+                            String(sale.order_id).padStart(6, '0')
+                        }}</span
+                    >
                 </div>
-                <p v-if="sale_transactions.data.length === 0" class="text-muted-foreground text-sm">No sales in this period.</p>
+                <p
+                    v-if="sale_transactions.data.length === 0"
+                    class="text-muted-foreground text-sm"
+                >
+                    No sales in this period.
+                </p>
             </div>
-            <nav v-if="sale_transactions.last_page > 1" class="mt-3 flex justify-between text-sm" aria-label="Sale transaction pages">
-                <Link v-if="sale_transactions.prev_page_url" :href="sale_transactions.prev_page_url" class="text-primary underline">Previous</Link><span v-else></span>
-                <Link v-if="sale_transactions.next_page_url" :href="sale_transactions.next_page_url" class="text-primary underline">Next</Link>
+            <nav
+                v-if="sale_transactions.last_page > 1"
+                class="mt-3 flex justify-between text-sm"
+                aria-label="Sale transaction pages"
+            >
+                <Link
+                    v-if="sale_transactions.prev_page_url"
+                    :href="sale_transactions.prev_page_url"
+                    class="text-primary underline"
+                    >Previous</Link
+                ><span v-else></span>
+                <Link
+                    v-if="sale_transactions.next_page_url"
+                    :href="sale_transactions.next_page_url"
+                    class="text-primary underline"
+                    >Next</Link
+                >
             </nav>
             <h3 class="mt-6 font-semibold">Refund payment source records</h3>
-            <p class="text-muted-foreground mt-1 text-xs">Staff-recorded transactions; payment review is shown in the return case.</p>
+            <p class="text-muted-foreground mt-1 text-xs">
+                Staff-recorded transactions; payment review is shown in the
+                return case.
+            </p>
             <div class="mt-3 space-y-2">
-                <div v-for="payment in refund_measures.payments.data" :key="payment.id" class="border-border flex flex-wrap items-center justify-between gap-2 border p-3 text-sm">
-                    <div><strong>Payment #{{ payment.id }}</strong> · {{ formatCurrency(payment.amount) }} · {{ payment.paid_at }} <span class="text-muted-foreground">{{ payment.external_reference }}</span></div>
-                    <Link v-if="page.props.auth.can?.viewOrders" :href="CustomerReturnController.index({ query: { case: payment.customer_return_id } })" class="text-primary underline">Return #{{ payment.customer_return_id }}</Link>
+                <div
+                    v-for="payment in refund_measures.payments.data"
+                    :key="payment.id"
+                    class="border-border flex flex-wrap items-center justify-between gap-2 border p-3 text-sm"
+                >
+                    <div>
+                        <strong>Payment #{{ payment.id }}</strong> ·
+                        {{ formatCurrency(payment.amount) }} ·
+                        {{ payment.paid_at }}
+                        <span class="text-muted-foreground">{{
+                            payment.external_reference
+                        }}</span>
+                    </div>
+                    <Link
+                        v-if="page.props.auth.can?.viewOrders"
+                        :href="
+                            CustomerReturnController.index({
+                                query: { case: payment.customer_return_id },
+                            })
+                        "
+                        class="text-primary underline"
+                        >Return #{{ payment.customer_return_id }}</Link
+                    >
                     <span v-else>Return #{{ payment.customer_return_id }}</span>
                 </div>
-                <p v-if="refund_measures.payments.data.length === 0" class="text-muted-foreground text-sm">No refund payments in this period.</p>
+                <p
+                    v-if="refund_measures.payments.data.length === 0"
+                    class="text-muted-foreground text-sm"
+                >
+                    No refund payments in this period.
+                </p>
             </div>
-            <nav v-if="refund_measures.payments.last_page > 1" class="mt-3 flex justify-between text-sm" aria-label="Refund payment pages">
-                <Link v-if="refund_measures.payments.prev_page_url" :href="refund_measures.payments.prev_page_url" class="text-primary underline">Previous</Link><span v-else></span>
-                <Link v-if="refund_measures.payments.next_page_url" :href="refund_measures.payments.next_page_url" class="text-primary underline">Next</Link>
+            <nav
+                v-if="refund_measures.payments.last_page > 1"
+                class="mt-3 flex justify-between text-sm"
+                aria-label="Refund payment pages"
+            >
+                <Link
+                    v-if="refund_measures.payments.prev_page_url"
+                    :href="refund_measures.payments.prev_page_url"
+                    class="text-primary underline"
+                    >Previous</Link
+                ><span v-else></span>
+                <Link
+                    v-if="refund_measures.payments.next_page_url"
+                    :href="refund_measures.payments.next_page_url"
+                    class="text-primary underline"
+                    >Next</Link
+                >
             </nav>
             <h3 class="mt-6 font-semibold">Outstanding approvals at cutoff</h3>
             <div class="mt-3 space-y-2">
-                <div v-for="refund in refund_measures.outstanding_refunds.data" :key="refund.id" class="border-border flex flex-wrap items-center justify-between gap-2 border p-3 text-sm">
-                    <div><strong>Refund #{{ refund.id }}</strong> · Approved {{ formatCurrency(refund.approved_amount) }} · Paid by cutoff {{ formatCurrency(refund.paid_at_cutoff) }} · Outstanding {{ formatCurrency(refund.outstanding_amount) }}</div>
-                    <Link v-if="page.props.auth.can?.viewOrders" :href="CustomerReturnController.index({ query: { case: refund.customer_return_id } })" class="text-primary underline">Return #{{ refund.customer_return_id }}</Link>
+                <div
+                    v-for="refund in refund_measures.outstanding_refunds.data"
+                    :key="refund.id"
+                    class="border-border flex flex-wrap items-center justify-between gap-2 border p-3 text-sm"
+                >
+                    <div>
+                        <strong>Refund #{{ refund.id }}</strong> · Approved
+                        {{ formatCurrency(refund.approved_amount) }} · Paid by
+                        cutoff {{ formatCurrency(refund.paid_at_cutoff) }} ·
+                        Outstanding
+                        {{ formatCurrency(refund.outstanding_amount) }}
+                    </div>
+                    <Link
+                        v-if="page.props.auth.can?.viewOrders"
+                        :href="
+                            CustomerReturnController.index({
+                                query: { case: refund.customer_return_id },
+                            })
+                        "
+                        class="text-primary underline"
+                        >Return #{{ refund.customer_return_id }}</Link
+                    >
                     <span v-else>Return #{{ refund.customer_return_id }}</span>
                 </div>
-                <p v-if="refund_measures.outstanding_refunds.data.length === 0" class="text-muted-foreground text-sm">No approved refund balance remains at cutoff.</p>
+                <p
+                    v-if="refund_measures.outstanding_refunds.data.length === 0"
+                    class="text-muted-foreground text-sm"
+                >
+                    No approved refund balance remains at cutoff.
+                </p>
             </div>
-            <nav v-if="refund_measures.outstanding_refunds.last_page > 1" class="mt-3 flex justify-between text-sm" aria-label="Outstanding refund pages">
-                <Link v-if="refund_measures.outstanding_refunds.prev_page_url" :href="refund_measures.outstanding_refunds.prev_page_url" class="text-primary underline">Previous</Link><span v-else></span>
-                <Link v-if="refund_measures.outstanding_refunds.next_page_url" :href="refund_measures.outstanding_refunds.next_page_url" class="text-primary underline">Next</Link>
+            <nav
+                v-if="refund_measures.outstanding_refunds.last_page > 1"
+                class="mt-3 flex justify-between text-sm"
+                aria-label="Outstanding refund pages"
+            >
+                <Link
+                    v-if="refund_measures.outstanding_refunds.prev_page_url"
+                    :href="refund_measures.outstanding_refunds.prev_page_url"
+                    class="text-primary underline"
+                    >Previous</Link
+                ><span v-else></span>
+                <Link
+                    v-if="refund_measures.outstanding_refunds.next_page_url"
+                    :href="refund_measures.outstanding_refunds.next_page_url"
+                    class="text-primary underline"
+                    >Next</Link
+                >
             </nav>
         </section>
 
@@ -727,6 +909,23 @@ defineOptions({
                     Last {{ days }} days
                 </Button>
                 <Button
+                    v-for="preset in ['today', 'this_month', 'previous_month']"
+                    :key="preset"
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    :disabled="isUpdatingReport"
+                    @click="applyCalendarPreset(preset)"
+                >
+                    {{
+                        {
+                            today: 'Today',
+                            this_month: 'This month',
+                            previous_month: 'Previous month',
+                        }[preset]
+                    }}
+                </Button>
+                <Button
                     type="button"
                     variant="ghost"
                     size="sm"
@@ -812,7 +1011,10 @@ defineOptions({
                     Sales summary
                 </h2>
                 <p class="text-muted-foreground mt-1 text-sm">
-                    Product revenue excludes third-party delivery charges.
+                    Product revenue excludes third-party delivery charges. The
+                    comparison uses the previous range of equal length. Refund
+                    details are included in the on-screen and PDF reports; CSV
+                    exports contain product rows only.
                 </p>
             </div>
             <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -966,7 +1168,13 @@ defineOptions({
                 </p>
             </div>
 
-            <div v-else class="border-border bg-card overflow-x-auto border" tabindex="0" role="region" aria-label="Product performance table">
+            <div
+                v-else
+                class="border-border bg-card overflow-x-auto border"
+                tabindex="0"
+                role="region"
+                aria-label="Product performance table"
+            >
                 <table class="w-full min-w-3xl text-left text-sm">
                     <thead
                         class="bg-secondary/60 text-muted-foreground text-xs uppercase"
@@ -992,7 +1200,7 @@ defineOptions({
                             <td class="px-5 py-4 font-medium">
                                 <button
                                     type="button"
-                                    class="hover:text-primary focus-visible:ring-ring max-md:min-h-11 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                                    class="hover:text-primary focus-visible:ring-ring text-left transition-colors focus-visible:ring-2 focus-visible:outline-none max-md:min-h-11"
                                     :aria-pressed="
                                         selectedProduct?.id === product.id
                                     "
@@ -1048,7 +1256,13 @@ defineOptions({
             >
                 <p class="font-medium">No category sales to report</p>
             </div>
-            <div v-else class="border-border bg-card overflow-x-auto border" tabindex="0" role="region" aria-label="Category performance table">
+            <div
+                v-else
+                class="border-border bg-card overflow-x-auto border"
+                tabindex="0"
+                role="region"
+                aria-label="Category performance table"
+            >
                 <table class="w-full min-w-2xl text-left text-sm">
                     <thead
                         class="bg-secondary/60 text-muted-foreground text-xs uppercase"
@@ -1074,7 +1288,7 @@ defineOptions({
                             <td class="px-5 py-4 font-medium">
                                 <button
                                     type="button"
-                                    class="hover:text-primary focus-visible:ring-ring max-md:min-h-11 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                                    class="hover:text-primary focus-visible:ring-ring text-left transition-colors focus-visible:ring-2 focus-visible:outline-none max-md:min-h-11"
                                     :aria-pressed="
                                         selectedCategory?.id === category.id
                                     "

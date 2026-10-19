@@ -23,7 +23,7 @@ class InventoryRepository
             ->select(['id', 'product_code', 'name', 'category_id', 'brand', 'is_active'])
             ->with([
                 'category:id,name',
-                'inventory:id,product_id,quantity,reorder_level,last_updated',
+                'inventory:id,product_id,quantity,quarantined_quantity,reorder_level,last_updated',
             ])
             ->withExists('lowStockInventory as is_low_stock')
             ->when(

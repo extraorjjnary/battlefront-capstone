@@ -47,6 +47,7 @@ class InventoryController extends Controller
                 'inventory' => $product->inventory === null ? null : [
                     'id' => $product->inventory->id,
                     'quantity' => $product->inventory->quantity,
+                    'quarantined_quantity' => $product->inventory->quarantined_quantity,
                     'reorder_level' => $product->inventory->reorder_level,
                     'last_updated' => $product->inventory->last_updated->toIso8601String(),
                 ],

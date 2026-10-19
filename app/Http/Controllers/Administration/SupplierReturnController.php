@@ -34,7 +34,9 @@ class SupplierReturnController extends Controller
         return Inertia::render('Administration/SupplierReturns', [
             'returns' => $returns,
             'selected_case' => $case,
-            'products' => Product::query()->whereHas('inventory', fn ($query) => $query->where('quantity', '>', 0))->orderBy('name')->get(['id', 'name']),
+            'products' => Product::query()->whereHas('inventory', fn ($query) => $query->where('quantity', '>', 0))
+                ->with('inventory:id,product_id,quantity')->orderBy('name')->get(['id', 'product_code', 'name'])
+                ->map(fn (Product $product): array => ['id' => $product->id, 'name' => $product->name, 'product_code' => $product->product_code, 'available_quantity' => $product->inventory->quantity]),
             'suppliers' => DB::table('suppliers')->where('is_active', true)->orderBy('name')->get(['id', 'name']),
         ]);
     }

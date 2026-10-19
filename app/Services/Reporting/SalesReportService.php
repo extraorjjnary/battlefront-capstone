@@ -35,6 +35,14 @@ class SalesReportService
         $categoryId = $normalizedFilters['category_id'];
         $dateRange = $this->dateRange($normalizedFilters);
         $salesSummary = $this->salesReportRepository->summary($dateRange, $productId, $categoryId);
+        $periodDays = $from->diffInDays($to) + 1;
+        $previousTo = $from->subDay();
+        $previousFrom = $previousTo->subDays($periodDays - 1);
+        $previousSummary = $this->salesReportRepository->summary(
+            [$previousFrom->toDateString(), $previousTo->addDay()->toDateString()],
+            $productId,
+            $categoryId,
+        );
         $dailySales = $this->salesReportRepository->dailySales($dateRange, $productId, $categoryId);
         $topProducts = $this->salesReportRepository->topProducts($dateRange, $categoryId);
 
@@ -60,6 +68,12 @@ class SalesReportService
             'filters' => $normalizedFilters,
             'active_filters' => $this->activeFilters($normalizedFilters),
             'kpis' => $this->kpiData($salesSummary),
+            'comparison' => [
+                'from' => $previousFrom->toDateString(),
+                'to' => $previousTo->toDateString(),
+                'total_revenue' => (string) $previousSummary->total_revenue,
+                'total_sales' => (int) $previousSummary->total_sales,
+            ],
             'sale_transactions' => $this->salesReportRepository->transactions($dateRange, $productId, $categoryId),
             'timeline' => $this->timelineData(array_values($dailySales->all()), $from, $to, $period),
             'top_products' => [
@@ -134,8 +148,9 @@ class SalesReportService
      */
     private function normalizeFilters(array $filters): array
     {
-        $to = isset($filters['to']) ? CarbonImmutable::parse($filters['to']) : CarbonImmutable::today();
-        $from = isset($filters['from']) ? CarbonImmutable::parse($filters['from']) : $to->subDays(29);
+        $timezone = config('battlefront.timezone');
+        $to = isset($filters['to']) ? CarbonImmutable::parse($filters['to'], $timezone) : CarbonImmutable::today($timezone);
+        $from = isset($filters['from']) ? CarbonImmutable::parse($filters['from'], $timezone) : $to->subDays(29);
 
         return [
             'from' => $from->toDateString(),
@@ -152,7 +167,7 @@ class SalesReportService
      */
     private function dateRange(array $filters): array
     {
-        return [$filters['from'], CarbonImmutable::parse($filters['to'])->addDay()->toDateString()];
+        return [$filters['from'], CarbonImmutable::parse($filters['to'], config('battlefront.timezone'))->addDay()->toDateString()];
     }
 
     /**

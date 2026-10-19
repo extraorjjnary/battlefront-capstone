@@ -35,7 +35,7 @@ class DashboardController extends Controller
             }
 
             return Inertia::render('Dashboard/Administration', [
-                'dashboard' => Inertia::defer(fn (): array => $dashboardService->administration(), 'dashboard', rescue: true),
+                'dashboard' => Inertia::defer(fn (): array => $dashboardService->administration($user), 'dashboard', rescue: true),
             ]);
         }
 

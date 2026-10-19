@@ -51,8 +51,8 @@ class SalesReportController extends Controller
         $report = $salesReportService->generate($request->effectiveFilters());
         $filters = $report['filters'];
         $engagement = $recommendationEngagementReport->generate(
-            CarbonImmutable::parse((string) $filters['from']),
-            CarbonImmutable::parse((string) $filters['to']),
+            CarbonImmutable::parse((string) $filters['from'], config('battlefront.timezone')),
+            CarbonImmutable::parse((string) $filters['to'], config('battlefront.timezone')),
         );
         $request->rememberFilters($filters);
 

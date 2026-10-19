@@ -64,61 +64,120 @@ export function useAppNavigation() {
         ];
 
         if (isAdministrator.value) {
-            items.push({ title: 'Work queue', href: WorkQueueController.index(), icon: ReceiptText });
-            if (page.props.auth?.can?.browseProductCatalog) items.push({
-                title: 'Product Catalog',
-                href: productIndex(),
-                icon: PackageSearch,
-            });
-            if (page.props.auth?.can?.manageProducts) items.push({
-                title: 'Catalog',
-                href: ProductController.index(),
-                icon: PackageSearch,
-                activeRoutes: [
-                    ProductController.index(),
-                    CategoryController.index(),
-                ],
-            });
-            if (page.props.auth?.can?.viewInventory) items.push({
-                title: 'Inventory',
-                href: InventoryController.index(),
-                icon: Boxes,
-            });
-            if (page.props.auth?.can?.viewInventory) items.push({ title: 'Stock requests', href: InventoryAdjustmentController.index(), icon: Boxes });
-            if (page.props.auth?.can?.viewInventory) items.push({ title: 'Stock reconciliation', href: StockReconciliationController.index(), icon: Boxes });
-            if (page.props.auth?.can?.viewInventory) items.push({ title: 'Damage reports', href: DamageReportController.index(), icon: Boxes });
-            if (page.props.auth?.can?.viewInventory) items.push({ title: 'Supplier returns', href: SupplierReturnController.index(), icon: Boxes });
-            if (page.props.auth?.can?.viewOrders) items.push({ title: 'Customer returns', href: CustomerReturnController.index(), icon: ReceiptText });
-            if (page.props.auth?.can?.manageSuppliers) items.push({ title: 'Suppliers', href: SupplierController.index(), icon: Boxes });
-            if (page.props.auth?.can?.viewOrders) items.push({
-                title: 'Orders',
-                href: AdministrationOrderController.index(),
+            items.push({
+                title: 'Work queue',
+                href: WorkQueueController.index(),
                 icon: ReceiptText,
             });
-            if (page.props.auth?.can?.viewReports) items.push({
-                title: 'Sales reports',
-                href: SalesReportController.index(),
-                icon: ChartColumn,
-            });
-            if (page.props.auth?.can?.viewOrders) items.push({ title: page.props.auth?.can?.viewStaffReports ? 'Staff sales' : 'My sales', href: StaffPerformanceController.index(), icon: ChartColumn });
-            if (page.props.auth?.can?.viewAudit) items.push({ title: 'Audit log', href: AuditLogController.index(), icon: ReceiptText });
-            if (page.props.auth?.can?.manageUsers) items.push({ title: 'Team access', href: TeamController.index(), icon: UsersRound });
-            if (page.props.auth?.can?.viewReports) items.push({
-                title: 'Forecasting',
-                href: ForecastingController.index(),
-                icon: TrendingUp,
-            });
-            if (page.props.auth?.can?.viewCustomers) items.push({
-                title: 'Customers',
-                href: CustomerController.index(),
-                icon: UsersRound,
-            });
-            if (page.props.auth?.can?.manageProducts) items.push({
-                title: 'Chatbot FAQs',
-                href: ChatbotKnowledgeController.index(),
-                icon: MessageSquareText,
-                activeRoutes: [ChatbotKnowledgeController.index()],
-            });
+            if (page.props.auth?.can?.browseProductCatalog)
+                items.push({
+                    title: 'Products',
+                    href: productIndex(),
+                    icon: PackageSearch,
+                });
+            if (page.props.auth?.can?.manageProducts)
+                items.push({
+                    title: 'Manage products',
+                    href: ProductController.index(),
+                    icon: PackageSearch,
+                    activeRoutes: [
+                        ProductController.index(),
+                        CategoryController.index(),
+                    ],
+                });
+            if (page.props.auth?.can?.viewInventory)
+                items.push({
+                    title: 'Inventory',
+                    href: InventoryController.index(),
+                    icon: Boxes,
+                });
+            if (page.props.auth?.can?.viewInventory)
+                items.push({
+                    title: 'Stock requests',
+                    href: InventoryAdjustmentController.index(),
+                    icon: Boxes,
+                });
+            if (page.props.auth?.can?.viewInventory)
+                items.push({
+                    title: 'Stock reconciliation',
+                    href: StockReconciliationController.index(),
+                    icon: Boxes,
+                });
+            if (page.props.auth?.can?.viewInventory)
+                items.push({
+                    title: 'Damage reports',
+                    href: DamageReportController.index(),
+                    icon: Boxes,
+                });
+            if (page.props.auth?.can?.viewInventory)
+                items.push({
+                    title: 'Supplier returns',
+                    href: SupplierReturnController.index(),
+                    icon: Boxes,
+                });
+            if (page.props.auth?.can?.viewOrders)
+                items.push({
+                    title: 'Customer returns',
+                    href: CustomerReturnController.index(),
+                    icon: ReceiptText,
+                });
+            if (page.props.auth?.can?.manageSuppliers)
+                items.push({
+                    title: 'Suppliers',
+                    href: SupplierController.index(),
+                    icon: Boxes,
+                });
+            if (page.props.auth?.can?.viewOrders)
+                items.push({
+                    title: 'Orders',
+                    href: AdministrationOrderController.index(),
+                    icon: ReceiptText,
+                });
+            if (page.props.auth?.can?.viewReports)
+                items.push({
+                    title: 'Sales reports',
+                    href: SalesReportController.index(),
+                    icon: ChartColumn,
+                });
+            if (page.props.auth?.can?.viewOrders)
+                items.push({
+                    title: page.props.auth?.can?.viewStaffReports
+                        ? 'Staff sales'
+                        : 'My sales',
+                    href: StaffPerformanceController.index(),
+                    icon: ChartColumn,
+                });
+            if (page.props.auth?.can?.viewAudit)
+                items.push({
+                    title: 'Audit log',
+                    href: AuditLogController.index(),
+                    icon: ReceiptText,
+                });
+            if (page.props.auth?.can?.manageUsers)
+                items.push({
+                    title: 'Team access',
+                    href: TeamController.index(),
+                    icon: UsersRound,
+                });
+            if (page.props.auth?.can?.viewReports)
+                items.push({
+                    title: 'Forecasting',
+                    href: ForecastingController.index(),
+                    icon: TrendingUp,
+                });
+            if (page.props.auth?.can?.viewCustomers)
+                items.push({
+                    title: 'Customers',
+                    href: CustomerController.index(),
+                    icon: UsersRound,
+                });
+            if (page.props.auth?.can?.manageProducts)
+                items.push({
+                    title: 'Chatbot FAQs',
+                    href: ChatbotKnowledgeController.index(),
+                    icon: MessageSquareText,
+                    activeRoutes: [ChatbotKnowledgeController.index()],
+                });
         } else {
             items.push({
                 title: 'Products',

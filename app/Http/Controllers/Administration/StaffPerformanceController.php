@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Administration;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Repositories\Reporting\SalesReportRepository;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -26,8 +27,9 @@ class StaffPerformanceController extends Controller
 
         $useCurrentMonth = $canViewAll && ! isset($filters['handler_id'])
             && ! $request->has('from') && ! $request->has('to');
-        $from = $filters['from'] ?? ($useCurrentMonth ? now()->startOfMonth()->toDateString() : null);
-        $to = $filters['to'] ?? ($useCurrentMonth ? today()->toDateString() : null);
+        $timezone = config('battlefront.timezone');
+        $from = $filters['from'] ?? ($useCurrentMonth ? CarbonImmutable::today($timezone)->startOfMonth()->toDateString() : null);
+        $to = $filters['to'] ?? ($useCurrentMonth ? CarbonImmutable::today($timezone)->toDateString() : null);
 
         $recordedSales = $reports->attributedSales($from, $to);
 
@@ -42,12 +44,14 @@ class StaffPerformanceController extends Controller
             ->orderByDesc('gross_sales')
             ->get();
 
+        $refundStart = $from === null ? null : CarbonImmutable::parse($from, $timezone)->startOfDay()->utc()->toDateTimeString();
+        $refundEnd = $to === null ? null : CarbonImmutable::parse($to, $timezone)->addDay()->startOfDay()->utc()->toDateTimeString();
         $refunds = DB::table('customer_refund_payments as payments')
             ->join('customer_refunds as refunds', 'refunds.id', '=', 'payments.customer_refund_id')
             ->join('customer_returns as returns', 'returns.id', '=', 'refunds.customer_return_id')
             ->join('sales', 'sales.order_id', '=', 'returns.order_id')
-            ->when($from, fn ($query) => $query->whereDate('payments.paid_at', '>=', $from))
-            ->when($to, fn ($query) => $query->whereDate('payments.paid_at', '<=', $to))
+            ->when($refundStart, fn ($query) => $query->where('payments.paid_at', '>=', $refundStart))
+            ->when($refundEnd, fn ($query) => $query->where('payments.paid_at', '<', $refundEnd))
             ->select('sales.handler_id')
             ->selectRaw('SUM(payments.amount) as amount')
             ->groupBy('sales.handler_id')

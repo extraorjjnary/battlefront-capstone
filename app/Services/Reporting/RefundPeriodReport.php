@@ -15,19 +15,21 @@ class RefundPeriodReport
      */
     public function generate(array $filters, string $grossSales): array
     {
-        $endExclusive = CarbonImmutable::parse($filters['to'])->addDay()->toDateString();
+        $timezone = config('battlefront.timezone');
+        $fromUtc = CarbonImmutable::parse($filters['from'], $timezone)->startOfDay()->utc()->toDateTimeString();
+        $endExclusiveUtc = CarbonImmutable::parse($filters['to'], $timezone)->addDay()->startOfDay()->utc()->toDateTimeString();
         $payments = $this->paymentQuery($filters)
-            ->where('payments.paid_at', '>=', $filters['from'])
-            ->where('payments.paid_at', '<', $endExclusive);
+            ->where('payments.paid_at', '>=', $fromUtc)
+            ->where('payments.paid_at', '<', $endExclusiveUtc);
         $paid = (string) (clone $payments)->sum('payments.amount');
 
         $balances = $this->refundQuery($filters)
-            ->where('refunds.created_at', '<', $endExclusive)
+            ->where('refunds.created_at', '<', $endExclusiveUtc)
             ->select('refunds.id', 'refunds.customer_return_id', 'refunds.approved_amount')
             ->selectSub(DB::table('customer_refund_payments as paid')
                 ->selectRaw('COALESCE(SUM(paid.amount), 0)')
                 ->whereColumn('paid.customer_refund_id', 'refunds.id')
-                ->where('paid.paid_at', '<', $endExclusive), 'paid_at_cutoff');
+                ->where('paid.paid_at', '<', $endExclusiveUtc), 'paid_at_cutoff');
         $outstanding = (string) DB::query()->fromSub($balances, 'balances')
             ->selectRaw('COALESCE(SUM(CASE WHEN approved_amount > paid_at_cutoff THEN approved_amount - paid_at_cutoff ELSE 0 END), 0) as amount')
             ->value('amount');
