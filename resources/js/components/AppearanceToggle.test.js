@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { Moon, Sun, Monitor } from '@lucide/vue';
+import { runInNewContext } from 'node:vm';
+import { Moon, Sun } from '@lucide/vue';
 import { compileScript, parse } from '@vue/compiler-sfc';
 import { renderToString } from '@vue/server-renderer';
 import * as Vue from 'vue';
@@ -33,12 +34,39 @@ const button = {
 
 function activeAppearanceTab(html) {
     return html.match(
-        /<button\b[^>]*class="[^"]*bg-white[^"]*"[^>]*>.*?<\/button>/s,
+        /<button\b[^>]*aria-pressed="true"[^>]*>.*?<\/button>/s,
     )?.[0];
 }
 
-function appearanceHarness({ preference = 'light', systemDark = false } = {}) {
+function appearanceHarness({
+    preference = 'light',
+    systemDark = false,
+    server = false,
+    user = { id: 1 },
+    guestPreference,
+    storageBlocked = false,
+} = {}) {
     const requests = [];
+    const sharedPage = {
+        props: { appearance: preference, auth: { user } },
+    };
+    const storage = new Map(
+        guestPreference === undefined
+            ? []
+            : [['battlefront_guest_appearance', guestPreference]],
+    );
+    const storageWrites = [];
+    const localStorage = {
+        getItem: (key) => {
+            if (storageBlocked) throw new Error('Storage unavailable');
+            return storage.get(key) ?? null;
+        },
+        setItem: (key, value) => {
+            if (storageBlocked) throw new Error('Storage unavailable');
+            storageWrites.push({ key, value });
+            storage.set(key, value);
+        },
+    };
     const listeners = new Map();
     const classes = new Set();
     const media = {
@@ -56,8 +84,9 @@ function appearanceHarness({ preference = 'light', systemDark = false } = {}) {
     };
     const modules = {
         vue: Vue,
-        '@lucide/vue': { Moon, Sun, Monitor },
+        '@lucide/vue': { Moon, Sun },
         '@inertiajs/vue3': {
+            usePage: () => sharedPage,
             router: {
                 on: (event, listener) => listeners.set(event, listener),
                 patch: (url, data, options) =>
@@ -86,8 +115,12 @@ function appearanceHarness({ preference = 'light', systemDark = false } = {}) {
         'window',
         'document',
         code + '\nreturn { initializeTheme, useAppearance };',
-    )(modules, { matchMedia: () => media }, document);
-    appearanceModule.initializeTheme();
+    )(
+        modules,
+        server ? undefined : { matchMedia: () => media, localStorage },
+        server ? undefined : document,
+    );
+    appearanceModule.initializeTheme(sharedPage.props);
     modules['@/composables/useAppearance'] = appearanceModule;
 
     function component(path, inlineTemplate = true) {
@@ -113,6 +146,9 @@ function appearanceHarness({ preference = 'light', systemDark = false } = {}) {
     return {
         ...appearanceModule.useAppearance(),
         requests,
+        storage,
+        storageWrites,
+        page: sharedPage,
         classes,
         modules,
         component,
@@ -121,11 +157,12 @@ function appearanceHarness({ preference = 'light', systemDark = false } = {}) {
         renderTabs: () => renderToString(Vue.h(tabs)),
         systemChange(dark) {
             media.matches = dark;
-            listeners.get('system')();
+            listeners.get('system')?.();
         },
-        navigate(value) {
+        navigate(value, user = { id: 1 }, component = 'Products/Index') {
+            sharedPage.props = { appearance: value, auth: { user } };
             listeners.get('navigate')({
-                detail: { page: { props: { appearance: value } } },
+                detail: { page: { component, props: sharedPage.props } },
             });
         },
     };
@@ -168,47 +205,46 @@ for (const [initial, next, icon] of [
 }
 
 for (const systemDark of [false, true]) {
-    test(`System with a ${systemDark ? 'dark' : 'light'} OS explicitly selects the opposite mode on click`, () => {
-        const harness = appearanceHarness({ preference: 'system', systemDark });
-
-        harness.controls.toggleAppearance();
-
-        assert.equal(harness.appearance.value, systemDark ? 'light' : 'dark');
-        assert.equal(harness.classes.has('dark'), !systemDark);
-        assert.deepEqual(harness.requests[0].data, {
-            appearance: systemDark ? 'light' : 'dark',
+    for (const preference of ['system', null, '', 'unsupported']) {
+        test(`legacy or missing preference ${preference} defaults to light on a ${systemDark ? 'dark' : 'light'} OS`, async () => {
+            const harness = appearanceHarness({ preference, systemDark });
+            assert.equal(harness.appearance.value, 'light');
+            assert.equal(harness.classes.has('dark'), false);
+            assert.match(await harness.render(), /lucide-sun/);
+            assert.doesNotMatch(
+                await harness.renderTabs(),
+                />System<|lucide-monitor/,
+            );
+            assert.equal(harness.requests.length, 0);
+            harness.systemChange(!systemDark);
+            assert.equal(harness.resolvedAppearance.value, 'light');
+            harness.controls.toggleAppearance();
+            assert.deepEqual(harness.requests[0].data, { appearance: 'dark' });
+            harness.systemChange(systemDark);
+            assert.equal(harness.classes.has('dark'), true);
         });
-        harness.systemChange(!systemDark);
-        harness.systemChange(systemDark);
-        assert.equal(harness.classes.has('dark'), !systemDark);
-    });
+    }
 }
 
-test('OS theme changes update the System icon and the next toggle action without saving a preference', async () => {
-    const harness = appearanceHarness({ preference: 'system' });
-    assert.equal(harness.resolvedAppearance.value, 'light');
-    assert.match(await harness.render(), /lucide-sun/);
-
-    harness.systemChange(true);
-
-    assert.equal(harness.appearance.value, 'system');
-    assert.equal(harness.resolvedAppearance.value, 'dark');
-    assert.match(await harness.render(), /lucide-moon/);
-    assert.equal(harness.requests.length, 0);
-    harness.systemChange(false);
-    assert.equal(harness.resolvedAppearance.value, 'light');
-    assert.equal(harness.classes.has('dark'), false);
-    harness.systemChange(true);
-    harness.controls.toggleAppearance();
-    assert.deepEqual(harness.requests[0].data, { appearance: 'light' });
+test('explicit light and dark preferences ignore operating-system changes', () => {
+    for (const preference of ['light', 'dark']) {
+        const harness = appearanceHarness({
+            preference,
+            systemDark: preference !== 'dark',
+        });
+        harness.systemChange(true);
+        harness.systemChange(false);
+        assert.equal(harness.appearance.value, preference);
+        assert.equal(harness.classes.has('dark'), preference === 'dark');
+        assert.equal(harness.requests.length, 0);
+    }
 });
 
 test('settings choices synchronize the toggle while navigation and refresh restore the saved preference', async () => {
     const harness = appearanceHarness();
-    const settings = harness.component('./AppearanceTabs.vue', false).setup(
-        {},
-        { expose() {} },
-    );
+    const settings = harness
+        .component('./AppearanceTabs.vue', false)
+        .setup({}, { expose() {} });
 
     settings.updateAppearance('dark');
 
@@ -218,28 +254,122 @@ test('settings choices synchronize the toggle while navigation and refresh resto
     assert.equal(harness.appearance.value, 'dark');
     const refreshed = appearanceHarness({ preference: 'dark' });
     assert.match(await refreshed.render(), /lucide-moon/);
-    settings.updateAppearance('system');
+    settings.updateAppearance('light');
     assert.match(await harness.render(), /lucide-sun/);
-    assert.match(activeAppearanceTab(await harness.renderTabs()), />System<\/span>/);
-    assert.equal(harness.appearance.value, 'system');
+    assert.match(
+        activeAppearanceTab(await harness.renderTabs()),
+        />Light<\/span>/,
+    );
+    assert.equal(harness.appearance.value, 'light');
 });
 
-test('failed saves restore both controls and the applied theme including a previous System preference', async () => {
-    for (const preference of ['light', 'system']) {
+test('failed saves restore both controls and the applied theme including a legacy preference', async () => {
+    for (const preference of ['light', 'dark', 'system']) {
         const harness = appearanceHarness({ preference });
 
         harness.controls.toggleAppearance();
         harness.requests[0].options.onError();
 
-        assert.equal(harness.appearance.value, preference);
-        assert.equal(harness.classes.has('dark'), false);
-        assert.match(await harness.render(), /lucide-sun/);
-        const label = preference === 'system' ? 'System' : 'Light';
+        const expected = preference === 'dark' ? 'dark' : 'light';
+        assert.equal(harness.appearance.value, expected);
+        assert.equal(harness.classes.has('dark'), expected === 'dark');
+        assert.match(
+            await harness.render(),
+            expected === 'dark' ? /lucide-moon/ : /lucide-sun/,
+        );
+        const label = expected === 'dark' ? 'Dark' : 'Light';
         assert.match(
             activeAppearanceTab(await harness.renderTabs()),
             new RegExp(`>${label}</span>`),
         );
     }
+});
+
+for (const [initial, selected] of [
+    ['light', 'dark'],
+    ['dark', 'light'],
+]) {
+    test(`latest ${selected} selection survives stale catalog, details and other page navigation`, async () => {
+        const harness = appearanceHarness({ preference: initial });
+        harness.navigate(initial);
+        harness.controls.toggleAppearance();
+        harness.requests[0].options.onSuccess?.();
+
+        for (const component of [
+            'Products/Index',
+            'Products/Show',
+            'Orders/Index',
+            'Dashboard/Customer',
+            'settings/Appearance',
+        ]) {
+            harness.navigate(initial, { id: 1 }, component);
+
+            assert.equal(harness.appearance.value, selected, component);
+            assert.equal(
+                harness.classes.has('dark'),
+                selected === 'dark',
+                component,
+            );
+            assert.match(
+                await harness.render(),
+                new RegExp(`aria-checked="${selected === 'dark'}"`),
+            );
+            assert.match(
+                activeAppearanceTab(await harness.renderTabs()),
+                selected === 'dark' ? />Dark<\/span>/ : />Light<\/span>/,
+            );
+        }
+        assert.equal(
+            harness.requests.length,
+            1,
+            'Restoring a page does not save an older preference',
+        );
+    });
+}
+
+test('the saved preference on a fresh load survives older history without another local selection', () => {
+    for (const [saved, stale] of [
+        ['dark', 'light'],
+        ['light', 'dark'],
+    ]) {
+        const harness = appearanceHarness({ preference: saved });
+        harness.navigate(stale);
+        assert.equal(harness.appearance.value, saved);
+        assert.equal(harness.classes.has('dark'), saved === 'dark');
+        assert.equal(harness.requests.length, 0);
+    }
+});
+
+test('logout and account changes discard local selections and late failures from the previous account', async () => {
+    const harness = appearanceHarness();
+    harness.controls.toggleAppearance();
+    harness.navigate('light', null, 'Welcome');
+    assert.equal(harness.appearance.value, 'light');
+    harness.navigate('dark', { id: 2 });
+    harness.requests[0].options.onError();
+    assert.equal(harness.appearance.value, 'dark');
+    assert.match(await harness.render(), /lucide-moon/);
+    harness.navigate('light', { id: 3 });
+    assert.equal(harness.classes.has('dark'), false);
+});
+
+test('a failed save stays rolled back when a cached response carries the rejected appearance', () => {
+    const harness = appearanceHarness();
+    harness.controls.toggleAppearance();
+    harness.requests[0].options.onError();
+    harness.navigate('dark');
+    assert.equal(harness.appearance.value, 'light');
+    assert.equal(harness.classes.has('dark'), false);
+});
+
+test('a late failure cannot undo a newer appearance choice', () => {
+    const harness = appearanceHarness({ preference: 'dark' });
+    harness.controls.toggleAppearance();
+    harness.controls.toggleAppearance();
+    harness.controls.toggleAppearance();
+    harness.requests[0].options.onError();
+    assert.equal(harness.appearance.value, 'light');
+    assert.equal(harness.classes.has('dark'), false);
 });
 
 test('both authenticated header variants render the toggle directly beside notifications for either account role', async () => {
@@ -259,7 +389,8 @@ test('both authenticated header variants render the toggle directly beside notif
         };
         harness.modules['@/components/NotificationBell.vue'] = {
             default: {
-                render: () => Vue.h('button', { 'aria-label': 'Notifications' }),
+                render: () =>
+                    Vue.h('button', { 'aria-label': 'Notifications' }),
             },
         };
         harness.modules['@/composables/useAppNavigation'] = {
@@ -302,5 +433,167 @@ test('both authenticated header variants render the toggle directly beside notif
                 /Switch to dark mode<\/div><\/div><\/div><button aria-label="Notifications"/,
             );
         }
+    }
+});
+
+test('server rendering follows each account without leaking appearance between requests', async () => {
+    const harness = appearanceHarness({ preference: 'dark', server: true });
+    assert.equal(harness.appearance.value, 'dark');
+    assert.match(await harness.render(), /lucide-moon/);
+    harness.page.props.appearance = 'system';
+    assert.match(await harness.render(), /lucide-sun/);
+    assert.equal(
+        harness.modules['@/composables/useAppearance'].useAppearance()
+            .appearance.value,
+        'light',
+    );
+    assert.equal(harness.appearance.value, 'dark');
+    assert.equal(harness.requests.length, 0);
+});
+
+for (const preference of [
+    undefined,
+    'system',
+    '',
+    'invalid',
+    'DARK',
+    'light',
+    'dark',
+]) {
+    test(`guest preference ${preference} resolves safely and persists without an account request`, () => {
+        const harness = appearanceHarness({
+            user: null,
+            guestPreference: preference,
+            systemDark: true,
+        });
+        const expected = preference === 'dark' ? 'dark' : 'light';
+        assert.equal(harness.appearance.value, expected);
+        harness.controls.toggleAppearance();
+        const selected = expected === 'dark' ? 'light' : 'dark';
+        assert.equal(harness.classes.has('dark'), selected === 'dark');
+        assert.deepEqual(harness.storageWrites, [
+            { key: 'battlefront_guest_appearance', value: selected },
+        ]);
+        for (const component of [
+            'Welcome',
+            'Products/Index',
+            'Products/Show',
+            'Branches/Index',
+            'auth/Login',
+            'auth/Register',
+        ]) {
+            harness.navigate('light', null, component);
+            assert.equal(harness.appearance.value, selected);
+        }
+        const refreshed = appearanceHarness({
+            user: null,
+            guestPreference: harness.storage.get(
+                'battlefront_guest_appearance',
+            ),
+        });
+        assert.equal(refreshed.appearance.value, selected);
+        assert.equal(harness.requests.length, 0);
+    });
+}
+
+test('account choices override guest storage and logout restores only the guest preference', () => {
+    const harness = appearanceHarness({ user: null, guestPreference: 'dark' });
+    harness.navigate('light', { id: 1 });
+    assert.equal(harness.appearance.value, 'light');
+    harness.controls.toggleAppearance();
+    harness.controls.toggleAppearance();
+    assert.equal(harness.requests.length, 2);
+    assert.equal(harness.storage.get('battlefront_guest_appearance'), 'dark');
+    assert.deepEqual(harness.storageWrites, []);
+    harness.navigate('light', null);
+    assert.equal(harness.appearance.value, 'dark');
+    harness.navigate('light', { id: 2 });
+    assert.equal(
+        harness.appearance.value,
+        'light',
+        'New accounts keep their own Light default',
+    );
+    harness.storage.delete('battlefront_guest_appearance');
+    harness.navigate('dark', null);
+    assert.equal(
+        harness.appearance.value,
+        'light',
+        'No guest choice never inherits an account preference',
+    );
+});
+
+test('unavailable guest storage falls back to Light while switching remains usable', () => {
+    const harness = appearanceHarness({ user: null, storageBlocked: true });
+    assert.equal(harness.appearance.value, 'light');
+    harness.controls.toggleAppearance();
+    harness.navigate('light', null);
+    assert.equal(harness.appearance.value, 'dark');
+    assert.equal(harness.requests.length, 0);
+});
+
+test('guest server rendering reserves the switch space until mounting to avoid hydration mismatches', async () => {
+    const harness = appearanceHarness({ user: null, server: true });
+    harness.modules['@/components/AppearanceToggle.vue'] = {
+        default: harness.component('./AppearanceToggle.vue'),
+    };
+    const html = await renderToString(
+        Vue.h(harness.component('./GuestAppearanceToggle.vue')),
+    );
+    assert.match(html, /aria-hidden="true"/);
+    assert.doesNotMatch(html, /role="switch"|lucide-moon|lucide-sun/);
+});
+
+const earlyThemeScript = readFileSync(
+    new URL('../../views/app.blade.php', import.meta.url),
+    'utf8',
+).match(/<script data-guest-appearance>([\s\S]*?)<\/script>/)[1];
+for (const preference of [undefined, 'system', 'invalid', 'light', 'dark']) {
+    test(`head initialization applies guest ${preference} before application code`, () => {
+        const classes = new Set();
+        const document = {
+            documentElement: {
+                dataset: { authenticated: 'false', appearance: 'light' },
+                classList: {
+                    toggle: (name, enabled) =>
+                        enabled ? classes.add(name) : classes.delete(name),
+                },
+            },
+        };
+        runInNewContext(earlyThemeScript, {
+            document,
+            localStorage: { getItem: () => preference },
+        });
+        assert.equal(classes.has('dark'), preference === 'dark');
+        assert.equal(
+            document.documentElement.dataset.appearance,
+            preference === 'dark' ? 'dark' : 'light',
+        );
+    });
+}
+
+test('head initialization preserves the server account appearance and tolerates blocked storage', () => {
+    for (const authenticated of ['true', 'false']) {
+        const classes = new Set(['dark']);
+        let reads = 0;
+        const document = {
+            documentElement: {
+                dataset: { authenticated, appearance: 'dark' },
+                classList: {
+                    toggle: (name, enabled) =>
+                        enabled ? classes.add(name) : classes.delete(name),
+                },
+            },
+        };
+        runInNewContext(earlyThemeScript, {
+            document,
+            localStorage: {
+                getItem() {
+                    reads++;
+                    throw new Error('Storage unavailable');
+                },
+            },
+        });
+        assert.equal(classes.has('dark'), authenticated === 'true');
+        assert.equal(reads, authenticated === 'true' ? 0 : 1);
     }
 });

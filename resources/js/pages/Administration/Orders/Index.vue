@@ -208,17 +208,17 @@ defineOptions({
     <main
         class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
     >
-        <section class="border-border bg-card relative overflow-hidden border">
+        <section class="surface-panel border-border bg-card relative overflow-hidden border">
             <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
             <div class="flex items-start gap-4 p-6">
                 <span
-                    class="bg-secondary text-primary flex size-11 shrink-0 items-center justify-center rounded-md"
+                    class="bg-secondary text-primary-ink flex size-11 shrink-0 items-center justify-center rounded-md"
                 >
                     <ReceiptText class="size-5" />
                 </span>
                 <div>
                     <p
-                        class="text-primary text-xs font-semibold tracking-widest uppercase"
+                        class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
                     >
                         Sagay City order desk
                     </p>
@@ -265,12 +265,12 @@ defineOptions({
         </section>
 
         <section
-            class="border-border bg-card border p-5"
+            class="surface-panel border-border bg-card border p-5"
             aria-labelledby="order-query-heading"
         >
             <div class="flex items-start gap-3">
                 <span
-                    class="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center rounded-md"
+                    class="bg-secondary text-primary-ink flex size-10 shrink-0 items-center justify-center rounded-md"
                 >
                     <SlidersHorizontal class="size-4" />
                 </span>
@@ -431,7 +431,7 @@ defineOptions({
 
             <div
                 v-if="orders.data.length === 0"
-                class="border-border bg-card flex min-h-48 items-center justify-center border p-6 text-center"
+                class="surface-panel border-border bg-card flex min-h-48 items-center justify-center border p-6 text-center"
             >
                 <div>
                     <PackageCheck
@@ -448,7 +448,7 @@ defineOptions({
 
             <div
                 v-else
-                class="border-border bg-card divide-border divide-y border"
+                class="surface-panel border-border bg-card divide-border divide-y border"
             >
                 <article
                     v-for="order in orders.data"

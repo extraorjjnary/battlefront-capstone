@@ -2,6 +2,7 @@
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import AppLogo from '@/components/AppLogo.vue';
+import GuestAppearanceToggle from '@/components/GuestAppearanceToggle.vue';
 import CustomerChatAssistant from '@/components/chatbot/CustomerChatAssistant.vue';
 import { Button } from '@/components/ui/button';
 import { dashboard, home, login, register } from '@/routes';
@@ -33,7 +34,7 @@ const storefrontLinks = [
 <template>
     <header
         v-if="!isAuthenticated"
-        class="border-border bg-background/95 sticky top-0 z-30 border-b backdrop-blur"
+        class="border-border bg-card/95 sticky top-0 z-30 border-b backdrop-blur"
     >
         <div
             class="mx-auto flex h-18 max-w-7xl items-center justify-between gap-2 px-4 sm:gap-6 sm:px-8"
@@ -46,12 +47,16 @@ const storefrontLinks = [
                 <AppLogo />
             </Link>
 
-            <nav class="flex items-center gap-1 sm:gap-2" aria-label="Primary">
+            <nav
+                class="flex items-center gap-0 min-[360px]:gap-1 sm:gap-2"
+                aria-label="Primary"
+            >
                 <Button
                     v-for="item in storefrontLinks"
                     :key="item.section"
                     as-child
                     size="sm"
+                    class="min-w-11 px-2 text-xs min-[360px]:px-3 min-[360px]:text-sm"
                     :variant="
                         props.activeSection === item.section
                             ? 'outline'
@@ -81,13 +86,19 @@ const storefrontLinks = [
                     <Link :href="dashboard()">Dashboard</Link>
                 </Button>
                 <template v-else>
-                    <Button as-child size="sm" variant="ghost">
+                    <Button
+                        as-child
+                        size="sm"
+                        variant="ghost"
+                        class="min-w-11 px-2 text-xs min-[360px]:px-3 min-[360px]:text-sm"
+                    >
                         <Link :href="login()">Log in</Link>
                     </Button>
                     <Button as-child size="sm" class="hidden sm:inline-flex">
                         <Link :href="register()">Register</Link>
                     </Button>
                 </template>
+                <GuestAppearanceToggle />
             </nav>
         </div>
         <CustomerChatAssistant />

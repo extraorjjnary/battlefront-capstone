@@ -202,7 +202,7 @@ watch(
 
         <main class="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
             <section
-                class="border-border bg-card relative overflow-hidden border px-6 py-8 sm:px-10 lg:grid lg:grid-cols-[1.45fr_0.55fr] lg:items-end lg:gap-10"
+                class="surface-panel border-border bg-card relative overflow-hidden border px-6 py-8 sm:px-10 lg:grid lg:grid-cols-[1.45fr_0.55fr] lg:items-end lg:gap-10"
                 aria-labelledby="catalog-heading"
             >
                 <div
@@ -211,13 +211,13 @@ watch(
                 />
                 <div>
                     <div
-                        class="border-primary/30 bg-primary/10 text-primary mb-4 flex size-11 items-center justify-center border"
+                        class="border-primary/30 bg-primary/10 text-primary-ink mb-4 flex size-11 items-center justify-center border"
                     >
                         <PackageSearch class="size-5" aria-hidden="true" />
                     </div>
                     <h1
                         id="catalog-heading"
-                        class="text-primary text-xs font-bold tracking-[0.2em] uppercase"
+                        class="text-primary-ink text-xs font-bold tracking-[0.2em] uppercase"
                     >
                         Customer catalog
                     </h1>
@@ -288,12 +288,12 @@ watch(
             </div>
 
             <section
-                class="border-border bg-card mt-6 border p-5 sm:p-6"
+                class="surface-panel border-border bg-card mt-6 border p-5 sm:p-6"
                 aria-labelledby="catalog-filters-heading"
             >
                 <div class="flex items-start gap-3">
                     <span
-                        class="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center"
+                        class="bg-secondary text-primary-ink flex size-10 shrink-0 items-center justify-center"
                     >
                         <SlidersHorizontal class="size-4" aria-hidden="true" />
                     </span>
@@ -457,7 +457,7 @@ watch(
                 <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
                     <div>
                         <p
-                            class="text-primary text-xs font-bold tracking-[0.18em] uppercase"
+                            class="text-primary-ink text-xs font-bold tracking-[0.18em] uppercase"
                         >
                             Product lineup
                         </p>
@@ -494,7 +494,7 @@ watch(
                     v-if="products.data.length"
                     data="products"
                     :buffer="300"
-                    class="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4"
+                    class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4"
                 >
                     <ProductCard
                         v-for="product in products.data"
@@ -509,7 +509,7 @@ watch(
                         >
                             <span class="sr-only">Loading more products…</span>
                             <div
-                                class="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4"
+                                class="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4"
                             >
                                 <ProductCardSkeleton
                                     v-for="card in 4"

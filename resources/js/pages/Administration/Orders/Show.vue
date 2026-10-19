@@ -348,20 +348,20 @@ defineOptions({
     <main
         class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
     >
-        <section class="border-border bg-card relative overflow-hidden border">
+        <section class="surface-panel border-border bg-card relative overflow-hidden border">
             <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
             <div
                 class="flex flex-col gap-5 p-6 sm:flex-row sm:items-start sm:justify-between"
             >
                 <div class="flex min-w-0 items-start gap-4">
                     <span
-                        class="bg-secondary text-primary flex size-11 shrink-0 items-center justify-center rounded-md"
+                        class="bg-secondary text-primary-ink flex size-11 shrink-0 items-center justify-center rounded-md"
                     >
                         <ReceiptText class="size-5" />
                     </span>
                     <div>
                         <p
-                            class="text-primary text-xs font-semibold tracking-widest uppercase"
+                            class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
                         >
                             Administrator order record
                         </p>
@@ -599,12 +599,12 @@ defineOptions({
                     </div>
 
                     <div
-                        class="border-border bg-card divide-border divide-y border"
+                        class="surface-panel border-border bg-card divide-border divide-y border"
                     >
                         <div class="grid md:grid-cols-2 md:divide-x">
                             <div class="flex gap-3 p-5">
                                 <UserRound
-                                    class="text-primary mt-0.5 size-5 shrink-0"
+                                    class="text-primary-ink mt-0.5 size-5 shrink-0"
                                 />
                                 <div class="min-w-0">
                                     <p class="text-muted-foreground text-sm">
@@ -622,7 +622,7 @@ defineOptions({
                             </div>
                             <div class="flex gap-3 p-5">
                                 <Truck
-                                    class="text-primary mt-0.5 size-5 shrink-0"
+                                    class="text-primary-ink mt-0.5 size-5 shrink-0"
                                 />
                                 <div>
                                     <p class="text-muted-foreground text-sm">
@@ -637,7 +637,7 @@ defineOptions({
                         <div class="grid md:grid-cols-2 md:divide-x">
                             <div class="flex gap-3 p-5">
                                 <PackageCheck
-                                    class="text-primary mt-0.5 size-5 shrink-0"
+                                    class="text-primary-ink mt-0.5 size-5 shrink-0"
                                 />
                                 <div>
                                     <p class="text-muted-foreground text-sm">
@@ -653,7 +653,7 @@ defineOptions({
                             </div>
                             <div class="flex gap-3 p-5">
                                 <MapPin
-                                    class="text-primary mt-0.5 size-5 shrink-0"
+                                    class="text-primary-ink mt-0.5 size-5 shrink-0"
                                 />
                                 <div>
                                     <p class="text-muted-foreground text-sm">
@@ -739,7 +739,7 @@ defineOptions({
                     </div>
 
                     <div
-                        class="border-border bg-card divide-border divide-y border"
+                        class="surface-panel border-border bg-card divide-border divide-y border"
                     >
                         <article
                             v-for="item in order.items"
@@ -783,7 +783,7 @@ defineOptions({
             <aside class="flex flex-col gap-6" aria-label="Order actions">
                 <section
                     v-if="order.shipment"
-                    class="border-border bg-card grid gap-4 border p-5"
+                    class="surface-panel border-border bg-card grid gap-4 border p-5"
                     aria-label="Shipment actions"
                 >
                     <h2 class="font-semibold">Manual shipment actions</h2>
@@ -918,10 +918,10 @@ defineOptions({
                         </DialogContent>
                     </Dialog>
                 </section>
-                <section class="border-border bg-card border p-5">
+                <section class="surface-panel border-border bg-card border p-5">
                     <div class="flex items-start gap-3">
                         <ShieldCheck
-                            class="text-primary mt-0.5 size-5 shrink-0"
+                            class="text-primary-ink mt-0.5 size-5 shrink-0"
                         />
                         <div>
                             <p class="text-muted-foreground text-sm">
@@ -1084,8 +1084,8 @@ defineOptions({
                                     "
                                     :class="
                                         selectedOrderStatus === 'completed'
-                                            ? 'bg-emerald-600 text-white hover:bg-emerald-700 focus-visible:ring-emerald-500/40 dark:bg-emerald-600 dark:hover:bg-emerald-500'
-                                            : 'bg-red-700 text-white hover:bg-red-800 focus-visible:ring-red-600/40 dark:bg-red-700 dark:hover:bg-red-600'
+                                            ? 'bg-success-action text-success-action-foreground hover:bg-success-action/90 focus-visible:ring-success-action'
+                                            : 'bg-destructive-action text-destructive-action-foreground hover:bg-destructive-action/90 focus-visible:ring-destructive'
                                     "
                                     :disabled="orderStatusForm.processing"
                                     @click="submitOrderStatus"
@@ -1100,9 +1100,9 @@ defineOptions({
                     </Dialog>
                 </section>
 
-                <section class="border-border bg-card border p-5">
+                <section class="surface-panel border-border bg-card border p-5">
                     <div class="flex items-start gap-3">
-                        <Banknote class="text-primary mt-0.5 size-5 shrink-0" />
+                        <Banknote class="text-primary-ink mt-0.5 size-5 shrink-0" />
                         <div>
                             <p class="text-muted-foreground text-sm">
                                 Payment method
@@ -1613,8 +1613,8 @@ defineOptions({
                                     :class="
                                         paymentStatusForm.payment_status ===
                                         'verified'
-                                            ? 'bg-emerald-600 text-white hover:bg-emerald-700 focus-visible:ring-emerald-500/40 dark:bg-emerald-600 dark:hover:bg-emerald-500'
-                                            : 'bg-red-700 text-white hover:bg-red-800 focus-visible:ring-red-600/40 dark:bg-red-700 dark:hover:bg-red-600'
+                                            ? 'bg-success-action text-success-action-foreground hover:bg-success-action/90 focus-visible:ring-success-action'
+                                            : 'bg-destructive-action text-destructive-action-foreground hover:bg-destructive-action/90 focus-visible:ring-destructive'
                                     "
                                     :disabled="paymentStatusForm.processing"
                                     @click="submitPaymentStatus"

@@ -103,7 +103,7 @@ function submitReplacementProof() {
             class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
         >
             <section
-                class="border-border bg-card relative overflow-hidden border p-6 sm:p-8"
+                class="surface-panel border-border bg-card relative overflow-hidden border p-6 sm:p-8"
                 aria-labelledby="confirmation-heading"
             >
                 <div
@@ -115,13 +115,13 @@ function submitReplacementProof() {
                 >
                     <div class="flex items-start gap-4">
                         <span
-                            class="bg-secondary text-primary flex size-12 shrink-0 items-center justify-center rounded-md"
+                            class="bg-secondary text-primary-ink flex size-12 shrink-0 items-center justify-center rounded-md"
                         >
                             <BadgeCheck class="size-6" aria-hidden="true" />
                         </span>
                         <div>
                             <p
-                                class="text-primary text-xs font-semibold tracking-widest uppercase"
+                                class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
                             >
                                 {{
                                     isConfirmation
@@ -263,7 +263,7 @@ function submitReplacementProof() {
                     </div>
 
                     <div
-                        class="border-border bg-card divide-border divide-y border"
+                        class="surface-panel border-border bg-card divide-border divide-y border"
                     >
                         <article
                             v-for="item in order.items"
@@ -285,7 +285,7 @@ function submitReplacementProof() {
                                 <div class="min-w-0">
                                     <p
                                         v-if="item.product.brand"
-                                        class="text-primary text-xs font-semibold tracking-wide uppercase"
+                                        class="text-primary-ink text-xs font-semibold tracking-wide uppercase"
                                     >
                                         {{ item.product.brand }}
                                     </p>
@@ -319,12 +319,12 @@ function submitReplacementProof() {
 
                 <aside class="grid gap-6 xl:sticky xl:top-6">
                     <section
-                        class="border-border bg-card border p-6"
+                        class="surface-panel border-border bg-card border p-6"
                         aria-labelledby="order-total-heading"
                     >
                         <div class="flex items-center gap-3">
                             <ReceiptText
-                                class="text-primary size-5"
+                                class="text-primary-ink size-5"
                                 aria-hidden="true"
                             />
                             <h2 id="order-total-heading" class="font-bold">
@@ -416,12 +416,12 @@ function submitReplacementProof() {
                     </section>
 
                     <section
-                        class="border-border bg-card border p-6"
+                        class="surface-panel border-border bg-card border p-6"
                         aria-labelledby="submitted-details-heading"
                     >
                         <div class="flex items-center gap-3">
                             <PackageCheck
-                                class="text-primary size-5"
+                                class="text-primary-ink size-5"
                                 aria-hidden="true"
                             />
                             <h2
@@ -616,7 +616,7 @@ function submitReplacementProof() {
 
                                 <Button
                                     type="submit"
-                                    class="w-full bg-red-700 text-white hover:bg-red-800 focus-visible:ring-red-600/40 dark:bg-red-700 dark:hover:bg-red-600"
+                                    class="w-full bg-destructive-action text-destructive-action-foreground hover:bg-destructive-action/90 focus-visible:ring-destructive"
                                     :disabled="
                                         replacementProofForm.processing ||
                                         !replacementProofForm.payment_proof

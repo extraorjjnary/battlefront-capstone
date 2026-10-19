@@ -31,13 +31,13 @@ function toggleAppearance() {
                     role="switch"
                     variant="ghost"
                     size="icon"
-                    class="appearance-toggle group h-9 w-12 rounded-full p-0 hover:bg-transparent focus-visible:ring-(--appearance-toggle-accent)/50 dark:hover:bg-transparent motion-reduce:transition-none cursor-pointer"
+                    class="appearance-toggle group h-9 w-12 rounded-full p-0 hover:bg-transparent focus-visible:ring-ring dark:hover:bg-transparent motion-reduce:transition-none cursor-pointer"
                     aria-label="Dark mode"
                     :aria-checked="resolvedAppearance === 'dark'"
                     @click="toggleAppearance"
                 >
                     <span
-                        class="relative h-6 w-10 rounded-full border border-black/10 dark:border-white/15 bg-muted transition-colors duration-200 group-hover:border-black/20 dark:group-hover:border-white/25 motion-reduce:transition-none"
+                        class="relative h-6 w-10 rounded-full border border-input bg-muted transition-colors duration-200 group-hover:border-ring motion-reduce:transition-none"
                         aria-hidden="true"
                     >
                         <span
@@ -61,9 +61,3 @@ function toggleAppearance() {
         </Tooltip>
     </TooltipProvider>
 </template>
-
-<style scoped>
-.appearance-toggle {
-    --appearance-toggle-accent: #ef1b1b;
-}
-</style>

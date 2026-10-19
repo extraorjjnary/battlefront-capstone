@@ -1,9 +1,11 @@
 <script setup>
 import { CircleCheckIcon, InfoIcon, Loader2Icon, OctagonXIcon, TriangleAlertIcon, XIcon } from "@lucide/vue";
 import { Toaster as Sonner } from "vue-sonner";
+import { useAppearance } from "@/composables/useAppearance";
 import { cn } from "@/lib/utils";
 import 'vue-sonner/style.css';
 const props = defineProps(Sonner.props);
+const { resolvedAppearance } = useAppearance();
 </script>
 
 <template>
@@ -16,6 +18,7 @@ const props = defineProps(Sonner.props);
       '--border-radius': 'var(--radius)',
     }"
     v-bind="props"
+    :theme="resolvedAppearance"
   >
     <template #success-icon>
       <CircleCheckIcon class="size-4" />

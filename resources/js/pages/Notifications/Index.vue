@@ -47,7 +47,7 @@ function markRead(id = null) {
             <header class="flex flex-wrap items-start justify-between gap-4">
                 <div>
                     <p
-                        class="text-primary text-xs font-semibold tracking-widest uppercase"
+                        class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
                     >
                         {{
                             isAdministrator
@@ -81,7 +81,7 @@ function markRead(id = null) {
             <section aria-label="Notification history" :aria-busy="busy">
                 <div
                     v-if="!notifications.data.length"
-                    class="border-border bg-card border border-dashed px-6 py-14 text-center"
+                    class="surface-panel border-border bg-card border border-dashed px-6 py-14 text-center"
                 >
                     <Bell
                         class="text-muted-foreground mx-auto size-8"
@@ -98,11 +98,11 @@ function markRead(id = null) {
                         }}
                     </p>
                 </div>
-                <div v-else class="border-border divide-border divide-y border">
+                <div v-else class="surface-panel border-border bg-card divide-border divide-y border">
                     <article
                         v-for="notification in notifications.data"
                         :key="notification.id"
-                        class="bg-card border-l-2 p-5"
+                        class="bg-card border-l-2 p-5 first:rounded-t-panel last:rounded-b-panel"
                         :class="
                             notification.is_read
                                 ? 'border-l-transparent'
@@ -150,7 +150,7 @@ function markRead(id = null) {
                         <Link
                             v-if="notification.order"
                             :href="navigation.order(notification.order.id)"
-                            class="text-primary focus-visible:ring-ring mt-3 inline-flex items-center gap-2 rounded-sm text-sm font-medium focus-visible:ring-2"
+                            class="text-primary-ink focus-visible:ring-ring mt-3 inline-flex items-center gap-2 rounded-sm text-sm font-medium focus-visible:ring-2"
                         >
                             View {{ notification.order.reference }}
                             <ArrowRight class="size-4" aria-hidden="true" />

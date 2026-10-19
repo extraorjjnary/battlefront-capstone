@@ -24,7 +24,7 @@ const phoneUrl = (phoneNumber) => `tel:${phoneNumber.replaceAll(' ', '')}`;
 
         <main class="mx-auto max-w-7xl px-5 py-10 sm:px-8 sm:py-14">
             <section
-                class="border-border bg-card relative overflow-hidden border px-6 py-10 shadow-sm sm:px-10 lg:grid lg:grid-cols-[1.5fr_0.7fr] lg:items-end lg:gap-12 lg:px-14 lg:py-14"
+                class="surface-panel border-border bg-card relative overflow-hidden border px-6 py-10 sm:px-10 lg:grid lg:grid-cols-[1.5fr_0.7fr] lg:items-end lg:gap-12 lg:px-14 lg:py-14"
             >
                 <div
                     class="bg-primary absolute inset-y-0 left-0 w-1.5"
@@ -32,12 +32,12 @@ const phoneUrl = (phoneNumber) => `tel:${phoneNumber.replaceAll(' ', '')}`;
                 />
                 <div>
                     <div
-                        class="border-primary/30 bg-primary/10 text-primary mb-5 flex size-11 items-center justify-center border"
+                        class="border-primary/30 bg-primary/10 text-primary-ink mb-5 flex size-11 items-center justify-center border"
                     >
                         <Navigation class="size-5" aria-hidden="true" />
                     </div>
                     <p
-                        class="text-primary mb-3 text-xs font-bold tracking-[0.2em] uppercase"
+                        class="text-primary-ink mb-3 text-xs font-bold tracking-[0.2em] uppercase"
                     >
                         Battlefront locations
                     </p>
@@ -74,7 +74,7 @@ const phoneUrl = (phoneNumber) => `tel:${phoneNumber.replaceAll(' ', '')}`;
                 <div class="mb-6 flex items-end justify-between gap-6">
                     <div>
                         <p
-                            class="text-primary text-xs font-bold tracking-[0.18em] uppercase"
+                            class="text-primary-ink text-xs font-bold tracking-[0.18em] uppercase"
                         >
                             Branch directory
                         </p>
@@ -94,7 +94,7 @@ const phoneUrl = (phoneNumber) => `tel:${phoneNumber.replaceAll(' ', '')}`;
                     <article
                         v-for="branch in branches"
                         :key="branch.id"
-                        class="bg-card border p-6 shadow-sm sm:p-8"
+                        class="surface-card bg-card border p-6 sm:p-8"
                         :class="
                             branch.is_operational
                                 ? 'border-primary/50 lg:col-span-2'
@@ -128,7 +128,7 @@ const phoneUrl = (phoneNumber) => `tel:${phoneNumber.replaceAll(' ', '')}`;
                         >
                             <div class="flex gap-3">
                                 <MapPin
-                                    class="text-primary mt-0.5 size-5 shrink-0"
+                                    class="text-primary-ink mt-0.5 size-5 shrink-0"
                                     aria-hidden="true"
                                 />
                                 <div>
@@ -145,7 +145,7 @@ const phoneUrl = (phoneNumber) => `tel:${phoneNumber.replaceAll(' ', '')}`;
 
                             <div class="flex gap-3">
                                 <Phone
-                                    class="text-primary mt-0.5 size-5 shrink-0"
+                                    class="text-primary-ink mt-0.5 size-5 shrink-0"
                                     aria-hidden="true"
                                 />
                                 <div>
@@ -173,7 +173,7 @@ const phoneUrl = (phoneNumber) => `tel:${phoneNumber.replaceAll(' ', '')}`;
 
                             <div class="flex gap-3">
                                 <Mail
-                                    class="text-primary mt-0.5 size-5 shrink-0"
+                                    class="text-primary-ink mt-0.5 size-5 shrink-0"
                                     aria-hidden="true"
                                 />
                                 <div class="min-w-0">
@@ -199,7 +199,7 @@ const phoneUrl = (phoneNumber) => `tel:${phoneNumber.replaceAll(' ', '')}`;
 
                             <div class="flex gap-3">
                                 <Clock3
-                                    class="text-primary mt-0.5 size-5 shrink-0"
+                                    class="text-primary-ink mt-0.5 size-5 shrink-0"
                                     aria-hidden="true"
                                 />
                                 <div>

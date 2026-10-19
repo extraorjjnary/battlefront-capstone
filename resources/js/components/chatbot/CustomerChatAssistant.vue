@@ -122,14 +122,20 @@ async function submitMessage() {
 <template>
     <Teleport v-if="isMounted" to="body">
         <div
-            class="fixed right-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-50 sm:right-6 sm:bottom-6"
+            data-customer-chat
+            class="fixed z-40 sm:right-6 sm:bottom-6"
+            :class="
+                isOpen
+                    ? 'inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] flex justify-end sm:inset-x-auto sm:w-96'
+                    : 'inset-x-0 bottom-0 flex h-(--mobile-support-height) items-center justify-end border-t border-border bg-card px-4 pb-[env(safe-area-inset-bottom)] sm:inset-x-auto sm:h-auto sm:border-0 sm:bg-transparent sm:p-0'
+            "
         >
             <Button
                 v-if="!isOpen"
                 ref="launcher"
                 type="button"
                 size="lg"
-                class="min-h-12 rounded-full px-5 shadow-lg"
+                class="min-h-12 rounded-full px-5 shadow-card"
                 aria-controls="battlefront-chat-panel"
                 aria-expanded="false"
                 @click="openPanel"
@@ -141,7 +147,7 @@ async function submitMessage() {
             <section
                 v-else
                 id="battlefront-chat-panel"
-                class="border-border bg-card text-card-foreground flex h-[min(36rem,calc(100dvh-2rem))] w-[calc(100vw-1.5rem)] max-w-96 flex-col overflow-hidden rounded-lg border shadow-2xl"
+                class="border-border bg-card text-card-foreground flex h-[min(36rem,calc(100dvh-2rem-env(safe-area-inset-bottom)))] w-full max-w-96 flex-col surface-panel overflow-hidden border"
                 aria-label="Battlefront customer support assistant"
                 @keydown.esc="closePanel"
             >
@@ -149,7 +155,7 @@ async function submitMessage() {
                     class="border-border flex shrink-0 items-center gap-3 border-b px-4 py-3"
                 >
                     <span
-                        class="bg-secondary text-primary flex size-9 shrink-0 items-center justify-center rounded-md"
+                        class="bg-secondary text-primary-ink flex size-9 shrink-0 items-center justify-center rounded-md"
                     >
                         <MessageSquareText class="size-5" aria-hidden="true" />
                     </span>
@@ -191,7 +197,7 @@ async function submitMessage() {
                         class="flex min-h-full flex-col items-center justify-center text-center"
                     >
                         <MessageSquareText
-                            class="text-primary size-8"
+                            class="text-primary-ink size-8"
                             aria-hidden="true"
                         />
                         <h2 class="mt-3 font-semibold">How can we help?</h2>
@@ -263,7 +269,7 @@ async function submitMessage() {
                                 role="status"
                             >
                                 <LoaderCircle
-                                    class="text-primary size-4 animate-spin motion-reduce:animate-none"
+                                    class="text-primary-ink size-4 animate-spin motion-reduce:animate-none"
                                     aria-hidden="true"
                                 />
                                 Responding…

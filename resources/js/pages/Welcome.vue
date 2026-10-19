@@ -47,7 +47,7 @@ const customerHighlights = [
 </script>
 
 <template>
-    <div class="dark bg-background text-foreground min-h-screen">
+    <div class="bg-background text-foreground min-h-screen">
         <Head title="Home">
             <meta
                 head-key="description"
@@ -64,7 +64,7 @@ const customerHighlights = [
                 aria-labelledby="hero-heading"
             >
                 <div
-                    class="bg-size[48px_48px] pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,#2a2e36_1px,transparent_1px),linear-gradient(to_bottom,#2a2e36_1px,transparent_1px)] mask-[linear-gradient(to_bottom,black,transparent_82%)] opacity-35"
+                    class="bg-size-[48px_48px] pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] mask-[linear-gradient(to_bottom,black,transparent_82%)] opacity-35"
                     aria-hidden="true"
                 />
 
@@ -73,7 +73,7 @@ const customerHighlights = [
                 >
                     <div>
                         <div
-                            class="border-primary/40 bg-primary/10 mb-6 inline-flex items-center gap-2 border px-3 py-1.5 text-xs font-bold tracking-[0.18em] text-[#ef1b1b] uppercase"
+                            class="border-warm-accent bg-warm-accent/50 mb-6 inline-flex items-center gap-2 border px-3 py-1.5 text-xs font-bold tracking-[0.18em] text-primary-ink uppercase"
                         >
                             <Cpu class="size-4" aria-hidden="true" />
                             Computer hardware, made clearer
@@ -84,7 +84,7 @@ const customerHighlights = [
                             class="max-w-3xl text-4xl leading-[1.05] font-bold tracking-tight text-balance sm:text-6xl lg:text-7xl"
                         >
                             Build your next setup with
-                            <span class="text-[#ef1b1b]">confidence.</span>
+                            <span class="text-primary-ink">confidence.</span>
                         </h1>
 
                         <p
@@ -123,7 +123,7 @@ const customerHighlights = [
                     </div>
 
                     <div
-                        class="border-border bg-card border shadow-2xl shadow-black/30"
+                        class="surface-panel border-border bg-card border"
                         aria-label="Hardware categories"
                     >
                         <div
@@ -131,7 +131,7 @@ const customerHighlights = [
                         >
                             <div>
                                 <p
-                                    class="text-xs font-bold tracking-[0.16em] text-[#ef1b1b] uppercase"
+                                    class="text-xs font-bold tracking-[0.16em] text-primary-ink uppercase"
                                 >
                                     Build station
                                 </p>
@@ -153,7 +153,7 @@ const customerHighlights = [
                             >
                                 <component
                                     :is="area.icon"
-                                    class="text-muted-foreground size-7 motion-safe:transition-colors motion-safe:group-hover:text-[#ef1b1b]"
+                                    class="text-muted-foreground size-7 motion-safe:transition-colors motion-safe:group-hover:text-primary-ink"
                                     aria-hidden="true"
                                 />
                                 <p class="text-sm font-semibold sm:text-base">
@@ -171,7 +171,7 @@ const customerHighlights = [
             >
                 <div class="max-w-2xl">
                     <p
-                        class="text-xs font-bold tracking-[0.18em] text-[#ef1b1b] uppercase"
+                        class="text-xs font-bold tracking-[0.18em] text-primary-ink uppercase"
                     >
                         A focused buying experience
                     </p>
@@ -204,7 +204,7 @@ const customerHighlights = [
                         ]"
                     >
                         <div
-                            class="border-primary/40 bg-primary/10 flex size-11 items-center justify-center border text-[#ef1b1b]"
+                            class="border-primary/40 bg-primary/10 flex size-11 items-center justify-center border text-primary-ink"
                         >
                             <component
                                 :is="highlight.icon"
@@ -228,13 +228,13 @@ const customerHighlights = [
                 >
                     <div class="flex gap-5">
                         <div
-                            class="border-primary/40 bg-primary/10 hidden size-12 shrink-0 items-center justify-center border text-[#ef1b1b] sm:flex"
+                            class="border-primary/40 bg-primary/10 hidden size-12 shrink-0 items-center justify-center border text-primary-ink sm:flex"
                         >
                             <MapPinned class="size-6" aria-hidden="true" />
                         </div>
                         <div>
                             <p
-                                class="text-xs font-bold tracking-[0.18em] text-[#ef1b1b] uppercase"
+                                class="text-xs font-bold tracking-[0.18em] text-primary-ink uppercase"
                             >
                                 Visit Battlefront
                             </p>

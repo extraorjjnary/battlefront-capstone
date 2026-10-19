@@ -107,7 +107,7 @@ defineOptions({
             class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
         >
             <section
-                class="border-border bg-card relative overflow-hidden border p-6 sm:p-8"
+                class="surface-panel border-border bg-card relative overflow-hidden border p-6 sm:p-8"
                 aria-labelledby="cart-heading"
             >
                 <div
@@ -116,13 +116,13 @@ defineOptions({
                 />
                 <div class="flex items-start gap-4">
                     <span
-                        class="bg-secondary text-primary flex size-11 shrink-0 items-center justify-center rounded-md"
+                        class="bg-secondary text-primary-ink flex size-11 shrink-0 items-center justify-center rounded-md"
                     >
                         <ShoppingCart class="size-5" aria-hidden="true" />
                     </span>
                     <div>
                         <p
-                            class="text-primary text-xs font-semibold tracking-widest uppercase"
+                            class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
                         >
                             Customer cart
                         </p>
@@ -151,7 +151,7 @@ defineOptions({
 
             <section
                 v-if="cart.items.length === 0"
-                class="border-border bg-card flex min-h-80 items-center justify-center border border-dashed p-8 text-center"
+                class="surface-panel border-border bg-card flex min-h-80 items-center justify-center border border-dashed p-8 text-center"
                 aria-labelledby="empty-cart-heading"
             >
                 <div class="max-w-md">
@@ -234,7 +234,7 @@ defineOptions({
                         </div>
 
                         <div
-                            class="border-border bg-card divide-border divide-y border"
+                            class="surface-panel border-border bg-card divide-border divide-y border"
                         >
                             <CartItemRow
                                 v-for="item in cart.items"
@@ -247,11 +247,11 @@ defineOptions({
                     </section>
 
                     <aside
-                        class="border-border bg-card border p-6 xl:sticky xl:top-6"
+                        class="surface-panel border-border bg-card border p-6 xl:sticky xl:top-6"
                         aria-labelledby="cart-summary-heading"
                     >
                         <p
-                            class="text-primary text-xs font-semibold tracking-widest uppercase"
+                            class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
                         >
                             Current totals
                         </p>

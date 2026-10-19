@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { useChartTheme } from '@/composables/useChartTheme';
 import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
 import { formatForecastUnits } from '@/lib/forecastUnits';
 
@@ -127,6 +128,8 @@ function generatedTime(value) {
     return dateFormatter.value.format(new Date(value));
 }
 
+const chartColors = useChartTheme();
+
 const chartData = computed(() => {
     const observations = result.value?.observations ?? [];
     const forecasts = result.value?.monthly_forecasts ?? [];
@@ -142,8 +145,8 @@ const chartData = computed(() => {
                     ...observations.map((item) => item.quantity_sold),
                     ...forecasts.map(() => null),
                 ],
-                borderColor: '#9CA3AF',
-                backgroundColor: '#9CA3AF',
+                borderColor: chartColors.value.secondary,
+                backgroundColor: chartColors.value.secondary,
                 pointRadius: 4,
                 tension: 0,
             },
@@ -157,8 +160,8 @@ const chartData = computed(() => {
                     ),
                     ...forecasts.map((item) => Number(item.forecast_quantity)),
                 ],
-                borderColor: '#EF1B1B',
-                backgroundColor: '#EF1B1B',
+                borderColor: chartColors.value.primary,
+                backgroundColor: chartColors.value.primary,
                 borderDash: [6, 4],
                 pointStyle: 'rectRot',
                 pointRadius: [
@@ -170,13 +173,20 @@ const chartData = computed(() => {
         ],
     };
 });
-const chartOptions = {
+const chartOptions = computed(() => ({
     responsive: true,
     maintainAspectRatio: false,
     animation: false,
     plugins: {
-        legend: { labels: { color: '#9CA3AF', usePointStyle: true } },
+        legend: {
+            labels: { color: chartColors.value.text, usePointStyle: true },
+        },
         tooltip: {
+            backgroundColor: chartColors.value.surface,
+            titleColor: chartColors.value.foreground,
+            bodyColor: chartColors.value.foreground,
+            borderColor: chartColors.value.border,
+            borderWidth: 1,
             callbacks: {
                 label: (item) =>
                     `${item.dataset.label}: ${formatForecastUnits(item.parsed.y)} units`,
@@ -188,21 +198,29 @@ const chartOptions = {
     },
     scales: {
         x: {
-            ticks: { color: '#9CA3AF', autoSkip: true, maxTicksLimit: 12 },
-            grid: { color: 'rgba(42, 46, 54, 0.55)' },
+            ticks: {
+                color: chartColors.value.text,
+                autoSkip: true,
+                maxTicksLimit: 12,
+            },
+            grid: { color: chartColors.value.border },
         },
         y: {
             beginAtZero: true,
-            title: { display: true, text: 'Units', color: '#9CA3AF' },
+            title: {
+                display: true,
+                text: 'Units',
+                color: chartColors.value.text,
+            },
             ticks: {
-                color: '#9CA3AF',
+                color: chartColors.value.text,
                 precision: 0,
                 callback: formatForecastUnits,
             },
-            grid: { color: 'rgba(42, 46, 54, 0.55)' },
+            grid: { color: chartColors.value.border },
         },
     },
-};
+}));
 </script>
 
 <template>
@@ -210,7 +228,7 @@ const chartOptions = {
         <Head title="Forecasting" />
         <header>
             <div class="flex items-center gap-3">
-                <ChartNoAxesCombined class="text-primary size-6" />
+                <ChartNoAxesCombined class="text-primary-ink size-6" />
                 <h1 class="text-2xl font-semibold tracking-tight">
                     Forecasting
                 </h1>
@@ -223,7 +241,7 @@ const chartOptions = {
 
         <div class="grid gap-6 xl:grid-cols-2">
             <section
-                class="border-border bg-card rounded-xl border p-5"
+                class="surface-panel border-border bg-card border p-5"
                 aria-labelledby="product-heading"
             >
                 <h2 id="product-heading" class="text-lg font-semibold">
@@ -304,7 +322,7 @@ const chartOptions = {
             </section>
 
             <section
-                class="border-border bg-card rounded-xl border p-5"
+                class="surface-panel border-border bg-card border p-5"
                 aria-labelledby="generate-heading"
             >
                 <h2 id="generate-heading" class="text-lg font-semibold">
@@ -416,7 +434,7 @@ const chartOptions = {
 
         <section
             v-if="result"
-            class="border-border bg-card rounded-xl border p-5"
+            class="surface-panel border-border bg-card border p-5"
             aria-labelledby="result-heading"
             aria-live="polite"
         >
@@ -560,7 +578,7 @@ const chartOptions = {
         </section>
 
         <section
-            class="border-border bg-card rounded-xl border p-5"
+            class="surface-panel border-border bg-card border p-5"
             aria-labelledby="saved-heading"
         >
             <div class="flex flex-wrap items-end justify-between gap-4">

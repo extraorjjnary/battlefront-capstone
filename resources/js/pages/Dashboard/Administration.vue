@@ -87,7 +87,7 @@ defineOptions({
             class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
         >
             <section
-                class="border-border bg-card relative overflow-hidden border px-6 py-5"
+                class="surface-panel border-border bg-card relative overflow-hidden border px-6 py-5"
                 aria-labelledby="admin-dashboard-heading"
             >
                 <div
@@ -95,7 +95,7 @@ defineOptions({
                     aria-hidden="true"
                 />
                 <p
-                    class="text-primary text-xs font-semibold tracking-widest uppercase"
+                    class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
                 >
                     Sagay City operations
                 </p>
@@ -123,7 +123,7 @@ defineOptions({
                     <template #fallback>
                         <div
                             aria-hidden="true"
-                            class="border-border bg-card grid border sm:grid-cols-2 xl:grid-cols-5"
+                            class="surface-panel border-border bg-card grid border sm:grid-cols-2 xl:grid-cols-5"
                         >
                             <StatSkeleton
                                 v-for="stat in 5"
@@ -134,7 +134,7 @@ defineOptions({
                         </div>
                     </template>
                     <dl
-                        class="border-border bg-card grid border sm:grid-cols-2 xl:grid-cols-5"
+                        class="surface-panel border-border bg-card grid border sm:grid-cols-2 xl:grid-cols-5"
                     >
                         <div
                             class="border-border border-b p-5 sm:border-r xl:border-b-0"
@@ -250,7 +250,7 @@ defineOptions({
                         <template #fallback>
                             <div
                                 aria-hidden="true"
-                                class="border-border bg-card divide-border divide-y border"
+                                class="surface-panel border-border bg-card divide-border divide-y border"
                             >
                                 <div v-for="queue in 3" :key="queue" class="p-5">
                                     <Skeleton class="h-5 w-40 max-w-full" />
@@ -258,12 +258,12 @@ defineOptions({
                                 </div>
                             </div>
                         </template>
-                        <div class="border-border bg-card border">
+                        <div class="surface-panel border-border bg-card border">
                             <div class="border-border border-b p-5">
                                 <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                     <div class="flex gap-3">
                                         <span
-                                            class="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center rounded-md"
+                                            class="bg-secondary text-primary-ink flex size-10 shrink-0 items-center justify-center rounded-md"
                                         >
                                             <WalletCards
                                                 class="size-5"
@@ -412,7 +412,7 @@ defineOptions({
                                 <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                                     <div class="flex gap-3">
                                         <span
-                                            class="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center rounded-md"
+                                            class="bg-secondary text-primary-ink flex size-10 shrink-0 items-center justify-center rounded-md"
                                         >
                                             <Boxes
                                                 class="size-5"
@@ -488,7 +488,7 @@ defineOptions({
                                         </div>
                                         <div class="shrink-0 text-right">
                                             <p
-                                                class="text-primary font-bold tabular-nums"
+                                                class="text-primary-ink font-bold tabular-nums"
                                             >
                                                 {{ product.quantity }} in stock
                                             </p>
@@ -521,12 +521,12 @@ defineOptions({
                         <template #fallback>
                             <div
                                 aria-hidden="true"
-                                class="border-border bg-card min-h-64 border p-4"
+                                class="surface-panel border-border bg-card min-h-64 border p-4"
                             >
                                 <ListSkeleton :rows="3" />
                             </div>
                         </template>
-                        <div class="border-border bg-card border">
+                        <div class="surface-panel border-border bg-card border">
                             <div
                                 v-if="props.dashboard.recent_orders.length === 0"
                                 class="text-muted-foreground flex min-h-64 flex-col items-center justify-center gap-3 p-8 text-center text-sm"
@@ -615,7 +615,7 @@ defineOptions({
                     </h2>
                 </div>
                 <div
-                    class="border-border bg-card grid border md:grid-cols-2 xl:grid-cols-4"
+                    class="surface-panel border-border bg-card grid border md:grid-cols-2 xl:grid-cols-4"
                 >
                     <Link
                         v-for="item in quickLinks"
@@ -625,7 +625,7 @@ defineOptions({
                     >
                         <component
                             :is="item.icon"
-                            class="text-primary mt-0.5 size-5 shrink-0"
+                            class="text-primary-ink mt-0.5 size-5 shrink-0"
                             aria-hidden="true"
                         />
                         <span class="min-w-0 flex-1">

@@ -73,7 +73,7 @@ test('a customer can update only their own approved profile fields', function ()
 
     $user->refresh();
     expect($user->role)->toBe(UserRole::Customer)
-        ->and($user->appearance->value)->toBe('system')
+        ->and($user->appearance->value)->toBe('light')
         ->and($user->email_verified_at)->toBeNull();
     expect(Hash::check('password', $user->password))->toBeTrue();
     $this->assertDatabaseHas('users', [

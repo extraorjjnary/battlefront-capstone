@@ -66,7 +66,7 @@ defineOptions({
             class="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 p-6 lg:p-10"
         >
             <section
-                class="border-border bg-card relative overflow-hidden border p-6 sm:p-8"
+                class="surface-panel border-border bg-card relative overflow-hidden border p-6 sm:p-8"
                 aria-labelledby="customer-dashboard-heading"
             >
                 <div
@@ -78,7 +78,7 @@ defineOptions({
                 >
                     <div class="max-w-2xl">
                         <p
-                            class="text-primary text-xs font-semibold tracking-widest uppercase"
+                            class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
                         >
                             Customer dashboard
                         </p>
@@ -132,7 +132,7 @@ defineOptions({
                     <template #fallback>
                         <div
                             aria-hidden="true"
-                            class="border-border bg-card grid border sm:grid-cols-2 lg:grid-cols-4"
+                            class="surface-panel border-border bg-card grid border sm:grid-cols-2 lg:grid-cols-4"
                         >
                             <StatSkeleton
                                 v-for="stat in 4"
@@ -142,7 +142,7 @@ defineOptions({
                         </div>
                     </template>
                     <dl
-                        class="border-border bg-card grid border sm:grid-cols-2 lg:grid-cols-4"
+                        class="surface-panel border-border bg-card grid border sm:grid-cols-2 lg:grid-cols-4"
                     >
                         <div
                             class="border-border border-b p-5 sm:border-r lg:border-b-0"
@@ -271,7 +271,7 @@ defineOptions({
                     <template #fallback>
                         <div
                             aria-hidden="true"
-                            class="border-border bg-card grid min-h-72 gap-6 border p-5 sm:p-6"
+                            class="surface-panel border-border bg-card grid min-h-72 gap-6 border p-5 sm:p-6"
                         >
                             <div class="grid gap-3">
                                 <Skeleton class="h-4 w-32" />
@@ -292,7 +292,7 @@ defineOptions({
                     </template>
                     <div
                         v-if="props.dashboard.latest_order"
-                        class="border-border bg-card border"
+                        class="surface-panel border-border bg-card border"
                     >
                         <div
                             class="border-border flex flex-col gap-5 border-b p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6"
@@ -426,7 +426,7 @@ defineOptions({
 
                     <div
                         v-else
-                        class="border-border bg-card flex min-h-72 items-center justify-center border border-dashed p-8 text-center"
+                        class="surface-panel border-border bg-card flex min-h-72 items-center justify-center border border-dashed p-8 text-center"
                     >
                         <div class="max-w-md">
                             <span

@@ -26,7 +26,7 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
 </script>
 
 <template>
-    <div class="px-4 py-6">
+    <div class="surface-panel bg-card ring-1 ring-border px-4 py-6">
         <Heading
             title="Settings"
             description="Manage your profile and account settings"

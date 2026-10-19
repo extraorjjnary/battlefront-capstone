@@ -62,7 +62,7 @@ test('stock badges show server status and exact positive quantities with safe un
         [null, 'Stock unavailable'],
     ]) {
         const html = (await renderToString(Vue.h(stock, { inventory }))).replace(/<!--[\s\S]*?-->/g, '');
-        assert.ok(html.includes(label), html);
+        assert.ok(html.replace(/<[^>]+>/g, '').includes(label), html);
         if (!inventory || !(inventory.quantity > 0) || inventory.status === 'unknown') {
             assert.doesNotMatch(html, /\d+ available|Only \d+ left/);
         }
@@ -74,7 +74,7 @@ test('catalog product cards render the stock quantity badge', async () => {
         product: { id: 7, name: 'Graphics card', category: { name: 'Graphics cards' },
             inventory: { quantity: 3, status: 'low_stock' } },
     }));
-    assert.ok(html.replace(/<!--[\s\S]*?-->/g, '').includes('Low stock · Only 3 left'));
+    assert.ok(html.replace(/<[^>]+>/g, '').includes('Low stock · Only 3 left'));
 });
 
 function cartItem(status = 'available', quantity = 5) {

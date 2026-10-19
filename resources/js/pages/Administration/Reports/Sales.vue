@@ -45,6 +45,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { useChartTheme } from '@/composables/useChartTheme';
 import { formatCurrency } from '@/lib/currency';
 
 ChartJS.register(
@@ -165,15 +166,17 @@ const kpiCards = computed(() => [
     },
 ]);
 
+const chartColors = useChartTheme();
+
 const timelineData = computed(() => ({
     labels: props.timeline.labels,
     datasets: [
         {
             label: 'Product revenue',
             data: props.timeline.revenue,
-            borderColor: '#EF1B1B',
-            backgroundColor: 'rgba(239, 27, 27, 0.12)',
-            pointBackgroundColor: '#EF1B1B',
+            borderColor: chartColors.value.highlight,
+            backgroundColor: chartColors.value.fill,
+            pointBackgroundColor: chartColors.value.highlight,
             fill: true,
             tension: 0.25,
             yAxisID: 'revenue',
@@ -181,9 +184,9 @@ const timelineData = computed(() => ({
         {
             label: 'Sales',
             data: props.timeline.sales,
-            borderColor: '#9CA3AF',
-            backgroundColor: '#9CA3AF',
-            pointBackgroundColor: '#9CA3AF',
+            borderColor: chartColors.value.secondary,
+            backgroundColor: chartColors.value.secondary,
+            pointBackgroundColor: chartColors.value.secondary,
             tension: 0.25,
             yAxisID: 'sales',
         },
@@ -198,20 +201,22 @@ const topProductsData = computed(() => ({
             data: props.top_products.quantities,
             backgroundColor: props.top_products.ids.map((id) => {
                 if (selectedProduct.value === null) {
-                    return '#B91C1C';
+                    return chartColors.value.primary;
                 }
 
                 return selectedProduct.value.id === id
-                    ? '#EF1B1B'
-                    : 'rgba(156, 163, 175, 0.32)';
+                    ? chartColors.value.highlight
+                    : chartColors.value.muted;
             }),
             borderColor: props.top_products.ids.map((id) =>
-                selectedProduct.value?.id === id ? '#F8FAFC' : '#2A2E36',
+                selectedProduct.value?.id === id
+                    ? chartColors.value.foreground
+                    : chartColors.value.border,
             ),
             borderWidth: props.top_products.ids.map((id) =>
                 selectedProduct.value?.id === id ? 3 : 1,
             ),
-            hoverBackgroundColor: '#EF1B1B',
+            hoverBackgroundColor: chartColors.value.highlight,
         },
     ],
 }));
@@ -224,51 +229,61 @@ const categoryData = computed(() => ({
             data: props.categories.revenue,
             backgroundColor: props.categories.ids.map((id) => {
                 if (selectedCategory.value === null) {
-                    return '#B91C1C';
+                    return chartColors.value.primary;
                 }
 
                 return selectedCategory.value.id === id
-                    ? '#EF1B1B'
-                    : 'rgba(156, 163, 175, 0.32)';
+                    ? chartColors.value.highlight
+                    : chartColors.value.muted;
             }),
             borderColor: props.categories.ids.map((id) =>
-                selectedCategory.value?.id === id ? '#F8FAFC' : '#111318',
+                selectedCategory.value?.id === id
+                    ? chartColors.value.foreground
+                    : chartColors.value.surface,
             ),
             borderWidth: props.categories.ids.map((id) =>
                 selectedCategory.value?.id === id ? 3 : 2,
             ),
-            hoverBackgroundColor: '#EF1B1B',
+            hoverBackgroundColor: chartColors.value.highlight,
         },
     ],
 }));
 
-const baseChartOptions = {
+const baseChartOptions = computed(() => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
+        tooltip: {
+            backgroundColor: chartColors.value.surface,
+            titleColor: chartColors.value.foreground,
+            bodyColor: chartColors.value.foreground,
+            borderColor: chartColors.value.border,
+            borderWidth: 1,
+        },
         legend: {
-            labels: { color: '#9CA3AF', usePointStyle: true },
+            labels: { color: chartColors.value.text, usePointStyle: true },
         },
     },
     scales: {
         x: {
-            ticks: { color: '#9CA3AF' },
-            grid: { color: 'rgba(42, 46, 54, 0.55)' },
+            ticks: { color: chartColors.value.text },
+            grid: { color: chartColors.value.border },
         },
         y: {
             beginAtZero: true,
-            ticks: { color: '#9CA3AF', precision: 0 },
-            grid: { color: 'rgba(42, 46, 54, 0.55)' },
+            ticks: { color: chartColors.value.text, precision: 0 },
+            grid: { color: chartColors.value.border },
         },
     },
-};
+}));
 
-const timelineOptions = {
-    ...baseChartOptions,
+const timelineOptions = computed(() => ({
+    ...baseChartOptions.value,
     interaction: { intersect: false, mode: 'index' },
     plugins: {
-        ...baseChartOptions.plugins,
+        ...baseChartOptions.value.plugins,
         tooltip: {
+            ...baseChartOptions.value.plugins.tooltip,
             callbacks: {
                 label(context) {
                     return context.dataset.yAxisID === 'revenue'
@@ -279,27 +294,27 @@ const timelineOptions = {
         },
     },
     scales: {
-        x: baseChartOptions.scales.x,
+        x: baseChartOptions.value.scales.x,
         revenue: {
             beginAtZero: true,
             position: 'left',
             ticks: {
-                color: '#9CA3AF',
+                color: chartColors.value.text,
                 callback: (value) => formatCurrency(value),
             },
-            grid: { color: 'rgba(42, 46, 54, 0.55)' },
+            grid: { color: chartColors.value.border },
         },
         sales: {
             beginAtZero: true,
             position: 'right',
-            ticks: { color: '#9CA3AF', precision: 0 },
+            ticks: { color: chartColors.value.text, precision: 0 },
             grid: { drawOnChartArea: false },
         },
     },
-};
+}));
 
 const topProductsOptions = computed(() => ({
-    ...baseChartOptions,
+    ...baseChartOptions.value,
     onClick(_event, elements) {
         if (elements.length === 0 || isUpdatingReport.value) {
             return;
@@ -342,9 +357,10 @@ const categoryOptions = computed(() => ({
     plugins: {
         legend: {
             position: 'bottom',
-            labels: { color: '#9CA3AF', usePointStyle: true },
+            labels: { color: chartColors.value.text, usePointStyle: true },
         },
         tooltip: {
+            ...baseChartOptions.value.plugins.tooltip,
             callbacks: {
                 label: (context) =>
                     `${context.label}: ${formatCurrency(context.raw)}`,
@@ -511,7 +527,7 @@ defineOptions({
     >
         <Head title="Sales reports" />
         <section
-            class="border-border bg-card relative overflow-hidden border p-6 sm:p-8"
+            class="surface-panel border-border bg-card relative overflow-hidden border p-6 sm:p-8"
         >
             <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
             <div
@@ -519,7 +535,7 @@ defineOptions({
             >
                 <div class="max-w-2xl">
                     <p
-                        class="text-primary text-xs font-semibold tracking-widest uppercase"
+                        class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
                     >
                         Administration · Sagay operations
                     </p>
@@ -536,7 +552,7 @@ defineOptions({
                 <div
                     class="text-muted-foreground flex items-center gap-2 text-sm"
                 >
-                    <CalendarRange class="text-primary size-4" />
+                    <CalendarRange class="text-primary-ink size-4" />
                     Inclusive date range
                 </div>
             </div>
@@ -572,12 +588,12 @@ defineOptions({
         </section>
 
         <section
-            class="border-border bg-card border p-5"
+            class="surface-panel border-border bg-card border p-5"
             aria-labelledby="sales-filter-heading"
         >
             <div class="flex items-start gap-3">
                 <span
-                    class="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center rounded-md"
+                    class="bg-secondary text-primary-ink flex size-10 shrink-0 items-center justify-center rounded-md"
                 >
                     <CalendarRange class="size-4" />
                 </span>
@@ -687,7 +703,7 @@ defineOptions({
 
         <section
             v-if="hasCrossFilter"
-            class="border-border bg-card flex flex-wrap items-center gap-2 border px-4 py-3"
+            class="surface-card border-border bg-card flex flex-wrap items-center gap-2 border px-4 py-3"
             aria-label="Active sales report filters"
         >
             <span
@@ -752,7 +768,7 @@ defineOptions({
                 <article
                     v-for="card in kpiCards"
                     :key="card.label"
-                    class="border-border bg-card min-w-0 border p-5"
+                    class="surface-card border-border bg-card min-w-0 border p-5"
                 >
                     <div class="flex items-start justify-between gap-4">
                         <div>
@@ -764,7 +780,7 @@ defineOptions({
                             </p>
                         </div>
                         <span
-                            class="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center rounded-md"
+                            class="bg-secondary text-primary-ink flex size-10 shrink-0 items-center justify-center rounded-md"
                         >
                             <component :is="card.icon" class="size-5" />
                         </span>
@@ -778,7 +794,7 @@ defineOptions({
 
         <section
             v-if="!hasSales"
-            class="border-border bg-card flex min-h-52 items-center justify-center border p-6 text-center"
+            class="surface-panel border-border bg-card flex min-h-52 items-center justify-center border p-6 text-center"
         >
             <div class="max-w-md">
                 <ChartNoAxesCombined
@@ -800,7 +816,7 @@ defineOptions({
 
         <template v-else>
             <section
-                class="border-border bg-card border p-5"
+                class="surface-panel border-border bg-card border p-5"
                 aria-labelledby="sales-trend-heading"
             >
                 <div>
@@ -818,7 +834,7 @@ defineOptions({
 
             <div class="grid gap-6 xl:grid-cols-2">
                 <section
-                    class="border-border bg-card min-w-0 border p-5"
+                    class="surface-panel border-border bg-card min-w-0 border p-5"
                     aria-labelledby="top-products-heading"
                 >
                     <p class="text-muted-foreground text-sm">
@@ -840,7 +856,7 @@ defineOptions({
                 </section>
 
                 <section
-                    class="border-border bg-card min-w-0 border p-5"
+                    class="surface-panel border-border bg-card min-w-0 border p-5"
                     aria-labelledby="category-sales-heading"
                 >
                     <p class="text-muted-foreground text-sm">
@@ -889,7 +905,7 @@ defineOptions({
 
             <div
                 v-if="products.data.length === 0"
-                class="border-border bg-card border p-8 text-center"
+                class="surface-panel border-border bg-card border p-8 text-center"
             >
                 <ShoppingBasket class="text-muted-foreground mx-auto size-8" />
                 <p class="mt-3 font-medium">No product sales to report</p>
@@ -899,7 +915,7 @@ defineOptions({
                 </p>
             </div>
 
-            <div v-else class="border-border bg-card overflow-x-auto border" tabindex="0" role="region" aria-label="Product performance table">
+            <div v-else class="surface-panel border-border bg-card overflow-x-auto border" tabindex="0" role="region" aria-label="Product performance table">
                 <table class="w-full min-w-3xl text-left text-sm">
                     <thead
                         class="bg-secondary/60 text-muted-foreground text-xs uppercase"
@@ -925,7 +941,7 @@ defineOptions({
                             <td class="px-5 py-4 font-medium">
                                 <button
                                     type="button"
-                                    class="hover:text-primary focus-visible:ring-ring max-md:min-h-11 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                                    class="hover:text-primary-ink focus-visible:ring-ring max-md:min-h-11 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
                                     :aria-pressed="
                                         selectedProduct?.id === product.id
                                     "
@@ -977,11 +993,11 @@ defineOptions({
             </div>
             <div
                 v-if="categories.rows.length === 0"
-                class="border-border bg-card border p-8 text-center"
+                class="surface-panel border-border bg-card border p-8 text-center"
             >
                 <p class="font-medium">No category sales to report</p>
             </div>
-            <div v-else class="border-border bg-card overflow-x-auto border" tabindex="0" role="region" aria-label="Category performance table">
+            <div v-else class="surface-panel border-border bg-card overflow-x-auto border" tabindex="0" role="region" aria-label="Category performance table">
                 <table class="w-full min-w-2xl text-left text-sm">
                     <thead
                         class="bg-secondary/60 text-muted-foreground text-xs uppercase"
@@ -1007,7 +1023,7 @@ defineOptions({
                             <td class="px-5 py-4 font-medium">
                                 <button
                                     type="button"
-                                    class="hover:text-primary focus-visible:ring-ring max-md:min-h-11 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                                    class="hover:text-primary-ink focus-visible:ring-ring max-md:min-h-11 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
                                     :aria-pressed="
                                         selectedCategory?.id === category.id
                                     "

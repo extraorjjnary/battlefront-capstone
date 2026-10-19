@@ -2,28 +2,33 @@
 
 use App\Enums\AppearancePreference;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
-test('new users default to system appearance', function () {
+test('new users default to light appearance', function () {
     $user = User::factory()->create();
 
-    expect($user->appearance)->toBe(AppearancePreference::System);
+    expect($user->appearance)->toBe(AppearancePreference::Light);
+
+    $id = DB::table('users')->insertGetId(User::factory()->raw());
+
+    $this->assertDatabaseHas('users', ['id' => $id, 'appearance' => 'light']);
 });
 
-test('authenticated users can save their appearance preference', function () {
+test('authenticated users can save their appearance preference', function (AppearancePreference $appearance) {
     $user = User::factory()->create();
 
     $this->actingAs($user)
         ->from(route('appearance.edit'))
         ->patch(route('appearance.update'), [
-            'appearance' => AppearancePreference::Dark->value,
+            'appearance' => $appearance->value,
         ])
         ->assertSessionHasNoErrors()
         ->assertRedirect(route('appearance.edit'))
         ->assertInertiaFlash('toast.message', 'Appearance updated.');
 
-    expect($user->refresh()->appearance)->toBe(AppearancePreference::Dark);
-});
+    expect($user->refresh()->appearance)->toBe($appearance);
+})->with([AppearancePreference::Light, AppearancePreference::Dark]);
 
 test('users keep independent appearance preferences', function () {
     $darkUser = User::factory()->create();
@@ -39,13 +44,6 @@ test('users keep independent appearance preferences', function () {
 
     expect($darkUser->refresh()->appearance)->toBe(AppearancePreference::Dark)
         ->and($otherUser->refresh()->appearance)->toBe(AppearancePreference::Light);
-
-    $this->actingAs($otherUser)
-        ->patch(route('appearance.update'), ['appearance' => 'system'])
-        ->assertSessionHasNoErrors();
-
-    expect($darkUser->refresh()->appearance)->toBe(AppearancePreference::Dark)
-        ->and($otherUser->refresh()->appearance)->toBe(AppearancePreference::System);
 });
 
 test('shared appearance follows the authenticated account', function () {
@@ -69,9 +67,9 @@ test('shared appearance follows the authenticated account', function () {
             ->where('appearance', 'light'));
 });
 
-test('appearance persists when the same user starts a new authenticated session', function () {
+test('appearance persists when the same user starts a new authenticated session', function (AppearancePreference $appearance) {
     $user = User::factory()->create([
-        'appearance' => AppearancePreference::Dark,
+        'appearance' => $appearance,
     ]);
 
     $this->post(route('login.store'), [
@@ -83,10 +81,10 @@ test('appearance persists when the same user starts a new authenticated session'
 
     $this->get(route('dashboard'))
         ->assertInertia(fn (Assert $page) => $page
-            ->where('appearance', 'dark'));
-});
+            ->where('appearance', $appearance->value));
+})->with([AppearancePreference::Light, AppearancePreference::Dark]);
 
-test('logout returns appearance to system', function () {
+test('logout returns appearance to light', function () {
     $user = User::factory()->create([
         'appearance' => AppearancePreference::Dark,
     ]);
@@ -98,16 +96,16 @@ test('logout returns appearance to system', function () {
     $this->assertGuest();
 
     $this->get(route('home'))
-        ->assertSee('data-appearance="system"', escape: false)
+        ->assertSee('data-appearance="light"', escape: false)
         ->assertInertia(fn (Assert $page) => $page
-            ->where('appearance', 'system'));
+            ->where('appearance', 'light'));
 });
 
-test('guest pages use system appearance', function () {
+test('guest pages use light appearance', function () {
     $this->get(route('home'))
-        ->assertSee('data-appearance="system"', escape: false)
+        ->assertSee('data-appearance="light"', escape: false)
         ->assertInertia(fn (Assert $page) => $page
-            ->where('appearance', 'system'));
+            ->where('appearance', 'light'));
 });
 
 test('appearance updates require authentication', function () {
@@ -115,16 +113,46 @@ test('appearance updates require authentication', function () {
         ->assertRedirectToRoute('login');
 });
 
-test('appearance updates reject unsupported values', function () {
+test('appearance updates reject unsupported values', function (mixed $appearance) {
     $user = User::factory()->create();
 
     $this->actingAs($user)
         ->from(route('appearance.edit'))
-        ->patch(route('appearance.update'), ['appearance' => 'sepia'])
+        ->patch(route('appearance.update'), ['appearance' => $appearance])
         ->assertSessionHasErrors([
-            'appearance' => 'Select light, dark, or system appearance.',
+            'appearance' => 'Select light or dark appearance.',
         ])
         ->assertRedirect(route('appearance.edit'));
 
-    expect($user->refresh()->appearance)->toBe(AppearancePreference::System);
+    expect($user->refresh()->appearance)->toBe(AppearancePreference::Light);
+})->with(['system', 'sepia', 123]);
+
+test('legacy system appearance displays as light without changing the stored preference', function () {
+    $user = User::factory()->create(['appearance' => AppearancePreference::System]);
+
+    $this->actingAs($user)->get(route('appearance.edit'))
+        ->assertSee('data-appearance="light"', escape: false)
+        ->assertDontSee('prefers-color-scheme')
+        ->assertInertia(fn (Assert $page) => $page->where('appearance', 'light'));
+
+    $this->assertDatabaseHas('users', ['id' => $user->id, 'appearance' => 'system']);
+});
+
+test('appearance default migration changes future inserts without rewriting existing preferences', function () {
+    $migration = require database_path('migrations/2026_10_19_045635_set_light_default_for_user_appearance.php');
+    $users = collect([AppearancePreference::Light, AppearancePreference::Dark, AppearancePreference::System])
+        ->map(fn (AppearancePreference $appearance) => User::factory()->create(['appearance' => $appearance]));
+
+    $migration->down();
+    $legacyId = DB::table('users')->insertGetId(User::factory()->raw());
+    $this->assertDatabaseHas('users', ['id' => $legacyId, 'appearance' => 'system']);
+
+    $migration->up();
+    $newId = DB::table('users')->insertGetId(User::factory()->raw());
+    $this->assertDatabaseHas('users', ['id' => $newId, 'appearance' => 'light']);
+    $this->assertDatabaseHas('users', ['id' => $legacyId, 'appearance' => 'system']);
+
+    foreach ($users as $user) {
+        $this->assertDatabaseHas('users', ['id' => $user->id, 'appearance' => $user->appearance->value]);
+    }
 });

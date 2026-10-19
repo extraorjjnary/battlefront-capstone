@@ -20,3 +20,9 @@ Only customer profiles may display or persist default_delivery_address. Administ
 ## Store appearance preferences per authenticated user
 
 Persist light, dark, or system on users and share the current value with every Inertia response. Guest and logout state must resolve to system; never use global appearance localStorage or cookies that can leak a prior account's preference.
+
+## Use Light and Dark appearance with legacy System read compatibility
+The approved Warm Battlefront refinement supersedes the earlier System default: guests, logout, new accounts and legacy stored system preferences resolve to Light. Offer and accept only Light/Dark for new preference saves; retain System enum casting for old rows without a backfill. Preserve per-account persistence and explicit Dark selections; do not introduce global appearance cookies/localStorage or OS-based overrides.
+
+## Keep guest appearance separate from account preferences
+The approved guest toggle supersedes the earlier guest-localStorage prohibition: store only guest Light/Dark choices under battlefront_guest_appearance, defaulting invalid/missing values to Light. Account database preferences always take priority and must never overwrite guest storage. Login uses the account preference; logout restores the prior guest choice. Apply guest colors before first paint and keep System unavailable.

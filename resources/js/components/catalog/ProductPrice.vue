@@ -9,16 +9,16 @@ defineProps({
 </script>
 
 <template>
-    <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+    <div class="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
         <span
             v-if="discountPrice"
-            class="text-muted-foreground text-sm line-through"
+            class="text-muted-foreground max-w-full text-xs wrap-anywhere line-through sm:text-sm"
         >
             {{ formatCurrency(price) }}
         </span>
         <span
-            class="max-w-full font-bold tracking-tight wrap-anywhere"
-            :class="compact ? 'text-sm sm:text-xl' : 'text-xl'"
+            class="max-w-full font-bold tracking-tight wrap-anywhere tabular-nums"
+            :class="compact ? 'text-base sm:text-xl' : 'text-xl'"
         >
             {{ formatCurrency(discountPrice ?? price) }}
         </span>

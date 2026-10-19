@@ -25,7 +25,10 @@ class AppearanceUpdateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'appearance' => ['required', new Enum(AppearancePreference::class)],
+            'appearance' => ['required', (new Enum(AppearancePreference::class))->only([
+                AppearancePreference::Light,
+                AppearancePreference::Dark,
+            ])],
         ];
     }
 
@@ -38,7 +41,7 @@ class AppearanceUpdateRequest extends FormRequest
     {
         return [
             'appearance.required' => 'Select an appearance preference.',
-            'appearance.*' => 'Select light, dark, or system appearance.',
+            'appearance.*' => 'Select light or dark appearance.',
         ];
     }
 }

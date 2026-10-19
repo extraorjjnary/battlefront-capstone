@@ -26,7 +26,7 @@ const { prefetchProduct, cancelProductPrefetch } = useProductPrefetch();
             cancelProductPrefetch();
             rememberCatalogVisit($event, product.id);
         "
-        class="border-border bg-card focus-visible:ring-ring group hover:border-primary/60 flex min-h-full min-w-0 flex-col overflow-hidden border transition-colors focus-visible:ring-2 focus-visible:outline-none"
+        class="surface-card border-border bg-card focus-visible:ring-ring group hover:border-primary/60 flex min-h-full min-w-0 flex-col overflow-hidden border transition-colors focus-visible:ring-2 focus-visible:outline-none"
     >
         <div
             class="aspect-square overflow-hidden sm:aspect-3/2"
@@ -35,17 +35,18 @@ const { prefetchProduct, cancelProductPrefetch } = useProductPrefetch();
                 :image-url="product.image_url"
                 :product-name="product.name"
                 contain
-                class="transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none [&_img]:size-[98%] lg:[&_img]:size-full lg:[&_img]:object-cover"
+                desktop-cover
+                class="transition-transform duration-300 group-hover:scale-[1.02] motion-reduce:transition-none max-lg:[&_img]:size-[98%]"
             />
         </div>
 
         <article
-            class="flex min-w-0 flex-1 flex-col gap-2 p-2.5 sm:gap-3 sm:p-4"
+            class="product-card-content"
         >
             <div class="flex flex-wrap items-center gap-2">
                 <Badge
                     variant="secondary"
-                    class="max-w-full wrap-anywhere whitespace-normal"
+                    class="max-w-full text-left leading-4 wrap-anywhere whitespace-normal"
                 >
                     {{ product.category.name }}
                 </Badge>
@@ -57,12 +58,12 @@ const { prefetchProduct, cancelProductPrefetch } = useProductPrefetch();
             <div>
                 <p
                     v-if="product.brand"
-                    class="text-muted-foreground truncate text-xs font-semibold tracking-wide uppercase"
+                    class="text-muted-foreground text-xs wrap-anywhere font-semibold tracking-wide uppercase"
                 >
                     {{ product.brand }}
                 </p>
                 <h3
-                    class="mt-1 line-clamp-2 text-sm leading-snug font-bold tracking-tight wrap-anywhere sm:text-lg"
+                    class="mt-1 text-sm leading-5 font-bold tracking-tight wrap-anywhere sm:text-lg"
                 >
                     {{ product.name }}
                 </h3>

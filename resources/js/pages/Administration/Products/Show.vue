@@ -51,7 +51,7 @@ defineOptions({
                 </Link>
                 <div>
                     <p
-                        class="text-primary text-xs font-semibold tracking-widest uppercase"
+                        class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
                     >
                         Sagay City catalog · {{ product.product_code }}
                     </p>
@@ -82,7 +82,7 @@ defineOptions({
             class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start"
         >
             <section
-                class="border-border bg-card border p-4 sm:p-6"
+                class="surface-panel border-border bg-card border p-4 sm:p-6"
                 aria-label="Product image"
             >
                 <div
@@ -104,7 +104,7 @@ defineOptions({
 
             <div class="flex flex-col gap-6">
                 <section
-                    class="border-border bg-card border p-6"
+                    class="surface-panel border-border bg-card border p-6"
                     aria-labelledby="product-details-heading"
                 >
                     <div
@@ -199,7 +199,7 @@ defineOptions({
                 </section>
 
                 <section
-                    class="border-border bg-card border p-6"
+                    class="surface-panel border-border bg-card border p-6"
                     aria-labelledby="product-stock-heading"
                 >
                     <div
@@ -220,7 +220,7 @@ defineOptions({
                         <Badge
                             v-else-if="product.stock_status === 'low_stock'"
                             variant="outline"
-                            class="border-primary/40 text-primary"
+                            class="border-primary/40 text-primary-ink"
                             >Low stock</Badge
                         >
                         <Badge

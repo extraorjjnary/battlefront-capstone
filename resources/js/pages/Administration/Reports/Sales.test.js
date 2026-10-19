@@ -76,6 +76,17 @@ function salesHarness(t, empty = false) {
     const props = Vue.reactive(salesFixture(empty));
     const page = Vue.reactive({ props: { errors: {} } });
     const visits = [];
+    const chartColors = Vue.ref({
+        primary: 'red',
+        secondary: 'gray',
+        highlight: 'red',
+        fill: 'pink',
+        muted: 'gray',
+        text: 'black',
+        foreground: 'black',
+        border: 'gray',
+        surface: 'white',
+    });
     const route = (format) => ({
         url({ query }) {
             const params = new URLSearchParams(
@@ -111,6 +122,7 @@ function salesHarness(t, empty = false) {
                 },
             '@/components/ui/button': { Button: button },
             '@/lib/currency': { formatCurrency },
+            '@/composables/useChartTheme': { useChartTheme: () => chartColors },
         },
         { get: (target, key) => target[key] ?? generic },
     );
@@ -142,6 +154,7 @@ function salesHarness(t, empty = false) {
         props,
         page,
         visits,
+        chartColors,
         tree: () => render({}, []),
         html: () => renderToString(render({}, [])),
     };
@@ -356,4 +369,43 @@ test('invalid product and category filters display accessible feedback', async (
         html,
         /role="alert"[^>]*>\s*The selected category is unavailable\./,
     );
+});
+
+test('chart theme changes update colors without changing sales data or selections', (t) => {
+    const harness = salesHarness(t);
+    const charts = () =>
+        findNodes(harness.tree(), (node) => node.props?.data?.datasets);
+    const before = charts().map((node) =>
+        JSON.parse(JSON.stringify(node.props.data)),
+    );
+    const filters = JSON.stringify(harness.props.active_filters);
+    harness.chartColors.value = {
+        primary: 'salmon',
+        secondary: 'silver',
+        highlight: 'coral',
+        fill: 'maroon',
+        muted: 'dimgray',
+        text: 'white',
+        foreground: 'white',
+        border: 'gray',
+        surface: 'black',
+    };
+    const after = charts();
+    assert.ok(after.length >= 3);
+    after.forEach((node, index) => {
+        assert.deepEqual(node.props.data.labels, before[index].labels);
+        node.props.data.datasets.forEach((dataset, datasetIndex) =>
+            assert.deepEqual(
+                dataset.data,
+                before[index].datasets[datasetIndex].data,
+            ),
+        );
+        assert.equal(node.props.options.plugins.legend.labels.color, 'white');
+        assert.equal(
+            node.props.options.plugins.tooltip.backgroundColor,
+            'black',
+        );
+    });
+    assert.equal(JSON.stringify(harness.props.active_filters), filters);
+    assert.equal(harness.visits.length, 0);
 });

@@ -30,6 +30,7 @@ test('new customers can register and immediately access authenticated pages', fu
     $user = User::where('email', 'test@example.com')->firstOrFail();
 
     expect($user->role)->toBe(UserRole::Customer)
+        ->and($user->appearance->value)->toBe('light')
         ->and($user->email_verified_at)->toBeNull();
 
     $this->get(route('dashboard'))->assertOk();

@@ -1,100 +1,122 @@
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import { update as updateAppearancePreference } from '@/routes/appearance';
 
-const supportedAppearances = new Set(['light', 'dark', 'system']);
-const appearance = ref('system');
+const appearance = ref('light');
+let accountAppearance;
 
-const normalizeAppearance = (value) =>
-    supportedAppearances.has(value) ? value : 'system';
+const normalizeAppearance = (value) => (value === 'dark' ? 'dark' : 'light');
+const guestAppearanceKey = 'battlefront_guest_appearance';
+
+function guestAppearance() {
+    try {
+        return normalizeAppearance(
+            window.localStorage.getItem(guestAppearanceKey),
+        );
+    } catch {
+        return 'light';
+    }
+}
+
+const pageAppearance = (props) =>
+    props.auth?.user
+        ? normalizeAppearance(props.appearance)
+        : guestAppearance();
 
 export function updateTheme(value) {
     if (typeof window === 'undefined') {
         return;
     }
 
-    const normalizedAppearance = normalizeAppearance(value);
-
-    if (normalizedAppearance === 'system') {
-        const mediaQueryList = window.matchMedia(
-            '(prefers-color-scheme: dark)',
-        );
-        const systemTheme = mediaQueryList.matches ? 'dark' : 'light';
-        document.documentElement.classList.toggle(
-            'dark',
-            systemTheme === 'dark',
-        );
-    } else {
-        document.documentElement.classList.toggle(
-            'dark',
-            normalizedAppearance === 'dark',
-        );
-    }
+    document.documentElement.classList.toggle(
+        'dark',
+        normalizeAppearance(value) === 'dark',
+    );
 }
-
-const mediaQuery = () => {
-    if (typeof window === 'undefined') {
-        return null;
-    }
-    return window.matchMedia('(prefers-color-scheme: dark)');
-};
-const prefersDark = () => {
-    if (typeof window === 'undefined') {
-        return false;
-    }
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-};
-const systemPrefersDark = ref(prefersDark());
-const handleSystemThemeChange = () => {
-    systemPrefersDark.value = prefersDark();
-    if (appearance.value === 'system') {
-        updateTheme('system');
-    }
-};
 
 const synchronizeAppearance = (value) => {
     appearance.value = normalizeAppearance(value);
     updateTheme(appearance.value);
 };
 
-export function initializeTheme() {
+export function initializeTheme(props) {
     if (typeof window === 'undefined') {
         return;
     }
 
-    synchronizeAppearance(document.documentElement.dataset.appearance);
-    mediaQuery()?.addEventListener('change', handleSystemThemeChange);
+    accountAppearance = {
+        userId: props.auth?.user?.id ?? null,
+        value: pageAppearance(props),
+    };
+    synchronizeAppearance(accountAppearance.value);
 
     router.on('navigate', (event) => {
-        synchronizeAppearance(event.detail.page.props.appearance);
+        const { props } = event.detail.page;
+        const userId = props.auth?.user?.id ?? null;
+
+        if (accountAppearance.userId !== userId) {
+            accountAppearance = {
+                userId,
+                value: pageAppearance(props),
+            };
+        }
+
+        // History and prefetch responses can carry an older account preference.
+        synchronizeAppearance(accountAppearance.value);
     });
 }
 
 export function useAppearance() {
-    const resolvedAppearance = computed(() => {
-        if (appearance.value === 'system') {
-            return systemPrefersDark.value ? 'dark' : 'light';
-        }
-        return appearance.value;
-    });
+    const page = usePage();
+
+    const currentAppearance =
+        typeof window === 'undefined'
+            ? ref(normalizeAppearance(page.props.appearance))
+            : appearance;
+    const resolvedAppearance = computed(() => currentAppearance.value);
 
     function updateAppearance(value) {
         const previousAppearance = appearance.value;
+        const selection = {
+            userId: page.props.auth?.user?.id ?? null,
+            value: normalizeAppearance(value),
+        };
+        accountAppearance = selection;
 
-        synchronizeAppearance(value);
+        synchronizeAppearance(selection.value);
+
+        if (selection.userId === null) {
+            try {
+                window.localStorage.setItem(
+                    guestAppearanceKey,
+                    selection.value,
+                );
+            } catch {
+                // Keep switching usable when browser storage is unavailable.
+            }
+
+            return;
+        }
 
         router.patch(
             updateAppearancePreference.url(),
             { appearance: appearance.value },
             {
                 preserveScroll: true,
-                onError: () => synchronizeAppearance(previousAppearance),
+                onError: () => {
+                    if (accountAppearance !== selection) {
+                        return;
+                    }
+
+                    selection.value = previousAppearance;
+                    synchronizeAppearance(previousAppearance);
+                },
             },
         );
     }
 
     return {
-        appearance,
+        appearance: currentAppearance,
         resolvedAppearance,
         updateAppearance,
     };

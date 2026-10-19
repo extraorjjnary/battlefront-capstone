@@ -52,10 +52,16 @@ const quantityLabel = computed(() => {
 
 <template>
     <span
-        class="inline-flex w-fit max-w-full items-center gap-2 border px-2.5 py-1.5 text-xs font-semibold"
+        class="inline-flex w-fit max-w-full items-start gap-1.5 rounded-md border px-2 py-1.5 text-xs leading-5 font-semibold"
         :class="state.class"
     >
-        <component :is="state.icon" class="size-3.5 shrink-0" aria-hidden="true" />
-        <span class="min-w-0 wrap-anywhere">{{ state.label }}<template v-if="quantityLabel"> · {{ quantityLabel }}</template></span>
+        <component :is="state.icon" class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+        <span class="min-w-0 wrap-anywhere">
+            <span class="block sm:inline">{{ state.label }}</span>
+            <template v-if="quantityLabel">
+                <span class="sr-only sm:not-sr-only"> · </span>
+                <span class="block font-medium sm:inline">{{ quantityLabel }}</span>
+            </template>
+        </span>
     </span>
 </template>

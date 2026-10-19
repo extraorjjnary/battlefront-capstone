@@ -158,7 +158,7 @@ defineOptions({
             class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
         >
             <section
-                class="border-border bg-card relative overflow-hidden border p-6 sm:p-8"
+                class="surface-panel border-border bg-card relative overflow-hidden border p-6 sm:p-8"
                 aria-labelledby="checkout-heading"
             >
                 <div
@@ -167,13 +167,13 @@ defineOptions({
                 />
                 <div class="flex items-start gap-4">
                     <span
-                        class="bg-secondary text-primary flex size-11 shrink-0 items-center justify-center rounded-md"
+                        class="bg-secondary text-primary-ink flex size-11 shrink-0 items-center justify-center rounded-md"
                     >
                         <PackageCheck class="size-5" aria-hidden="true" />
                     </span>
                     <div>
                         <p
-                            class="text-primary text-xs font-semibold tracking-widest uppercase"
+                            class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
                         >
                             Customer checkout
                         </p>
@@ -214,12 +214,12 @@ defineOptions({
                     <InputError :message="errors.cart_item_ids" />
 
                     <section
-                        class="border-border bg-card grid gap-6 border p-6"
+                        class="surface-panel border-border bg-card grid gap-6 border p-6"
                         aria-labelledby="recipient-heading"
                     >
                         <div class="flex items-center gap-3">
                             <ShieldCheck
-                                class="text-primary size-5"
+                                class="text-primary-ink size-5"
                                 aria-hidden="true"
                             />
                             <div>
@@ -276,12 +276,12 @@ defineOptions({
                     </section>
 
                     <section
-                        class="border-border bg-card grid gap-6 border p-6"
+                        class="surface-panel border-border bg-card grid gap-6 border p-6"
                         aria-labelledby="fulfillment-heading"
                     >
                         <div class="flex items-center gap-3">
                             <MapPin
-                                class="text-primary size-5"
+                                class="text-primary-ink size-5"
                                 aria-hidden="true"
                             />
                             <div>
@@ -352,7 +352,7 @@ defineOptions({
                         >
                             <div class="flex items-start gap-3">
                                 <Store
-                                    class="text-primary mt-0.5 size-5 shrink-0"
+                                    class="text-primary-ink mt-0.5 size-5 shrink-0"
                                     aria-hidden="true"
                                 />
                                 <div>
@@ -585,12 +585,12 @@ defineOptions({
                     </section>
 
                     <section
-                        class="border-border bg-card grid gap-6 border p-6"
+                        class="surface-panel border-border bg-card grid gap-6 border p-6"
                         aria-labelledby="payment-heading"
                     >
                         <div class="flex items-center gap-3">
                             <CreditCard
-                                class="text-primary size-5"
+                                class="text-primary-ink size-5"
                                 aria-hidden="true"
                             />
                             <div>
@@ -723,7 +723,7 @@ defineOptions({
                                     </div>
                                     <span
                                         v-if="selectedPaymentAccount.is_demo"
-                                        class="border-primary/40 bg-primary/10 text-primary shrink-0 border px-2 py-1 text-xs font-semibold tracking-wide uppercase"
+                                        class="border-primary/40 bg-primary/10 text-primary-ink shrink-0 border px-2 py-1 text-xs font-semibold tracking-wide uppercase"
                                     >
                                         Demo details
                                     </span>
@@ -763,7 +763,7 @@ defineOptions({
 
                             <div class="border-border flex gap-3 border-t pt-4">
                                 <Upload
-                                    class="text-primary mt-0.5 size-5 shrink-0"
+                                    class="text-primary-ink mt-0.5 size-5 shrink-0"
                                     aria-hidden="true"
                                 />
                                 <div>
@@ -809,11 +809,11 @@ defineOptions({
                 </div>
 
                 <aside
-                    class="border-border bg-card border p-6 xl:sticky xl:top-6"
+                    class="surface-panel border-border bg-card border p-6 xl:sticky xl:top-6"
                     aria-labelledby="checkout-summary-heading"
                 >
                     <p
-                        class="text-primary text-xs font-semibold tracking-widest uppercase"
+                        class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
                     >
                         Current cart
                     </p>

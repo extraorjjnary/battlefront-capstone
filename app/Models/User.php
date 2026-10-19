@@ -60,7 +60,7 @@ class User extends Authenticatable
      * @var array<string, mixed>
      */
     protected $attributes = [
-        'appearance' => 'system',
+        'appearance' => 'light',
         'role' => 'customer',
         'search_recommendations_enabled' => true,
         'product_view_recommendations_enabled' => true,

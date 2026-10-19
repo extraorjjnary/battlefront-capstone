@@ -27,18 +27,18 @@ defineOptions({
         class="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-8 p-6 lg:p-10"
     >
         <section
-            class="border-border bg-card relative overflow-hidden border p-6"
+            class="surface-panel border-border bg-card relative overflow-hidden border p-6"
         >
             <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
             <div class="flex items-start gap-4">
                 <span
-                    class="bg-secondary text-primary flex size-11 shrink-0 items-center justify-center rounded-md"
+                    class="bg-secondary text-primary-ink flex size-11 shrink-0 items-center justify-center rounded-md"
                 >
                     <PackagePlus class="size-5" />
                 </span>
                 <div>
                     <p
-                        class="text-primary text-xs font-semibold tracking-widest uppercase"
+                        class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
                     >
                         Sagay City catalog
                     </p>
@@ -53,7 +53,7 @@ defineOptions({
             </div>
         </section>
 
-        <section class="border-border bg-card border p-6 sm:p-8">
+        <section class="surface-panel border-border bg-card border p-6 sm:p-8">
             <ProductForm
                 :categories="categories"
                 :tags="tags"

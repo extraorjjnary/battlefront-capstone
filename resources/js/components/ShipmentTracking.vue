@@ -29,13 +29,13 @@ function formatCivilDate(value) {
 
 <template>
     <section
-        class="border-border bg-card border p-5 sm:p-6"
+        class="surface-panel border-border bg-card border p-5 sm:p-6"
         aria-label="Shipment tracking"
     >
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="flex items-start gap-3">
                 <Truck
-                    class="text-primary mt-0.5 size-5 shrink-0"
+                    class="text-primary-ink mt-0.5 size-5 shrink-0"
                     aria-hidden="true"
                 />
                 <div>

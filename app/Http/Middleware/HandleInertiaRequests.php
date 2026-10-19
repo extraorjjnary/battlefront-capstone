@@ -53,8 +53,8 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'notificationSummary' => fn (): ?array => $request->user() === null
                 ? null : app(NotificationHistory::class)->summary($request->user()),
-            'appearance' => $request->user()?->appearance->value
-                ?? AppearancePreference::System->value,
+            'appearance' => $request->user()?->appearance->resolved()->value
+                ?? AppearancePreference::Light->value,
             'auth' => [
                 'user' => $request->user(),
                 'can' => [

@@ -80,20 +80,20 @@ defineOptions({
     <main
         class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
     >
-        <section class="border-border bg-card relative overflow-hidden border">
+        <section class="surface-panel border-border bg-card relative overflow-hidden border">
             <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
             <div
                 class="flex flex-col gap-5 p-6 sm:flex-row sm:items-start sm:justify-between"
             >
                 <div class="flex items-start gap-4">
                     <span
-                        class="bg-secondary text-primary flex size-11 shrink-0 items-center justify-center rounded-md"
+                        class="bg-secondary text-primary-ink flex size-11 shrink-0 items-center justify-center rounded-md"
                     >
                         <MessageSquareText class="size-5" />
                     </span>
                     <div>
                         <p
-                            class="text-primary text-xs font-semibold tracking-widest uppercase"
+                            class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
                         >
                             Customer support content
                         </p>
@@ -120,7 +120,7 @@ defineOptions({
 
         <Collapsible
             v-model:open="previewOpen"
-            class="border-border bg-card border"
+            class="surface-panel border-border bg-card border"
         >
             <h2>
                 <CollapsibleTrigger as-child>
@@ -261,7 +261,7 @@ defineOptions({
 
             <div
                 v-if="knowledge.data.length === 0"
-                class="border-border bg-card flex min-h-52 items-center justify-center border p-6 text-center"
+                class="surface-panel border-border bg-card flex min-h-52 items-center justify-center border p-6 text-center"
             >
                 <div>
                     <MessageSquareText
@@ -278,7 +278,7 @@ defineOptions({
 
             <div
                 v-else
-                class="border-border bg-card divide-border divide-y border"
+                class="surface-panel border-border bg-card divide-border divide-y border"
             >
                 <article
                     v-for="item in knowledge.data"

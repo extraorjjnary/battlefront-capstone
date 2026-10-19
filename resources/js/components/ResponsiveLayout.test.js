@@ -6,15 +6,16 @@ import { join } from 'node:path';
 import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 
-// Opt in with a running local app and an existing Chromium/Edge executable.
+// Opt in with built assets, a running local app and an existing Chromium/Edge executable.
 const baseUrl = process.env.BATTLEFRONT_UI_URL;
 const executable = process.env.BATTLEFRONT_UI_BROWSER;
 const widths = [320, 375, 390, 428, 768, 1024, 1440];
 const longName = 'Battlefront Ultra Performance Graphics Card With Extended Cooling';
 const product = {
     id: 7, name: longName, brand: 'Battlefront', category: { id: 3, name: 'Graphics Cards & Accessories' },
+    shipping_handling: { label: 'Standard handling', surcharge: '0.00', preparation_days: 1 },
     price: '123456.78', discount_price: '99999.99', description: 'Detailed specifications for computer hardware.',
-    image_url: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="100"%3E%3Crect width="200" height="100" fill="gray"/%3E%3C/svg%3E', inventory: { quantity: 8, status: 'low_stock' }, tags: [], is_featured: true,
+    image_url: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="100"%3E%3Crect width="200" height="100" fill="gray"/%3E%3C/svg%3E', inventory: { id: 17, quantity: 8, reorder_level: 10, last_updated: '2026-10-12T08:00:00Z', status: 'low_stock' }, tags: [], is_featured: true,
 };
 const cart = {
     items: [{ id: 11, quantity: 2, product: { ...product, category: product.category.name },
@@ -57,7 +58,7 @@ const checkout = {
     deliveryAddressPrefill: { delivery_destination: 'Sagay City', delivery_barangay_code: '1804523018', delivery_address_details: '12 Mabini Street' },
 };
 
-async function openBrowser(t) {
+async function openBrowser(t, { built = true } = {}) {
     const profile = await mkdtemp(join(tmpdir(), 'battlefront-responsive-'));
     const browser = spawn(executable, [
         '--headless', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
@@ -132,20 +133,37 @@ async function openBrowser(t) {
         await delay(100);
     }
     const initialPage = await evaluate(`JSON.parse(document.querySelector('script[data-page="app"]').textContent)`);
-    const template = await (await fetch(baseUrl)).text();
+    let template = await (await fetch(baseUrl)).text();
+    if (built) {
+        const manifest = JSON.parse(await readFile(new URL('../../../public/build/manifest.json', import.meta.url), 'utf8'));
+        const app = manifest['resources/js/app.js'];
+        const styles = [manifest['resources/css/app.css'].file, ...(app.css ?? [])];
+        template = template
+            .replace(/<script\b[^>]*src="[^"]*(?:@vite\/client|resources\/js\/)[^"]*"[^>]*><\/script>/g, '')
+            .replace(/<link\b[^>]*href="[^"]*resources\/css\/app.css[^"]*"[^>]*>/g, '')
+            .replace('</head>', styles.map(file => `<link rel="stylesheet" href="/build/${file}">`).join('') + `<script type="module" src="/build/${app.file}"></script></head>`);
+    }
     let fixture;
     let fixtureNumber = 0;
+    const navigationFixtures = new Map();
+    const navigationRequests = [];
+    const appearanceRequests = [];
+    const fixturePage = (current = fixture) => ({ ...initialPage, component: current.component, flash: current.flash, scrollProps: current.component === 'Products/Index' ? { products: { pageName: 'page', currentPage: 1, previousPage: null, nextPage: null } } : {}, props: { ...initialPage.props, is_personalized: false, has_featured_fallback: false, guest_recommendation_scope: null, recommendations_enabled: true, ...current.props,
+        appearance: current.appearance, auth: current.auth ?? { user: null, can: {} }, errors: {}, notificationSummary: { unread_count: 0, recent: [] }, responsiveFixtureNumber: current.number,
+    }, url: current.url ?? '/__responsive_fixture' });
     intercept = async ({ requestId, request, resourceType, responseStatusCode }) => {
         if (responseStatusCode && resourceType === 'Document' && new URL(request.url).pathname === '/__responsive_fixture') {
-            const page = { ...initialPage, component: fixture.component, scrollProps: fixture.component === 'Products/Index' ? { products: { pageName: 'page', currentPage: 1, previousPage: null, nextPage: null } } : {}, props: { ...initialPage.props, ...fixture.props,
-                auth: fixture.auth ?? { user: null, can: {} }, errors: {}, notificationSummary: { unread_count: 0, recent: [] }, responsiveFixtureNumber: fixture.number,
-            }, url: '/__responsive_fixture' };
+            const page = fixturePage();
             const encoded = JSON.stringify(page).replaceAll('<', '\\u003c');
             const html = template.replace(/(<script data-page="app"[^>]*>)[\s\S]*?(<\/script>)/, `$1${encoded}$2`)
-                .replace(/<div data-server-rendered="true" id="app">[\s\S]*?(?=<\/body>)/, '<div id="app"></div>');
+                .replace(/<div data-server-rendered="true" id="app">[\s\S]*?(?=<\/body>)/, '<div id="app"></div>')
+                .replace(/data-authenticated="[^"]*"/, `data-authenticated="${fixture.auth?.user ? 'true' : 'false'}"`)
+                .replace(/data-appearance="[^"]*"/, `data-appearance="${fixture.appearance}"`)
+                .replace(/(<html\b[^>]*)(>)/, (_, attributes, end) => attributes.replace(/\sclass="[^"]*"/, '') + ` class="${fixture.appearance === 'dark' ? 'dark' : ''}"` + end);
+            const observedHtml = html.replace(/(<script data-guest-appearance>[\s\S]*?)(<\/script>)/, '$1 window.appearanceBeforeApp = document.documentElement.classList.contains("dark"); $2');
             assert.notEqual(html, template, 'Replace the initial Inertia page with an isolated fixture');
             await command('Fetch.fulfillRequest', { requestId, responseCode: 200,
-                responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], body: Buffer.from(html).toString('base64') });
+                responseHeaders: [{ name: 'Content-Type', value: 'text/html; charset=utf-8' }], body: Buffer.from(observedHtml).toString('base64') });
         } else if (new URL(request.url).pathname.endsWith('/delivery-locations')) {
             const url = new URL(request.url);
             const level = url.searchParams.get('level');
@@ -162,6 +180,19 @@ async function openBrowser(t) {
             const quote = { ...checkout.deliveryQuotes[0], destination: '1804523000', destination_label: 'Sagay City', payment_methods: ['gcash', 'maya', 'cod'] };
             await command('Fetch.fulfillRequest', { requestId, responseCode: 200,
                 responseHeaders: [{ name: 'Content-Type', value: 'application/json' }], body: Buffer.from(JSON.stringify({ data: { available: true, quote } })).toString('base64') });
+        } else if (request.method === 'PATCH' && new URL(request.url).pathname === '/settings/appearance') {
+            appearanceRequests.push(JSON.parse(request.postData));
+            const page = await evaluate("JSON.parse(JSON.stringify(document.querySelector('#app').__vue_app__.config.globalProperties.$page))");
+            page.props.appearance = JSON.parse(request.postData).appearance;
+            fixture.appearance = page.props.appearance;
+            page.flash = { toast: { type: 'success', message: 'Appearance updated.' } };
+            await command('Fetch.fulfillRequest', { requestId, responseCode: 200,
+                responseHeaders: [{ name: 'Content-Type', value: 'application/json' }, { name: 'X-Inertia', value: 'true' }], body: Buffer.from(JSON.stringify(page)).toString('base64') });
+        } else if (request.method === 'GET' && navigationFixtures.has(new URL(request.url).pathname)) {
+            navigationRequests.push(new URL(request.url).pathname);
+            const page = fixturePage(navigationFixtures.get(new URL(request.url).pathname));
+            await command('Fetch.fulfillRequest', { requestId, responseCode: 200,
+                responseHeaders: [{ name: 'Content-Type', value: 'application/json' }, { name: 'X-Inertia', value: 'true' }], body: Buffer.from(JSON.stringify(page)).toString('base64') });
         } else if (request.method !== 'GET') {
             await command('Fetch.failRequest', { requestId, errorReason: 'Aborted' });
         } else if (new URL(request.url).pathname.endsWith('/notifications/summary')) {
@@ -171,9 +202,15 @@ async function openBrowser(t) {
     };
     await command('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }, { urlPattern: '*/__responsive_fixture', requestStage: 'Response' }] });
     return {
-        command, evaluate, exceptions, diagnostics,
-        async show(component, props, customer = true) {
-            fixture = { component, props, number: ++fixtureNumber, auth: customer ? { user: { id: 999999, name: 'Responsive Customer', email: 'fixture@example.test', role: customer === 'admin' ? 'administrator' : 'customer', appearance: 'dark' },
+        command, evaluate, exceptions, diagnostics, navigationRequests, appearanceRequests,
+        registerPage(url, component, props, appearance, auth = fixture.auth) {
+            navigationFixtures.set(url, { ...fixture, url, component, props, appearance, auth, flash: {} });
+        },
+        async show(component, props, customer = true, appearance = 'light', flash = {}) {
+            if (!customer && appearance !== null) {
+                await evaluate(`localStorage.setItem('battlefront_guest_appearance', ${JSON.stringify(appearance)})`);
+            }
+            fixture = { component, props, appearance, flash, number: ++fixtureNumber, auth: customer ? { user: { id: 999999, name: 'Responsive Customer', email: 'fixture@example.test', role: customer === 'admin' ? 'administrator' : 'customer', appearance },
                 can: { useCustomerCart: customer !== 'admin', accessAdministration: customer === 'admin' } } : undefined };
             await command('Page.navigate', { url: `${baseUrl}/__responsive_fixture` });
             for (let attempt = 0; attempt < 100; attempt++) {
@@ -183,7 +220,8 @@ async function openBrowser(t) {
                 }
                 await delay(100);
             }
-            assert.fail(`The ${component} fixture did not mount: ${exceptions.join('; ')}; ${diagnostics.slice(-8).join('; ')}`);
+            const state = await evaluate(`({ title: document.title, url: location.href, heading: document.querySelector('h1')?.textContent, app: document.querySelector('#app')?.innerHTML.slice(0, 250) })`);
+            assert.fail(`The ${component} fixture did not mount: ${JSON.stringify(state)}; ${exceptions.join('; ')}; ${diagnostics.slice(-8).join('; ')}`);
         },
         async resize(width, height = 900) {
             await command('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
@@ -236,6 +274,7 @@ test('responsive shopping layouts remain usable in a real browser', {
                             const rect = control.getBoundingClientRect();
                             return rect.left >= 0 && rect.right <= innerWidth && control.getAttribute('aria-labelledby')?.includes('catalog-sort-label');
                         })(),
+                        readable: cards.every(card => { const name = card.querySelector('h3'); const price = card.querySelector('article > div:last-child > div > span:last-child'); return parseFloat(getComputedStyle(name).fontSize) >= 14 && name.scrollHeight <= name.clientHeight + 1 && parseFloat(getComputedStyle(price).fontSize) >= 16; }),
                         priceFits: price.scrollWidth <= price.clientWidth + 1, imageFits: getComputedStyle(cards[0].querySelector('img')).objectFit === 'contain',
                         descriptionHidden: getComputedStyle(cards[0].querySelector('h3 + p')).display === 'none' };
                 })()`);
@@ -244,7 +283,8 @@ test('responsive shopping layouts remain usable in a real browser', {
                 assert.equal(result.featuredInteractions, true, 'Main grid products retain Featured badges, navigation and qualitative stock badges');
                 assert.equal(result.sortFits, true, `labeled sort control fits at ${width}`);
                 assert.equal(result.priceFits, true, `catalog price fits at ${width}`);
-                assert.equal(result.imageFits, width < 1024, 'Catalog photography uses containment on mobile and fills the desktop frame');
+                assert.equal(result.readable, true, 'Product names are at least 14px, fully readable, with prices at least 16px');
+                assert.equal(result.imageFits, width < 1024, 'Catalog photography is contained below desktop and covers its frame on desktop');
                 assert.equal(result.descriptionHidden, width < 640, 'Mobile cards reserve space for names, prices and stock');
             }
         }
@@ -363,7 +403,7 @@ test('responsive shopping layouts remain usable in a real browser', {
     assert.deepEqual(browser.exceptions, [], 'Fixture pages mount without JavaScript exceptions');
 });
 
-test('shopping photos fill desktop frames and recommendations keep two usable mobile columns', {
+test('shopping photos fill desktop frames and preserve readable mobile cards in both themes', {
     skip: !baseUrl || !executable ? 'Set BATTLEFRONT_UI_URL and BATTLEFRONT_UI_BROWSER to run browser geometry checks' : false,
     timeout: 180000,
 }, async t => {
@@ -406,23 +446,25 @@ test('shopping photos fill desktop frames and recommendations keep two usable mo
             visible: rect.left + (rect.width - width) / 2 >= frame.left - 0.75 && rect.right - (rect.width - width) / 2 <= frame.right + 0.75 && rect.top + (rect.height - height) / 2 >= frame.top - 0.75 && rect.bottom - (rect.height - height) / 2 <= frame.bottom + 0.75,
             fillsFrame: scale >= idealScale * 0.97, frameWidth: frame.width, frameHeight: frame.height };
     }))()`;
-    for (const [component, props, customer] of pages) {
-        await browser.show(component, props, customer);
+    const themedPages = ['light', 'dark'].flatMap(theme =>
+        pages.map(([component, props, customer]) => ({ theme, component, props, customer })),
+    );
+    for (const { theme, component, props, customer } of themedPages) {
+        await browser.show(component, props, customer, theme);
         await browser.evaluate(`Promise.all([...document.querySelectorAll('main img[src^="data:image/svg+xml"]')].map(image => { image.loading = 'eager'; return image.decode(); }))`);
         for (const width of widths) {
             await browser.resize(width);
             await assertFits(browser, `${component} photography ${width}`);
             const images = await browser.evaluate(measurePhotos);
             assert.ok(images.length >= 3, `${component} renders the image fixtures`);
-            const isDesktopCatalog = component === 'Products/Index' && width >= 1024;
             for (const image of images) {
-                const fillsDesktopFrame = width >= 1024 && (image.recommendation || ['Products/Index', 'Products/Show'].includes(component));
+                const desktopCover = width >= 1024 && (image.recommendation || ['Products/Index', 'Products/Show'].includes(component));
                 assert.equal(image.loaded, true);
-                assert.equal(image.fit, fillsDesktopFrame ? 'cover' : 'contain', `${component} uses the appropriate photo presentation at ${width}`);
-                if (fillsDesktopFrame) {
-                    assert.equal(image.edgeToEdge, true, `${component} desktop photography reaches every edge of its frame at ${width}`);
+                assert.equal(image.fit, desktopCover ? 'cover' : 'contain', `${component} ${theme} photo fit at ${width}`);
+                if (desktopCover) {
+                    assert.equal(image.edgeToEdge, true, `${component} ${theme} desktop photos fill the frame without letterboxing`);
                 } else {
-                    assert.equal(image.visible, true, `${component} photo fits its image frame at ${width}`);
+                    assert.equal(image.visible, true, `${component} ${theme} contained photos stay fully visible at ${width}`);
                 }
                 assert.equal(image.fillsFrame, true, `${component} avoids unnecessary image padding at ${width}`);
                 if (component === 'Products/Show' && width >= 1024 && !image.recommendation) {
@@ -437,19 +479,20 @@ test('shopping photos fill desktop frames and recommendations keep two usable mo
                         usable: cards.every(card => {
                             const bounds = card.getBoundingClientRect();
                             return [...card.querySelectorAll('p, a, button, span')].every(element => {
+                                if (element.classList.contains('sr-only') && getComputedStyle(element).position === 'absolute') return true;
                                 const rect = element.getBoundingClientRect();
                                 return rect.left >= bounds.left && rect.right <= bounds.right && element.scrollWidth <= element.clientWidth + 1;
                             });
                         }),
                         clickable: cards.every(card => [...card.querySelectorAll('a')].every(link => link.getAttribute('href')?.includes('/products/'))),
-                        titlesCompact: cards.every(card => { const title = card.querySelectorAll('a')[1]; return title.getBoundingClientRect().height <= parseFloat(getComputedStyle(title).lineHeight) * 2 + 0.75; }),
+                        titlesReadable: cards.every(card => { const title = card.querySelectorAll('a')[1]; return parseFloat(getComputedStyle(title).fontSize) >= 14 && title.scrollHeight <= title.clientHeight + 1; }),
                         hideHeight: cards[0].querySelector('button').getBoundingClientRect().height };
                 })()`);
                 assert.equal(cards.columns, width < 1024 ? 2 : width < 1280 ? 3 : 4, `${component} recommendation columns at ${width}`);
                 assert.equal(cards.usable, true, `${component} recommendation titles, prices and stock labels fit at ${width}`);
                 assert.equal(cards.clickable, true, 'Recommendation images and titles link to their products');
                 assert.ok(cards.hideHeight >= (width < 768 ? 44 : 40), 'Recommendation hide actions retain usable targets');
-                if (width < 640) assert.equal(cards.titlesCompact, true, 'Mobile recommendation names stay within two readable lines');
+                assert.equal(cards.titlesReadable, true, 'Recommendation model names stay readable without clipping');
                 const photo = images.find(image => image.recommendation);
                 assert.ok(Math.abs(photo.frameWidth / photo.frameHeight - (width < 640 ? 1 : 1.5)) < 0.01, 'Recommendation images match catalog aspect ratios');
             }
@@ -468,7 +511,7 @@ test('shopping photos fill desktop frames and recommendations keep two usable mo
                 await delay(350);
                 const hovered = (await browser.evaluate(measurePhotos)).find(image => image.catalog);
                 assert.ok(await browser.evaluate(`parseFloat(getComputedStyle(document.querySelector('#product-list-heading').closest('section').querySelector('img').parentElement).scale) > 1`), 'Catalog hover zoom remains active');
-                if (!isDesktopCatalog) {
+                if (width < 1024) {
                     assert.equal(hovered.visible, true, 'Mobile hover keeps the full photograph inside the frame');
                 }
                 assert.equal(hovered.frameWidth, photo.frameWidth, 'Hover preserves card width');
@@ -514,3 +557,1025 @@ test('shopping photos fill desktop frames and recommendations keep two usable mo
     }
     assert.deepEqual(browser.exceptions, []);
 });
+
+
+test(
+    'Warm Battlefront surfaces, preferences and charts stay consistent in both themes',
+    {
+        skip:
+            !baseUrl || !executable
+                ? 'Set the local app and browser environment variables'
+                : false,
+        timeout: 240000,
+    },
+    async (t) => {
+        const browser = await openBrowser(t, { built: true });
+        const paginated = (data) => ({
+            data,
+            total: data.length,
+            current_page: 1,
+            last_page: 1,
+            next_page_url: null,
+            prev_page_url: null,
+        });
+        const filters = {
+            q: null,
+            category_id: null,
+            brand: null,
+            tag_id: null,
+            status: null,
+            stock: 'all',
+        };
+        const filter_options = { categories: [], brands: [], tags: [] };
+        const recommendations = [
+            {
+                product,
+                reasons: [{ code: 'popular', value: 'Popular hardware' }],
+            },
+        ];
+        const sales = {
+            filters: { from: '2026-09-01', to: '2026-09-30', period: 'month' },
+            active_filters: { product: null, category: null },
+            kpis: {
+                total_sales: 2,
+                total_revenue: '199999.98',
+                average_order_value: '99999.99',
+                total_items_sold: 2,
+            },
+            timeline: {
+                labels: ['Sep 2026'],
+                sales: [2],
+                revenue: [199999.98],
+            },
+            top_products: { ids: [7], labels: [longName], quantities: [2] },
+            categories: {
+                ids: [3],
+                labels: ['Graphics cards'],
+                revenue: [199999.98],
+                rows: [],
+            },
+            products: paginated([
+                {
+                    id: 7,
+                    name: longName,
+                    category: 'Graphics cards',
+                    sales_count: 2,
+                    quantity_sold: 2,
+                    item_revenue: '199999.98',
+                },
+            ]),
+            recommendation_engagement: { summary: {}, placements: [] },
+        };
+        const forecast = {
+            status: 'ready',
+            product: { ...product, product_code: 'GPU-007' },
+            forecast_quantity: 12,
+            target_label: 'Q4 2026',
+            source_label: '36 completed months',
+            generated_at: '2026-10-12T08:00:00Z',
+            timezone: 'Asia/Manila',
+            observations: [
+                { label: 'Sep 2026', start: '2026-09-01', quantity_sold: 8 },
+            ],
+            monthly_forecasts: ['Oct', 'Nov', 'Dec'].map((label) => ({
+                label,
+                forecast_quantity: 4,
+            })),
+        };
+        const forecastProps = {
+            products: paginated([]),
+            filters: {},
+            timezone: 'Asia/Manila',
+            forecasts: paginated([]),
+        };
+        const fixtures = [
+            ['Welcome', {}, false],
+            [
+                'Products/Index',
+                {
+                    products: paginated([product]),
+                    filters,
+                    filter_options,
+                    recommendations,
+                },
+                true,
+            ],
+            [
+                'Products/Show',
+                { product, can_record_product_dwell: false, recommendations },
+                true,
+            ],
+            ['Cart/Index', { cart, recommendations }, true],
+            ['Checkout/Index', checkout, true],
+            ['Orders/Index', { orders: paginated([order]) }, true],
+            ['Orders/Show', { order, isConfirmation: false }, true],
+            ['Branches/Index', { branches: [] }, false],
+            [
+                'Dashboard/Customer',
+                {
+                    dashboard: {
+                        summary: {
+                            cart_items: 1,
+                            cart_units: 2,
+                            active_orders: 0,
+                            total_orders: 0,
+                        },
+                        latest_order: null,
+                    },
+                    recommendations,
+                },
+                true,
+            ],
+            [
+                'Dashboard/Administration',
+                {
+                    dashboard: {
+                        kpis: {
+                            recorded_revenue: '400',
+                            recorded_sales: 2,
+                            pending_orders: 0,
+                            processing_orders: 0,
+                            low_stock_products: 0,
+                            out_of_stock_products: 0,
+                        },
+                        needs_attention: {
+                            pending_payment_reviews: 0,
+                            payment_orders: [],
+                            low_stock_products: [],
+                            out_of_stock_products: [],
+                        },
+                        recent_orders: [],
+                    },
+                },
+                'admin',
+            ],
+            [
+                'Administration/Products/Index',
+                {
+                    products: paginated([
+                        {
+                            ...product,
+                            product_code: 'GPU-007',
+                            is_active: true,
+                        },
+                    ]),
+                    filters,
+                    filter_options,
+                },
+                'admin',
+            ],
+            [
+                'Administration/Inventory',
+                {
+                    products: paginated([
+                        {
+                            ...product,
+                            category: 'Graphics cards',
+                            is_active: true,
+                            stock_status: 'low_stock',
+                            product_code: 'GPU-007',
+                        },
+                    ]),
+                    filters,
+                    filter_options,
+                    low_stock_count: 1,
+                    out_of_stock_count: 0,
+                },
+                'admin',
+            ],
+            [
+                'Administration/Orders/Show',
+                { order: { ...order, allowed_status_transitions: [] } },
+                'admin',
+            ],
+            ['Administration/Reports/Sales', sales, 'admin'],
+            [
+                'Administration/Forecasting',
+                forecastProps,
+                'admin',
+                { forecast_result: forecast },
+            ],
+            ['settings/Appearance', {}, true],
+            [
+                'auth/Login',
+                { canResetPassword: true, canRegister: true },
+                false,
+            ],
+        ];
+        const readTheme = `(() => { const css = getComputedStyle(document.documentElement); const token = name => css.getPropertyValue(name).trim(); return { dark: document.documentElement.classList.contains('dark'), background: getComputedStyle(document.body).backgroundColor, surface: token('--card'), foreground: token('--foreground'), muted: token('--muted-foreground'), ink: token('--primary-ink'), input: token('--input'), primary: token('--primary'), primaryForeground: token('--primary-foreground'), colorScheme: css.colorScheme }; })()`;
+        const luminance = (hex) => {
+            if (hex.length === 4) {
+                hex =
+                    '#' +
+                    Array.from(
+                        hex.slice(1),
+                        (character) => character + character,
+                    ).join('');
+            }
+            const rgb = hex
+                .slice(1)
+                .match(/../g)
+                .map((value) => parseInt(value, 16) / 255)
+                .map((value) =>
+                    value <= 0.04045
+                        ? value / 12.92
+                        : ((value + 0.055) / 1.055) ** 2.4,
+                );
+            return rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
+        };
+        const contrast = (a, b) => {
+            const values = [luminance(a), luminance(b)].sort((a, b) => b - a);
+            return (values[0] + 0.05) / (values[1] + 0.05);
+        };
+        for (const theme of ['light', 'dark']) {
+            await browser.command('Emulation.setEmulatedMedia', {
+                features: [
+                    {
+                        name: 'prefers-color-scheme',
+                        value: theme === 'light' ? 'dark' : 'light',
+                    },
+                ],
+            });
+            for (const [component, props, account, flash] of fixtures) {
+                await browser.show(component, props, account, theme, flash);
+                for (const width of widths) {
+                    await browser.resize(width);
+                    await assertFits(
+                        browser,
+                        component + ' ' + theme + ' ' + width,
+                    );
+                    const surfaces = await browser.evaluate(
+                        `(() => [...document.querySelectorAll('.surface-card, .surface-panel')].map(element => { const style = getComputedStyle(element); return { panel: element.classList.contains('surface-panel'), radii: [style.borderTopLeftRadius, style.borderTopRightRadius, style.borderBottomRightRadius, style.borderBottomLeftRadius], shadow: style.boxShadow, nested: !!element.parentElement.closest('.surface-card, .surface-panel') }; }))()`,
+                    );
+                    if (component !== 'auth/Login') {
+                        assert.ok(
+                            surfaces.length > 0,
+                            component + ' uses the shared surface treatment',
+                        );
+                    }
+                    for (const surface of surfaces) {
+                        assert.ok(
+                            surface.radii.every(
+                                (radius) =>
+                                    radius ===
+                                    (surface.panel ? '16px' : '12px'),
+                            ),
+                            component + ' has consistent corners',
+                        );
+                        assert.notEqual(
+                            surface.shadow,
+                            'none',
+                            component + ' has subtle depth',
+                        );
+                        assert.equal(
+                            surface.shadow.includes('inset'),
+                            theme === 'dark',
+                            component + ' uses mode-appropriate shadows',
+                        );
+                        assert.equal(
+                            surface.nested,
+                            false,
+                            component + ' avoids stacked surface decoration',
+                        );
+                    }
+                    const actual = await browser.evaluate(readTheme);
+                    assert.equal(
+                        actual.dark,
+                        theme === 'dark',
+                        component + ' honors its saved theme',
+                    );
+                    assert.equal(
+                        actual.background,
+                        theme === 'dark'
+                            ? 'rgb(9, 11, 16)'
+                            : 'rgb(250, 247, 244)',
+                    );
+                    assert.equal(actual.colorScheme, theme);
+                    assert.ok(
+                        contrast(actual.foreground, actual.surface) >= 4.5,
+                        'Readable surface text: ' + JSON.stringify(actual),
+                    );
+                    assert.ok(
+                        contrast(actual.muted, actual.surface) >= 4.5,
+                        'Readable muted text',
+                    );
+                    assert.ok(
+                        contrast(actual.ink, actual.surface) >= 4.5,
+                        'Readable red text',
+                    );
+                    assert.ok(
+                        contrast(actual.primaryForeground, actual.primary) >=
+                            4.5,
+                        'Readable primary buttons',
+                    );
+                    assert.ok(
+                        contrast(actual.input, actual.surface) >= 3,
+                        'Visible input boundaries',
+                    );
+                }
+                if (
+                    process.env.BATTLEFRONT_THEME_PREVIEW &&
+                    [
+                        'Welcome',
+                        'Products/Index',
+                        'Administration/Reports/Sales',
+                        'Administration/Forecasting',
+                    ].includes(component)
+                ) {
+                    for (const width of [390, 1440]) {
+                        await browser.resize(width);
+                        const shot = await browser.command(
+                            'Page.captureScreenshot',
+                            { format: 'png', captureBeyondViewport: false },
+                        );
+                        await writeFile(
+                            process.env.BATTLEFRONT_THEME_PREVIEW +
+                                '-' +
+                                component.replaceAll('/', '-') +
+                                '-' +
+                                theme +
+                                '-' +
+                                width +
+                                '.png',
+                            Buffer.from(shot.data, 'base64'),
+                        );
+                    }
+                }
+            }
+        }
+        await browser.show('Welcome', {}, false, 'system');
+        assert.equal(
+            (await browser.evaluate(readTheme)).dark,
+            false,
+            'Legacy System renders Light',
+        );
+        await browser.command('Emulation.setEmulatedMedia', {
+            features: [{ name: 'prefers-color-scheme', value: 'dark' }],
+        });
+        assert.equal(
+            (await browser.evaluate(readTheme)).dark,
+            false,
+            'OS changes cannot override Light',
+        );
+        await browser.show('Administration/Reports/Sales', sales, 'admin');
+        const manifest = JSON.parse(
+            await readFile(
+                new URL('../../../public/build/manifest.json', import.meta.url),
+                'utf8',
+            ),
+        );
+        const chartChunk = Object.values(manifest).find(
+            (entry) => entry.name === 'useChartTheme',
+        ).file;
+        const readCharts = `(async () => { const module = await import('/build/${chartChunk}'); const Chart = Object.values(module).find(value => typeof value?.getChart === 'function'); return [...document.querySelectorAll('canvas')].map(canvas => { const chart = Chart.getChart(canvas); return { data: chart.data.datasets.map(dataset => dataset.data), legend: chart.options.plugins.legend.labels.color, tooltip: chart.options.plugins.tooltip.backgroundColor }; }); })()`;
+        const before = await browser.evaluate(readCharts);
+        assert.equal(before.length, 3);
+        await browser.evaluate(
+            `document.querySelector('[role=switch][aria-label="Dark mode"]').click()`,
+        );
+        for (let attempt = 0; attempt < 30; attempt++) {
+            if (
+                await browser.evaluate(
+                    `document.querySelector('[role=switch]').getAttribute('aria-checked') === 'true' && document.querySelector('[data-sonner-toaster]')?.dataset.theme === 'dark'`,
+                )
+            )
+                break;
+            await delay(100);
+        }
+        assert.equal((await browser.evaluate(readTheme)).dark, true);
+        const after = await browser.evaluate(readCharts);
+        assert.deepEqual(
+            after.map((chart) => chart.data),
+            before.map((chart) => chart.data),
+            'Theme switching preserves chart data',
+        );
+        assert.notEqual(
+            after[0].legend,
+            before[0].legend,
+            'Mounted chart colors refresh immediately',
+        );
+        assert.notEqual(
+            after[0].tooltip,
+            before[0].tooltip,
+            'Tooltip surfaces refresh immediately',
+        );
+        assert.equal(
+            await browser.evaluate(
+                `document.querySelector('[data-sonner-toaster]').dataset.theme`,
+            ),
+            'dark',
+        );
+        for (const theme of ['light', 'dark']) {
+            await browser.show('Cart/Index', { cart }, true, theme);
+            await browser.resize(390);
+            await browser.evaluate(
+                `[...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Remove').click()`,
+            );
+            await delay(300);
+            assert.equal(
+                await browser.evaluate(
+                    `getComputedStyle(document.querySelector('[role=dialog]')).backgroundColor`,
+                ),
+                theme === 'dark' ? 'rgb(17, 19, 24)' : 'rgb(255, 255, 255)',
+            );
+        }
+        assert.deepEqual(
+            browser.exceptions,
+            [],
+            'Theme fixtures have no JavaScript exceptions',
+        );
+    },
+);
+
+test(
+    'latest appearance survives history and prefetched catalog navigation',
+    {
+        skip:
+            !baseUrl || !executable
+                ? 'Set BATTLEFRONT_UI_URL and BATTLEFRONT_UI_BROWSER to run appearance navigation checks'
+                : false,
+        timeout: 90000,
+    },
+    async (t) => {
+        const browser = await openBrowser(t);
+        const catalogProps = {
+            products: {
+                data: [product],
+                total: 1,
+                current_page: 1,
+                last_page: 1,
+                next_page_url: null,
+                prev_page_url: null,
+            },
+            filters: { sort: 'featured' },
+            filter_options: { categories: [], brands: [], tags: [] },
+            recommendations: [],
+        };
+        async function waitFor(expression, message) {
+            for (let attempt = 0; attempt < 100; attempt++) {
+                if (await browser.evaluate(expression)) return;
+                await delay(50);
+            }
+            assert.fail(message + '; ' + browser.exceptions.join('; '));
+        }
+        async function assertAppearance(selected) {
+            const state = await browser.evaluate(
+                `({ dark: document.documentElement.classList.contains('dark'), checked: document.querySelector('[role=switch][aria-label="Dark mode"]').getAttribute('aria-checked'), theme: document.querySelector('[data-sonner-toaster]')?.dataset.theme, documentPreserved: window.appearanceNavigationDocument === true })`,
+            );
+            assert.deepEqual(state, {
+                dark: selected === 'dark',
+                checked: String(selected === 'dark'),
+                theme: selected,
+                documentPreserved: true,
+            });
+        }
+        for (const [width, initial, selected] of [
+            [390, 'light', 'dark'],
+            [1440, 'dark', 'light'],
+        ]) {
+            await browser.resize(width);
+            await browser.show('Products/Index', catalogProps, true, initial);
+            browser.registerPage(
+                '/products/7',
+                'Products/Show',
+                {
+                    product,
+                    can_record_product_dwell: false,
+                    recommendations: [],
+                },
+                initial,
+            );
+            browser.registerPage(
+                '/orders',
+                'Orders/Index',
+                {
+                    orders: {
+                        data: [order],
+                        total: 1,
+                        current_page: 1,
+                        last_page: 1,
+                    },
+                },
+                initial,
+            );
+            browser.registerPage(
+                '/settings/appearance',
+                'settings/Appearance',
+                {},
+                initial,
+            );
+            await browser.evaluate(`(async () => {
+            window.appearanceNavigationRouter = document.querySelector('#app').__vue_app__.config.globalProperties.$inertia;
+            window.appearanceNavigationDocument = true;
+            window.appearanceNavigationRouter.prefetch('/products/7');
+        })()`);
+            await waitFor(
+                `!!window.appearanceNavigationRouter.getCached('/products/7')`,
+                'Product details must finish prefetching',
+            );
+            const productRequests = browser.navigationRequests.filter(
+                (path) => path === '/products/7',
+            ).length;
+            await browser.evaluate(
+                `window.appearanceNavigationRouter.visit('/orders')`,
+            );
+            await waitFor(
+                `location.pathname === '/orders' && !!document.querySelector('#order-history-heading')`,
+                'Orders must mount',
+            );
+            await browser.evaluate(
+                `document.querySelector('[role=switch][aria-label="Dark mode"]').click()`,
+            );
+            await waitFor(
+                `!!document.querySelector('[data-sonner-toast]')`,
+                'Appearance save must finish',
+            );
+            await assertAppearance(selected);
+            await browser.evaluate('history.back()');
+            await waitFor(
+                `location.pathname === '/__responsive_fixture' && !!document.querySelector('#catalog-heading')`,
+                'Back must restore the cached catalog',
+            );
+            await assertAppearance(selected);
+            await browser.evaluate(
+                `document.querySelector('a.surface-card[href$="/products/7"]').click()`,
+            );
+            await waitFor(
+                `location.pathname === '/products/7' && !!document.querySelector('form button[type=submit]')`,
+                'Prefetched product details must mount',
+            );
+            await assertAppearance(selected);
+            assert.equal(
+                browser.navigationRequests.filter(
+                    (path) => path === '/products/7',
+                ).length,
+                productRequests,
+                'Details use the response prefetched before the appearance change',
+            );
+            await browser.evaluate('history.back()');
+            await waitFor(
+                `location.pathname === '/__responsive_fixture' && !!document.querySelector('#catalog-heading')`,
+                'Back must restore the catalog again',
+            );
+            await assertAppearance(selected);
+            await browser.evaluate('history.forward()');
+            await waitFor(
+                `location.pathname === '/products/7' && !!document.querySelector('form button[type=submit]')`,
+                'Forward must restore details',
+            );
+            await assertAppearance(selected);
+            await browser.evaluate(
+                `window.appearanceNavigationRouter.visit('/settings/appearance')`,
+            );
+            await waitFor(
+                `location.pathname === '/settings/appearance' && !!document.querySelector('button[aria-pressed="true"]')`,
+                'Appearance settings must mount',
+            );
+            await assertAppearance(selected);
+            assert.equal(
+                await browser.evaluate(
+                    `document.querySelector('button[aria-pressed="true"]').textContent.trim()`,
+                ),
+                selected === 'dark' ? 'Dark' : 'Light',
+            );
+            await browser.evaluate('history.go(-2)');
+            await waitFor(
+                `location.pathname === '/__responsive_fixture' && !!document.querySelector('#catalog-heading')`,
+                'Catalog must be current before reloading',
+            );
+            await browser.command('Page.reload');
+            await waitFor(
+                `window.appearanceNavigationDocument !== true && !!document.querySelector('#app')?.__vue_app__ && !!document.querySelector('#catalog-heading')`,
+                'Reload must mount the catalog using the saved server preference',
+            );
+            await browser.evaluate(
+                'window.appearanceNavigationDocument = true',
+            );
+            await assertAppearance(selected);
+            await browser.evaluate('history.forward()');
+            await waitFor(
+                `location.pathname === '/products/7' && !!document.querySelector('form button[type=submit]')`,
+                'Forward after reload must restore older product details',
+            );
+            await assertAppearance(selected);
+        }
+        assert.deepEqual(
+            browser.exceptions,
+            [],
+            'Appearance navigation has no JavaScript exceptions',
+        );
+    },
+);
+
+test(
+    'mobile support stays clear of shopping controls and opens an accessible chat panel',
+    {
+        skip:
+            !baseUrl || !executable
+                ? 'Set the local app and browser environment variables'
+                : false,
+        timeout: 120000,
+    },
+    async (t) => {
+        const browser = await openBrowser(t);
+        const catalog = {
+            products: {
+                data: Array.from({ length: 4 }, (_, index) => ({
+                    ...product,
+                    id: index + 1,
+                })),
+                total: 4,
+                current_page: 1,
+                last_page: 1,
+                next_page_url: null,
+                prev_page_url: null,
+            },
+            filters: { sort: 'featured' },
+            filter_options: { categories: [], brands: [], tags: [] },
+            recommendations: [],
+        };
+        for (const theme of ['light', 'dark']) {
+            for (const [component, props, customer] of [
+                ['Products/Index', catalog, false],
+                ['Products/Index', catalog, true],
+                [
+                    'Products/Show',
+                    {
+                        product,
+                        can_record_product_dwell: false,
+                        recommendations: [],
+                    },
+                    true,
+                ],
+                ['Cart/Index', { cart }, true],
+                ['Checkout/Index', checkout, true],
+            ]) {
+                await browser.show(component, props, customer, theme);
+                for (const width of [320, 390, 768, 1440]) {
+                    await browser.resize(width);
+                    const dock = await browser.evaluate(`(() => {
+                    const element = document.querySelector('[data-customer-chat]');
+                    const rect = element.getBoundingClientRect();
+                    const button = element.querySelector('button');
+                    return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, height: rect.height, clientWidth: document.documentElement.clientWidth,
+                        clearance: parseFloat(getComputedStyle(document.body).paddingBottom),
+                        target: button.getBoundingClientRect().height,
+                        shadow: getComputedStyle(button).boxShadow };
+                })()`);
+                    assert.ok(
+                        dock.left >= 0 &&
+                            dock.right <= width &&
+                            dock.bottom <= 900,
+                        `${component} support fits at ${width}`,
+                    );
+                    assert.ok(dock.target >= 44);
+                    if (width < 640) {
+                        assert.equal(dock.left, 0);
+                        assert.equal(dock.right, dock.clientWidth);
+                        assert.ok(
+                            dock.clearance >= dock.height,
+                            'The mobile support dock has reserved page clearance',
+                        );
+                    } else {
+                        assert.equal(
+                            dock.clearance,
+                            0,
+                            'Desktop pages retain their original bottom spacing',
+                        );
+                        assert.ok(
+                            dock.right - dock.left < 220,
+                            'Desktop support retains its compact floating launcher',
+                        );
+                    }
+                    const controls = await browser.evaluate(`(async () => {
+                    const dock = document.querySelector('[data-customer-chat]').getBoundingClientRect();
+                    const results = [];
+                    for (const element of document.querySelectorAll('main input:not([type=hidden]), main [role=combobox], main button:not([disabled]), main h3, main nav a')) {
+                        if (!element.getBoundingClientRect().height || element.closest('header, [data-slot=sidebar]')) continue;
+                        element.scrollIntoView({ block: 'center' });
+                        await new Promise(resolve => requestAnimationFrame(resolve));
+                        const rect = element.getBoundingClientRect();
+                        const top = Math.max(rect.top, 74);
+                        const bottom = Math.min(rect.bottom, innerHeight);
+                        const x = rect.left + rect.width / 2;
+                        const y = (top + bottom) / 2;
+                        const hit = document.elementFromPoint(x, y);
+                        const label = element.closest('label') ?? document.querySelector('label[for="' + element.id + '"]');
+                        results.push({ text: element.textContent.trim().slice(0, 50) || element.id,
+                            clear: !(rect.left < dock.right && rect.right > dock.left && rect.top < dock.bottom && rect.bottom > dock.top),
+                            reachable: hit === element || element.contains(hit),
+                            target: element.matches('input[type=radio], input[type=checkbox], [role=checkbox]') ? Math.max(rect.height, label?.getBoundingClientRect().height ?? 0) : element.matches('input, [role=combobox], button') ? rect.height : null });
+                    }
+                    return results;
+                })()`);
+                    assert.ok(controls.length > 0);
+                    assert.deepEqual(
+                        controls.filter(
+                            (control) => !control.clear || !control.reachable,
+                        ),
+                        [],
+                        `${component} shopping content remains unobstructed at ${width}`,
+                    );
+                    if (width < 768)
+                        assert.deepEqual(
+                            controls.filter(
+                                (control) =>
+                                    control.target !== null &&
+                                    control.target < 44,
+                            ),
+                            [],
+                            'Shopping controls retain 44px touch targets',
+                        );
+                    await assertFits(
+                        browser,
+                        `${component} support dock ${theme} ${width}`,
+                    );
+                    if (
+                        process.env.BATTLEFRONT_UI_PREVIEW &&
+                        component === 'Products/Index' &&
+                        customer &&
+                        width === 390
+                    ) {
+                        await browser.evaluate(
+                            `(() => { const section = document.querySelector('#product-list-heading').closest('section'); scrollTo(0, section.getBoundingClientRect().top + scrollY - 82); })()`,
+                        );
+                        const screenshot = await browser.command(
+                            'Page.captureScreenshot',
+                            { format: 'png', captureBeyondViewport: false },
+                        );
+                        await writeFile(
+                            process.env.BATTLEFRONT_UI_PREVIEW +
+                                '-' +
+                                theme +
+                                '-390.png',
+                            Buffer.from(screenshot.data, 'base64'),
+                        );
+                    }
+                }
+            }
+            await browser.resize(320, 480);
+            await browser.evaluate(
+                `document.querySelector('[aria-controls="battlefront-chat-panel"]').click()`,
+            );
+            const panel = await browser.evaluate(`(() => {
+            const element = document.querySelector('#battlefront-chat-panel');
+            const rect = element.getBoundingClientRect();
+            return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+                focused: document.activeElement.id, background: getComputedStyle(element).backgroundColor,
+                radius: getComputedStyle(element).borderTopLeftRadius };
+        })()`);
+            assert.ok(
+                panel.left >= 0 &&
+                    panel.right <= 320 &&
+                    panel.top >= 0 &&
+                    panel.bottom <= 480,
+                'The chat panel fits a short mobile viewport',
+            );
+            assert.equal(panel.focused, 'floating-chatbot-message');
+            assert.equal(panel.radius, '16px');
+            assert.equal(
+                panel.background,
+                theme === 'dark' ? 'rgb(17, 19, 24)' : 'rgb(255, 255, 255)',
+            );
+            await browser.evaluate(
+                `document.querySelector('#battlefront-chat-panel').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`,
+            );
+            assert.equal(
+                await browser.evaluate(
+                    `document.activeElement.getAttribute('aria-controls')`,
+                ),
+                'battlefront-chat-panel',
+                'Closing support returns keyboard focus to the launcher',
+            );
+        }
+        assert.deepEqual(browser.exceptions, []);
+    },
+);
+
+test(
+    'guest appearance persists across public pages and stays separate from account settings',
+    {
+        skip:
+            !baseUrl || !executable
+                ? 'Set the local app and browser environment variables'
+                : false,
+        timeout: 120000,
+    },
+    async (t) => {
+        const browser = await openBrowser(t);
+        const key = 'battlefront_guest_appearance';
+        const catalog = {
+            products: {
+                data: [product],
+                total: 1,
+                current_page: 1,
+                last_page: 1,
+                next_page_url: null,
+                prev_page_url: null,
+            },
+            filters: { sort: 'featured' },
+            filter_options: { categories: [], brands: [], tags: [] },
+            recommendations: [],
+        };
+        const readAppearance = `({ dark: document.documentElement.classList.contains('dark'), checked: document.querySelector('[role=switch][aria-label="Dark mode"]')?.getAttribute('aria-checked'), stored: localStorage.getItem('${key}'), beforeApp: window.appearanceBeforeApp })`;
+        async function waitFor(expression, message) {
+            for (let attempt = 0; attempt < 100; attempt++) {
+                if (await browser.evaluate(expression)) return;
+                await delay(50);
+            }
+            assert.fail(message + '; ' + browser.exceptions.join('; '));
+        }
+        await browser.command('Emulation.setEmulatedMedia', {
+            features: [{ name: 'prefers-color-scheme', value: 'dark' }],
+        });
+        await browser.evaluate(`localStorage.removeItem('${key}')`);
+        await browser.show('Welcome', {}, false, null);
+        await waitFor(
+            `!!document.querySelector('[role=switch]')`,
+            'The guest switch must mount',
+        );
+        assert.deepEqual(await browser.evaluate(readAppearance), {
+            dark: false,
+            checked: 'false',
+            stored: null,
+            beforeApp: false,
+        });
+        await browser.evaluate(
+            `document.querySelector('[role=switch]').focus()`,
+        );
+        await browser.command('Input.dispatchKeyEvent', {
+            type: 'keyDown',
+            key: ' ',
+            code: 'Space',
+            windowsVirtualKeyCode: 32,
+        });
+        await browser.command('Input.dispatchKeyEvent', {
+            type: 'keyUp',
+            key: ' ',
+            code: 'Space',
+            windowsVirtualKeyCode: 32,
+        });
+        await waitFor(
+            `document.querySelector('[role=switch]').getAttribute('aria-checked') === 'true'`,
+            'Space must operate the guest switch',
+        );
+        assert.equal((await browser.evaluate(readAppearance)).stored, 'dark');
+        for (const [component, props] of [
+            ['Welcome', {}],
+            ['Products/Index', catalog],
+            [
+                'Products/Show',
+                {
+                    product,
+                    can_record_product_dwell: false,
+                    recommendations: [],
+                },
+            ],
+            ['Branches/Index', { branches: [] }],
+            ['auth/Login', { canResetPassword: true }],
+            ['auth/Register', { passwordRules: 'min:8' }],
+        ]) {
+            await browser.show(component, props, false, null);
+            await waitFor(
+                `!!document.querySelector('[role=switch]')`,
+                component + ' must expose the guest switch',
+            );
+            assert.deepEqual(
+                await browser.evaluate(readAppearance),
+                {
+                    dark: true,
+                    checked: 'true',
+                    stored: 'dark',
+                    beforeApp: true,
+                },
+                component + ' restores Dark before application code',
+            );
+            for (const width of [320, 375, 390, 768, 1440]) {
+                await browser.resize(width);
+                await assertFits(
+                    browser,
+                    component + ' guest appearance ' + width,
+                );
+                const bounds = await browser.evaluate(`(() => {
+                const control = document.querySelector('[role=switch]');
+                const rect = control.getBoundingClientRect();
+                return { left: rect.left, right: rect.right, height: rect.height, width: rect.width, viewport: document.documentElement.clientWidth };
+            })()`);
+                assert.ok(
+                    bounds.left >= 0 && bounds.right <= bounds.viewport,
+                    component + ' switch stays visible at ' + width,
+                );
+                assert.ok(
+                    bounds.width >= 44 &&
+                        bounds.height >= (width < 768 ? 44 : 36),
+                    'The switch retains accessible target dimensions',
+                );
+                if (
+                    process.env.BATTLEFRONT_GUEST_PREVIEW &&
+                    ['Welcome', 'auth/Login', 'auth/Register'].includes(
+                        component,
+                    ) &&
+                    [320, 1440].includes(width)
+                ) {
+                    const screenshot = await browser.command(
+                        'Page.captureScreenshot',
+                        { format: 'png', captureBeyondViewport: false },
+                    );
+                    await writeFile(
+                        process.env.BATTLEFRONT_GUEST_PREVIEW +
+                            '-' +
+                            component.replaceAll('/', '-') +
+                            '-' +
+                            width +
+                            '.png',
+                        Buffer.from(screenshot.data, 'base64'),
+                    );
+                }
+            }
+        }
+        assert.deepEqual(
+            browser.appearanceRequests,
+            [],
+            'Guests never call the account preference endpoint',
+        );
+        await browser.show('settings/Appearance', {}, true, 'light');
+        assert.deepEqual(
+            await browser.evaluate(readAppearance),
+            { dark: false, checked: 'false', stored: 'dark', beforeApp: false },
+            'Account Light wins over stored guest Dark before mounting',
+        );
+        await browser.evaluate(
+            `document.querySelector('[role=switch]').click()`,
+        );
+        await waitFor(
+            `!!document.querySelector('[data-sonner-toast]')`,
+            'Account Dark must save',
+        );
+        assert.equal((await browser.evaluate(readAppearance)).dark, true);
+        await browser.evaluate(
+            `document.querySelector('[role=switch]').click()`,
+        );
+        await waitFor(
+            `document.querySelector('[role=switch]').getAttribute('aria-checked') === 'false' && document.querySelectorAll('[data-sonner-toast]').length >= 2`,
+            'Account Light must save',
+        );
+        assert.equal(
+            (await browser.evaluate(readAppearance)).stored,
+            'dark',
+            'Account saves never overwrite guest storage',
+        );
+        assert.deepEqual(browser.appearanceRequests, [
+            { appearance: 'dark' },
+            { appearance: 'light' },
+        ]);
+        browser.registerPage(
+            '/__guest_appearance_logout',
+            'Products/Index',
+            catalog,
+            'light',
+            null,
+        );
+        await browser.evaluate(
+            `document.querySelector('#app').__vue_app__.config.globalProperties.$inertia.visit('/__guest_appearance_logout')`,
+        );
+        await waitFor(
+            `location.pathname === '/__guest_appearance_logout' && !!document.querySelector('header nav [role=switch]')`,
+            'Logout must expose the guest header',
+        );
+        assert.equal(
+            (await browser.evaluate(readAppearance)).dark,
+            true,
+            'Logout restores the prior guest preference',
+        );
+        const auth = {
+            user: {
+                id: 999998,
+                name: 'Appearance Account',
+                email: 'appearance@example.test',
+                role: 'customer',
+            },
+            can: { useCustomerCart: true, accessAdministration: false },
+        };
+        browser.registerPage(
+            '/__guest_appearance_login',
+            'settings/Appearance',
+            {},
+            'light',
+            auth,
+        );
+        await browser.evaluate(
+            `document.querySelector('#app').__vue_app__.config.globalProperties.$inertia.visit('/__guest_appearance_login')`,
+        );
+        await waitFor(
+            `location.pathname === '/__guest_appearance_login' && !!document.querySelector('button[aria-pressed="true"]')`,
+            'Login must mount account settings',
+        );
+        assert.equal(
+            (await browser.evaluate(readAppearance)).dark,
+            false,
+            'Login reapplies the account preference',
+        );
+        assert.equal((await browser.evaluate(readAppearance)).stored, 'dark');
+        assert.deepEqual(browser.exceptions, []);
+    },
+);

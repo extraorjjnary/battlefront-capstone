@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 <template>
     <section class="border-border border-t pt-10" aria-hidden="true">
-        <p class="text-primary text-xs font-bold tracking-[0.18em] uppercase">
+        <p class="text-primary-ink text-xs font-bold tracking-[0.18em] uppercase">
             Product recommendations
         </p>
         <h2 class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
@@ -14,18 +14,18 @@ import { Skeleton } from '@/components/ui/skeleton';
             Finding available products for you.
         </p>
         <div
-            class="mt-5 grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4"
+            class="mt-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4"
         >
             <article
                 v-for="card in 4"
                 :key="card"
                 data-slot="product-card-skeleton"
-                class="border-border bg-card flex min-w-0 flex-col overflow-hidden border"
+                class="surface-card border-border bg-card flex min-w-0 flex-col overflow-hidden border"
             >
                 <Skeleton
                     class="aspect-square w-full rounded-none sm:aspect-3/2"
                 />
-                <div class="flex flex-1 flex-col gap-2 p-2.5 sm:gap-3 sm:p-4">
+                <div class="product-card-content">
                     <div class="grid gap-1">
                         <Skeleton class="h-4 w-1/3" />
                         <Skeleton class="h-5 w-full" />

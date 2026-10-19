@@ -30,7 +30,7 @@ function retry() {
                 </div>
             </template>
             <template #rescue="{ reloading }">
-                <div class="border-border bg-card border p-5">
+                <div class="rounded-card border-border bg-card border p-5">
                     <p role="alert" class="text-destructive text-sm">
                         {{ errorMessage }}
                     </p>

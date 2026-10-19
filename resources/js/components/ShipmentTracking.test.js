@@ -42,6 +42,7 @@ function trackingProps(overrides = {}) {
     return {
         shipment: {
             carrier: 'lbc',
+            arrangement: { value: 'quoted_lbc', label: 'Battlefront-arranged LBC delivery' },
             status: {
                 value: 'awaiting_preparation',
                 label: 'Awaiting preparation',
@@ -65,6 +66,7 @@ function trackingProps(overrides = {}) {
             ...overrides,
         },
         quote: {
+            pricing_configured: true,
             destination: 'Bacolod City',
             delivery_fee: '250.00',
             base_fee: '250.00',

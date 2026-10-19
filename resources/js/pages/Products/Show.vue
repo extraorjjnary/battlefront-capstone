@@ -181,7 +181,7 @@ function returnToCatalog() {
             </Button>
 
             <article
-                class="border-border bg-card mt-6 grid overflow-hidden border lg:grid-cols-[minmax(0,1.3fr)_minmax(22rem,1fr)]"
+                class="surface-panel border-border bg-card mt-6 grid overflow-hidden border lg:grid-cols-[minmax(0,1.3fr)_minmax(22rem,1fr)]"
             >
                 <div
                     class="border-border aspect-square overflow-hidden border-b sm:aspect-4/3 lg:relative lg:aspect-auto lg:min-h-[min(36rem,70vh)] lg:border-r lg:border-b-0"
@@ -190,7 +190,8 @@ function returnToCatalog() {
                         :image-url="product.image_url"
                         :product-name="product.name"
                         contain
-                        class="lg:absolute lg:inset-0 lg:[&_img]:object-cover"
+                        desktop-cover
+                        class="lg:absolute lg:inset-0"
                     />
                 </div>
 
@@ -204,7 +205,7 @@ function returnToCatalog() {
 
                     <p
                         v-if="product.brand"
-                        class="text-primary mt-7 text-xs font-bold tracking-[0.18em] uppercase"
+                        class="text-primary-ink mt-7 text-xs font-bold tracking-[0.18em] uppercase"
                     >
                         {{ product.brand }}
                     </p>
@@ -321,7 +322,7 @@ function returnToCatalog() {
                             class="flex items-center gap-2 font-semibold"
                         >
                             <Tag
-                                class="text-primary size-4"
+                                class="text-primary-ink size-4"
                                 aria-hidden="true"
                             />
                             Product tags
