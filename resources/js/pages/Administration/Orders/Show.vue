@@ -802,6 +802,11 @@ defineOptions({
                             </p>
                         </article>
                     </div>
+                    <dl v-if="order.profitability" class="border-border mt-4 grid gap-3 border p-4 sm:grid-cols-3">
+                        <div><dt class="text-muted-foreground text-sm">Cost of goods sold</dt><dd class="mt-1 font-semibold tabular-nums">{{ formatCurrency(order.profitability.cost_of_goods_sold) }}</dd></div>
+                        <div><dt class="text-muted-foreground text-sm">Sales returns</dt><dd class="mt-1 font-semibold tabular-nums">{{ formatCurrency(order.profitability.sales_returns) }}</dd></div>
+                        <div><dt class="text-muted-foreground text-sm">Gross profit</dt><dd class="mt-1 font-semibold tabular-nums">{{ order.profitability.available ? formatCurrency(order.profitability.gross_profit) : 'Unavailable' }}</dd></div>
+                    </dl>
                 </section>
             </div>
 

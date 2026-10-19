@@ -12,7 +12,10 @@ use stdClass;
 
 class AdministrationWorkQueue
 {
-    /** @return LengthAwarePaginator<int, array<string, mixed>> */
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return LengthAwarePaginator<int, array<string, mixed>>
+     */
     public function paginate(User $actor, array $filters = []): LengthAwarePaginator
     {
         $queries = [];

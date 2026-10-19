@@ -32,6 +32,7 @@ const props = defineProps({
 });
 const page = usePage();
 const canEditPrice = computed(() => page.props.auth?.can?.priceProducts === true);
+const canEditAcquisitionCost = computed(() => page.props.auth?.can?.manageProductCosts === true);
 
 const categoryId = ref(
     String(props.product?.category_id ?? props.categories[0]?.id ?? ''),
@@ -317,6 +318,16 @@ function firstTagError(errors) {
                         :aria-invalid="Boolean(errors.discount_price)"
                     />
                     <InputError :message="errors.discount_price" />
+                </div>
+                <div v-if="canEditAcquisitionCost" class="grid gap-2">
+                    <Label for="acquisition_cost">Acquisition cost (PHP)</Label>
+                    <Input id="acquisition_cost" name="acquisition_cost" type="number" min="0" max="9999999999.99" step="0.01" inputmode="decimal" :default-value="product?.acquisition_cost" placeholder="0.00" :aria-invalid="Boolean(errors.acquisition_cost)" />
+                    <InputError :message="errors.acquisition_cost" />
+                </div>
+                <div v-if="product && canEditAcquisitionCost" class="grid gap-2 md:col-span-2">
+                    <Label for="cost_change_reason">Reason for an acquisition cost change</Label>
+                    <Textarea id="cost_change_reason" name="cost_change_reason" rows="2" maxlength="1000" placeholder="Required when the acquisition cost changes" :aria-invalid="Boolean(errors.cost_change_reason)" />
+                    <InputError :message="errors.cost_change_reason" />
                 </div>
                 <div v-if="product && canEditPrice" class="grid gap-2 md:col-span-2">
                     <Label for="price_change_reason">Reason for a price change</Label>

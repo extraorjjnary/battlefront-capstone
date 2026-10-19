@@ -75,6 +75,8 @@ class HandleInertiaRequests extends Middleware
                     'browseProductCatalog' => $canBrowseProductCatalog,
                     'manageProducts' => $request->user()?->can('products.manage') ?? false,
                     'priceProducts' => $request->user()?->can('products.price') ?? false,
+                    'manageProductCosts' => $request->user()?->can('products.cost') ?? false,
+                    'viewProfitReports' => $request->user()?->can('reports.profit') ?? false,
                     'deleteCatalog' => $request->user()?->can('catalog.delete') ?? false,
                     'manageSuppliers' => $request->user()?->can('suppliers.manage') ?? false,
                     'manageUsers' => $request->user()?->can('users.manage') ?? false,

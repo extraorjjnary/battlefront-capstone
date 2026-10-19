@@ -15,6 +15,7 @@ use App\Services\CatalogProductPresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -50,6 +51,7 @@ class ProductController extends Controller
                 'is_active',
                 'shipping_profile',
             ])
+            ->when($request->user()->can('products.cost'), fn (Builder $query): Builder => $query->addSelect('acquisition_cost'))
             ->with([
                 'category:id,name,is_active',
                 'tags:id,name',
@@ -95,6 +97,7 @@ class ProductController extends Controller
                 'name' => $product->name,
                 'brand' => $product->brand,
                 'price' => $product->price,
+                ...($request->user()->can('products.cost') ? ['acquisition_cost' => $product->acquisition_cost] : []),
                 'discount_price' => $product->discount_price,
                 'image_url' => $product->image_url,
                 'is_featured' => $product->is_featured,
@@ -181,7 +184,7 @@ class ProductController extends Controller
     /**
      * Display the specified product and its current stock.
      */
-    public function show(Product $product): Response
+    public function show(Request $request, Product $product): Response
     {
         $product->load(['category:id,name,is_active', 'tags:id,name', 'inventory:id,product_id,quantity,reorder_level']);
         $product->loadExists('lowStockInventory as is_low_stock');
@@ -200,6 +203,7 @@ class ProductController extends Controller
                     'is_active',
                     'edit_version',
                 ]),
+                ...($request->user()->can('products.cost') ? ['acquisition_cost' => $product->acquisition_cost] : []),
                 'image_url' => $product->image_url,
                 'category' => $product->category->only(['name', 'is_active']),
                 'shipping_handling' => $this->presenter->handling($product->shipping_profile),
@@ -218,7 +222,7 @@ class ProductController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Product $product): Response
+    public function edit(Request $request, Product $product): Response
     {
         $product->load('tags:id,name');
 
@@ -226,6 +230,7 @@ class ProductController extends Controller
             ...$this->productOptions(),
             'product' => [
                 'shipping_profile' => $product->shipping_profile->value,
+                ...($request->user()->can('products.cost') ? ['acquisition_cost' => $product->acquisition_cost] : []),
                 ...$product->only([
                     'id',
                     'product_code',

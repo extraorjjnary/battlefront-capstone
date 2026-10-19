@@ -124,6 +124,11 @@ class HandleCustomerReturn
 
             DB::table('customer_return_items')->where('id', $returnItem->id)->update([
                 'disposition' => $accept ? $disposition : 'return_to_customer',
+                'sales_return_amount' => $accept ? $approvedAmount : '0.00',
+                'cost_recovered_amount' => $accept && $disposition === 'restock' && $originalItem->acquisition_cost_at_time !== null
+                    ? bcmul($this->decimal((string) $returnItem->quantity), $originalItem->acquisition_cost_at_time, 2)
+                    : ($accept ? '0.00' : null),
+                'financial_recognized_at' => $accept ? now() : null,
             ]);
             DB::table('customer_returns')->where('id', $returnId)->update([
                 'status' => $accept ? 'accepted' : 'rejected_pending_handover',

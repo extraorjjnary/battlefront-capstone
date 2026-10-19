@@ -14,7 +14,10 @@ use RuntimeException;
 
 class RealCatalogImportService
 {
-    public function __construct(private readonly CatalogImagePipeline $images) {}
+    public function __construct(
+        private readonly CatalogImagePipeline $images,
+        private readonly AcquisitionCostEstimator $acquisitionCostEstimator,
+    ) {}
 
     public function writeTemplate(string $outputPath, ?string $manifestPath = null): int
     {
@@ -192,6 +195,10 @@ class RealCatalogImportService
                         'brand' => $row['brand'] ?? $product->brand,
                         'price' => $row['price'],
                     ]);
+                    if ($product->acquisition_cost === null) {
+                        $product->acquisition_cost = $this->acquisitionCostEstimator->forProduct($category->name, $row['price']);
+                        $product->acquisition_cost_source = $product->acquisition_cost === null ? null : 'category_policy_v1';
+                    }
                     if (! ProductImagePaths::isAdminOwned($product->image_path, $product->id)) {
                         $product->image_path = $row['image_path'];
                     }

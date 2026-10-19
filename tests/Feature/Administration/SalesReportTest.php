@@ -145,6 +145,13 @@ test('administrators receive zero values and empty reports when no sales exist',
             'total_revenue' => '0.00',
             'average_order_value' => '0.00',
             'total_items_sold' => 0,
+            'sales_returns' => '0.00',
+            'net_sales' => '0.00',
+            'cost_of_goods_sold' => '0.00',
+            'cost_recovered' => '0.00',
+            'gross_profit' => '0.00',
+            'gross_margin' => null,
+            'cost_data_complete' => true,
         ])
         ->where('top_products.labels', [])
         ->where('categories.rows', [])
@@ -309,6 +316,13 @@ test('sales KPIs and product and category reports use sale-backed order records'
             'total_revenue' => '500.00',
             'average_order_value' => '250.00',
             'total_items_sold' => 6,
+            'sales_returns' => '0.00',
+            'net_sales' => '500.00',
+            'cost_of_goods_sold' => '0.00',
+            'cost_recovered' => '0.00',
+            'gross_profit' => null,
+            'gross_margin' => null,
+            'cost_data_complete' => false,
         ])
         ->where('timeline.labels', ['Sep 2026'])
         ->where('timeline.sales', [2])
@@ -322,6 +336,9 @@ test('sales KPIs and product and category reports use sale-backed order records'
             'sales_count' => 2,
             'quantity_sold' => 5,
             'item_revenue' => '400.00',
+            'cost_of_goods_sold' => '0.00',
+            'gross_profit_before_returns' => null,
+            'gross_margin_before_returns' => null,
         ])
         ->where('products.data.1', [
             'id' => $keyboard->id,
@@ -330,6 +347,9 @@ test('sales KPIs and product and category reports use sale-backed order records'
             'sales_count' => 1,
             'quantity_sold' => 1,
             'item_revenue' => '100.00',
+            'cost_of_goods_sold' => '0.00',
+            'gross_profit_before_returns' => null,
+            'gross_margin_before_returns' => null,
         ])
         ->where('categories.rows.0', [
             'id' => $components->id,
@@ -337,6 +357,9 @@ test('sales KPIs and product and category reports use sale-backed order records'
             'sales_count' => 2,
             'quantity_sold' => 5,
             'item_revenue' => '400.00',
+            'cost_of_goods_sold' => '0.00',
+            'gross_profit_before_returns' => null,
+            'gross_margin_before_returns' => null,
         ])
         ->where('categories.rows.1', [
             'id' => $peripherals->id,
@@ -344,7 +367,50 @@ test('sales KPIs and product and category reports use sale-backed order records'
             'sales_count' => 1,
             'quantity_sold' => 1,
             'item_revenue' => '100.00',
+            'cost_of_goods_sold' => '0.00',
+            'gross_profit_before_returns' => null,
+            'gross_margin_before_returns' => null,
         ]));
+});
+
+test('sales report calculates gross profit from the acquisition cost saved with each sale item', function () {
+    $administrator = User::factory()->administrator()->create();
+    $product = Product::factory()->create(['acquisition_cost' => '30.00']);
+    $sale = createSalesReportEntry('2026-09-05', '100.00', [
+        ['product' => $product, 'quantity' => 2, 'price' => '50.00'],
+    ]);
+    DB::table('order_items')->where('order_id', $sale->order_id)->update(['acquisition_cost_at_time' => '30.00']);
+
+    $this->actingAs($administrator)
+        ->get(route('administration.reports.sales', ['from' => '2026-09-01', 'to' => '2026-09-30']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('kpis.cost_of_goods_sold', '60.00')
+            ->where('kpis.net_sales', '100.00')
+            ->where('kpis.gross_profit', '40.00')
+            ->where('kpis.gross_margin', '40.00')
+            ->where('kpis.cost_data_complete', true)
+            ->where('timeline.gross_profit_before_returns', [0, 0, 0, 0, 40, ...array_fill(0, 25, 0)])
+            ->where('products.data.0.gross_profit_before_returns', '40.00'));
+});
+
+test('sales report omits profitability data when an administrator lacks the profit permission', function () {
+    $managerRoleId = DB::table('administration_roles')->where('code', 'manager')->value('id');
+    $profitPermissionId = DB::table('administration_permissions')->where('code', 'reports.profit')->value('id');
+    DB::table('administration_role_permissions')
+        ->where('administration_role_id', $managerRoleId)
+        ->where('administration_permission_id', $profitPermissionId)
+        ->delete();
+    $manager = User::factory()->administrator()->create(['administration_role_id' => $managerRoleId]);
+
+    createSalesReportEntry('2026-09-05', '100.00', [
+        ['product' => Product::factory()->create(['acquisition_cost' => '30.00']), 'quantity' => 2, 'price' => '50.00'],
+    ]);
+
+    $this->actingAs($manager)
+        ->get(route('administration.reports.sales', ['from' => '2026-09-01', 'to' => '2026-09-30']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->missing('kpis.gross_profit')
+            ->missing('products.data.0.cost_of_goods_sold'));
 });
 
 test('new sale dates follow the configured Philippine business calendar', function () {
@@ -382,7 +448,7 @@ test('historical and newly recorded sales use product snapshots across reporting
     $this->actingAs($administrator)->get(route('administration.reports.sales', [
         'from' => '2026-09-01', 'to' => '2026-09-03', 'period' => $period,
     ]))->assertInertia(fn (Assert $page) => $page
-        ->where('kpis', ['total_sales' => 3, 'total_revenue' => '500.00', 'average_order_value' => '166.67', 'total_items_sold' => 8])
+        ->where('kpis', ['total_sales' => 3, 'total_revenue' => '500.00', 'average_order_value' => '166.67', 'total_items_sold' => 8, 'sales_returns' => '0.00', 'net_sales' => '500.00', 'cost_of_goods_sold' => '0.00', 'cost_recovered' => '0.00', 'gross_profit' => null, 'gross_margin' => null, 'cost_data_complete' => false])
         ->where('timeline.revenue', $revenue)->where('timeline.sales', $sales)
         ->where('products.data.0.item_revenue', '300.00')->where('products.data.1.item_revenue', '200.00'));
     $this->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
@@ -401,11 +467,11 @@ test('historical and newly recorded sales use product snapshots across reporting
         'from' => '2026-09-01', 'to' => '2026-09-03', 'period' => $period,
         'product_id' => $processor->id, 'category_id' => $processor->category_id,
     ]))->assertInertia(fn (Assert $page) => $page
-        ->where('kpis', ['total_sales' => 3, 'total_revenue' => '300.00', 'average_order_value' => '100.00', 'total_items_sold' => 6]));
+        ->where('kpis', ['total_sales' => 3, 'total_revenue' => '300.00', 'average_order_value' => '100.00', 'total_items_sold' => 6, 'sales_returns' => '0.00', 'net_sales' => '300.00', 'cost_of_goods_sold' => '0.00', 'cost_recovered' => '0.00', 'gross_profit' => null, 'gross_margin' => null, 'cost_data_complete' => false]));
     $this->get(route('administration.reports.sales', [
         'from' => '2026-09-01', 'to' => '2026-09-03', 'period' => $period, 'category_id' => $keyboard->category_id,
     ]))->assertInertia(fn (Assert $page) => $page
-        ->where('kpis', ['total_sales' => 2, 'total_revenue' => '200.00', 'average_order_value' => '100.00', 'total_items_sold' => 2]));
+        ->where('kpis', ['total_sales' => 2, 'total_revenue' => '200.00', 'average_order_value' => '100.00', 'total_items_sold' => 2, 'sales_returns' => '0.00', 'net_sales' => '200.00', 'cost_of_goods_sold' => '0.00', 'cost_recovered' => '0.00', 'gross_profit' => null, 'gross_margin' => null, 'cost_data_complete' => false]));
 })->with(['daily' => ['day', [200, 200, 100], [1, 1, 1]], 'weekly' => ['week', [500], [3]], 'monthly' => ['month', [500], [3]]]);
 
 test('zero product subtotals and itemless legacy sales preserve sales counts without recognizing delivery revenue', function () {
@@ -420,7 +486,7 @@ test('zero product subtotals and itemless legacy sales preserve sales counts wit
 
     $this->actingAs($administrator)->get(route('administration.reports.sales', ['from' => '2026-09-01', 'to' => '2026-09-02']))
         ->assertInertia(fn (Assert $page) => $page
-            ->where('kpis', ['total_sales' => 2, 'total_revenue' => '100.50', 'average_order_value' => '50.25', 'total_items_sold' => 0])
+            ->where('kpis', ['total_sales' => 2, 'total_revenue' => '100.50', 'average_order_value' => '50.25', 'total_items_sold' => 0, 'sales_returns' => '0.00', 'net_sales' => '100.50', 'cost_of_goods_sold' => '0.00', 'cost_recovered' => '0.00', 'gross_profit' => null, 'gross_margin' => null, 'cost_data_complete' => false])
             ->where('timeline.revenue', [0, 100.5])->where('timeline.sales', [1, 1]));
 });
 
@@ -466,6 +532,13 @@ test('category filters update dependent aggregates while retaining category char
             'total_revenue' => '400.00',
             'average_order_value' => '200.00',
             'total_items_sold' => 5,
+            'sales_returns' => '0.00',
+            'net_sales' => '400.00',
+            'cost_of_goods_sold' => '0.00',
+            'cost_recovered' => '0.00',
+            'gross_profit' => null,
+            'gross_margin' => null,
+            'cost_data_complete' => false,
         ])
         ->where('timeline.sales', [2])
         ->where('timeline.revenue', [400])
@@ -482,6 +555,9 @@ test('category filters update dependent aggregates while retaining category char
             'sales_count' => 2,
             'quantity_sold' => 5,
             'item_revenue' => '400.00',
+            'cost_of_goods_sold' => '0.00',
+            'gross_profit_before_returns' => null,
+            'gross_margin_before_returns' => null,
         ]])
         ->where('products.data.0.id', $fixture['processor']->id)
         ->where('products.total', 1));
@@ -510,6 +586,13 @@ test('product filters update dependent aggregates while retaining product chart 
             'total_revenue' => '100.00',
             'average_order_value' => '100.00',
             'total_items_sold' => 1,
+            'sales_returns' => '0.00',
+            'net_sales' => '100.00',
+            'cost_of_goods_sold' => '0.00',
+            'cost_recovered' => '0.00',
+            'gross_profit' => null,
+            'gross_margin' => null,
+            'cost_data_complete' => false,
         ])
         ->where('timeline.sales', [1])
         ->where('timeline.revenue', [100])
@@ -553,6 +636,13 @@ test('clearing cross filters restores the complete date-range report', function 
             'total_revenue' => '500.00',
             'average_order_value' => '250.00',
             'total_items_sold' => 6,
+            'sales_returns' => '0.00',
+            'net_sales' => '500.00',
+            'cost_of_goods_sold' => '0.00',
+            'cost_recovered' => '0.00',
+            'gross_profit' => null,
+            'gross_margin' => null,
+            'cost_data_complete' => false,
         ])
         ->where('products.total', 2)
         ->where('categories.rows', fn ($rows): bool => $rows->count() === 2));
@@ -576,6 +666,13 @@ test('incompatible product and category filters return defined empty aggregates'
             'total_revenue' => '0.00',
             'average_order_value' => '0.00',
             'total_items_sold' => 0,
+            'sales_returns' => '0.00',
+            'net_sales' => '0.00',
+            'cost_of_goods_sold' => '0.00',
+            'cost_recovered' => '0.00',
+            'gross_profit' => '0.00',
+            'gross_margin' => null,
+            'cost_data_complete' => true,
         ])
         ->where('timeline.sales', array_fill(0, 30, 0))
         ->where('timeline.revenue', array_fill(0, 30, 0))

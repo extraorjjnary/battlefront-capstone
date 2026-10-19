@@ -19,6 +19,8 @@ test('the product schema follows the approved ERD decisions', function () {
         'category_id',
         'brand',
         'price',
+        'acquisition_cost',
+        'acquisition_cost_source',
         'is_featured',
         'discount_price',
         'image_path',

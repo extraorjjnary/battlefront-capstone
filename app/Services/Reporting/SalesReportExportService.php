@@ -23,9 +23,9 @@ class SalesReportExportService
     /**
      * @param  array<string, mixed>  $filters
      */
-    public function printReport(array $filters): Response
+    public function printReport(array $filters, bool $includeProfitability = true): Response
     {
-        $report = $this->salesReportService->document($filters);
+        $report = $this->salesReportService->document($filters, $includeProfitability);
 
         return response()->view('reports.sales', [
             ...$report,
@@ -38,9 +38,9 @@ class SalesReportExportService
     /**
      * @param  array<string, mixed>  $filters
      */
-    public function pdf(array $filters): Response
+    public function pdf(array $filters, bool $includeProfitability = true): Response
     {
-        $report = $this->salesReportService->document($filters);
+        $report = $this->salesReportService->document($filters, $includeProfitability);
         $report['refundMeasures'] = $this->refundPeriodReport->generate($report['filters'], $report['kpis']['total_revenue']);
         $options = new Options;
         $options->setDefaultFont('DejaVu Sans');
@@ -71,11 +71,11 @@ class SalesReportExportService
     /**
      * @param  array<string, mixed>  $filters
      */
-    public function csv(array $filters): StreamedResponse
+    public function csv(array $filters, bool $includeProfitability = true): StreamedResponse
     {
-        $report = $this->salesReportService->exportProducts($filters);
+        $report = $this->salesReportService->exportProducts($filters, $includeProfitability);
 
-        return response()->streamDownload(function () use ($report): void {
+        return response()->streamDownload(function () use ($report, $includeProfitability): void {
             $stream = fopen('php://output', 'wb');
 
             if ($stream === false) {
@@ -86,6 +86,10 @@ class SalesReportExportService
                 fwrite($stream, "\xEF\xBB\xBF");
                 $this->writeCsvRow($stream, [
                     'Product', 'Current category', 'Number of sales', 'Quantity sold', 'Item revenue (PHP, excluding third-party delivery charges)',
+                    ...($includeProfitability ? [
+                        'Cost of goods sold (PHP)', 'Gross profit before returns (PHP)', 'Gross margin before returns (%)',
+                        'Sales returns (PHP)', 'Net product sales (PHP)', 'Gross profit (PHP)', 'Gross margin (%)',
+                    ] : []),
                     'Report from', 'Report to', 'Reporting period', 'Product filter', 'Category filter',
                 ]);
 
@@ -96,6 +100,12 @@ class SalesReportExportService
                         $product['sales_count'],
                         $product['quantity_sold'],
                         $product['item_revenue'],
+                        ...($includeProfitability ? [
+                            $product['cost_of_goods_sold'] ?? '',
+                            $product['gross_profit_before_returns'] ?? '',
+                            $product['gross_margin_before_returns'] ?? '',
+                            '', '', '', '',
+                        ] : []),
                         $report['filters']['from'],
                         $report['filters']['to'],
                         $report['filters']['period'],

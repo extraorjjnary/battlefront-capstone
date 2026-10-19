@@ -545,6 +545,9 @@ defineOptions({
                         >
                             {{ formatPrice(product.price) }}
                         </p>
+                        <p v-if="product.acquisition_cost !== undefined" class="text-muted-foreground mt-2 text-xs">
+                            Acquisition cost · {{ formatPrice(product.acquisition_cost) }}
+                        </p>
                     </div>
 
                     <div

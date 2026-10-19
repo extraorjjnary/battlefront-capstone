@@ -159,6 +159,10 @@ defineOptions({
                                 {{ formatPrice(product.price) }}
                             </dd>
                         </div>
+                        <div v-if="product.acquisition_cost !== undefined">
+                            <dt class="text-muted-foreground">Acquisition cost</dt>
+                            <dd class="mt-1 font-medium tabular-nums">{{ formatPrice(product.acquisition_cost) }}</dd>
+                        </div>
                         <div>
                             <dt class="text-muted-foreground">
                                 Discount price

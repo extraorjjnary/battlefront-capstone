@@ -448,6 +448,12 @@ function salesProps() {
             average_order_value: '250.00',
             total_items_sold: 6,
         },
+        comparison: {
+            from: '2026-08-02',
+            to: '2026-08-31',
+            total_sales: 2,
+            total_revenue: '500.00',
+        },
         timeline: { labels: ['Sep 1'], revenue: [500], sales: [2] },
         top_products: {
             labels: ['Mechanical Keyboard'],

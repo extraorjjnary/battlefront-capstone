@@ -17,6 +17,7 @@ use App\Repositories\Order\AdministratorOrderRepository;
 use App\Services\DeliveryQuotePresenter;
 use App\Services\Order\OrderProcessingService;
 use App\Services\ShipmentPresenter;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -128,10 +129,39 @@ class OrderController extends Controller
     /**
      * Display complete processing details for an order.
      */
-    public function show(Order $order, OrderProcessingService $processing, ShipmentPresenter $shipments, DeliveryQuotePresenter $quotes): Response
+    public function show(Request $request, Order $order, OrderProcessingService $processing, ShipmentPresenter $shipments, DeliveryQuotePresenter $quotes): Response
     {
         $order = $this->orderRepository->loadDetails($order);
         $nextShipmentStatus = $processing->nextShipmentStatus($order);
+        $canViewProfitability = $request->user()->can('reports.profit');
+        $orderHasSale = DB::table('sales')->where('order_id', $order->id)->exists();
+        $salesReturns = (string) DB::table('customer_return_items as return_items')
+            ->join('order_items', 'order_items.id', '=', 'return_items.order_item_id')
+            ->where('order_items.order_id', $order->id)->sum('return_items.sales_return_amount');
+        $costRecovered = (string) DB::table('customer_return_items as return_items')
+            ->join('order_items', 'order_items.id', '=', 'return_items.order_item_id')
+            ->where('order_items.order_id', $order->id)->sum('return_items.cost_recovered_amount');
+        $costOfGoodsSold = '0.00';
+        $hasMissingCost = $order->items->isEmpty();
+        foreach ($order->items as $item) {
+            if ($item->acquisition_cost_at_time === null) {
+                $hasMissingCost = true;
+
+                continue;
+            }
+            $costOfGoodsSold = bcadd($costOfGoodsSold, bcmul($item->acquisition_cost_at_time, (string) $item->quantity, 2), 2);
+        }
+        $productRevenue = $order->product_subtotal ?? $order->items->reduce(
+            fn (string $total, OrderItem $item): string => bcadd(
+                $total,
+                bcmul($item->price_at_time, (string) $item->quantity, 2),
+                2,
+            ),
+            '0.00',
+        );
+        $grossProfit = ! $hasMissingCost && $orderHasSale && $order->status === OrderStatus::Completed
+            ? bcsub(bcsub($productRevenue, $salesReturns, 2), bcsub($costOfGoodsSold, $costRecovered, 2), 2)
+            : null;
 
         return Inertia::render('Administration/Orders/Show', [
             'handler_options' => $order->status === OrderStatus::Completed || $order->status === OrderStatus::Cancelled
@@ -226,6 +256,14 @@ class OrderController extends Controller
                         'line_total' => bcmul($unitPrice, (string) $item->quantity, 2),
                     ];
                 })->values()->all(),
+                ...($canViewProfitability ? [
+                    'profitability' => [
+                        'sales_returns' => $salesReturns,
+                        'cost_of_goods_sold' => $costOfGoodsSold,
+                        'gross_profit' => $grossProfit,
+                        'available' => $grossProfit !== null,
+                    ],
+                ] : []),
                 'item_count' => $order->items->count(),
                 'total_quantity' => $order->items->sum('quantity'),
                 'product_subtotal' => $order->product_subtotal,

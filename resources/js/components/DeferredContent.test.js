@@ -235,7 +235,12 @@ test('loaded empty customer data clears skeletons and renders the existing empty
 });
 
 test('administrator skeletons preserve tool navigation and resolve to operational values', async () => {
-    const props = { auth: { user: { id: 2, name: 'Administrator' } } };
+    const props = {
+        auth: {
+            user: { id: 2, name: 'Administrator' },
+            can: { viewReports: true, viewOrders: true, viewInventory: true, manageProducts: true },
+        },
+    };
     let html = await renderPage('Dashboard/Administration', props);
     assert.equal((html.match(/data-slot="stat-skeleton"/g) ?? []).length, 5);
     assert.match(html, /Administration tools/);

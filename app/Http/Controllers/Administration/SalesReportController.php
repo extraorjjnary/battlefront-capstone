@@ -19,17 +19,17 @@ class SalesReportController extends Controller
 {
     public function printReport(SalesReportRequest $request, SalesReportExportService $exports): DocumentResponse
     {
-        return $exports->printReport($request->effectiveFilters());
+        return $exports->printReport($request->effectiveFilters(), $request->user()->can('reports.profit'));
     }
 
     public function pdf(SalesReportRequest $request, SalesReportExportService $exports): DocumentResponse
     {
-        return $exports->pdf($request->effectiveFilters());
+        return $exports->pdf($request->effectiveFilters(), $request->user()->can('reports.profit'));
     }
 
     public function csv(SalesReportRequest $request, SalesReportExportService $exports): StreamedResponse
     {
-        return $exports->csv($request->effectiveFilters());
+        return $exports->csv($request->effectiveFilters(), $request->user()->can('reports.profit'));
     }
 
     public function reset(SalesReportRequest $request): RedirectResponse
@@ -48,7 +48,7 @@ class SalesReportController extends Controller
         RecommendationEngagementReport $recommendationEngagementReport,
         RefundPeriodReport $refundPeriodReport,
     ): Response {
-        $report = $salesReportService->generate($request->effectiveFilters());
+        $report = $salesReportService->generate($request->effectiveFilters(), $request->user()->can('reports.profit'));
         $filters = $report['filters'];
         $engagement = $recommendationEngagementReport->generate(
             CarbonImmutable::parse((string) $filters['from'], config('battlefront.timezone')),

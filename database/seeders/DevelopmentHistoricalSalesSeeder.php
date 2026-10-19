@@ -349,7 +349,13 @@ class DevelopmentHistoricalSalesSeeder extends Seeder
             if (! is_numeric($price) || bccomp($price, '0', 2) < 0) {
                 throw new RuntimeException('Historical sales product prices must be numeric and nonnegative.');
             }
-            $items[] = ['product_id' => $product->id, 'quantity' => $quantity, 'price_at_time' => $price];
+            $items[] = [
+                'product_id' => $product->id,
+                'quantity' => $quantity,
+                'price_at_time' => $price,
+                'acquisition_cost_at_time' => $product->acquisition_cost,
+                'acquisition_cost_source' => $product->acquisition_cost_source,
+            ];
             $total = bcadd($total, bcmul($price, (string) $quantity, 2), 2);
         }
         $slot = (int) substr($key, -2) - 1;

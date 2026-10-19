@@ -240,6 +240,8 @@ class OrderPlacementService
                     'product_id' => $line['product']->id,
                     'quantity' => $line['quantity'],
                     'price_at_time' => $line['unit_price'],
+                    'acquisition_cost_at_time' => $line['product']->acquisition_cost,
+                    'acquisition_cost_source' => $line['product']->acquisition_cost_source,
                 ]);
 
                 $this->adjustInventoryStock->decrease(

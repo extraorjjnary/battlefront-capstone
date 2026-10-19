@@ -13,6 +13,8 @@ test('the order item schema follows the approved ERD decisions', function () {
         'product_id',
         'quantity',
         'price_at_time',
+        'acquisition_cost_at_time',
+        'acquisition_cost_source',
     ]);
 });
 

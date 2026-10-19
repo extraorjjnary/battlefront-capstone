@@ -24,6 +24,7 @@ class DashboardService
         $canViewOrders = $actor->can('orders.view');
         $canViewInventory = $actor->can('inventory.view');
         $salesSummary = $canViewReports ? $this->salesReportRepository->recordedSalesSummary() : null;
+        $profitSummary = $actor->can('reports.profit') ? $this->salesReportRepository->recordedProfitabilitySummary() : null;
         $orderSummary = $canViewOrders ? Order::query()
             ->toBase()
             ->selectRaw(
@@ -45,6 +46,8 @@ class DashboardService
             'kpis' => [
                 'recorded_revenue' => $salesSummary === null ? null : $this->money($salesSummary->total_revenue),
                 'recorded_sales' => $salesSummary === null ? null : (int) $salesSummary->total_sales,
+                'recorded_gross_profit' => $profitSummary?->gross_profit,
+                'profit_data_complete' => $profitSummary?->cost_data_complete,
                 'pending_orders' => $orderSummary === null ? null : (int) $orderSummary->pending_orders,
                 'processing_orders' => $orderSummary === null ? null : (int) $orderSummary->processing_orders,
                 'low_stock_products' => $lowStockQuery === null ? null : (clone $lowStockQuery)->count(),

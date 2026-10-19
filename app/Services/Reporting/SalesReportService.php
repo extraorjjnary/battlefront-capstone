@@ -10,10 +10,10 @@ use stdClass;
 /**
  * @phpstan-type SalesFilters array{from: string, to: string, period: string, product_id: ?int, category_id: ?int}
  * @phpstan-type ActiveFilters array{product: ?array{id: int, name: string}, category: ?array{id: int, name: string}}
- * @phpstan-type ProductRow array{id: int, name: string, category: string, sales_count: int, quantity_sold: int, item_revenue: string}
- * @phpstan-type CategoryRow array{id: int, name: string, sales_count: int, quantity_sold: int, item_revenue: string}
- * @phpstan-type Kpis array{total_sales: int, total_revenue: string, average_order_value: string, total_items_sold: int}
- * @phpstan-type Timeline array{labels: list<string>, sales: list<int>, revenue: list<float>}
+ * @phpstan-type ProductRow array{id: int, name: string, category: string, sales_count: int, quantity_sold: int, item_revenue: string, cost_of_goods_sold?: string, gross_profit_before_returns?: string|null, gross_margin_before_returns?: string|null}
+ * @phpstan-type CategoryRow array{id: int, name: string, sales_count: int, quantity_sold: int, item_revenue: string, cost_of_goods_sold?: string, gross_profit_before_returns?: string|null, gross_margin_before_returns?: string|null}
+ * @phpstan-type Kpis array{total_sales: int, total_revenue: numeric-string, average_order_value: string, total_items_sold: int, sales_returns?: string, net_sales?: string, cost_of_goods_sold?: string, cost_recovered?: string, gross_profit?: string|null, gross_margin?: string|null, cost_data_complete?: bool}
+ * @phpstan-type Timeline array{labels: list<string>, sales: list<int>, revenue: list<float>, gross_profit_before_returns?: list<float|null>}
  */
 class SalesReportService
 {
@@ -25,7 +25,7 @@ class SalesReportService
      * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
-    public function generate(array $filters): array
+    public function generate(array $filters, bool $includeProfitability = true): array
     {
         $normalizedFilters = $this->normalizeFilters($filters);
         $from = CarbonImmutable::parse($normalizedFilters['from']);
@@ -43,7 +43,7 @@ class SalesReportService
             $productId,
             $categoryId,
         );
-        $dailySales = $this->salesReportRepository->dailySales($dateRange, $productId, $categoryId);
+        $dailySales = $this->salesReportRepository->dailySales($dateRange, $productId, $categoryId, $includeProfitability);
         $topProducts = $this->salesReportRepository->topProducts($dateRange, $categoryId);
 
         if (
@@ -60,14 +60,16 @@ class SalesReportService
         $products = $this->salesReportRepository
             ->products($dateRange, $productId, $categoryId)
             ->appends($normalizedFilters)
-            ->through($this->productData(...));
+            ->through(fn (stdClass $product): array => $this->productData($product, $includeProfitability));
         $categoryChart = $this->salesReportRepository->categories($dateRange, $productId);
         $categoryReport = $this->salesReportRepository->categories($dateRange, $productId, $categoryId);
 
         return [
             'filters' => $normalizedFilters,
             'active_filters' => $this->activeFilters($normalizedFilters),
-            'kpis' => $this->kpiData($salesSummary),
+            'kpis' => $this->kpiData($salesSummary, $includeProfitability
+                ? $this->salesReportRepository->profitabilitySummary($dateRange, $productId, $categoryId)
+                : null),
             'comparison' => [
                 'from' => $previousFrom->toDateString(),
                 'to' => $previousTo->toDateString(),
@@ -75,7 +77,7 @@ class SalesReportService
                 'total_sales' => (int) $previousSummary->total_sales,
             ],
             'sale_transactions' => $this->salesReportRepository->transactions($dateRange, $productId, $categoryId),
-            'timeline' => $this->timelineData(array_values($dailySales->all()), $from, $to, $period),
+            'timeline' => $this->timelineData(array_values($dailySales->all()), $from, $to, $period, includeProfitability: $includeProfitability),
             'top_products' => [
                 'ids' => $topProducts->pluck('id')->map(fn (mixed $id): int => (int) $id)->all(),
                 'labels' => $topProducts->pluck('name')->all(),
@@ -87,7 +89,7 @@ class SalesReportService
                 'labels' => $categoryChart->pluck('name')->all(),
                 'revenue' => $categoryChart->pluck('item_revenue')
                     ->map(fn (mixed $revenue): float => (float) $revenue)->all(),
-                'rows' => $categoryReport->map($this->categoryData(...))->all(),
+                'rows' => $categoryReport->map(fn (stdClass $category): array => $this->categoryData($category, $includeProfitability))->all(),
             ],
             'products' => $products,
         ];
@@ -97,20 +99,30 @@ class SalesReportService
      * Prepare CSV metadata and lazy product rows without querying dashboard charts.
      *
      * @param  array<string, mixed>  $filters
-     * @return array{filters: SalesFilters, active_filters: ActiveFilters, products: LazyCollection<int, ProductRow>}
+     * @return array{filters: SalesFilters, active_filters: ActiveFilters, kpis: Kpis, products: LazyCollection<int, covariant ProductRow>}
      */
-    public function exportProducts(array $filters): array
+    public function exportProducts(array $filters, bool $includeProfitability = true): array
     {
         $normalizedFilters = $this->normalizeFilters($filters);
 
         return [
             'filters' => $normalizedFilters,
             'active_filters' => $this->activeFilters($normalizedFilters),
+            'kpis' => $this->kpiData(
+                $this->salesReportRepository->summary(
+                    $this->dateRange($normalizedFilters),
+                    $normalizedFilters['product_id'],
+                    $normalizedFilters['category_id'],
+                ),
+                $includeProfitability
+                    ? $this->salesReportRepository->profitabilitySummary($this->dateRange($normalizedFilters), $normalizedFilters['product_id'], $normalizedFilters['category_id'])
+                    : null,
+            ),
             'products' => $this->salesReportRepository->exportProducts(
                 $this->dateRange($normalizedFilters),
                 $normalizedFilters['product_id'],
                 $normalizedFilters['category_id'],
-            )->map($this->productData(...)),
+            )->map(fn (stdClass $product): array => $this->productData($product, $includeProfitability)),
         ];
     }
 
@@ -118,27 +130,33 @@ class SalesReportService
      * Build the common print/PDF document from the authoritative aggregates.
      *
      * @param  array<string, mixed>  $filters
-     * @return array{filters: SalesFilters, active_filters: ActiveFilters, products: LazyCollection<int, ProductRow>, kpis: Kpis, timeline: Timeline, categories: list<CategoryRow>}
+     * @return array{filters: SalesFilters, active_filters: ActiveFilters, products: LazyCollection<int, covariant ProductRow>, kpis: Kpis, timeline: Timeline, categories: list<CategoryRow>}
      */
-    public function document(array $filters): array
+    public function document(array $filters, bool $includeProfitability = true): array
     {
-        $report = $this->exportProducts($filters);
+        $report = $this->exportProducts($filters, $includeProfitability);
         $scope = $report['filters'];
         $dateRange = $this->dateRange($scope);
-        $dailySales = $this->salesReportRepository->dailySales($dateRange, $scope['product_id'], $scope['category_id']);
+        $dailySales = $this->salesReportRepository->dailySales($dateRange, $scope['product_id'], $scope['category_id'], $includeProfitability);
 
         return [
             ...$report,
-            'kpis' => $this->kpiData($this->salesReportRepository->summary($dateRange, $scope['product_id'], $scope['category_id'])),
+            'kpis' => $this->kpiData(
+                $this->salesReportRepository->summary($dateRange, $scope['product_id'], $scope['category_id']),
+                $includeProfitability
+                    ? $this->salesReportRepository->profitabilitySummary($dateRange, $scope['product_id'], $scope['category_id'])
+                    : null,
+            ),
             'timeline' => $this->timelineData(
                 array_values($dailySales->all()),
                 CarbonImmutable::parse($scope['from']),
                 CarbonImmutable::parse($scope['to']),
                 $scope['period'],
                 includeYear: true,
+                includeProfitability: $includeProfitability,
             ),
             'categories' => array_values($this->salesReportRepository->categories($dateRange, $scope['product_id'], $scope['category_id'])
-                ->map($this->categoryData(...))->all()),
+                ->map(fn (stdClass $category): array => $this->categoryData($category, $includeProfitability))->all()),
         ];
     }
 
@@ -191,51 +209,95 @@ class SalesReportService
     /**
      * @return Kpis
      */
-    private function kpiData(stdClass $summary): array
+    private function kpiData(stdClass $summary, ?stdClass $profitability): array
     {
         $totalSales = (int) ($summary->total_sales ?? 0);
-        $totalRevenue = (float) ($summary->total_revenue ?? 0);
-
-        return [
+        $totalRevenue = $this->numericAmount($summary->total_revenue ?? '0.00');
+        $kpis = [
             'total_sales' => $totalSales,
             'total_revenue' => $this->money($totalRevenue),
-            'average_order_value' => $this->money($totalSales === 0 ? 0 : $totalRevenue / $totalSales),
+            'average_order_value' => $this->money($totalSales === 0 ? 0 : (float) $totalRevenue / $totalSales),
             'total_items_sold' => (int) ($summary->total_items_sold ?? 0),
+        ];
+
+        if ($profitability === null) {
+            return $kpis;
+        }
+
+        $salesReturns = $this->numericAmount($profitability->sales_returns);
+        $costOfGoodsSold = $this->numericAmount($profitability->cost_of_goods_sold);
+        $costRecovered = $this->numericAmount($profitability->cost_recovered);
+        $netSales = bcsub($totalRevenue, $salesReturns, 2);
+        $missingCosts = $profitability->missing_cost_units > 0
+            || $profitability->sales_with_items < $totalSales;
+        $grossProfit = $missingCosts ? null : bcsub($netSales, bcsub($costOfGoodsSold, $costRecovered, 2), 2);
+
+        return [
+            ...$kpis,
+            'sales_returns' => $this->money($salesReturns),
+            'net_sales' => $this->money($netSales),
+            'cost_of_goods_sold' => $this->money($costOfGoodsSold),
+            'cost_recovered' => $this->money($costRecovered),
+            'gross_profit' => $grossProfit === null ? null : $this->money($grossProfit),
+            'gross_margin' => $grossProfit === null || bccomp($netSales, '0.00', 2) <= 0
+                ? null
+                : $this->money(bcmul(bcdiv($grossProfit, $netSales, 6), '100', 2)),
+            'cost_data_complete' => ! $missingCosts,
         ];
     }
 
     /**
      * @return ProductRow
      */
-    private function productData(stdClass $product): array
+    private function productData(stdClass $product, bool $includeProfitability = true): array
     {
-        return [
+        $data = [
             'id' => (int) $product->id,
             'name' => (string) $product->name,
             'category' => (string) $product->category_name,
             'sales_count' => (int) $product->sales_count,
             'quantity_sold' => (int) $product->quantity_sold,
-            'item_revenue' => $this->money($product->item_revenue),
+            'item_revenue' => $this->money($this->numericAmount($product->item_revenue)),
         ];
+
+        return $includeProfitability ? [...$data, ...$this->profitabilityRow($product)] : $data;
     }
 
     /**
      * @return CategoryRow
      */
-    private function categoryData(stdClass $category): array
+    private function categoryData(stdClass $category, bool $includeProfitability = true): array
     {
-        return [
+        $data = [
             'id' => (int) $category->id,
             'name' => (string) $category->name,
             'sales_count' => (int) $category->sales_count,
             'quantity_sold' => (int) $category->quantity_sold,
-            'item_revenue' => $this->money($category->item_revenue),
+            'item_revenue' => $this->money($this->numericAmount($category->item_revenue)),
+        ];
+
+        return $includeProfitability ? [...$data, ...$this->profitabilityRow($category)] : $data;
+    }
+
+    /** @return array{cost_of_goods_sold: string, gross_profit_before_returns: string|null, gross_margin_before_returns: string|null} */
+    private function profitabilityRow(stdClass $row): array
+    {
+        $revenue = $this->numericAmount($row->item_revenue);
+        $cost = $this->numericAmount($row->cost_of_goods_sold);
+        $profit = (int) $row->missing_cost_units > 0 ? null : bcsub($revenue, $cost, 2);
+
+        return [
+            'cost_of_goods_sold' => $this->money($cost),
+            'gross_profit_before_returns' => $profit === null ? null : $this->money($profit),
+            'gross_margin_before_returns' => $profit === null || bccomp($revenue, '0.00', 2) <= 0
+                ? null
+                : $this->money(bcmul(bcdiv($profit, $revenue, 6), '100', 2)),
         ];
     }
 
     /**
      * @param  list<stdClass>  $dailySales
-     * @return array{labels: list<string>, sales: list<int>, revenue: list<float>}
+     * @return array{labels: list<string>, sales: list<int>, revenue: list<float>, gross_profit_before_returns?: list<float|null>}
      */
     private function timelineData(
         array $dailySales,
@@ -243,6 +305,7 @@ class SalesReportService
         CarbonImmutable $to,
         string $period,
         bool $includeYear = false,
+        bool $includeProfitability = true,
     ): array {
         $buckets = [];
         $current = $this->periodStart($from, $period);
@@ -254,6 +317,8 @@ class SalesReportService
                 'label' => $this->periodLabel($current, $period, $includeYear),
                 'sales' => 0,
                 'revenue' => 0.0,
+                'gross_profit_before_returns' => 0.0,
+                'incomplete_sales' => 0,
             ];
             $current = $this->nextPeriod($current, $period);
         }
@@ -268,13 +333,27 @@ class SalesReportService
 
             $buckets[$key]['sales'] += (int) $dailySale->sales_count;
             $buckets[$key]['revenue'] += (float) $dailySale->revenue;
+            if ($includeProfitability) {
+                $buckets[$key]['gross_profit_before_returns'] += (float) $dailySale->gross_profit_before_returns;
+                $buckets[$key]['incomplete_sales'] += (int) ($dailySale->incomplete_sales ?? ($dailySale->missing_cost_units > 0 ? 1 : 0));
+            }
         }
 
-        return [
+        $timeline = [
             'labels' => array_column($buckets, 'label'),
             'sales' => array_column($buckets, 'sales'),
             'revenue' => array_column($buckets, 'revenue'),
         ];
+
+        return $includeProfitability ? [
+            ...$timeline,
+            'gross_profit_before_returns' => array_map(
+                static fn (array $bucket): ?float => $bucket['incomplete_sales'] > 0
+                    ? null
+                    : $bucket['gross_profit_before_returns'],
+                array_values($buckets),
+            ),
+        ] : $timeline;
     }
 
     private function periodStart(CarbonImmutable $date, string $period): CarbonImmutable
@@ -306,8 +385,19 @@ class SalesReportService
         };
     }
 
+    /** @return numeric-string */
     private function money(mixed $value): string
     {
         return number_format((float) $value, 2, '.', '');
+    }
+
+    /** @return numeric-string */
+    private function numericAmount(mixed $value): string
+    {
+        if (! is_numeric($value)) {
+            throw new \InvalidArgumentException('A report amount must be numeric.');
+        }
+
+        return (string) $value;
     }
 }

@@ -340,26 +340,27 @@ test('COD enters the payment attention queue and sales reporting only at the app
     $productId = $order->items->sole()->product_id;
     $months = [['start' => '2026-10-01', 'end_exclusive' => '2026-11-01']];
     $dashboard = app(DashboardService::class);
+    $administrator = User::factory()->administrator()->create();
     $reports = app(SalesReportRepository::class);
     $monthly = app(MonthlySalesRepository::class);
     $processing = app(OrderProcessingService::class);
-    expect($dashboard->administration()['needs_attention']['pending_payment_reviews'])->toBe(0);
+    expect($dashboard->administration($administrator)['needs_attention']['pending_payment_reviews'])->toBe(0);
     expect($monthly->aggregateProduct($productId, $months))->toBe([]);
 
     $processing->updateShipmentStatus($order, ShipmentStatus::Delivered);
 
-    expect($dashboard->administration()['needs_attention'])->pending_payment_reviews->toBe(1)
+    expect($dashboard->administration($administrator)['needs_attention'])->pending_payment_reviews->toBe(1)
         ->payment_orders->toHaveCount(1);
     expect((int) $reports->summary(['2026-10-01', '2026-11-01'], null, null)->total_sales)->toBe(0);
     expect($monthly->aggregateProduct($productId, $months))->toBe([]);
 
     $processing->confirmCodCollection($order, true);
 
-    expect($dashboard->administration()['needs_attention']['pending_payment_reviews'])->toBe(0);
+    expect($dashboard->administration($administrator)['needs_attention']['pending_payment_reviews'])->toBe(0);
     $summary = $reports->summary(['2026-10-01', '2026-11-01'], null, null);
     expect((int) $summary->total_sales)->toBe(1);
     expect((float) $summary->total_revenue)->toBe(100.0);
-    expect($dashboard->administration()['kpis'])->toMatchArray(['recorded_revenue' => '100.00', 'recorded_sales' => 1]);
+    expect($dashboard->administration($administrator)['kpis'])->toMatchArray(['recorded_revenue' => '100.00', 'recorded_sales' => 1]);
     expect($monthly->aggregateProduct($productId, $months))->toBe([['start' => '2026-10-01', 'quantity_sold' => 2]]);
 });
 

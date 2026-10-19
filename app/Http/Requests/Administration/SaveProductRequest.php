@@ -31,22 +31,22 @@ class SaveProductRequest extends FormRequest
 
         $product = $this->route('product');
         if (! $product instanceof Product) {
-            return $this->user()->can('products.price');
+            return $this->user()->can('products.price')
+                && (! $this->exists('acquisition_cost') || $this->user()->can('products.cost'));
         }
 
-        if ($this->user()->can('products.price')) {
-            return true;
-        }
-
-        if ((int) $this->input('edit_version') !== $product->edit_version) {
-            return true;
-        }
-
-        return is_numeric($this->input('price'))
+        $pricesUnchanged = is_numeric($this->input('price'))
             && bccomp($this->numericAmount($this->input('price')), $this->numericAmount($product->price), 2) === 0
             && ($this->input('discount_price') === null && $product->discount_price === null
                 || is_numeric($this->input('discount_price')) && $product->discount_price !== null
                     && bccomp($this->numericAmount($this->input('discount_price')), $this->numericAmount($product->discount_price), 2) === 0);
+        $costUnchanged = ! $this->exists('acquisition_cost')
+            || ($this->input('acquisition_cost') === null && $product->acquisition_cost === null)
+            || (is_numeric($this->input('acquisition_cost')) && $product->acquisition_cost !== null
+                && bccomp($this->numericAmount($this->input('acquisition_cost')), $this->numericAmount($product->acquisition_cost), 2) === 0);
+
+        return ($pricesUnchanged || $this->user()->can('products.price'))
+            && ($costUnchanged || $this->user()->can('products.cost'));
     }
 
     /**
@@ -64,6 +64,8 @@ class SaveProductRequest extends FormRequest
         return [
             'edit_version' => $product instanceof Product ? ['required', 'integer', 'min:1'] : ['exclude'],
             'price_change_reason' => $product instanceof Product ? ['nullable', 'string', 'min:5', 'max:1000'] : ['exclude'],
+            'acquisition_cost' => ['sometimes', 'nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
+            'cost_change_reason' => $product instanceof Product ? ['nullable', 'string', 'min:5', 'max:1000'] : ['exclude'],
             'shipping_profile' => ['sometimes', 'required', Rule::enum(ShippingProfile::class)],
             'product_code' => $product instanceof Product ? [
                 'bail', 'required', 'string', 'regex:'.Product::CODE_PATTERN,

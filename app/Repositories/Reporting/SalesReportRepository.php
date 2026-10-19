@@ -33,6 +33,49 @@ class SalesReportRepository
         return $summary;
     }
 
+    /** @param array{0: string, 1: string} $dateRange */
+    public function profitabilitySummary(array $dateRange, ?int $productId, ?int $categoryId): stdClass
+    {
+        $items = $this->itemReportQuery($dateRange, $productId, $categoryId)
+            ->selectRaw('COALESCE(SUM(order_items.quantity * order_items.acquisition_cost_at_time), 0) as cost_of_goods_sold')
+            ->selectRaw('COALESCE(SUM(CASE WHEN order_items.acquisition_cost_at_time IS NULL THEN order_items.quantity ELSE 0 END), 0) as missing_cost_units')
+            ->selectRaw('COUNT(DISTINCT sales.id) as sales_with_items')
+            ->first();
+
+        $returns = $this->returnReportQuery($dateRange, $productId, $categoryId)->first();
+
+        return (object) [
+            'cost_of_goods_sold' => $items->cost_of_goods_sold,
+            'missing_cost_units' => (int) $items->missing_cost_units,
+            'sales_with_items' => (int) $items->sales_with_items,
+            'sales_returns' => $returns->sales_returns ?? '0.00',
+            'cost_recovered' => $returns->cost_recovered ?? '0.00',
+        ];
+    }
+
+    public function recordedProfitabilitySummary(): stdClass
+    {
+        $summary = $this->recordedSalesSummary();
+        $profitability = $this->profitabilitySummary(['1900-01-01', '2100-01-01'], null, null);
+        $missing = $profitability->missing_cost_units > 0 || $profitability->sales_with_items < (int) $summary->total_sales;
+        $netSales = bcsub($this->numericAmount($summary->total_revenue), $this->numericAmount($profitability->sales_returns), 2);
+
+        return (object) [
+            'gross_profit' => $missing ? null : bcsub($netSales, bcsub($this->numericAmount($profitability->cost_of_goods_sold), $this->numericAmount($profitability->cost_recovered), 2), 2),
+            'cost_data_complete' => ! $missing,
+        ];
+    }
+
+    /** @return numeric-string */
+    private function numericAmount(mixed $value): string
+    {
+        if (! is_numeric($value)) {
+            throw new \InvalidArgumentException('A report amount must be numeric.');
+        }
+
+        return (string) $value;
+    }
+
     /**
      * @param  array{0: string, 1: string}  $dateRange
      * @return LengthAwarePaginator<int, stdClass>
@@ -40,7 +83,7 @@ class SalesReportRepository
     public function transactions(array $dateRange, ?int $productId, ?int $categoryId): LengthAwarePaginator
     {
         $query = $productId === null && $categoryId === null
-            ? $this->recordedSaleQuery($dateRange)->addSelect('sales.order_id')
+            ? $this->recordedSaleQuery($dateRange)
             : $this->itemReportQuery($dateRange, $productId, $categoryId)
                 ->select('sales.id', 'sales.order_id', 'sales.sale_date')
                 ->selectRaw('SUM(order_items.quantity * order_items.price_at_time) as product_revenue')
@@ -68,7 +111,7 @@ class SalesReportRepository
         $timezone = config('battlefront.timezone');
 
         return $this->recordedSaleQuery(null)
-            ->addSelect('sales.order_id', 'sales.handler_id')
+            ->addSelect('sales.handler_id')
             ->when($from, fn (Builder $query): Builder => $query->whereDate('sales.sale_date', '>=', CarbonImmutable::parse($from, $timezone)->toDateString()))
             ->when($to, fn (Builder $query): Builder => $query->whereDate('sales.sale_date', '<=', CarbonImmutable::parse($to, $timezone)->toDateString()));
     }
@@ -84,7 +127,7 @@ class SalesReportRepository
     {
         $query = DB::table('sales')
             ->join('orders', 'orders.id', '=', 'sales.order_id')
-            ->select(['sales.id', 'sales.sale_date'])
+            ->select(['sales.id', 'sales.order_id', 'sales.sale_date'])
             ->selectRaw('COALESCE(orders.product_subtotal,
                 (SELECT SUM(items.quantity * items.price_at_time) FROM order_items items WHERE items.order_id = orders.id),
                 orders.total_amount - orders.delivery_fee) as product_revenue');
@@ -103,25 +146,42 @@ class SalesReportRepository
      * @param  array{0: string, 1: string}  $dateRange
      * @return Collection<int, stdClass>
      */
-    public function dailySales(array $dateRange, ?int $productId, ?int $categoryId): Collection
+    public function dailySales(array $dateRange, ?int $productId, ?int $categoryId, bool $includeProfitability = true): Collection
     {
         if ($productId !== null || $categoryId !== null) {
-            return $this->itemReportQuery($dateRange, $productId, $categoryId)
+            $query = $this->itemReportQuery($dateRange, $productId, $categoryId)
                 ->select('sales.sale_date')
                 ->selectRaw('COUNT(DISTINCT sales.id) as sales_count')
                 ->selectRaw('COALESCE(SUM(order_items.quantity * order_items.price_at_time), 0) as revenue')
+                ->when($includeProfitability, fn (Builder $query): Builder => $query
+                    ->selectRaw('COALESCE(SUM(order_items.quantity * (order_items.price_at_time - order_items.acquisition_cost_at_time)), 0) as gross_profit_before_returns')
+                    ->selectRaw('COALESCE(SUM(CASE WHEN order_items.acquisition_cost_at_time IS NULL THEN order_items.quantity ELSE 0 END), 0) as missing_cost_units'))
                 ->groupBy('sales.sale_date')
-                ->orderBy('sales.sale_date')
-                ->get();
+                ->orderBy('sales.sale_date');
+
+            return $query->get();
         }
 
-        return DB::query()->fromSub($this->recordedSaleQuery($dateRange), 'recorded_sales')
+        $query = DB::query()->fromSub($this->recordedSaleQuery($dateRange), 'recorded_sales')
             ->select('sale_date')
             ->selectRaw('COUNT(*) as sales_count')
             ->selectRaw('COALESCE(SUM(product_revenue), 0) as revenue')
             ->groupBy('sale_date')
-            ->orderBy('sale_date')
-            ->get();
+            ->orderBy('sale_date');
+
+        if ($includeProfitability) {
+            $itemCosts = DB::table('order_items')
+                ->select('order_id')
+                ->selectRaw('SUM(quantity * acquisition_cost_at_time) as cost_of_goods_sold')
+                ->selectRaw('SUM(CASE WHEN acquisition_cost_at_time IS NULL THEN quantity ELSE 0 END) as missing_cost_units')
+                ->selectRaw('COUNT(*) as item_rows')
+                ->groupBy('order_id');
+            $query->leftJoinSub($itemCosts, 'item_costs', 'item_costs.order_id', '=', 'recorded_sales.order_id')
+                ->addSelect(DB::raw('COALESCE(SUM(recorded_sales.product_revenue - COALESCE(item_costs.cost_of_goods_sold, 0)), 0) as gross_profit_before_returns'))
+                ->addSelect(DB::raw('SUM(CASE WHEN item_costs.item_rows IS NULL OR item_costs.missing_cost_units > 0 THEN 1 ELSE 0 END) as incomplete_sales'));
+        }
+
+        return $query->get();
     }
 
     /**
@@ -227,6 +287,8 @@ class SalesReportRepository
             ->selectRaw('COUNT(DISTINCT sales.id) as sales_count')
             ->selectRaw('COALESCE(SUM(order_items.quantity), 0) as quantity_sold')
             ->selectRaw('COALESCE(SUM(order_items.quantity * order_items.price_at_time), 0) as item_revenue')
+            ->selectRaw('COALESCE(SUM(order_items.quantity * order_items.acquisition_cost_at_time), 0) as cost_of_goods_sold')
+            ->selectRaw('COALESCE(SUM(CASE WHEN order_items.acquisition_cost_at_time IS NULL THEN order_items.quantity ELSE 0 END), 0) as missing_cost_units')
             ->groupBy('products.id', 'products.name', 'categories.name');
     }
 
@@ -243,6 +305,8 @@ class SalesReportRepository
             ->selectRaw('COUNT(DISTINCT sales.id) as sales_count')
             ->selectRaw('COALESCE(SUM(order_items.quantity), 0) as quantity_sold')
             ->selectRaw('COALESCE(SUM(order_items.quantity * order_items.price_at_time), 0) as item_revenue')
+            ->selectRaw('COALESCE(SUM(order_items.quantity * order_items.acquisition_cost_at_time), 0) as cost_of_goods_sold')
+            ->selectRaw('COALESCE(SUM(CASE WHEN order_items.acquisition_cost_at_time IS NULL THEN order_items.quantity ELSE 0 END), 0) as missing_cost_units')
             ->groupBy('categories.id', 'categories.name');
     }
 
@@ -268,5 +332,25 @@ class SalesReportRepository
                 $categoryId !== null,
                 fn (Builder $query): Builder => $query->where('products.category_id', $categoryId),
             );
+    }
+
+    /** @param array{0: string, 1: string} $dateRange */
+    private function returnReportQuery(array $dateRange, ?int $productId, ?int $categoryId): Builder
+    {
+        $from = CarbonImmutable::parse($dateRange[0], config('battlefront.timezone'))->startOfDay()->utc()->toDateTimeString();
+        $to = CarbonImmutable::parse($dateRange[1], config('battlefront.timezone'))->startOfDay()->utc()->toDateTimeString();
+
+        return DB::table('customer_return_items as return_items')
+            ->join('customer_returns as returns', 'returns.id', '=', 'return_items.customer_return_id')
+            ->join('order_items', 'order_items.id', '=', 'return_items.order_item_id')
+            ->join('products', 'products.id', '=', 'order_items.product_id')
+            ->join('categories', 'categories.id', '=', 'products.category_id')
+            ->whereNotNull('return_items.financial_recognized_at')
+            ->where('return_items.financial_recognized_at', '>=', $from)
+            ->where('return_items.financial_recognized_at', '<', $to)
+            ->when($productId !== null, fn (Builder $query): Builder => $query->where('products.id', $productId))
+            ->when($categoryId !== null, fn (Builder $query): Builder => $query->where('products.category_id', $categoryId))
+            ->selectRaw('COALESCE(SUM(return_items.sales_return_amount), 0) as sales_returns')
+            ->selectRaw('COALESCE(SUM(return_items.cost_recovered_amount), 0) as cost_recovered');
     }
 }

@@ -4,6 +4,7 @@ namespace App\Actions\Product;
 
 use App\Actions\Catalog\CatalogName;
 use App\Models\Product;
+use App\Services\AcquisitionCostEstimator;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,7 @@ class CreateProduct
     public function __construct(
         private readonly StoreProductImage $storeProductImage,
         private readonly DeleteManagedProductImage $deleteManagedProductImage,
+        private readonly AcquisitionCostEstimator $acquisitionCostEstimator,
     ) {}
 
     /**
@@ -28,14 +30,21 @@ class CreateProduct
     {
         $attributes['name'] = CatalogName::normalize($attributes['name']);
         unset($attributes['shipping_profile_reviewed']);
+        $manualCost = array_key_exists('acquisition_cost', $attributes) && $attributes['acquisition_cost'] !== null;
+        $attributes['acquisition_cost'] ??= $this->acquisitionCostEstimator->forProduct(
+            (string) DB::table('categories')->where('id', $attributes['category_id'])->value('name'),
+            (string) $attributes['price'],
+        );
         for ($attempt = 0; $attempt < 5; $attempt++) {
             $attributes['product_code'] = 'ADMIN'.Str::ulid();
             $storedImage = null;
             $productId = null;
 
             try {
-                return DB::transaction(function () use ($attributes, $tagIds, $image, &$storedImage, &$productId): Product {
+                return DB::transaction(function () use ($attributes, $tagIds, $image, $manualCost, &$storedImage, &$productId): Product {
                     $product = Product::query()->create($attributes);
+                    $product->acquisition_cost_source = $product->acquisition_cost === null ? null : ($manualCost ? 'manual' : 'category_policy_v1');
+                    $product->save();
                     if (isset($attributes['shipping_profile'])) {
                         $product->shipping_profile_source = 'manual';
                         $product->save();

@@ -339,6 +339,53 @@ test('empty reports retain usable export controls', (t) => {
     );
 });
 
+test('report filters and sales overview come before refund source records', async (t) => {
+    const harness = salesHarness(t);
+    const html = await harness.html();
+    const filterPosition = html.indexOf('Reporting period');
+    const summaryPosition = html.indexOf('Sales summary');
+    const productsPosition = html.indexOf('Product performance report');
+    const refundsPosition = html.indexOf('Sales and refunds by event date');
+
+    assert.ok(filterPosition < summaryPosition);
+    assert.ok(summaryPosition < productsPosition);
+    assert.ok(productsPosition < refundsPosition);
+    assert.match(
+        html,
+        /<details class="border-border mt-6 border"><summary/,
+    );
+    assert.ok(!html.includes('<details open'));
+});
+
+test('profitability values appear only for administrators who can view profit reports', async (t) => {
+    const harness = salesHarness(t);
+    harness.page.props.auth.can.viewProfitReports = true;
+    harness.props.kpis = {
+        ...harness.props.kpis,
+        sales_returns: '10.00',
+        net_sales: '390.00',
+        cost_of_goods_sold: '240.00',
+        cost_recovered: '20.00',
+        gross_profit: '170.00',
+        gross_margin: '43.59',
+        cost_data_complete: true,
+    };
+    harness.props.products.data[0] = {
+        ...harness.props.products.data[0],
+        cost_of_goods_sold: '240.00',
+        gross_profit_before_returns: '160.00',
+        gross_margin_before_returns: '40.00',
+    };
+    const html = await harness.html();
+
+    assert.match(html, /Net product sales/);
+    assert.match(html, /Cost of goods sold/);
+    assert.match(html, /Gross profit/);
+    assert.match(html, /₱170\.00/);
+    assert.match(html, /Gross profit before returns/);
+    assert.match(html, /₱160\.00/);
+});
+
 test('reset posts without current filters and synchronizes the controls and exports from the server response', async (t) => {
     const harness = salesHarness(t);
 

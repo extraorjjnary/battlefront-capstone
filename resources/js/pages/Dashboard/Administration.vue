@@ -151,14 +151,15 @@ defineOptions({
                         <div
                             v-if="permissions.viewReports"
                             aria-hidden="true"
-                            class="border-border bg-card grid border sm:grid-cols-2 xl:grid-cols-5"
+                            class="border-border bg-card grid border sm:grid-cols-2"
+                            :class="permissions.viewProfitReports ? 'xl:grid-cols-6' : 'xl:grid-cols-5'"
                         >
                             <StatSkeleton
-                                v-for="stat in 5"
+                                v-for="stat in permissions.viewProfitReports ? 6 : 5"
                                 :key="stat"
                                 class="border-border border-b sm:border-r xl:border-b-0"
                                 :class="
-                                    stat === 5
+                                    stat === (permissions.viewProfitReports ? 6 : 5)
                                         ? 'sm:col-span-2 xl:col-span-1'
                                         : ''
                                 "
@@ -166,7 +167,8 @@ defineOptions({
                         </div>
                     </template>
                     <dl
-                        class="border-border bg-card grid border sm:grid-cols-2 xl:grid-cols-5"
+                        class="border-border bg-card grid border sm:grid-cols-2"
+                        :class="permissions.viewProfitReports ? 'xl:grid-cols-6' : 'xl:grid-cols-5'"
                     >
                         <div
                             class="border-border border-b p-5 sm:border-r xl:border-b-0"
@@ -192,6 +194,18 @@ defineOptions({
                             <p class="text-muted-foreground mt-1 text-xs">
                                 Excludes third-party delivery charges.
                             </p>
+                        </div>
+                        <div
+                            v-if="permissions.viewProfitReports"
+                            class="border-border border-b p-5 sm:border-r xl:border-b-0"
+                        >
+                            <dt class="text-muted-foreground text-sm">
+                                Gross profit
+                            </dt>
+                            <dd class="mt-2 text-2xl font-bold tabular-nums">
+                                {{ dashboard.kpis.profit_data_complete ? formatCurrency(dashboard.kpis.recorded_gross_profit) : 'Unavailable' }}
+                            </dd>
+                            <p class="text-muted-foreground mt-1 text-xs">All-time product sales</p>
                         </div>
                         <div
                             v-if="permissions.viewOrders"

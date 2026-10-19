@@ -106,6 +106,7 @@ class AuditLogController extends Controller
                 }),
                 'customer' => $query->where('users.role', 'customer'),
                 'administrator' => $query->where('users.role', 'administrator'),
+                default => $query,
             })
             ->when($filters['subject_type'] ?? null, fn ($query, $type) => $query->where('audit_logs.subject_type', $type))
             ->when($filters['subject_id'] ?? null, fn ($query, $id) => $query->where('audit_logs.subject_id', $id))

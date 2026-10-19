@@ -14,10 +14,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $product_id
  * @property int $quantity
  * @property numeric-string $price_at_time
+ * @property numeric-string|null $acquisition_cost_at_time
  * @property-read Order $order
  * @property-read Product $product
  */
-#[Fillable(['order_id', 'product_id', 'quantity', 'price_at_time'])]
+#[Fillable(['order_id', 'product_id', 'quantity', 'price_at_time', 'acquisition_cost_at_time', 'acquisition_cost_source'])]
 class OrderItem extends Model
 {
     /** @use HasFactory<OrderItemFactory> */
@@ -60,6 +61,7 @@ class OrderItem extends Model
         return [
             'quantity' => 'integer',
             'price_at_time' => 'decimal:2',
+            'acquisition_cost_at_time' => 'decimal:2',
         ];
     }
 }

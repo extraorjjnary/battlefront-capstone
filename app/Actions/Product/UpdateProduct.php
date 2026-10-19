@@ -51,6 +51,17 @@ class UpdateProduct
                     && $attributes['product_code'] !== $lockedProduct->product_code) {
                     throw ValidationException::withMessages(['product_code' => 'Imported product codes cannot be changed.']);
                 }
+                $acquisitionCost = $attributes['acquisition_cost'] ?? null;
+                $costChanged = array_key_exists('acquisition_cost', $attributes)
+                    && (($acquisitionCost === null) !== ($lockedProduct->acquisition_cost === null)
+                        || ($acquisitionCost !== null && $lockedProduct->acquisition_cost !== null
+                            && bccomp($this->numericAmount($acquisitionCost), $this->numericAmount($lockedProduct->acquisition_cost), 2) !== 0));
+                $costChangeReason = trim((string) ($attributes['cost_change_reason'] ?? ''));
+                unset($attributes['cost_change_reason']);
+                if ($costChanged && mb_strlen($costChangeReason) < 5) {
+                    throw ValidationException::withMessages(['cost_change_reason' => 'Explain the acquisition cost change in at least five characters.']);
+                }
+                unset($attributes['acquisition_cost']);
                 $oldImagePath = $lockedProduct->image_path;
                 $storedImage = $this->storeProductImage->execute($image, $lockedProduct->id);
                 if ($storedImage !== null) {
@@ -59,6 +70,10 @@ class UpdateProduct
                 $profileChanged = isset($attributes['shipping_profile']) && $lockedProduct->shipping_profile->value !== $attributes['shipping_profile'];
                 unset($attributes['shipping_profile_reviewed']);
                 $lockedProduct->fill($attributes);
+                if ($costChanged) {
+                    $lockedProduct->acquisition_cost = $acquisitionCost;
+                    $lockedProduct->acquisition_cost_source = 'manual';
+                }
                 if ($profileChanged) {
                     $lockedProduct->shipping_profile_source = 'manual';
                 }
@@ -73,7 +88,7 @@ class UpdateProduct
                     'action' => 'product.updated',
                     'subject_type' => 'product',
                     'subject_id' => $lockedProduct->id,
-                    'reason' => $priceChanged ? $priceChangeReason : null,
+                    'reason' => $costChanged ? $costChangeReason : ($priceChanged ? $priceChangeReason : null),
                     'changes' => json_encode(['before' => $before, 'after' => $changedAttributes, 'tag_ids' => $tagIds], JSON_THROW_ON_ERROR),
                     'created_at' => now(),
                 ]);

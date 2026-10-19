@@ -285,6 +285,8 @@ test('administrators receive stable empty dashboard data', function () {
             ->where('dashboard.kpis', [
                 'recorded_revenue' => '0.00',
                 'recorded_sales' => 0,
+                'recorded_gross_profit' => '0.00',
+                'profit_data_complete' => true,
                 'pending_orders' => 0,
                 'processing_orders' => 0,
                 'low_stock_products' => 0,

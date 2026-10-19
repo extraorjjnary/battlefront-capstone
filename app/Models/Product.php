@@ -30,6 +30,7 @@ use Illuminate\Support\Facades\Storage;
  * @property int $category_id
  * @property string|null $brand
  * @property string $price
+ * @property numeric-string|null $acquisition_cost
  * @property bool $is_featured
  * @property string|null $discount_price
  * @property string|null $image_path
@@ -54,6 +55,7 @@ use Illuminate\Support\Facades\Storage;
     'category_id',
     'brand',
     'price',
+    'acquisition_cost',
     'is_featured',
     'discount_price',
     'image_path',
@@ -253,6 +255,7 @@ class Product extends Model
             'is_catalog_imported' => 'boolean',
             'shipping_profile' => ShippingProfile::class,
             'price' => 'decimal:2',
+            'acquisition_cost' => 'decimal:2',
             'is_featured' => 'boolean',
             'discount_price' => 'decimal:2',
             'is_active' => 'boolean',

@@ -51,8 +51,8 @@ class AppServiceProvider extends ServiceProvider
         foreach ([
             'orders.view', 'orders.process', 'orders.assign', 'inventory.view',
             'inventory.request', 'inventory.approve', 'inventory.reorder',
-            'products.manage', 'products.price', 'catalog.delete',
-            'customers.view', 'reports.view', 'reports.export', 'forecast.manage',
+            'products.manage', 'products.price', 'products.cost', 'catalog.delete',
+            'customers.view', 'reports.view', 'reports.export', 'reports.profit', 'forecast.manage',
             'returns.request', 'returns.approve', 'returns.record_payment', 'returns.dispatch',
             'returns.resolve', 'returns.reconcile',
             'suppliers.manage', 'staff_reports.view', 'audit.view', 'audit.export',
