@@ -41,7 +41,13 @@ class SendExpoNotification implements ShouldQueue
         $delivery = DB::transaction(function (): ?NotificationPushDelivery {
             $delivery = NotificationPushDelivery::query()->with(['device.user', 'device.accessToken', 'notification'])
                 ->whereKey($this->deliveryId)->lockForUpdate()->first();
-            if ($delivery === null || $delivery->status !== 'pending') {
+            if ($delivery === null || ! in_array($delivery->status, ['pending', 'accepted'], true)) {
+                return null;
+            }
+            if ($delivery->status === 'accepted' && $delivery->ticket_id !== null) {
+                return $delivery;
+            }
+            if ($delivery->status !== 'pending') {
                 return null;
             }
             $delivery->update(['status' => 'sending']);
@@ -52,33 +58,49 @@ class SendExpoNotification implements ShouldQueue
             return;
         }
 
+        if ($delivery->status === 'accepted' && $delivery->ticket_id !== null
+            && $delivery->error_code === 'ReceiptQueuePending') {
+            $this->enqueueReceiptCheck($delivery->id);
+
+            return;
+        }
+        if ($delivery->status === 'accepted') {
+            return;
+        }
+
         $device = $delivery->device;
         $notification = $delivery->notification;
-        if ($device->registration_version !== $delivery->registration_version || ! $devices->eligible($device)
-            || (int) $notification->notifiable_id !== $device->user_id
-            || $notification->notifiable_type !== $device->user->getMorphClass()
-            || ($notification->data['audience'] ?? null) !== 'customer') {
-            $delivery->update(['status' => 'skipped']);
-            if ($device->registration_version === $delivery->registration_version && ! $devices->eligible($device)) {
-                $devices->deactivate($device, $delivery->registration_version);
+        try {
+            if ($device->registration_version !== $delivery->registration_version || ! $devices->eligible($device)
+                || (int) $notification->notifiable_id !== $device->user_id
+                || $notification->notifiable_type !== $device->user->getMorphClass()
+                || ($notification->data['audience'] ?? null) !== 'customer') {
+                $delivery->update(['status' => 'skipped']);
+                if ($device->registration_version === $delivery->registration_version && ! $devices->eligible($device)) {
+                    $devices->deactivate($device, $delivery->registration_version);
+                }
+
+                return;
+            }
+            $presented = $history->presentMany($device->user, collect([$notification]))->sole();
+            if ($presented['order'] === null) {
+                $delivery->update(['status' => 'skipped']);
+
+                return;
             }
 
-            return;
-        }
-        $presented = $history->presentMany($device->user, collect([$notification]))->sole();
-        if ($presented['order'] === null) {
-            $delivery->update(['status' => 'skipped']);
-
-            return;
-        }
-
-        try {
             $result = $expo->send((string) $device->expo_push_token, [
                 'notification_id' => $notification->id, 'order_id' => $presented['order']['id'],
                 'deep_link' => $presented['order']['deep_link'],
             ], $device->platform === 'android' ? $device->notification_channel : null);
-        } catch (RuntimeException $exception) {
-            $delivery->update(['status' => 'pending']);
+        } catch (Throwable $exception) {
+            try {
+                NotificationPushDelivery::query()->whereKey($delivery->id)->where('status', 'sending')
+                    ->update(['status' => 'pending']);
+            } catch (Throwable) {
+                NotificationFailureReporter::report('push_reset', (string) $delivery->id);
+            }
+
             throw $exception;
         }
 
@@ -91,17 +113,31 @@ class SendExpoNotification implements ShouldQueue
             return;
         }
         $delivery->update(['status' => 'accepted', 'ticket_id' => $result['id'], 'accepted_at' => now()]);
+        $this->enqueueReceiptCheck($delivery->id);
+    }
+
+    private function enqueueReceiptCheck(int $deliveryId): void
+    {
         try {
-            Bus::dispatch((new CheckExpoReceipt($delivery->id))->delay(now()->addMinutes(15)));
-        } catch (Throwable) {
-            NotificationFailureReporter::report('receipt_enqueue', $notification->id);
+            Bus::dispatch((new CheckExpoReceipt($deliveryId))->delay(now()->addMinutes(15)));
+            NotificationPushDelivery::query()->whereKey($deliveryId)->where('status', 'accepted')
+                ->where('error_code', 'ReceiptQueuePending')->update(['error_code' => null]);
+        } catch (Throwable $exception) {
+            NotificationPushDelivery::query()->whereKey($deliveryId)->where('status', 'accepted')
+                ->update(['error_code' => 'ReceiptQueuePending']);
+            NotificationFailureReporter::report('receipt_enqueue', (string) $deliveryId);
+
+            throw new RuntimeException('Expo receipt scheduling unavailable.', previous: $exception);
         }
     }
 
     public function failed(?Throwable $exception): void
     {
-        NotificationPushDelivery::query()->whereKey($this->deliveryId)->where('status', 'pending')
+        NotificationPushDelivery::query()->whereKey($this->deliveryId)->whereIn('status', ['pending', 'sending'])
             ->update(['status' => 'failed', 'error_code' => 'RetriesExhausted']);
+        NotificationPushDelivery::query()->whereKey($this->deliveryId)->where('status', 'accepted')
+            ->where('error_code', 'ReceiptQueuePending')
+            ->whereNotNull('ticket_id')->update(['status' => 'receipt_unavailable', 'error_code' => 'ReceiptQueueExhausted']);
         NotificationFailureReporter::report('push_exhausted', (string) $this->deliveryId);
     }
 }

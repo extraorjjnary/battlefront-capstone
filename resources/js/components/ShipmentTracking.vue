@@ -2,6 +2,7 @@
 import { Truck } from '@lucide/vue';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/currency';
+import { formatDateTime } from '@/lib/dateTime';
 import { orderStatusBadgeClass } from '@/lib/orderStatus';
 
 defineProps({
@@ -9,17 +10,13 @@ defineProps({
     quote: { type: Object, default: null },
 });
 
-const timestampFormatter = new Intl.DateTimeFormat('en-PH', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-});
 const civilDateFormatter = new Intl.DateTimeFormat('en-PH', {
     dateStyle: 'medium',
     timeZone: 'UTC',
 });
 
 function formatTimestamp(value) {
-    return timestampFormatter.format(new Date(value));
+    return formatDateTime(value);
 }
 
 function formatCivilDate(value) {

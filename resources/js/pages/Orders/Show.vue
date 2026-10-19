@@ -33,6 +33,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Spinner } from '@/components/ui/spinner';
 import { formatCurrency } from '@/lib/currency';
+import { formatDateTime } from '@/lib/dateTime';
 import { orderStatusBadgeClass } from '@/lib/orderStatus';
 import { index as productIndex } from '@/routes/products';
 import { store as cancelOrder } from '@/routes/orders/cancel';
@@ -71,13 +72,8 @@ function submitCancellation() {
     });
 }
 
-const dateFormatter = new Intl.DateTimeFormat('en-PH', {
-    dateStyle: 'long',
-    timeStyle: 'short',
-});
-
 function formatOrderDate(value) {
-    return dateFormatter.format(new Date(value));
+    return formatDateTime(value, 'long');
 }
 
 function selectReplacementProof(event) {

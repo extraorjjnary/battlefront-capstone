@@ -5,6 +5,7 @@ import AuditLogController from '@/actions/App/Http/Controllers/Administration/Au
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { formatDateTime } from '@/lib/dateTime';
 
 const props = defineProps({
     entries: { type: Object, required: true },
@@ -20,8 +21,6 @@ const subjectType = ref(props.filters.subject_type ?? '');
 const subjectId = ref(props.filters.subject_id ?? '');
 const from = ref(props.filters.from ?? '');
 const to = ref(props.filters.to ?? '');
-const dateFormatter = new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium', timeStyle: 'short' });
-
 function applyFilters() {
     router.get(AuditLogController.index(), {
         action: action.value || undefined,
@@ -62,7 +61,7 @@ defineOptions({ layout: { breadcrumbs: [{ title: 'Audit log', href: AuditLogCont
             <p class="text-muted-foreground text-sm">{{ entries.total }} matching events, newest first</p>
             <section class="grid gap-3" aria-label="Audit events">
                 <article v-for="entry in entries.data" :key="entry.id" class="border-border bg-card border p-5 text-sm">
-                    <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="font-semibold">{{ entry.action_label }}</h2><p class="text-muted-foreground mt-1">{{ entry.actor_name }}<span v-if="entry.actor_id"> (#{{ entry.actor_id }})</span> · <time :datetime="entry.created_at">{{ dateFormatter.format(new Date(entry.created_at)) }}</time></p></div><span class="text-muted-foreground text-xs">Event #{{ entry.id }}</span></div>
+                    <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="font-semibold">{{ entry.action_label }}</h2><p class="text-muted-foreground mt-1">{{ entry.actor_name }}<span v-if="entry.actor_id"> (#{{ entry.actor_id }})</span> · <time :datetime="entry.created_at">{{ formatDateTime(entry.created_at) }}</time></p></div><span class="text-muted-foreground text-xs">Event #{{ entry.id }}</span></div>
                     <p class="mt-3"><Link v-if="entry.subject_url" :href="entry.subject_url" class="text-primary font-medium underline">{{ entry.subject_label }} #{{ entry.subject_id }}</Link><span v-else>{{ entry.subject_label }}<template v-if="entry.subject_id"> #{{ entry.subject_id }}</template></span></p>
                     <p v-if="entry.reason" class="mt-2">Reason: {{ entry.reason }}</p>
                     <details v-if="entry.details.length" class="border-border mt-3 border-t pt-3"><summary class="text-primary cursor-pointer font-medium">View recorded changes</summary><dl class="mt-3 grid gap-2"><div v-for="(detail, index) in entry.details" :key="index" class="bg-secondary grid gap-1 p-2 sm:grid-cols-[10rem_1fr]"><dt class="font-medium">{{ detail.label }}</dt><dd class="break-words"><span v-if="detail.before !== null" class="text-muted-foreground">{{ detail.before }} → </span>{{ detail.after }}</dd></div></dl></details>

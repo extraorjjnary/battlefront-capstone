@@ -1,13 +1,9 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3';
 import WorkQueueController from '@/actions/App/Http/Controllers/Administration/WorkQueueController';
+import { formatDateTime } from '@/lib/dateTime';
 
 defineProps({ entries: { type: Object, required: true } });
-
-const dateFormatter = new Intl.DateTimeFormat('en-PH', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-});
 
 defineOptions({
     layout: { breadcrumbs: [{ title: 'Work queue', href: WorkQueueController.index() }] },
@@ -29,7 +25,7 @@ defineOptions({
                     <p class="text-primary text-xs font-semibold uppercase">{{ entry.kind.replaceAll('_', ' ') }}</p>
                     <h2 class="mt-1 font-semibold">{{ entry.reference }}</h2>
                     <p class="text-muted-foreground mt-1 text-sm">{{ entry.required_action }} · Responsible: {{ entry.responsible_name }}</p>
-                    <p class="text-muted-foreground mt-1 text-xs">Opened {{ dateFormatter.format(new Date(entry.created_at)) }} · {{ entry.age_days }} days old</p>
+                    <p class="text-muted-foreground mt-1 text-xs">Opened {{ formatDateTime(entry.created_at) }} · {{ entry.age_days }} days old</p>
                 </div>
                 <Link :href="entry.href" class="text-primary text-sm font-semibold underline">Open record</Link>
             </article>

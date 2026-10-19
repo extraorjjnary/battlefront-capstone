@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
+import { BUSINESS_TIMEZONE, formatDateTime } from '@/lib/dateTime';
 import { formatForecastUnits } from '@/lib/forecastUnits';
 
 ChartJS.register(
@@ -61,15 +62,6 @@ const { search, isSearching, cancelPendingSearch } = useDebouncedSearch({
         product_id: props.filters.product_id ?? undefined,
     }),
 });
-const dateFormatter = computed(
-    () =>
-        new Intl.DateTimeFormat('en-PH', {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-            timeZone: props.timezone,
-        }),
-);
-
 watch(
     () => props.selected_product?.id,
     (id) => {
@@ -124,7 +116,7 @@ function pageRoute(options, saved = false) {
 }
 
 function generatedTime(value) {
-    return dateFormatter.value.format(new Date(value));
+    return formatDateTime(value);
 }
 
 const chartData = computed(() => {
@@ -473,9 +465,7 @@ const chartOptions = {
                     <div>
                         <dt class="text-muted-foreground text-xs">Generated</dt>
                         <dd class="mt-1 font-medium">
-                            {{ generatedTime(result.generated_at) }} ({{
-                                result.timezone
-                            }})
+                            {{ generatedTime(result.generated_at) }} ({{ BUSINESS_TIMEZONE }})
                         </dd>
                     </div>
                 </dl>
@@ -604,7 +594,7 @@ const chartOptions = {
                             <th scope="col" class="p-3">Target</th>
                             <th scope="col" class="p-3">Source period</th>
                             <th scope="col" class="p-3">
-                                Generated ({{ timezone }})
+                                Generated ({{ BUSINESS_TIMEZONE }})
                             </th>
                         </tr>
                     </thead>

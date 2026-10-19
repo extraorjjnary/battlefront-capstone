@@ -25,6 +25,16 @@ const generic = new Proxy(
 
 function salesFixture(empty = false) {
     return {
+        refund_measures: {
+            cutoff: '2026-09-30',
+            gross_item_sales: '400.00',
+            refund_payments: '0.00',
+            gross_less_refunds: '400.00',
+            outstanding_at_cutoff: '0.00',
+            outstanding_refunds: { data: [], last_page: 1 },
+            payments: { data: [], last_page: 1 },
+        },
+        sale_transactions: { data: [], last_page: 1 },
         filters: {
             from: '2026-09-01',
             to: '2026-09-30',

@@ -6,6 +6,7 @@ import OrderController from '@/actions/App/Http/Controllers/Administration/Order
 import CustomerReturnController from '@/actions/App/Http/Controllers/Administration/CustomerReturnController';
 import UserInfo from '@/components/UserInfo.vue';
 import { Button } from '@/components/ui/button';
+import { formatTimestampDate } from '@/lib/dateTime';
 
 defineProps({
     customer: { type: Object, required: true },
@@ -13,12 +14,8 @@ defineProps({
     order_status_filter: { type: String, required: true },
 });
 
-const dateFormatter = new Intl.DateTimeFormat('en-PH', {
-    dateStyle: 'long',
-});
-
 function formatJoinedDate(value) {
-    return value ? dateFormatter.format(new Date(value)) : 'Not available';
+    return value ? formatTimestampDate(value, 'long') : 'Not available';
 }
 
 defineOptions({

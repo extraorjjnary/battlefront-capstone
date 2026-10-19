@@ -3,6 +3,7 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 import StaffPerformanceController from '@/actions/App/Http/Controllers/Administration/StaffPerformanceController';
 import { formatCurrency } from '@/lib/currency';
+import { formatCalendarDate } from '@/lib/dateTime';
 
 const props = defineProps({
     filters: { type: Object, required: true },
@@ -51,7 +52,7 @@ defineOptions({ layout: { breadcrumbs: [{ title: 'Staff sales', href: StaffPerfo
         </div>
         <section class="space-y-3" aria-label="Attributed sales">
             <div><h2 class="text-lg font-semibold">{{ can_view_all ? `${selected_handler_name}'s sales` : 'My sales records' }}</h2><p class="text-muted-foreground text-sm">{{ transactions.total }} attributed sale records{{ filters.from || filters.to ? ' in the selected dates' : ' across all dates' }}. Historical records without a handler are not assigned to an account.</p></div>
-            <div class="border-border bg-card overflow-x-auto border"><table class="w-full min-w-[32rem] text-left text-sm"><thead class="bg-secondary text-muted-foreground"><tr><th class="p-3">Sale date</th><th class="p-3">Order</th><th class="p-3">Gross item sales</th></tr></thead><tbody><tr v-for="sale in transactions.data" :key="sale.id" class="border-border border-t"><td class="p-3">{{ new Date(sale.sale_date).toLocaleDateString('en-PH') }}</td><td class="p-3"><Link :href="sale.order_url" class="text-primary underline">{{ sale.order_reference }}</Link></td><td class="p-3">{{ formatCurrency(sale.gross_sales) }}</td></tr></tbody></table><p v-if="!transactions.data.length" class="text-muted-foreground p-5 text-sm">No sales recorded for this account in these dates.</p></div>
+            <div class="border-border bg-card overflow-x-auto border"><table class="w-full min-w-[32rem] text-left text-sm"><thead class="bg-secondary text-muted-foreground"><tr><th class="p-3">Sale date</th><th class="p-3">Order</th><th class="p-3">Gross item sales</th></tr></thead><tbody><tr v-for="sale in transactions.data" :key="sale.id" class="border-border border-t"><td class="p-3">{{ formatCalendarDate(sale.sale_date) }}</td><td class="p-3"><Link :href="sale.order_url" class="text-primary underline">{{ sale.order_reference }}</Link></td><td class="p-3">{{ formatCurrency(sale.gross_sales) }}</td></tr></tbody></table><p v-if="!transactions.data.length" class="text-muted-foreground p-5 text-sm">No recorded sales match these filters.</p></div>
             <nav v-if="transactions.last_page > 1" class="flex justify-between text-sm" aria-label="Sale pages"><Link v-if="transactions.prev_page_url" :href="transactions.prev_page_url" class="text-primary underline">Previous</Link><span v-else></span><Link v-if="transactions.next_page_url" :href="transactions.next_page_url" class="text-primary underline">Next</Link></nav>
         </section>
     </main>

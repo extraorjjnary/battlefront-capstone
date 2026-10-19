@@ -5,6 +5,7 @@ import { compileScript, parse } from '@vue/compiler-sfc';
 import { renderToString } from '@vue/server-renderer';
 import * as Vue from 'vue';
 import { formatCurrency } from '../lib/currency.js';
+import { formatDateTime } from '../lib/dateTime.js';
 import { orderStatusBadgeClass } from '../lib/orderStatus.js';
 
 const source = readFileSync(
@@ -27,6 +28,7 @@ const modules = {
         },
     },
     '@/lib/currency': { formatCurrency },
+    '@/lib/dateTime': { formatDateTime },
     '@/lib/orderStatus': { orderStatusBadgeClass },
 };
 const executable = script.content
@@ -42,6 +44,10 @@ function trackingProps(overrides = {}) {
     return {
         shipment: {
             carrier: 'lbc',
+            arrangement: {
+                value: 'configured_rate',
+                label: 'Configured-rate LBC delivery',
+            },
             status: {
                 value: 'awaiting_preparation',
                 label: 'Awaiting preparation',

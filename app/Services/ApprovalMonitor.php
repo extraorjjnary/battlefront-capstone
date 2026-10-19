@@ -5,8 +5,10 @@ namespace App\Services;
 use App\Enums\UserRole;
 use App\Models\User;
 use App\Notifications\ApprovalConcentrationAlert;
+use App\Services\Notifications\NotificationFailureReporter;
 use Illuminate\Support\Facades\DB;
 use LogicException;
+use Throwable;
 
 class ApprovalMonitor
 {
@@ -68,10 +70,21 @@ class ApprovalMonitor
         ]);
 
         DB::afterCommit(function () use ($reviewer, $requester, $count, $decisions): void {
-            $ownerRoleId = DB::table('administration_roles')->where('code', 'owner')->value('id');
-            User::query()->where('role', UserRole::Administrator->value)
-                ->where('administration_role_id', $ownerRoleId)->where('is_active', true)
-                ->get()->each(fn (User $owner) => $owner->notify(new ApprovalConcentrationAlert($reviewer->name, $requester->name, $count, $decisions)));
+            try {
+                $ownerRoleId = DB::table('administration_roles')->where('code', 'owner')->value('id');
+                $owners = User::query()->where('role', UserRole::Administrator->value)
+                    ->where('administration_role_id', $ownerRoleId)->where('is_active', true)->get();
+
+                foreach ($owners as $owner) {
+                    try {
+                        $owner->notify(new ApprovalConcentrationAlert($reviewer->name, $requester->name, $count, $decisions));
+                    } catch (Throwable) {
+                        NotificationFailureReporter::report('approval_alert', (string) $requester->id);
+                    }
+                }
+            } catch (Throwable) {
+                NotificationFailureReporter::report('approval_alert_lookup', (string) $requester->id);
+            }
         });
     }
 }

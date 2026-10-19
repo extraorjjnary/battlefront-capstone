@@ -9,6 +9,8 @@ return [
 
     'operational_branch_city' => 'Sagay City',
 
+    'timezone' => 'Asia/Manila',
+
     'operating_hours' => '8:00 AM–6:00 PM',
 
     /**

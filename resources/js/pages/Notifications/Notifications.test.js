@@ -5,6 +5,7 @@ import { compileScript, parse } from '@vue/compiler-sfc';
 import { renderToString } from '@vue/server-renderer';
 import * as Vue from 'vue';
 import { loadSkeletonComponent } from '../../lib/skeletonTestHelpers.js';
+import { formatDateTime } from '../../lib/dateTime.js';
 
 const primitive = {
     render() {
@@ -51,6 +52,7 @@ function loadNotificationComponent(
 ) {
     const modules = {
         vue: Vue,
+        '@/lib/dateTime': { formatDateTime },
         '@inertiajs/vue3': { Head: primitive, Link: link, router },
         '@lucide/vue': {
             Bell: primitive,

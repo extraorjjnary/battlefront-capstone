@@ -27,6 +27,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Spinner } from '@/components/ui/spinner';
+import { formatDateTime } from '@/lib/dateTime';
 
 const props = defineProps({
     products: { type: Object, required: true },
@@ -64,13 +65,8 @@ const stockFilterSummary = computed(
         })[props.filters.stock] ?? '',
 );
 
-const dateFormatter = new Intl.DateTimeFormat('en-PH', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-});
-
 function formatLastUpdated(value) {
-    return value ? dateFormatter.format(new Date(value)) : 'Not available';
+    return value ? formatDateTime(value) : 'Not available';
 }
 
 function inventoryPage(page) {

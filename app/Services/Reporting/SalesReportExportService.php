@@ -24,7 +24,7 @@ class SalesReportExportService
     {
         return response()->view('reports.sales', [
             ...$this->salesReportService->document($filters),
-            'generatedAt' => now()->format('M j, Y, g:i A T'),
+            'generatedAt' => $this->generatedAt(),
             'print' => true,
         ], 200, self::HEADERS);
     }
@@ -49,7 +49,7 @@ class SalesReportExportService
         $pdf->addInfo('Title', 'Battlefront Computer Trading Sales Report');
         $pdf->loadHtml(view('reports.sales', [
             ...$report,
-            'generatedAt' => now()->format('M j, Y, g:i A T'),
+            'generatedAt' => $this->generatedAt(),
             'print' => false,
         ])->render(), 'UTF-8');
         $pdf->render();
@@ -111,6 +111,11 @@ class SalesReportExportService
     private function filename(array $filters, string $extension): string
     {
         return 'sales-report_'.$filters['from'].'_to_'.$filters['to'].'.'.$extension;
+    }
+
+    private function generatedAt(): string
+    {
+        return now(config('battlefront.timezone'))->format('M j, Y, g:i A').' '.config('battlefront.timezone');
     }
 
     /**

@@ -5,17 +5,14 @@ import CustomerController from '@/actions/App/Http/Controllers/Administration/Cu
 import CatalogPagination from '@/components/CatalogPagination.vue';
 import UserInfo from '@/components/UserInfo.vue';
 import { Button } from '@/components/ui/button';
+import { formatTimestampDate } from '@/lib/dateTime';
 
 defineProps({
     customers: { type: Object, required: true },
 });
 
-const dateFormatter = new Intl.DateTimeFormat('en-PH', {
-    dateStyle: 'medium',
-});
-
 function formatJoinedDate(value) {
-    return value ? dateFormatter.format(new Date(value)) : 'Not available';
+    return value ? formatTimestampDate(value) : 'Not available';
 }
 
 defineOptions({

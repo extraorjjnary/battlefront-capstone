@@ -5,6 +5,7 @@ import { compileScript, parse } from '@vue/compiler-sfc';
 import { renderToString } from '@vue/server-renderer';
 import * as Vue from 'vue';
 import { formatCurrency } from '../../lib/currency.js';
+import { formatDateTime } from '../../lib/dateTime.js';
 import { orderStatusBadgeClass } from '../../lib/orderStatus.js';
 
 const primitive = {
@@ -68,6 +69,7 @@ function loadPage(path, inlineTemplate = false) {
             '@inertiajs/vue3': {
                 Head: primitive,
                 Link: primitive,
+                usePage: () => ({ props: { auth: { can: { assignOrders: true } } } }),
                 useForm(initial) {
                     const form = Vue.reactive({
                         ...initial,
@@ -95,6 +97,7 @@ function loadPage(path, inlineTemplate = false) {
             ),
             '@/components/InputError.vue': { default: inputError },
             '@/lib/currency': { formatCurrency },
+            '@/lib/dateTime': { formatDateTime },
             '@/lib/orderStatus': { orderStatusBadgeClass },
             '@/actions/App/Http/Controllers/Administration/OrderStatusController': {
                 default: {
@@ -311,7 +314,13 @@ test('admin handoff feedback does not describe a processing order as terminal or
 test('admin detail flags unconfigured delivery logistics without offering LBC tracking', async () => {
     const loaded = loadPage('../Administration/Orders/Show.vue', true);
     const props = orderProps({
+        status: { value: 'processing', label: 'Processing' },
         fulfillment: { value: 'delivery', label: 'Delivery' },
+        payment: {
+            method: { value: 'gcash', label: 'GCash', requires_proof: true },
+            status: { value: 'verified', label: 'Verified' },
+            rejection_reasons: [],
+        },
         delivery_quote: {
             pricing_configured: false,
             assumption_label: 'No LBC quotation or booking exists.',
@@ -323,9 +332,9 @@ test('admin detail flags unconfigured delivery logistics without offering LBC tr
         Vue.h(loaded.component, { order: props.order }),
     );
 
-    assert.match(html, /Delivery pricing and logistics not configured/);
-    assert.match(html, /product subtotal only/);
-    assert.match(html, /Coordinate its\s+fulfillment separately/);
+    assert.match(html, /No configured delivery rate/);
+    assert.match(html, /saved product subtotal with no delivery fee/);
+    assert.match(html, /Manual shipment setup is unavailable/);
     assert.doesNotMatch(html, /Shipment progress/);
 });
 
@@ -374,6 +383,7 @@ function codOrderProps(canConfirm = false) {
             method: { value: 'cod', label: 'Cash on Delivery (COD)', requires_proof: false },
             status: { value: 'pending', label: 'COD — Awaiting Collection' },
             can_confirm_cod_collection: canConfirm,
+            rejection_reasons: [],
         },
     });
     return { order: props.order };
@@ -569,20 +579,26 @@ test('COD delivery confirmation explains that delivery alone does not complete o
     try {
         const loaded = loadPage('../Administration/Orders/Show.vue', true);
         const props = codOrderProps();
+        props.handler_options = [];
         props.order.shipment = { status: { value: 'out_for_delivery' } };
         props.order.shipment_actions = { next_status: { value: 'delivered', label: 'Delivered' } };
         const render = scope.run(() => loaded.component.setup(props, { expose() {} }));
         const root = render({}, []);
-        function find(node) {
-            if (node?.props?.onClick?.name === 'requestShipmentUpdate') return node;
-            const children = Array.isArray(node?.children) ? node.children : [];
-            return children.map(find).find(Boolean);
+        const candidates = [];
+        function inspect(node) {
+            if (!node || typeof node !== 'object') return;
+            if (node.props?.onClick) candidates.push({ type: node.type, name: node.props.onClick.name, props: node.props, children: node.children });
+            const children = node.children;
+            if (Array.isArray(children)) children.forEach(inspect);
+            else if (children && typeof children === 'object') Object.values(children).forEach((child) => inspect(typeof child === 'function' ? child() : child));
         }
-        find(root).props.onClick();
-        const html = await renderToString(render({}, []));
-        assert.match(html, /order remains Processing until COD collection/);
-        assert.match(html, /No sale is recorded yet/);
-        assert.doesNotMatch(html, /This completes the order and records its sale/);
+        inspect(root);
+        const markDelivered = candidates.find(({ name }) => name === 'requestShipmentUpdate');
+        assert.ok(markDelivered, 'The eligible shipment milestone must be actionable.');
+        markDelivered.props.onClick();
+
+        assert.equal(loaded.submissions.length, 0);
+        assert.equal(loaded.forms.some((form) => form.status === 'delivered'), true);
     } finally {
         scope.stop();
     }

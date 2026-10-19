@@ -148,6 +148,9 @@ async function renderPage(
                     ],
                 ),
             ),
+            '@/actions/App/Http/Controllers/Administration/WorkQueueController': {
+                default: { index: route },
+            },
         },
         { get: (target, key) => target[key] ?? generic },
     );

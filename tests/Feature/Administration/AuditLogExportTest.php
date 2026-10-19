@@ -59,6 +59,76 @@ test('audit events show readable changes only to a role allowed to view the reco
             ->where('entries.data.0.subject_url', null));
 });
 
+test('audit timestamps are serialized in UTC and exported in Philippine time', function () {
+    $owner = User::factory()->administrator()->create();
+    DB::table('audit_logs')->insert([
+        'actor_id' => $owner->id,
+        'action' => 'stock.checked',
+        'subject_type' => 'inventory',
+        'subject_id' => 7,
+        'created_at' => '2026-09-10 02:00:00',
+    ]);
+
+    $this->actingAs($owner)->get(route('administration.reports.audit'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('entries.data.0.created_at', '2026-09-10T02:00:00.000000Z'));
+
+    $stream = fopen('php://temp', 'w+b');
+    fwrite($stream, $this->actingAs($owner)->get(route('administration.reports.audit.export'))->streamedContent());
+    rewind($stream);
+    $header = fgetcsv($stream, 0, ',', '"', '');
+    $row = fgetcsv($stream, 0, ',', '"', '');
+    fclose($stream);
+
+    expect($header[1])->toBe('Date');
+    expect($row[1])->toBe('2026-09-10 10:00:00 +08:00');
+});
+
+test('audit date filters use inclusive Philippine calendar days', function () {
+    $owner = User::factory()->administrator()->create();
+    DB::table('audit_logs')->insert([
+        ['actor_id' => $owner->id, 'action' => 'time.boundary', 'subject_type' => 'inventory', 'subject_id' => 1,
+            'created_at' => '2026-09-09 15:59:59'],
+        ['actor_id' => $owner->id, 'action' => 'time.boundary', 'subject_type' => 'inventory', 'subject_id' => 2,
+            'created_at' => '2026-09-09 16:00:00'],
+        ['actor_id' => $owner->id, 'action' => 'time.boundary', 'subject_type' => 'inventory', 'subject_id' => 3,
+            'created_at' => '2026-09-10 15:59:59'],
+        ['actor_id' => $owner->id, 'action' => 'time.boundary', 'subject_type' => 'inventory', 'subject_id' => 4,
+            'created_at' => '2026-09-10 16:00:00'],
+    ]);
+
+    $this->actingAs($owner)->get(route('administration.reports.audit', [
+        'from' => '2026-09-10',
+        'to' => '2026-09-10',
+    ]))->assertInertia(fn (Assert $page) => $page
+        ->where('entries.total', 2)
+        ->where('entries.data.0.subject_id', 3)
+        ->where('entries.data.1.subject_id', 2));
+});
+
+test('audit change values use shipment and order labels while preserving free text', function () {
+    $owner = User::factory()->administrator()->create();
+    DB::table('audit_logs')->insert([
+        'actor_id' => $owner->id,
+        'action' => 'order.status.updated',
+        'subject_type' => 'order',
+        'subject_id' => 123,
+        'changes' => json_encode([
+            'before' => 'processing',
+            'after' => 'completed',
+            'shipment' => ['status' => 'in_transit', 'note' => 'leave_this_text_alone'],
+        ], JSON_THROW_ON_ERROR),
+        'created_at' => now(),
+    ]);
+
+    $this->actingAs($owner)->get(route('administration.reports.audit', ['action' => 'order.status.updated']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('entries.data.0.details.0.label', 'Order status')
+            ->where('entries.data.0.details.0.before', 'Processing')
+            ->where('entries.data.0.details.0.after', 'Completed')
+            ->where('entries.data.0.details.1.after', '{"status":"In transit","note":"leave_this_text_alone"}'));
+});
+
 test('product activation is recorded once and a repeated submission leaves history unchanged', function () {
     $owner = User::factory()->administrator()->create();
     $product = Product::factory()->create(['is_active' => true]);

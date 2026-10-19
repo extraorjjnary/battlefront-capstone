@@ -14,6 +14,7 @@ import CatalogPagination from '@/components/CatalogPagination.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/currency';
+import { formatDateTime } from '@/lib/dateTime';
 import { orderStatusBadgeClass } from '@/lib/orderStatus';
 import { index as productIndex } from '@/routes/products';
 
@@ -21,13 +22,8 @@ defineProps({
     orders: { type: Object, required: true },
 });
 
-const dateFormatter = new Intl.DateTimeFormat('en-PH', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-});
-
 function formatOrderDate(value) {
-    return dateFormatter.format(new Date(value));
+    return formatDateTime(value);
 }
 
 defineOptions({

@@ -118,6 +118,8 @@ function startCodWorker(Closure $task): Process
 }
 
 test('real MySQL overlap serializes delivery and COD collection without duplicate sales', function (string $firstOperation, string $secondOperation, ShipmentStatus $initial, array $expectedOutcomes, int $expectedSales) {
+    expect(DB::connection('mysql')->selectOne('SELECT @@session.time_zone AS timezone')->timezone)->toBe('+00:00');
+
     $order = Order::factory()->cashOnDelivery()->create(['status' => OrderStatus::Processing]);
     Shipment::factory()->for($order)->create(['status' => $initial, 'delivered_at' => $initial === ShipmentStatus::Delivered ? now() : null]);
     $stock = Inventory::factory()->create(['quantity' => 8]);

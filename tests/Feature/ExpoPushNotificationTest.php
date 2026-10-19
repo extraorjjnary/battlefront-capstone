@@ -15,6 +15,7 @@ use App\Models\OrderItem;
 use App\Models\PushDevice;
 use App\Models\Shipment;
 use App\Models\User;
+use App\Services\Notifications\NotificationHistory;
 use App\Services\Order\OrderProcessingService;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Auth;
@@ -293,6 +294,74 @@ test('provider errors retain usable tokens and expose only sanitized failures', 
     }
     expect($delivery->device->refresh()->is_active)->toBeTrue();
 })->with(['connection', 'temporary', 'malformed', 'credentials', 'payload']);
+
+test('push preparation failures reset the claim so the queued job can retry', function () {
+    config(['services.expo.enabled' => true]);
+    Http::preventStrayRequests();
+    Http::fake(['exp.host/--/api/v2/push/send' => Http::response(['data' => ['status' => 'ok', 'id' => 'retry-ticket']])]);
+    Bus::fake([CheckExpoReceipt::class]);
+    $delivery = NotificationPushDelivery::factory()->create();
+    $history = Mockery::mock(NotificationHistory::class);
+    $history->shouldReceive('presentMany')->once()->andThrow(new RuntimeException('Preparation failed.'));
+    app()->instance(NotificationHistory::class, $history);
+
+    expect(fn () => app()->call([new SendExpoNotification($delivery->id), 'handle']))
+        ->toThrow(RuntimeException::class);
+    expect($delivery->refresh()->status)->toBe('pending');
+
+    app()->forgetInstance(NotificationHistory::class);
+    app()->call([new SendExpoNotification($delivery->id), 'handle']);
+
+    expect($delivery->refresh()->status)->toBe('accepted');
+    Http::assertSentCount(1);
+});
+
+test('receipt enqueue retries from the saved ticket without sending another push', function () {
+    config(['services.expo.enabled' => true]);
+    Http::preventStrayRequests();
+    Http::fake(['exp.host/--/api/v2/push/send' => Http::response(['data' => ['status' => 'ok', 'id' => 'receipt-retry-ticket']])]);
+    $delivery = NotificationPushDelivery::factory()->create();
+    $attempts = 0;
+    Bus::shouldReceive('dispatch')->twice()->andReturnUsing(function (CheckExpoReceipt $job) use (&$attempts, $delivery): null {
+        expect($job->deliveryId)->toBe($delivery->id);
+        $attempts++;
+        if ($attempts === 1) {
+            throw new RuntimeException('Queue unavailable.');
+        }
+
+        return null;
+    });
+
+    expect(fn () => app()->call([new SendExpoNotification($delivery->id), 'handle']))
+        ->toThrow(RuntimeException::class);
+    expect($delivery->refresh()->status)->toBe('accepted');
+    expect($delivery->error_code)->toBe('ReceiptQueuePending');
+
+    app()->call([new SendExpoNotification($delivery->id), 'handle']);
+
+    expect($delivery->refresh()->status)->toBe('accepted');
+    expect($delivery->error_code)->toBeNull();
+    Http::assertSentCount(1);
+});
+
+test('exhausted push and receipt jobs persist explicit failure states without overwriting terminal states', function () {
+    $pending = NotificationPushDelivery::factory()->create(['status' => 'pending']);
+    (new SendExpoNotification($pending->id))->failed(new RuntimeException('Retries exhausted.'));
+    expect($pending->refresh()->status)->toBe('failed');
+    expect($pending->error_code)->toBe('RetriesExhausted');
+
+    $accepted = NotificationPushDelivery::factory()->create([
+        'status' => 'accepted',
+        'ticket_id' => 'receipt-exhausted-ticket',
+    ]);
+    (new CheckExpoReceipt($accepted->id))->failed(new RuntimeException('Retries exhausted.'));
+    expect($accepted->refresh()->status)->toBe('receipt_unavailable');
+    expect($accepted->error_code)->toBe('ReceiptRetriesExhausted');
+
+    $received = NotificationPushDelivery::factory()->create(['status' => 'provider_received']);
+    (new SendExpoNotification($received->id))->failed(new RuntimeException('Delayed callback.'));
+    expect($received->refresh()->status)->toBe('provider_received');
+});
 
 test('push provider failure cannot change completed payment cancellation or shipment business outcomes', function (string $action) {
     config(['services.expo.enabled' => true]);

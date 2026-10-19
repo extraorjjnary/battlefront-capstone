@@ -38,4 +38,58 @@ jobs:
         run: composer setup
 
       - name: Run CI Checks
-        run: composer ci:check
+        run: composer ci:check && npm run test:frontend
+
+  mysql-concurrency:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: battlefront-test-password
+          MYSQL_DATABASE: battlefront_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pbattlefront-test-password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      APP_ENV: testing
+      DB_CONNECTION: sqlite
+      DB_DATABASE: ':memory:'
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USERNAME: root
+      DB_PASSWORD: battlefront-test-password
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.4'
+          extensions: bcmath, gd, pdo_mysql
+          tools: composer:v2
+          coverage: none
+
+      - name: Prepare SQLite database
+        run: touch database/database.sqlite
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Prepare application key
+        run: |
+          cp .env.example .env
+          php artisan key:generate --force
+
+      - name: Run MySQL concurrency and migration tests
+        run: BATTLEFRONT_COD_MYSQL_TESTS=1 php artisan test --compact tests/Feature/CodOrderConcurrencyTest.php

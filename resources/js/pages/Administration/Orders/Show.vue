@@ -40,6 +40,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { formatDateTime } from '@/lib/dateTime';
 import {
     Select,
     SelectContent,
@@ -182,11 +183,6 @@ function submitPickupConfirmation() {
         },
     });
 }
-
-const dateFormatter = new Intl.DateTimeFormat('en-PH', {
-    dateStyle: 'long',
-    timeStyle: 'short',
-});
 
 function selectOrderStatus(status) {
     selectedOrderStatus.value = status;
@@ -390,7 +386,7 @@ defineOptions({
                         <p class="text-muted-foreground mt-2 text-sm">
                             Placed
                             {{
-                                dateFormatter.format(new Date(order.created_at))
+                                formatDateTime(order.created_at, 'long')
                             }}
                         </p>
                     </div>

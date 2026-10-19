@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency } from '@/lib/currency';
+import { formatDateTime } from '@/lib/dateTime';
 import { orderStatusBadgeClass } from '@/lib/orderStatus';
 import { dashboard as dashboardRoute } from '@/routes';
 
@@ -65,13 +66,8 @@ const quickLinks = [
         icon: ChartNoAxesCombined,
     },
 ];
-const dateFormatter = new Intl.DateTimeFormat('en-PH', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-});
-
 function formatDate(value) {
-    return dateFormatter.format(new Date(value));
+    return formatDateTime(value);
 }
 
 defineOptions({

@@ -5,17 +5,13 @@ import { ref } from 'vue';
 import CatalogPagination from '@/components/CatalogPagination.vue';
 import { Button } from '@/components/ui/button';
 import { useNotificationNavigation } from '@/composables/useNotificationNavigation';
+import { formatDateTime } from '@/lib/dateTime';
 
 defineProps({ notifications: { type: Object, required: true } });
 const navigation = useNotificationNavigation();
 const { summary, isAdministrator } = navigation;
 const busy = ref(false);
 const error = ref('');
-const dateFormatter = new Intl.DateTimeFormat('en-PH', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-});
-
 function markRead(id = null) {
     error.value = '';
     router.patch(
@@ -121,11 +117,7 @@ function markRead(id = null) {
                                     <time
                                         :datetime="notification.occurred_at"
                                         >{{
-                                            dateFormatter.format(
-                                                new Date(
-                                                    notification.occurred_at,
-                                                ),
-                                            )
+                                            formatDateTime(notification.occurred_at)
                                         }}</time
                                     >
                                 </p>

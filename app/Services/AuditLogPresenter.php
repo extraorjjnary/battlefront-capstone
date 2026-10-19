@@ -2,7 +2,15 @@
 
 namespace App\Services;
 
+use App\Enums\FulfillmentMethod;
+use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
+use App\Enums\PaymentStatus;
+use App\Enums\ShipmentArrangement;
+use App\Enums\ShipmentStatus;
+use App\Enums\UserRole;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use stdClass;
 
@@ -17,7 +25,7 @@ class AuditLogPresenter
 
         return [
             'id' => (int) $entry->id,
-            'created_at' => $entry->created_at,
+            'created_at' => CarbonImmutable::parse($entry->created_at, 'UTC')->utc()->toISOString(),
             'actor_id' => $entry->actor_id === null ? null : (int) $entry->actor_id,
             'actor_name' => $entry->actor_name ?? 'System or removed account',
             'action' => $entry->action,
@@ -28,7 +36,7 @@ class AuditLogPresenter
             'subject_url' => $this->subjectUrl($viewer, $entry->subject_type, $entry->subject_id),
             'reason' => $detailsVisible ? $entry->reason : null,
             'details_visible' => $detailsVisible,
-            'details' => is_array($changes) ? $this->details($changes) : [],
+            'details' => is_array($changes) ? $this->details($changes, $entry->action) : [],
             'has_changes' => $entry->changes !== null,
         ];
     }
@@ -69,11 +77,31 @@ class AuditLogPresenter
      * @param  array<string, mixed>  $changes
      * @return list<array{label: string, before: string|null, after: string}>
      */
-    private function details(array $changes): array
+    private function details(array $changes, string $action): array
     {
         $before = is_array($changes['before'] ?? null) ? $changes['before'] : [];
         $after = is_array($changes['after'] ?? null) ? $changes['after'] : [];
         $rows = [];
+
+        if (! is_array($changes['before'] ?? null) && ! is_array($changes['after'] ?? null)
+            && (array_key_exists('before', $changes) || array_key_exists('after', $changes))) {
+            $field = match ($action) {
+                'order.status.updated' => 'status',
+                'order.payment_status.updated' => 'payment_status',
+                default => 'value',
+            };
+            $rows[] = [
+                'label' => match ($action) {
+                    'order.status.updated' => 'Order status',
+                    'order.payment_status.updated' => 'Payment status',
+                    'inventory.reorder_level.updated' => 'Reorder level',
+                    'order.handler.assigned' => 'Assigned handler',
+                    default => 'Value',
+                },
+                'before' => array_key_exists('before', $changes) ? $this->value($field, $changes['before']) : null,
+                'after' => array_key_exists('after', $changes) ? $this->value($field, $changes['after']) : 'Removed',
+            ];
+        }
 
         foreach ($after as $key => $value) {
             $rows[] = [
@@ -92,7 +120,8 @@ class AuditLogPresenter
             }
         }
         foreach ($changes as $key => $value) {
-            if (in_array($key, ['before', 'after'], true)) {
+            if (in_array($key, ['before', 'after'], true)
+                && (is_array($value) || $rows !== [])) {
                 continue;
             }
             $rows[] = ['label' => Str::headline((string) $key), 'before' => null,
@@ -116,7 +145,9 @@ class AuditLogPresenter
         }
 
         if (is_array($value)) {
-            $value = $this->redactNested($value);
+            $value = $this->presentNestedValues($value);
+        } elseif (is_string($value)) {
+            $value = $this->enumLabel($value) ?? $value;
         }
 
         return is_scalar($value) ? (string) $value : (json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[unavailable]');
@@ -125,14 +156,26 @@ class AuditLogPresenter
     /** @param array<string|int, mixed> $values
      * @return array<string|int, mixed>
      */
-    private function redactNested(array $values): array
+    private function presentNestedValues(array $values): array
     {
         foreach ($values as $key => $value) {
             $values[$key] = preg_match('/password|secret|token|proof|evidence|(^|_)path$/i', (string) $key) === 1
                 ? '[redacted]'
-                : (is_array($value) ? $this->redactNested($value) : $value);
+                : (is_array($value) ? $this->presentNestedValues($value)
+                    : (is_string($value) ? ($this->enumLabel($value) ?? $value) : $value));
         }
 
         return $values;
+    }
+
+    private function enumLabel(string $value): ?string
+    {
+        return ShipmentStatus::tryFrom($value)?->label()
+            ?? ShipmentArrangement::tryFrom($value)?->label()
+            ?? PaymentMethod::tryFrom($value)?->label()
+            ?? PaymentStatus::tryFrom($value)?->label()
+            ?? OrderStatus::tryFrom($value)?->label()
+            ?? FulfillmentMethod::tryFrom($value)?->label()
+            ?? (UserRole::tryFrom($value) === null ? null : Str::headline($value));
     }
 }

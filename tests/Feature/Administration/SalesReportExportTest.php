@@ -110,7 +110,7 @@ test('print reports contain authoritative KPIs and complete sale backed breakdow
         ]));
 
     $response->assertOk()->assertHeader('Content-Type', 'text/html; charset=utf-8')
-        ->assertSee('Battlefront Computer Trading')->assertSee('Oct 12, 2026, 9:30 AM')
+        ->assertSee('Battlefront Computer Trading')->assertSee('Oct 12, 2026, 5:30 PM Asia/Manila')
         ->assertSee('2026-09-01 to 2026-09-30')->assertSee('₱500.00')->assertSee('₱250.00')
         ->assertSee('Sales by reporting period')->assertSee('Category sales breakdown')->assertSee('Product sales breakdown')
         ->assertSee('Ryzen 7')->assertSee('Mechanical Keyboard')->assertSee('window.print()', false)

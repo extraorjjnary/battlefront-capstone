@@ -43,7 +43,7 @@ class AuditLogController extends Controller
             fputcsv($output, ['ID', 'Date', 'Actor', 'Action', 'Subject type', 'Subject ID', 'Reason', 'Changes']);
             foreach ($this->query($filters)->cursor() as $entry) {
                 fputcsv($output, [
-                    $entry->id, $entry->created_at, $this->csvText($entry->actor_name),
+                    $entry->id, $this->formatTimestamp($entry->created_at), $this->csvText($entry->actor_name),
                     $this->csvText($entry->action), $this->csvText($entry->subject_type),
                     $entry->subject_id, $this->csvText($entry->reason), $this->csvText($entry->changes),
                 ], ',', '"', '');
@@ -57,6 +57,19 @@ class AuditLogController extends Controller
         $value ??= '';
 
         return preg_match('/^(?:[\t\r\n]|[\s\p{Z}\p{C}]*[=+\-@])/u', $value) === 1 ? "'".$value : $value;
+    }
+
+    private function formatTimestamp(string $timestamp): string
+    {
+        return CarbonImmutable::parse($timestamp, 'UTC')
+            ->setTimezone(config('battlefront.timezone'))
+            ->format('Y-m-d H:i:s P');
+    }
+
+    private function dateBoundary(string $date): string
+    {
+        return CarbonImmutable::parse($date, config('battlefront.timezone'))
+            ->startOfDay()->utc()->toDateTimeString();
     }
 
     /** @return array<string, mixed> */
@@ -84,8 +97,8 @@ class AuditLogController extends Controller
             ->when($filters['actor_id'] ?? null, fn ($query, $actor) => $query->where('audit_logs.actor_id', $actor))
             ->when($filters['subject_type'] ?? null, fn ($query, $type) => $query->where('audit_logs.subject_type', $type))
             ->when($filters['subject_id'] ?? null, fn ($query, $id) => $query->where('audit_logs.subject_id', $id))
-            ->when($filters['from'] ?? null, fn ($query, $from) => $query->where('audit_logs.created_at', '>=', $from))
-            ->when($filters['to'] ?? null, fn ($query, $to) => $query->where('audit_logs.created_at', '<', CarbonImmutable::parse($to)->addDay()->toDateString()))
+            ->when($filters['from'] ?? null, fn ($query, $from) => $query->where('audit_logs.created_at', '>=', $this->dateBoundary($from)))
+            ->when($filters['to'] ?? null, fn ($query, $to) => $query->where('audit_logs.created_at', '<', $this->dateBoundary(CarbonImmutable::parse($to)->addDay()->toDateString())))
             ->orderByDesc('audit_logs.id');
     }
 }
