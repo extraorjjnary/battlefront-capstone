@@ -66,6 +66,54 @@ function createSalesCrossFilterFixture(): array
     return compact('components', 'peripherals', 'processor', 'keyboard');
 }
 
+test('sales report separates sale dates from refund payment dates and calculates balance at cutoff', function () {
+    $owner = User::factory()->administrator()->create();
+    $product = Product::factory()->create();
+    $sale = createSalesReportEntry('2026-09-05', '100.00', [
+        ['product' => $product, 'quantity' => 1, 'price' => '100.00'],
+    ]);
+    $itemId = DB::table('order_items')->where('order_id', $sale->order_id)->value('id');
+    $returnId = DB::table('customer_returns')->insertGetId([
+        'order_id' => $sale->order_id, 'requester_id' => $owner->id,
+        'status' => 'accepted', 'reason' => 'Verified return',
+        'created_at' => '2026-09-06 10:00:00', 'updated_at' => '2026-09-06 10:00:00',
+    ]);
+    DB::table('customer_return_items')->insert([
+        'customer_return_id' => $returnId, 'order_item_id' => $itemId,
+        'quantity' => 1, 'condition' => 'opened', 'disposition' => 'write_off',
+    ]);
+    $refundId = DB::table('customer_refunds')->insertGetId([
+        'customer_return_id' => $returnId, 'approved_by' => $owner->id,
+        'approved_amount' => '50.00', 'paid_amount' => '30.00',
+        'created_at' => '2026-09-06 10:00:00', 'updated_at' => '2026-10-02 10:00:00',
+    ]);
+    foreach ([['20.00', '2026-09-20 10:00:00'], ['10.00', '2026-10-02 10:00:00']] as [$amount, $date]) {
+        DB::table('customer_refund_payments')->insert([
+            'customer_refund_id' => $refundId, 'recorded_by' => $owner->id,
+            'amount' => $amount, 'payment_method' => 'cash', 'external_reference' => $date,
+            'paid_at' => $date,
+        ]);
+    }
+
+    $this->actingAs($owner)->get(route('administration.reports.sales', ['from' => '2026-09-01', 'to' => '2026-09-30']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('refund_measures.gross_item_sales', '100.00')
+            ->where('refund_measures.refund_payments', '20.00')
+            ->where('refund_measures.gross_less_refunds', '80.00')
+            ->where('refund_measures.outstanding_at_cutoff', '30.00')
+            ->where('refund_measures.payments.total', 1)
+            ->where('refund_measures.outstanding_refunds.total', 1)
+            ->where('sale_transactions.total', 1));
+
+    $unrelated = Product::factory()->create();
+    $this->actingAs($owner)->get(route('administration.reports.sales', [
+        'from' => '2026-09-01', 'to' => '2026-09-30', 'product_id' => $unrelated->id,
+    ]))->assertInertia(fn (Assert $page) => $page
+        ->where('refund_measures.gross_item_sales', '0.00')
+        ->where('refund_measures.refund_payments', '0.00')
+        ->where('refund_measures.outstanding_at_cutoff', '0.00'));
+});
+
 test('guests are redirected from sales reports and customers are forbidden', function () {
     $customer = User::factory()->customer()->create();
 

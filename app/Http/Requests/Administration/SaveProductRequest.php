@@ -38,8 +38,15 @@ class SaveProductRequest extends FormRequest
             return true;
         }
 
-        return (string) $this->input('price') === (string) $product->price
-            && (string) $this->input('discount_price') === (string) $product->discount_price;
+        if ((int) $this->input('edit_version') !== $product->edit_version) {
+            return true;
+        }
+
+        return is_numeric($this->input('price'))
+            && bccomp($this->numericAmount($this->input('price')), $this->numericAmount($product->price), 2) === 0
+            && ($this->input('discount_price') === null && $product->discount_price === null
+                || is_numeric($this->input('discount_price')) && $product->discount_price !== null
+                    && bccomp($this->numericAmount($this->input('discount_price')), $this->numericAmount($product->discount_price), 2) === 0);
     }
 
     /**
@@ -55,6 +62,8 @@ class SaveProductRequest extends FormRequest
             : [];
 
         return [
+            'edit_version' => $product instanceof Product ? ['required', 'integer', 'min:1'] : ['exclude'],
+            'price_change_reason' => $product instanceof Product ? ['nullable', 'string', 'min:5', 'max:1000'] : ['exclude'],
             'shipping_profile' => ['sometimes', 'required', Rule::enum(ShippingProfile::class)],
             'product_code' => $product instanceof Product ? [
                 'bail', 'required', 'string', 'regex:'.Product::CODE_PATTERN,
@@ -108,6 +117,7 @@ class SaveProductRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'edit_version.required' => 'Reload this product and review the latest changes before saving.',
             'product_code.required' => 'Enter a product code.',
             'product_code.regex' => 'Use 1 to 64 letters or digits for the product code.',
             'product_code.unique' => 'This product code is already in use.',
@@ -131,5 +141,15 @@ class SaveProductRequest extends FormRequest
             'tag_ids.*.distinct' => 'Each tag may only be selected once.',
             'tag_ids.*.exists' => 'Select valid product tags.',
         ];
+    }
+
+    /** @return numeric-string */
+    private function numericAmount(mixed $amount): string
+    {
+        if (! is_numeric($amount)) {
+            throw new \InvalidArgumentException('A product price must be numeric.');
+        }
+
+        return (string) $amount;
     }
 }

@@ -97,6 +97,18 @@ class NotificationHistory
             'created_at' => $notification->created_at?->toIso8601String(),
             'read_at' => $notification->read_at?->toIso8601String(),
             'is_read' => $notification->read_at !== null,
+            'decisions' => collect(is_array($data['decisions'] ?? null) ? $data['decisions'] : [])->map(function (array $decision) use ($user): array {
+                $routeName = match ($decision['action']) {
+                    'inventory.adjustment.approved' => 'administration.inventory-adjustments.index',
+                    'damage.decided' => 'administration.damage-reports.index',
+                    'customer_return.accepted' => 'administration.customer-returns.index',
+                    'supplier_return.approved' => 'administration.supplier-returns.index',
+                    default => null,
+                };
+
+                return [...$decision, 'web_url' => $routeName !== null && $user->can('audit.view')
+                    ? route($routeName, ['case' => $decision['subject_id']]) : null];
+            })->all(),
             'order' => $order === null ? null : [
                 'id' => $order->id,
                 'reference' => $order->reference,

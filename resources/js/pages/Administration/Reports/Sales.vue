@@ -1,5 +1,5 @@
 <script setup>
-import { Head, router, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     ArcElement,
     BarElement,
@@ -27,6 +27,8 @@ import {
 import { computed, ref, watch } from 'vue';
 import { Bar, Doughnut, Line } from 'vue-chartjs';
 import SalesReportController from '@/actions/App/Http/Controllers/Administration/SalesReportController';
+import CustomerReturnController from '@/actions/App/Http/Controllers/Administration/CustomerReturnController';
+import OrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
 import {
     csv,
     pdf,
@@ -69,6 +71,8 @@ const props = defineProps({
     products: { type: Object, required: true },
     active_filters: { type: Object, required: true },
     recommendation_engagement: { type: Object, required: true },
+    refund_measures: { type: Object, required: true },
+    sale_transactions: { type: Object, required: true },
 });
 
 const page = usePage();
@@ -569,6 +573,62 @@ defineOptions({
                     </a>
                 </Button>
             </div>
+        </section>
+
+        <section aria-labelledby="refund-measures-heading" class="border-border bg-card border p-5">
+            <h2 id="refund-measures-heading" class="text-xl font-semibold">Sales and refunds by event date</h2>
+            <p class="text-muted-foreground mt-1 text-sm">Sales use sale dates; recorded refund payments use payment dates. The difference is a period measure, not profit. Outstanding balance includes approvals through {{ refund_measures.cutoff }} and payments recorded through that date.</p>
+            <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div v-for="measure in [
+                    { label: 'Gross item sales', value: refund_measures.gross_item_sales },
+                    { label: 'Recorded refund payments', value: refund_measures.refund_payments },
+                    { label: 'Gross less refunds in period', value: refund_measures.gross_less_refunds },
+                    { label: 'Outstanding approved refunds at cutoff', value: refund_measures.outstanding_at_cutoff },
+                ]" :key="measure.label" class="border-border border p-4">
+                    <p class="text-muted-foreground text-xs">{{ measure.label }}</p>
+                    <p class="mt-2 text-xl font-bold">{{ formatCurrency(measure.value) }}</p>
+                </div>
+            </div>
+            <h3 class="mt-6 font-semibold">Sale source records</h3>
+            <div class="mt-3 space-y-2">
+                <div v-for="sale in sale_transactions.data" :key="sale.id" class="border-border flex flex-wrap items-center justify-between gap-2 border p-3 text-sm">
+                    <div><strong>Sale #{{ sale.id }}</strong> · {{ formatCurrency(sale.product_revenue) }} · {{ sale.sale_date }}</div>
+                    <Link v-if="page.props.auth.can?.viewOrders" :href="OrderController.show(sale.order_id)" class="text-primary underline">Order BF-{{ String(sale.order_id).padStart(6, '0') }}</Link>
+                    <span v-else>Order BF-{{ String(sale.order_id).padStart(6, '0') }}</span>
+                </div>
+                <p v-if="sale_transactions.data.length === 0" class="text-muted-foreground text-sm">No sales in this period.</p>
+            </div>
+            <nav v-if="sale_transactions.last_page > 1" class="mt-3 flex justify-between text-sm" aria-label="Sale transaction pages">
+                <Link v-if="sale_transactions.prev_page_url" :href="sale_transactions.prev_page_url" class="text-primary underline">Previous</Link><span v-else></span>
+                <Link v-if="sale_transactions.next_page_url" :href="sale_transactions.next_page_url" class="text-primary underline">Next</Link>
+            </nav>
+            <h3 class="mt-6 font-semibold">Refund payment source records</h3>
+            <p class="text-muted-foreground mt-1 text-xs">Staff-recorded transactions; payment review is shown in the return case.</p>
+            <div class="mt-3 space-y-2">
+                <div v-for="payment in refund_measures.payments.data" :key="payment.id" class="border-border flex flex-wrap items-center justify-between gap-2 border p-3 text-sm">
+                    <div><strong>Payment #{{ payment.id }}</strong> · {{ formatCurrency(payment.amount) }} · {{ payment.paid_at }} <span class="text-muted-foreground">{{ payment.external_reference }}</span></div>
+                    <Link v-if="page.props.auth.can?.viewOrders" :href="CustomerReturnController.index({ query: { case: payment.customer_return_id } })" class="text-primary underline">Return #{{ payment.customer_return_id }}</Link>
+                    <span v-else>Return #{{ payment.customer_return_id }}</span>
+                </div>
+                <p v-if="refund_measures.payments.data.length === 0" class="text-muted-foreground text-sm">No refund payments in this period.</p>
+            </div>
+            <nav v-if="refund_measures.payments.last_page > 1" class="mt-3 flex justify-between text-sm" aria-label="Refund payment pages">
+                <Link v-if="refund_measures.payments.prev_page_url" :href="refund_measures.payments.prev_page_url" class="text-primary underline">Previous</Link><span v-else></span>
+                <Link v-if="refund_measures.payments.next_page_url" :href="refund_measures.payments.next_page_url" class="text-primary underline">Next</Link>
+            </nav>
+            <h3 class="mt-6 font-semibold">Outstanding approvals at cutoff</h3>
+            <div class="mt-3 space-y-2">
+                <div v-for="refund in refund_measures.outstanding_refunds.data" :key="refund.id" class="border-border flex flex-wrap items-center justify-between gap-2 border p-3 text-sm">
+                    <div><strong>Refund #{{ refund.id }}</strong> · Approved {{ formatCurrency(refund.approved_amount) }} · Paid by cutoff {{ formatCurrency(refund.paid_at_cutoff) }} · Outstanding {{ formatCurrency(refund.outstanding_amount) }}</div>
+                    <Link v-if="page.props.auth.can?.viewOrders" :href="CustomerReturnController.index({ query: { case: refund.customer_return_id } })" class="text-primary underline">Return #{{ refund.customer_return_id }}</Link>
+                    <span v-else>Return #{{ refund.customer_return_id }}</span>
+                </div>
+                <p v-if="refund_measures.outstanding_refunds.data.length === 0" class="text-muted-foreground text-sm">No approved refund balance remains at cutoff.</p>
+            </div>
+            <nav v-if="refund_measures.outstanding_refunds.last_page > 1" class="mt-3 flex justify-between text-sm" aria-label="Outstanding refund pages">
+                <Link v-if="refund_measures.outstanding_refunds.prev_page_url" :href="refund_measures.outstanding_refunds.prev_page_url" class="text-primary underline">Previous</Link><span v-else></span>
+                <Link v-if="refund_measures.outstanding_refunds.next_page_url" :href="refund_measures.outstanding_refunds.next_page_url" class="text-primary underline">Next</Link>
+            </nav>
         </section>
 
         <section

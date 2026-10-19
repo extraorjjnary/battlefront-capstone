@@ -90,6 +90,9 @@ class SalesReportRequest extends FormRequest
             'product_id' => ['nullable', 'integer', Rule::exists('products', 'id')],
             'category_id' => ['nullable', 'integer', Rule::exists('categories', 'id')],
             'page' => ['nullable', 'integer', 'min:1'],
+            'sale_page' => ['nullable', 'integer', 'min:1'],
+            'refund_page' => ['nullable', 'integer', 'min:1'],
+            'balance_page' => ['nullable', 'integer', 'min:1'],
         ];
     }
 

@@ -22,6 +22,8 @@ import AdministrationOrderController from '@/actions/App/Http/Controllers/Admini
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import SalesReportController from '@/actions/App/Http/Controllers/Administration/SalesReportController';
 import StaffPerformanceController from '@/actions/App/Http/Controllers/Administration/StaffPerformanceController';
+import StockReconciliationController from '@/actions/App/Http/Controllers/Administration/StockReconciliationController';
+import WorkQueueController from '@/actions/App/Http/Controllers/Administration/WorkQueueController';
 import AuditLogController from '@/actions/App/Http/Controllers/Administration/AuditLogController';
 import InventoryAdjustmentController from '@/actions/App/Http/Controllers/Administration/InventoryAdjustmentController';
 import DamageReportController from '@/actions/App/Http/Controllers/Administration/DamageReportController';
@@ -62,6 +64,7 @@ export function useAppNavigation() {
         ];
 
         if (isAdministrator.value) {
+            items.push({ title: 'Work queue', href: WorkQueueController.index(), icon: ReceiptText });
             if (page.props.auth?.can?.browseProductCatalog) items.push({
                 title: 'Product Catalog',
                 href: productIndex(),
@@ -82,6 +85,7 @@ export function useAppNavigation() {
                 icon: Boxes,
             });
             if (page.props.auth?.can?.viewInventory) items.push({ title: 'Stock requests', href: InventoryAdjustmentController.index(), icon: Boxes });
+            if (page.props.auth?.can?.viewInventory) items.push({ title: 'Stock reconciliation', href: StockReconciliationController.index(), icon: Boxes });
             if (page.props.auth?.can?.viewInventory) items.push({ title: 'Damage reports', href: DamageReportController.index(), icon: Boxes });
             if (page.props.auth?.can?.viewInventory) items.push({ title: 'Supplier returns', href: SupplierReturnController.index(), icon: Boxes });
             if (page.props.auth?.can?.viewOrders) items.push({ title: 'Customer returns', href: CustomerReturnController.index(), icon: ReceiptText });

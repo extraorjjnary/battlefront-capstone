@@ -33,6 +33,20 @@ class UpdateProduct
         try {
             DB::transaction(function () use ($product, $attributes, $tagIds, $image, &$storedImage): void {
                 $lockedProduct = Product::query()->lockForUpdate()->findOrFail($product->id);
+                $expectedVersion = (int) $attributes['edit_version'];
+                unset($attributes['edit_version']);
+                if ($expectedVersion !== $lockedProduct->edit_version) {
+                    throw ValidationException::withMessages(['edit_version' => 'This product changed while you were editing. Reload and review the latest values before saving.']);
+                }
+                $priceChanged = bccomp($this->numericAmount($attributes['price']), $this->numericAmount($lockedProduct->price), 2) !== 0
+                    || (($attributes['discount_price'] ?? null) === null) !== ($lockedProduct->discount_price === null)
+                    || (($attributes['discount_price'] ?? null) !== null && $lockedProduct->discount_price !== null
+                        && bccomp($this->numericAmount($attributes['discount_price']), $this->numericAmount($lockedProduct->discount_price), 2) !== 0);
+                $priceChangeReason = trim((string) ($attributes['price_change_reason'] ?? ''));
+                unset($attributes['price_change_reason']);
+                if ($priceChanged && mb_strlen($priceChangeReason) < 5) {
+                    throw ValidationException::withMessages(['price_change_reason' => 'Explain the price change in at least five characters.']);
+                }
                 if ($lockedProduct->is_catalog_imported && isset($attributes['product_code'])
                     && $attributes['product_code'] !== $lockedProduct->product_code) {
                     throw ValidationException::withMessages(['product_code' => 'Imported product codes cannot be changed.']);
@@ -50,6 +64,7 @@ class UpdateProduct
                 }
                 $changedAttributes = $lockedProduct->getDirty();
                 $before = array_intersect_key($lockedProduct->getOriginal(), $changedAttributes);
+                $lockedProduct->edit_version++;
                 $lockedProduct->save();
                 $lockedProduct->tags()->sync($tagIds);
 
@@ -58,6 +73,7 @@ class UpdateProduct
                     'action' => 'product.updated',
                     'subject_type' => 'product',
                     'subject_id' => $lockedProduct->id,
+                    'reason' => $priceChanged ? $priceChangeReason : null,
                     'changes' => json_encode(['before' => $before, 'after' => $changedAttributes, 'tag_ids' => $tagIds], JSON_THROW_ON_ERROR),
                     'created_at' => now(),
                 ]);
@@ -79,5 +95,15 @@ class UpdateProduct
         }
 
         return $product->refresh();
+    }
+
+    /** @return numeric-string */
+    private function numericAmount(mixed $amount): string
+    {
+        if (! is_numeric($amount)) {
+            throw ValidationException::withMessages(['price' => 'Enter a valid product price.']);
+        }
+
+        return (string) $amount;
     }
 }

@@ -23,6 +23,7 @@ test('the product schema follows the approved ERD decisions', function () {
         'discount_price',
         'image_path',
         'is_active',
+        'edit_version',
         'created_at',
     ]);
 });

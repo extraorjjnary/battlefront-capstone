@@ -3,6 +3,7 @@
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia as Assert;
 
 test('reported damage immediately quarantines stock and another person decides its disposition', function () {
     $staff = User::factory()->administrator()->create([
@@ -22,14 +23,18 @@ test('reported damage immediately quarantines stock and another person decides i
     expect($inventoryAfterReport->quantity)->toBe($before - 1)
         ->and($inventoryAfterReport->quarantined_quantity)->toBe(1);
     $id = DB::table('damage_reports')->where('product_id', $product->id)->value('id');
+    $this->actingAs($manager)->get(route('administration.damage-reports.index'))
+        ->assertInertia(fn (Assert $page) => $page->component('Administration/DamageReports')->where('reports.data.0.held_quantity', 1));
     $this->actingAs($staff)->post(route('administration.damage-reports.decide', $id), [
-        'disposition' => 'write_off',
+        'disposition' => 'write_off', 'reason' => 'Unit cannot be sold safely',
     ])->assertForbidden();
     $this->actingAs($manager)->post(route('administration.damage-reports.decide', $id), [
-        'disposition' => 'write_off',
+        'disposition' => 'write_off', 'reason' => 'Unit cannot be sold safely',
     ])->assertSessionHasNoErrors();
     expect($product->inventory->fresh()->quarantined_quantity)->toBe(0);
     $this->assertDatabaseHas('inventory_movements', ['reference_id' => $id, 'kind' => 'damage_write_off']);
+    $this->actingAs($manager)->get(route('administration.damage-reports.index'))
+        ->assertInertia(fn (Assert $page) => $page->component('Administration/DamageReports')->where('reports.data.0.held_quantity', 0));
 });
 
 test('damage cannot quarantine more than sellable quantity', function () {

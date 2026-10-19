@@ -49,6 +49,7 @@ test('manager can manage products while owner retains price and deletion control
     $this->actingAs($manager)->get(route('administration.products.create'))->assertForbidden();
     $this->actingAs($manager)->delete(route('administration.products.destroy', $product))->assertForbidden();
     $this->actingAs($manager)->put(route('administration.products.update', $product), [
+        'edit_version' => $product->edit_version,
         'product_code' => $product->product_code,
         'name' => $product->name,
         'category_id' => $product->category_id,

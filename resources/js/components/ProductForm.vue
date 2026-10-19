@@ -88,6 +88,8 @@ function firstTagError(errors) {
 
 <template>
     <Form v-bind="form" class="space-y-8" v-slot="{ errors, processing }">
+        <input v-if="product" type="hidden" name="edit_version" :value="product.edit_version" />
+        <InputError v-if="product" :message="errors.edit_version" />
         <input
             v-if="methodOverride"
             type="hidden"
@@ -315,6 +317,11 @@ function firstTagError(errors) {
                         :aria-invalid="Boolean(errors.discount_price)"
                     />
                     <InputError :message="errors.discount_price" />
+                </div>
+                <div v-if="product && canEditPrice" class="grid gap-2 md:col-span-2">
+                    <Label for="price_change_reason">Reason for a price change</Label>
+                    <Textarea id="price_change_reason" name="price_change_reason" rows="2" maxlength="1000" placeholder="Required when the regular or discount price changes" :aria-invalid="Boolean(errors.price_change_reason)" />
+                    <InputError :message="errors.price_change_reason" />
                 </div>
 
                 <div class="grid gap-2 md:col-span-2">

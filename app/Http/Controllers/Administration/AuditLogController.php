@@ -3,35 +3,37 @@
 namespace App\Http\Controllers\Administration;
 
 use App\Http\Controllers\Controller;
+use App\Services\AuditLogPresenter;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 use RuntimeException;
+use stdClass;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AuditLogController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request, AuditLogPresenter $presenter): Response
     {
-        $filters = $request->validate([
-            'action' => ['nullable', 'string', 'max:100'],
-            'actor_id' => ['nullable', 'integer'],
-        ]);
+        $filters = $this->filters($request);
 
         return Inertia::render('Administration/Reports/AuditLog', [
             'filters' => $filters,
-            'entries' => $this->query($filters)->paginate(25)->withQueryString(),
+            'entries' => $this->query($filters)->paginate(25)->withQueryString()
+                ->through(fn (stdClass $entry): array => $presenter->present($entry, $request->user())),
+            'actors' => DB::table('users')->whereIn('id', DB::table('audit_logs')->whereNotNull('actor_id')->select('actor_id'))
+                ->orderBy('name')->orderBy('id')->get(['id', 'name']),
+            'actions' => DB::table('audit_logs')->distinct()->orderBy('action')->pluck('action'),
+            'subjectTypes' => DB::table('audit_logs')->distinct()->orderBy('subject_type')->pluck('subject_type'),
         ]);
     }
 
     public function export(Request $request): StreamedResponse
     {
-        $filters = $request->validate([
-            'action' => ['nullable', 'string', 'max:100'],
-            'actor_id' => ['nullable', 'integer'],
-        ]);
+        $filters = $this->filters($request);
 
         return response()->streamDownload(function () use ($filters): void {
             $output = fopen('php://output', 'w');
@@ -40,14 +42,38 @@ class AuditLogController extends Controller
             }
             fputcsv($output, ['ID', 'Date', 'Actor', 'Action', 'Subject type', 'Subject ID', 'Reason', 'Changes']);
             foreach ($this->query($filters)->cursor() as $entry) {
-                fputcsv($output, [$entry->id, $entry->created_at, $entry->actor_name, $entry->action, $entry->subject_type, $entry->subject_id, $entry->reason, $entry->changes]);
+                fputcsv($output, [
+                    $entry->id, $entry->created_at, $this->csvText($entry->actor_name),
+                    $this->csvText($entry->action), $this->csvText($entry->subject_type),
+                    $entry->subject_id, $this->csvText($entry->reason), $this->csvText($entry->changes),
+                ], ',', '"', '');
             }
             fclose($output);
         }, 'audit-log.csv', ['Content-Type' => 'text/csv']);
     }
 
+    private function csvText(?string $value): string
+    {
+        $value ??= '';
+
+        return preg_match('/^(?:[\t\r\n]|[\s\p{Z}\p{C}]*[=+\-@])/u', $value) === 1 ? "'".$value : $value;
+    }
+
+    /** @return array<string, mixed> */
+    private function filters(Request $request): array
+    {
+        return $request->validate([
+            'action' => ['nullable', 'string', 'max:100'],
+            'actor_id' => ['nullable', 'integer', 'min:1'],
+            'subject_type' => ['nullable', 'string', 'max:100'],
+            'subject_id' => ['nullable', 'integer', 'min:1'],
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
+        ]);
+    }
+
     /**
-     * @param  array{action?: string|null, actor_id?: int|null}  $filters
+     * @param  array<string, mixed>  $filters
      */
     private function query(array $filters): Builder
     {
@@ -56,6 +82,10 @@ class AuditLogController extends Controller
             ->select('audit_logs.*', 'users.name as actor_name')
             ->when($filters['action'] ?? null, fn ($query, $action) => $query->where('audit_logs.action', $action))
             ->when($filters['actor_id'] ?? null, fn ($query, $actor) => $query->where('audit_logs.actor_id', $actor))
+            ->when($filters['subject_type'] ?? null, fn ($query, $type) => $query->where('audit_logs.subject_type', $type))
+            ->when($filters['subject_id'] ?? null, fn ($query, $id) => $query->where('audit_logs.subject_id', $id))
+            ->when($filters['from'] ?? null, fn ($query, $from) => $query->where('audit_logs.created_at', '>=', $from))
+            ->when($filters['to'] ?? null, fn ($query, $to) => $query->where('audit_logs.created_at', '<', CarbonImmutable::parse($to)->addDay()->toDateString()))
             ->orderByDesc('audit_logs.id');
     }
 }

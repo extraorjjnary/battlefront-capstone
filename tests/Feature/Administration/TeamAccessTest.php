@@ -76,6 +76,7 @@ test('owner permission changes take effect on the next request', function () {
 
     $this->actingAs($owner)->put(route('administration.team.permissions.update', 'manager'), [
         'permissions' => $existing,
+        'edit_version' => 1,
     ])->assertSessionHasNoErrors();
 
     $this->actingAs($manager)->get(route('administration.reports.sales'))->assertForbidden();
@@ -88,7 +89,7 @@ test('owner can remove every permission from a role', function () {
         'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
     ]);
 
-    $this->actingAs($owner)->put(route('administration.team.permissions.update', 'staff'), [])
+    $this->actingAs($owner)->put(route('administration.team.permissions.update', 'staff'), ['edit_version' => 1])
         ->assertSessionHasNoErrors();
 
     $this->actingAs($staff)->get(route('administration.orders.index'))->assertForbidden();

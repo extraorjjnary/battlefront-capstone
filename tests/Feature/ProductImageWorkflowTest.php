@@ -17,8 +17,10 @@ function imageProductPayload(?Product $product = null): array
         'name' => $product?->name ?? 'Admin-created product',
         'category_id' => $product?->category_id ?? Category::factory()->create()->id,
         'brand' => 'Verified brand',
-        'price' => '100.00',
+        'price' => $product?->price ?? '100.00',
+        'discount_price' => $product?->discount_price,
         'is_featured' => false,
+        ...($product !== null ? ['edit_version' => $product->edit_version] : []),
     ];
 }
 

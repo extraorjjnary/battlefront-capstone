@@ -16,6 +16,7 @@ import InventoryController from '@/actions/App/Http/Controllers/Administration/I
 import OrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import SalesReportController from '@/actions/App/Http/Controllers/Administration/SalesReportController';
+import WorkQueueController from '@/actions/App/Http/Controllers/Administration/WorkQueueController';
 import DeferredContent from '@/components/DeferredContent.vue';
 import ListSkeleton from '@/components/ListSkeleton.vue';
 import StatSkeleton from '@/components/StatSkeleton.vue';
@@ -33,6 +34,12 @@ const props = defineProps({
 const page = usePage();
 const user = computed(() => page.props.auth.user);
 const quickLinks = [
+    {
+        title: 'Work queue',
+        description: 'Find open work available to your role.',
+        href: WorkQueueController.index(),
+        icon: ReceiptText,
+    },
     {
         title: 'Orders',
         description: 'Review payments and process active orders.',

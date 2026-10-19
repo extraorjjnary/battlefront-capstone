@@ -35,6 +35,7 @@ use Illuminate\Support\Facades\Storage;
  * @property string|null $image_path
  * @property-read string|null $image_url
  * @property bool $is_active
+ * @property int $edit_version
  * @property Carbon $created_at
  * @property-read Category $category
  * @property-read Inventory|null $inventory
@@ -84,6 +85,7 @@ class Product extends Model
         'shipping_profile' => 'standard',
         'is_featured' => false,
         'is_active' => true,
+        'edit_version' => 1,
     ];
 
     /**
@@ -254,6 +256,7 @@ class Product extends Model
             'is_featured' => 'boolean',
             'discount_price' => 'decimal:2',
             'is_active' => 'boolean',
+            'edit_version' => 'integer',
         ];
     }
 }

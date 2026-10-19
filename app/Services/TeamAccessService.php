@@ -77,15 +77,18 @@ class TeamAccessService
     /**
      * @param  list<string>  $codes
      */
-    public function replacePermissions(User $actor, string $role, array $codes): void
+    public function replacePermissions(User $actor, string $role, array $codes, int $editVersion): void
     {
         if (in_array($role, ['owner', 'it'], true)) {
             throw ValidationException::withMessages(['role' => 'Owner and IT permissions are fixed.']);
         }
 
-        DB::transaction(function () use ($actor, $role, $codes): void {
+        DB::transaction(function () use ($actor, $role, $codes, $editVersion): void {
             $roleId = $this->roleId($role);
-            DB::table('administration_roles')->where('id', $roleId)->lockForUpdate()->first();
+            $lockedRole = DB::table('administration_roles')->where('id', $roleId)->lockForUpdate()->first();
+            if ($lockedRole === null || (int) $lockedRole->edit_version !== $editVersion) {
+                throw ValidationException::withMessages(['edit_version' => 'These permissions changed while you were editing. Reload and review the latest grants before saving.']);
+            }
             $permissions = DB::table('administration_permissions')->whereIn('code', $codes)->pluck('id', 'code');
             if ($permissions->count() !== count(array_unique($codes))
                 || array_intersect($codes, ['users.manage', 'permissions.manage', 'audit.export']) !== []) {
@@ -102,6 +105,11 @@ class TeamAccessService
                     'administration_role_id' => $roleId, 'administration_permission_id' => $permissionId,
                 ]);
             }
+
+            DB::table('administration_roles')->where('id', $roleId)->update([
+                'edit_version' => $editVersion + 1,
+                'updated_at' => now(),
+            ]);
 
             $this->audit($actor, 'role.permissions.updated', $roleId, ['before' => $before, 'after' => $codes]);
         }, attempts: 3);

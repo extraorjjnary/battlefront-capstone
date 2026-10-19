@@ -186,6 +186,7 @@ class ProductController extends Controller
                     'price',
                     'discount_price',
                     'is_active',
+                    'edit_version',
                 ]),
                 'image_url' => $product->image_url,
                 'category' => $product->category->only(['name', 'is_active']),

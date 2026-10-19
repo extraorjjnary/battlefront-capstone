@@ -40,9 +40,9 @@ class HandleDamage
         }, attempts: 3);
     }
 
-    public function decide(int $damageId, User $reviewer, string $disposition, ?int $supplierId = null): void
+    public function decide(int $damageId, User $reviewer, string $disposition, string $reason, ?int $supplierId = null): void
     {
-        DB::transaction(function () use ($damageId, $reviewer, $disposition, $supplierId): void {
+        DB::transaction(function () use ($damageId, $reviewer, $disposition, $reason, $supplierId): void {
             $report = DB::table('damage_reports')->where('id', $damageId)->lockForUpdate()->first();
             if ($report === null) {
                 abort(404);
@@ -95,9 +95,10 @@ class HandleDamage
                 'status' => 'approved',
                 'disposition' => $disposition,
                 'reviewer_id' => $reviewer->id,
+                'decision_reason' => $reason,
                 'updated_at' => now(),
             ]);
-            $this->audit($reviewer, 'damage.decided', $damageId, ['disposition' => $disposition, 'requester_id' => $report->requester_id], null);
+            $this->audit($reviewer, 'damage.decided', $damageId, ['disposition' => $disposition, 'requester_id' => $report->requester_id], $reason);
             app(ApprovalMonitor::class)->afterApproval($reviewer, (int) $report->requester_id);
         }, attempts: 3);
     }

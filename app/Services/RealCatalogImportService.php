@@ -196,6 +196,9 @@ class RealCatalogImportService
                         $product->image_path = $row['image_path'];
                     }
                     $product->is_catalog_imported = true;
+                    if (! $isNew && $product->isDirty()) {
+                        $product->edit_version++;
+                    }
                     $product->save();
                     if ($isNew) {
                         app(CatalogShippingClassification::class)->apply($product);

@@ -60,6 +60,7 @@ class SalesReportService
             'filters' => $normalizedFilters,
             'active_filters' => $this->activeFilters($normalizedFilters),
             'kpis' => $this->kpiData($salesSummary),
+            'sale_transactions' => $this->salesReportRepository->transactions($dateRange, $productId, $categoryId),
             'timeline' => $this->timelineData(array_values($dailySales->all()), $from, $to, $period),
             'top_products' => [
                 'ids' => $topProducts->pluck('id')->map(fn (mixed $id): int => (int) $id)->all(),

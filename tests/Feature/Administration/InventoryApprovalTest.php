@@ -80,6 +80,36 @@ test('owners cannot approve their own stock request', function () {
     $this->assertDatabaseHas('inventory_adjustment_requests', ['id' => $requestId, 'status' => 'pending']);
 });
 
+test('a requester can withdraw and replace a pending stock request without changing stock', function () {
+    $staff = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
+    $other = User::factory()->administrator()->create();
+    $product = Product::factory()->available()->create();
+    $initial = $product->inventory->quantity;
+    $this->actingAs($staff)->patch(route('administration.inventory.update', $product->inventory), [
+        'quantity' => $initial + 2, 'reorder_level' => $product->inventory->reorder_level, 'reason' => 'Physical count differs',
+    ])->assertSessionHasNoErrors();
+    $firstId = DB::table('inventory_adjustment_requests')->where('product_id', $product->id)->value('id');
+
+    $this->actingAs($other)->post(route('administration.inventory-adjustments.withdraw', $firstId), [
+        'reason' => 'Request entered by mistake',
+    ])->assertForbidden();
+    $this->actingAs($staff)->post(route('administration.inventory-adjustments.withdraw', $firstId), [
+        'reason' => 'Request entered by mistake',
+    ])->assertSessionHasNoErrors();
+    $this->actingAs($staff)->post(route('administration.inventory-adjustments.replace', $firstId), [
+        'quantity' => $initial + 3, 'reason' => 'Corrected physical shelf count',
+    ])->assertSessionHasNoErrors();
+    $this->actingAs($staff)->post(route('administration.inventory-adjustments.replace', $firstId), [
+        'quantity' => $initial + 4, 'reason' => 'Another correction attempt',
+    ])->assertSessionHasErrors('replacement');
+
+    $this->assertDatabaseHas('inventory_adjustment_requests', ['id' => $firstId, 'status' => 'withdrawn']);
+    $this->assertDatabaseHas('inventory_adjustment_requests', ['replaces_request_id' => $firstId, 'target_quantity' => $initial + 3, 'status' => 'pending']);
+    expect($product->inventory->fresh()->quantity)->toBe($initial);
+});
+
 test('opening stock stays unavailable until a second person approves it', function () {
     $requester = User::factory()->administrator()->create();
     $reviewer = User::factory()->administrator()->create();

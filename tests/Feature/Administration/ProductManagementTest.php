@@ -16,6 +16,7 @@ test('updated product codes are required and use the safe catalog format', funct
     $product = Product::factory()->for($category)->create(['product_code' => 'UNCHANGED']);
 
     $this->actingAs($administrator)->put(route('administration.products.update', $product), [
+        'edit_version' => $product->edit_version,
         'product_code' => $code, 'name' => 'New product', 'category_id' => $category->id,
         'brand' => 'Brand', 'price' => '100', 'is_featured' => false,
     ])->assertSessionHasErrors(['product_code' => $message]);
@@ -33,7 +34,7 @@ test('updating cannot reuse another products code ignoring case', function (stri
     $administrator = User::factory()->administrator()->create();
     $existing = Product::factory()->create(['product_code' => 'ABC123']);
     $other = Product::factory()->create(['product_code' => 'OTHER']);
-    $payload = ['product_code' => $code, 'name' => 'Product', 'category_id' => $existing->category_id,
+    $payload = ['edit_version' => $other->edit_version, 'product_code' => $code, 'name' => 'Product', 'category_id' => $existing->category_id,
         'brand' => 'Brand', 'price' => '100', 'is_featured' => false];
 
     $this->actingAs($administrator)->put(route('administration.products.update', $other), $payload)
@@ -50,6 +51,7 @@ test('imported codes are visible and protected from changes and forged origin fl
     $this->actingAs($administrator)->get(route('administration.products.edit', $product))
         ->assertInertia(fn (Assert $page) => $page->where('product.product_code', '000123')->where('product.is_catalog_imported', true));
     $this->put(route('administration.products.update', $product), [
+        'edit_version' => $product->edit_version,
         'product_code' => 'CHANGED', 'is_catalog_imported' => false,
         'name' => $product->name, 'category_id' => $product->category_id,
         'brand' => $product->brand, 'price' => $product->price, 'is_featured' => false,
@@ -506,6 +508,8 @@ test('administrators can update product details tags and shipping assignments', 
     $response = $this
         ->actingAs($administrator)
         ->put(route('administration.products.update', $product), [
+            'edit_version' => $product->edit_version,
+            'price_change_reason' => 'New catalog price approved',
             'product_code' => 'UPDATED001',
             'name' => 'Updated product name',
             'description' => null,
@@ -542,6 +546,7 @@ test('administrators can add a verified brand to an imported product', function 
     $product->save();
 
     $this->actingAs($administrator)->put(route('administration.products.update', $product), [
+        'edit_version' => $product->edit_version,
         'product_code' => $product->product_code,
         'name' => $product->name,
         'category_id' => $product->category_id,
@@ -566,6 +571,7 @@ test('updating a product without a new image keeps the existing image', function
     $this->actingAs($administrator)
         ->post(route('administration.products.update', $product), [
             '_method' => 'put',
+            'edit_version' => $product->edit_version,
             'product_code' => 'UPDATED001',
             'name' => 'Updated product',
             'category_id' => $category->id,
@@ -593,6 +599,7 @@ test('replacing a product image stores the new path and removes the old managed 
     $this->actingAs($administrator)
         ->post(route('administration.products.update', $product), [
             '_method' => 'put',
+            'edit_version' => $product->edit_version,
             'product_code' => $product->product_code,
             'name' => $product->name,
             'category_id' => $category->id,
@@ -625,6 +632,7 @@ test('an invalid product relationship leaves details and tags unchanged', functi
         ->actingAs($administrator)
         ->from(route('administration.products.edit', $product))
         ->put(route('administration.products.update', $product), [
+            'edit_version' => $product->edit_version,
             'product_code' => 'UPDATED001',
             'name' => 'Changed product',
             'category_id' => $category->id,

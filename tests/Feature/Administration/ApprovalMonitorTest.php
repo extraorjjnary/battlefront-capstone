@@ -1,11 +1,13 @@
 <?php
 
+use App\Models\Product;
 use App\Models\User;
 use App\Notifications\ApprovalConcentrationAlert;
 use App\Services\ApprovalMonitor;
 use Illuminate\Support\Facades\DB;
 
 test('the fifth manager approval for the same staff member raises an owner review alert', function () {
+    $owner = User::factory()->administrator()->create();
     $staff = User::factory()->administrator()->create([
         'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
     ]);
@@ -24,9 +26,15 @@ test('the fifth manager approval for the same staff member raises an owner revie
     app(ApprovalMonitor::class)->afterApproval($manager, $staff->id);
     $this->assertDatabaseMissing('audit_logs', ['action' => 'approval.concentration_alert']);
 
+    $product = Product::factory()->create();
+    $damageId = DB::table('damage_reports')->insertGetId([
+        'product_id' => $product->id, 'requester_id' => $staff->id, 'quantity' => 2,
+        'status' => 'decided', 'reason' => 'Physical inspection damage',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
     DB::table('audit_logs')->insert([
         'actor_id' => $manager->id, 'action' => 'damage.decided',
-        'subject_type' => 'damage_report', 'subject_id' => 5,
+        'subject_type' => 'damage_report', 'subject_id' => $damageId,
         'changes' => json_encode(['requester_id' => $staff->id], JSON_THROW_ON_ERROR),
         'created_at' => now(),
     ]);
@@ -35,4 +43,8 @@ test('the fifth manager approval for the same staff member raises an owner revie
 
     $payload = (new ApprovalConcentrationAlert($manager->name, $staff->name, 5))->toArray($manager);
     expect($payload['body'])->toContain('5 requests')->toContain($staff->name);
+    $notification = $owner->notifications()->firstOrFail();
+    expect($notification->data['decisions'][0])->toMatchArray([
+        'action' => 'damage.decided', 'subject_id' => $damageId, 'quantity' => 2,
+    ]);
 });

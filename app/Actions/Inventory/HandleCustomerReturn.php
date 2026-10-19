@@ -58,9 +58,9 @@ class HandleCustomerReturn
         }, attempts: 3);
     }
 
-    public function decide(int $returnId, User $reviewer, bool $accept, string $disposition, string $approvedAmount, ?int $supplierId = null): void
+    public function decide(int $returnId, User $reviewer, bool $accept, string $disposition, string $approvedAmount, string $reason, ?int $supplierId = null): void
     {
-        DB::transaction(function () use ($returnId, $reviewer, $accept, $disposition, $approvedAmount, $supplierId): void {
+        DB::transaction(function () use ($returnId, $reviewer, $accept, $disposition, $approvedAmount, $reason, $supplierId): void {
             $return = DB::table('customer_returns')->where('id', $returnId)->lockForUpdate()->first();
             if ($return === null) {
                 abort(404);
@@ -83,6 +83,10 @@ class HandleCustomerReturn
                 throw ValidationException::withMessages(['approved_amount' => 'Refund approval exceeds the returned item value.']);
             }
 
+            if (! $accept && (bccomp($approvedAmount, '0.00', 2) !== 0 || $disposition !== '' || $supplierId !== null)) {
+                throw ValidationException::withMessages(['decision' => 'A rejected return cannot include a disposition or refund.']);
+            }
+
             $inventory = Inventory::query()->where('product_id', $originalItem->product_id)->lockForUpdate()->firstOrFail();
             if ($inventory->quarantined_quantity < $returnItem->quantity) {
                 throw ValidationException::withMessages(['decision' => 'Received stock is no longer in quarantine.']);
@@ -91,10 +95,10 @@ class HandleCustomerReturn
             $beforeHeld = $inventory->quarantined_quantity;
             if ($accept && $disposition === 'write_off') {
                 $inventory->quarantined_quantity = max(0, (int) ($inventory->quarantined_quantity - $returnItem->quantity));
-            } elseif ($disposition === 'restock') {
+            } elseif ($accept && $disposition === 'restock') {
                 $inventory->quarantined_quantity = max(0, (int) ($inventory->quarantined_quantity - $returnItem->quantity));
                 $inventory->quantity += $returnItem->quantity;
-            } elseif ($disposition === 'supplier_return') {
+            } elseif ($accept && $disposition === 'supplier_return') {
                 if ($supplierId === null || ! DB::table('suppliers')->where('id', $supplierId)->where('is_active', true)->exists()) {
                     throw ValidationException::withMessages(['supplier_id' => 'Select an active supplier.']);
                 }
@@ -109,7 +113,7 @@ class HandleCustomerReturn
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
-            } else {
+            } elseif ($accept) {
                 throw ValidationException::withMessages(['disposition' => 'Unknown return disposition.']);
             }
 
@@ -124,6 +128,7 @@ class HandleCustomerReturn
             DB::table('customer_returns')->where('id', $returnId)->update([
                 'status' => $accept ? 'accepted' : 'rejected_pending_handover',
                 'reviewer_id' => $reviewer->id,
+                'decision_reason' => $reason,
                 'updated_at' => now(),
             ]);
             if ($accept && bccomp($approvedAmount, '0.00', 2) > 0) {
@@ -139,7 +144,7 @@ class HandleCustomerReturn
             $this->audit($reviewer, $accept ? 'customer_return.accepted' : 'customer_return.rejected', $returnId, [
                 'requester_id' => $return->requester_id, 'disposition' => $accept ? $disposition : 'return_to_customer',
                 'approved_amount' => $accept ? $approvedAmount : '0.00',
-            ], null);
+            ], $reason);
             if ($accept) {
                 app(ApprovalMonitor::class)->afterApproval($reviewer, (int) $return->requester_id);
             }
@@ -206,6 +211,38 @@ class HandleCustomerReturn
                 'updated_at' => now(),
             ]);
             $this->audit($actor, 'customer_refund.paid', $refundId, ['amount' => $amount, 'method' => $method, 'external_reference' => $externalReference], null);
+        }, attempts: 3);
+    }
+
+    public function reviewPayment(int $paymentId, User $reviewer, string $decision, string $reason): void
+    {
+        DB::transaction(function () use ($paymentId, $reviewer, $decision, $reason): void {
+            $payment = DB::table('customer_refund_payments')->where('id', $paymentId)->lockForUpdate()->first();
+            if ($payment === null) {
+                abort(404);
+            }
+            if ((int) $payment->recorded_by === $reviewer->id) {
+                throw ValidationException::withMessages(['decision' => 'You cannot reconcile a payment you recorded.']);
+            }
+            if (! $reviewer->hasAdministrationPermission('returns.reconcile')) {
+                abort(403);
+            }
+            $latest = DB::table('customer_refund_payment_reviews')->where('customer_refund_payment_id', $paymentId)->orderByDesc('id')->first();
+            if ($latest?->decision === 'verified' || $latest?->decision === $decision) {
+                throw ValidationException::withMessages(['decision' => 'This payment already has that reconciliation status.']);
+            }
+
+            DB::table('customer_refund_payment_reviews')->insert([
+                'customer_refund_payment_id' => $paymentId,
+                'reviewed_by' => $reviewer->id,
+                'decision' => $decision,
+                'reason' => $reason,
+                'created_at' => now(),
+            ]);
+            $this->audit($reviewer, 'customer_refund.payment_reviewed', $paymentId, [
+                'decision' => $decision,
+                'previous_decision' => $latest?->decision,
+            ], $reason);
         }, attempts: 3);
     }
 

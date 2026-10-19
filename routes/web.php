@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Administration\AdministrationEvidenceController;
 use App\Http\Controllers\Administration\AuditLogController;
 use App\Http\Controllers\Administration\CategoryActivationController;
 use App\Http\Controllers\Administration\CategoryController;
@@ -28,9 +29,11 @@ use App\Http\Controllers\Administration\ProductController;
 use App\Http\Controllers\Administration\RolePermissionController;
 use App\Http\Controllers\Administration\SalesReportController;
 use App\Http\Controllers\Administration\StaffPerformanceController;
+use App\Http\Controllers\Administration\StockReconciliationController;
 use App\Http\Controllers\Administration\SupplierController;
 use App\Http\Controllers\Administration\SupplierReturnController;
 use App\Http\Controllers\Administration\TeamController;
+use App\Http\Controllers\Administration\WorkQueueController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CartItemController;
@@ -147,6 +150,7 @@ Route::middleware(['auth', 'can:access-administration'])
     ->prefix('administration')
     ->name('administration.')
     ->group(function () {
+        Route::get('work-queue', [WorkQueueController::class, 'index'])->name('work-queue.index');
         // notifications
         Route::get('notifications', [AdministrationNotificationController::class, 'index'])->name('notifications.index');
         Route::get('notifications/summary', [AdministrationNotificationController::class, 'summary'])->name('notifications.summary');
@@ -188,6 +192,10 @@ Route::middleware(['auth', 'can:access-administration'])
         Route::post('inventory-adjustments/{adjustment}/decision', [InventoryAdjustmentController::class, 'decide'])
             ->middleware('can:inventory.approve')
             ->name('inventory-adjustments.decide');
+        Route::post('inventory-adjustments/{adjustment}/withdrawal', [InventoryAdjustmentController::class, 'withdraw'])
+            ->middleware('can:inventory.request')->name('inventory-adjustments.withdraw');
+        Route::post('inventory-adjustments/{adjustment}/replacement', [InventoryAdjustmentController::class, 'replace'])
+            ->middleware('can:inventory.request')->name('inventory-adjustments.replace');
         Route::get('damage-reports', [DamageReportController::class, 'index'])->middleware('can:inventory.view')->name('damage-reports.index');
         Route::post('damage-reports', [DamageReportController::class, 'store'])->middleware('can:returns.request')->name('damage-reports.store');
         Route::post('damage-reports/{damageReport}/decision', [DamageReportController::class, 'decide'])
@@ -203,6 +211,10 @@ Route::middleware(['auth', 'can:access-administration'])
             ->middleware('can:returns.dispatch')->name('supplier-returns.dispatch');
         Route::post('supplier-returns/{supplierReturn}/acknowledgement', [SupplierReturnController::class, 'acknowledge'])
             ->middleware('can:returns.approve')->name('supplier-returns.acknowledge');
+        Route::post('supplier-returns/{supplierReturn}/follow-up', [SupplierReturnController::class, 'followUp'])
+            ->middleware('can:returns.approve')->name('supplier-returns.follow-up');
+        Route::post('supplier-returns/{supplierReturn}/resolution', [SupplierReturnController::class, 'resolve'])
+            ->middleware('can:returns.resolve')->name('supplier-returns.resolve');
         Route::get('customer-returns', [CustomerReturnController::class, 'index'])->middleware('can:orders.view')->name('customer-returns.index');
         Route::post('customer-returns', [CustomerReturnController::class, 'store'])->middleware('can:returns.request')->name('customer-returns.store');
         Route::post('customer-returns/{customerReturn}/decision', [CustomerReturnController::class, 'decide'])
@@ -211,6 +223,13 @@ Route::middleware(['auth', 'can:access-administration'])
             ->middleware('can:returns.dispatch')->name('customer-returns.handover');
         Route::post('customer-refunds/{refund}/payments', [CustomerReturnController::class, 'recordPayment'])
             ->middleware('can:returns.record_payment')->name('customer-refunds.payments.store');
+        Route::post('customer-refund-payments/{payment}/review', [CustomerReturnController::class, 'reviewPayment'])
+            ->middleware('can:returns.reconcile')->name('customer-refund-payments.review');
+        Route::post('evidence/{subjectType}/{subjectId}', [AdministrationEvidenceController::class, 'store'])
+            ->whereIn('subjectType', ['damage_report', 'customer_return', 'refund_payment'])
+            ->whereNumber('subjectId')->name('evidence.store');
+        Route::get('evidence/{evidence}', [AdministrationEvidenceController::class, 'show'])
+            ->whereNumber('evidence')->name('evidence.show');
 
         // chatbots
         Route::post('chatbot-knowledge/preview', ChatbotKnowledgePreviewController::class)
@@ -271,6 +290,8 @@ Route::middleware(['auth', 'can:access-administration'])
             ->name('reports.sales');
         Route::get('reports/staff', [StaffPerformanceController::class, 'index'])
             ->middleware('can:orders.view')->name('reports.staff');
+        Route::get('reports/stock-reconciliation', [StockReconciliationController::class, 'index'])
+            ->middleware('can:inventory.view')->name('reports.stock-reconciliation');
         Route::get('reports/audit', [AuditLogController::class, 'index'])
             ->middleware('can:audit.view')->name('reports.audit');
         Route::get('reports/audit/export', [AuditLogController::class, 'export'])

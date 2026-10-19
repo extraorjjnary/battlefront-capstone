@@ -410,6 +410,7 @@ test('an admin replacement preserves its manifest image and survives future impo
 
         $this->actingAs($administrator)->post(route('administration.products.update', $product), [
             '_method' => 'put',
+            'edit_version' => $product->edit_version,
             'product_code' => $product->product_code,
             'name' => $product->name,
             'category_id' => $product->category_id,

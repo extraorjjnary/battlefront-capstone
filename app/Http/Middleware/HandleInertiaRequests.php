@@ -65,6 +65,8 @@ class HandleInertiaRequests extends Middleware
                     'accessAdministration' => $request->user()?->can('access-administration') ?? false,
                     'approveInventory' => $request->user()?->can('inventory.approve') ?? false,
                     'approveReturns' => $request->user()?->can('returns.approve') ?? false,
+                    'resolveReturns' => $request->user()?->can('returns.resolve') ?? false,
+                    'reconcileReturns' => $request->user()?->can('returns.reconcile') ?? false,
                     'assignOrders' => $request->user()?->can('orders.assign') ?? false,
                     'viewReports' => $request->user()?->can('reports.view') ?? false,
                     'viewStaffReports' => $request->user()?->can('staff_reports.view') ?? false,

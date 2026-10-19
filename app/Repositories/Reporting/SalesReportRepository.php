@@ -33,6 +33,23 @@ class SalesReportRepository
     }
 
     /**
+     * @param  array{0: string, 1: string}  $dateRange
+     * @return LengthAwarePaginator<int, stdClass>
+     */
+    public function transactions(array $dateRange, ?int $productId, ?int $categoryId): LengthAwarePaginator
+    {
+        $query = $productId === null && $categoryId === null
+            ? $this->recordedSaleQuery($dateRange)->addSelect('sales.order_id')
+            : $this->itemReportQuery($dateRange, $productId, $categoryId)
+                ->select('sales.id', 'sales.order_id', 'sales.sale_date')
+                ->selectRaw('SUM(order_items.quantity * order_items.price_at_time) as product_revenue')
+                ->groupBy('sales.id', 'sales.order_id', 'sales.sale_date');
+
+        return $query->orderByDesc('sales.sale_date')->orderByDesc('sales.id')
+            ->paginate(10, ['*'], 'sale_page')->withQueryString();
+    }
+
+    /**
      * Summarize product revenue without rewriting legacy sale amounts.
      *
      * @param  array{0: string, 1: string}|null  $dateRange
@@ -43,6 +60,14 @@ class SalesReportRepository
             ->selectRaw('COUNT(*) as total_sales')
             ->selectRaw('COALESCE(SUM(product_revenue), 0) as total_revenue')
             ->first();
+    }
+
+    public function attributedSales(?string $from = null, ?string $to = null): Builder
+    {
+        return $this->recordedSaleQuery(null)
+            ->addSelect('sales.order_id', 'sales.handler_id')
+            ->when($from, fn (Builder $query): Builder => $query->whereDate('sales.sale_date', '>=', $from))
+            ->when($to, fn (Builder $query): Builder => $query->whereDate('sales.sale_date', '<=', $to));
     }
 
     /**

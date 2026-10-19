@@ -1,0 +1,84 @@
+<?php
+
+namespace App\Services\Reporting;
+
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Support\Facades\DB;
+
+class RefundPeriodReport
+{
+    /**
+     * @param  array{from: string, to: string, product_id: ?int, category_id: ?int}  $filters
+     * @param  numeric-string  $grossSales
+     * @return array<string, mixed>
+     */
+    public function generate(array $filters, string $grossSales): array
+    {
+        $endExclusive = CarbonImmutable::parse($filters['to'])->addDay()->toDateString();
+        $payments = $this->paymentQuery($filters)
+            ->where('payments.paid_at', '>=', $filters['from'])
+            ->where('payments.paid_at', '<', $endExclusive);
+        $paid = (string) (clone $payments)->sum('payments.amount');
+
+        $balances = $this->refundQuery($filters)
+            ->where('refunds.created_at', '<', $endExclusive)
+            ->select('refunds.id', 'refunds.customer_return_id', 'refunds.approved_amount')
+            ->selectSub(DB::table('customer_refund_payments as paid')
+                ->selectRaw('COALESCE(SUM(paid.amount), 0)')
+                ->whereColumn('paid.customer_refund_id', 'refunds.id')
+                ->where('paid.paid_at', '<', $endExclusive), 'paid_at_cutoff');
+        $outstanding = (string) DB::query()->fromSub($balances, 'balances')
+            ->selectRaw('COALESCE(SUM(CASE WHEN approved_amount > paid_at_cutoff THEN approved_amount - paid_at_cutoff ELSE 0 END), 0) as amount')
+            ->value('amount');
+
+        return [
+            'gross_item_sales' => $grossSales,
+            'refund_payments' => bcadd($this->numericAmount($paid), '0', 2),
+            'gross_less_refunds' => bcsub($grossSales, $this->numericAmount($paid), 2),
+            'outstanding_at_cutoff' => bcadd($this->numericAmount($outstanding), '0', 2),
+            'cutoff' => $filters['to'],
+            'outstanding_refunds' => DB::query()->fromSub($balances, 'balances')
+                ->select('id', 'customer_return_id', 'approved_amount', 'paid_at_cutoff')
+                ->selectRaw('approved_amount - paid_at_cutoff as outstanding_amount')
+                ->whereColumn('approved_amount', '>', 'paid_at_cutoff')
+                ->orderBy('id')->paginate(10, ['*'], 'balance_page')->withQueryString(),
+            'payments' => (clone $payments)
+                ->select('payments.id', 'payments.customer_refund_id', 'refunds.customer_return_id', 'payments.amount', 'payments.paid_at', 'payments.external_reference')
+                ->orderByDesc('payments.paid_at')->orderByDesc('payments.id')
+                ->paginate(10, ['*'], 'refund_page')->withQueryString(),
+        ];
+    }
+
+    /** @param array{product_id: ?int, category_id: ?int} $filters */
+    private function refundQuery(array $filters): Builder
+    {
+        return DB::table('customer_refunds as refunds')
+            ->when($filters['product_id'] !== null || $filters['category_id'] !== null,
+                fn (Builder $query): Builder => $query->whereExists(fn (Builder $items): Builder => $items
+                    ->selectRaw('1')
+                    ->from('customer_return_items as returned_items')
+                    ->join('order_items', 'order_items.id', '=', 'returned_items.order_item_id')
+                    ->join('products', 'products.id', '=', 'order_items.product_id')
+                    ->whereColumn('returned_items.customer_return_id', 'refunds.customer_return_id')
+                    ->when($filters['product_id'], fn (Builder $matching, int $id): Builder => $matching->where('products.id', $id))
+                    ->when($filters['category_id'], fn (Builder $matching, int $id): Builder => $matching->where('products.category_id', $id))));
+    }
+
+    /** @param array{product_id: ?int, category_id: ?int} $filters */
+    private function paymentQuery(array $filters): Builder
+    {
+        return $this->refundQuery($filters)
+            ->join('customer_refund_payments as payments', 'payments.customer_refund_id', '=', 'refunds.id');
+    }
+
+    /** @return numeric-string */
+    private function numericAmount(string $amount): string
+    {
+        if (! is_numeric($amount)) {
+            throw new \UnexpectedValueException('A report amount must be numeric.');
+        }
+
+        return $amount;
+    }
+}

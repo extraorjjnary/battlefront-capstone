@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Administration;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\SalesReportRequest;
 use App\Services\Reporting\RecommendationEngagementReport;
+use App\Services\Reporting\RefundPeriodReport;
 use App\Services\Reporting\SalesReportExportService;
 use App\Services\Reporting\SalesReportService;
 use Carbon\CarbonImmutable;
@@ -45,6 +46,7 @@ class SalesReportController extends Controller
         SalesReportRequest $request,
         SalesReportService $salesReportService,
         RecommendationEngagementReport $recommendationEngagementReport,
+        RefundPeriodReport $refundPeriodReport,
     ): Response {
         $report = $salesReportService->generate($request->effectiveFilters());
         $filters = $report['filters'];
@@ -57,6 +59,7 @@ class SalesReportController extends Controller
         return Inertia::render('Administration/Reports/Sales', [
             ...$report,
             'recommendation_engagement' => $engagement,
+            'refund_measures' => $refundPeriodReport->generate($filters, $report['kpis']['total_revenue']),
         ]);
     }
 }

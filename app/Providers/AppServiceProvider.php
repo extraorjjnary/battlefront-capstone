@@ -54,6 +54,7 @@ class AppServiceProvider extends ServiceProvider
             'products.manage', 'products.price', 'catalog.delete',
             'customers.view', 'reports.view', 'reports.export', 'forecast.manage',
             'returns.request', 'returns.approve', 'returns.record_payment', 'returns.dispatch',
+            'returns.resolve', 'returns.reconcile',
             'suppliers.manage', 'staff_reports.view', 'audit.view', 'audit.export',
             'users.manage', 'permissions.manage',
         ] as $permission) {
