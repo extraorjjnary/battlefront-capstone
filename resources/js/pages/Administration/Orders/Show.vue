@@ -406,7 +406,7 @@ defineOptions({
                 <p class="text-muted-foreground mt-1 text-sm">{{ order.assigned_handler_name ?? 'Unassigned' }}</p>
                 <p v-if="order.handler_required && !order.assigned_handler_id" class="text-destructive mt-1 text-xs">Assign a handler before completing this order.</p>
             </div>
-            <form v-if="!order.assigned_handler_id && !['completed', 'cancelled'].includes(order.status.value)" @submit.prevent="claimForm.post(OrderHandlerController.claim(order.id))">
+            <form v-if="page.props.auth.can?.processOrders && !order.assigned_handler_id && !['completed', 'cancelled'].includes(order.status.value)" @submit.prevent="claimForm.post(OrderHandlerController.claim(order.id))">
                 <Button type="submit" variant="outline" :disabled="claimForm.processing">Claim order</Button>
             </form>
             <form v-if="handler_options.length && page.props.auth.can?.assignOrders" class="flex items-end gap-2" @submit.prevent="handlerForm.patch(OrderHandlerController.assign(order.id))">
@@ -427,7 +427,7 @@ defineOptions({
         >
             <div class="flex min-w-0 flex-col gap-8">
                 <ShipmentTracking
-                    v-if="order.shipment"
+                    v-if="order.shipment && page.props.auth.can?.processOrders"
                     :shipment="order.shipment"
                     :quote="order.delivery_quote"
                 />
@@ -449,7 +449,7 @@ defineOptions({
                     <p class="text-muted-foreground text-xs leading-5">
                         {{ order.delivery_quote.assumption_label }}
                     </p>
-                    <div v-if="order.can_create_manual_shipment">
+                    <div v-if="order.can_create_manual_shipment && page.props.auth.can?.processOrders">
                         <Button
                             type="button"
                             @click="requestManualShipment"
@@ -970,7 +970,7 @@ defineOptions({
                         {{ order.cancellation_blocked_reason }}
                     </p>
                     <div
-                        v-if="order.allowed_status_transitions.length"
+                        v-if="page.props.auth.can?.processOrders && order.allowed_status_transitions.length"
                         class="border-border mt-5 grid gap-4 border-t pt-5"
                     >
                         <div class="grid gap-2">
@@ -1207,7 +1207,7 @@ defineOptions({
                     </div>
 
                     <div
-                        v-if="order.payment.pay_at_pickup && !['completed', 'cancelled'].includes(order.status.value)"
+                        v-if="page.props.auth.can?.processOrders && order.payment.pay_at_pickup && !['completed', 'cancelled'].includes(order.status.value)"
                         class="border-border mt-5 grid gap-4 border-t pt-5"
                     >
                         <p class="font-semibold">Payment and pickup confirmation</p>
@@ -1221,7 +1221,7 @@ defineOptions({
                             Payment is already verified. Confirm product handover to complete pickup.
                         </p>
                         <Button
-                            v-if="order.payment.can_confirm_pickup"
+                        v-if="page.props.auth.can?.processOrders && order.payment.can_confirm_pickup"
                             type="button"
                             class="w-full whitespace-normal"
                             :disabled="pickupConfirmationForm.processing"
@@ -1279,6 +1279,7 @@ defineOptions({
                     </div>
                     <div
                         v-else-if="
+                            page.props.auth.can?.processOrders &&
                             order.payment.method.value === 'cod' &&
                             order.payment.status.value === 'pending' &&
                             order.status.value !== 'cancelled'
@@ -1294,7 +1295,7 @@ defineOptions({
                             amount of {{ formatCurrency(order.total) }}.
                         </p>
                         <Button
-                            v-if="order.payment.can_confirm_cod_collection"
+                        v-if="page.props.auth.can?.processOrders && order.payment.can_confirm_cod_collection"
                             type="button"
                             :disabled="codCollectionForm.processing"
                             @click="requestCodConfirmation"
@@ -1365,6 +1366,7 @@ defineOptions({
                     </div>
                     <div
                         v-else-if="
+                            page.props.auth.can?.processOrders &&
                             !order.payment.pay_at_pickup &&
                             order.payment.status.value === 'pending' &&
                             order.status.value !== 'cancelled'

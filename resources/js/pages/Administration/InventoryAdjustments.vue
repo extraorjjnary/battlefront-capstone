@@ -49,12 +49,12 @@ defineOptions({
                     <Button type="submit" name="decision" value="reject" variant="outline" :disabled="processing">Reject</Button>
                 </div>
             </Form>
-            <Form v-if="entry.status === 'pending' && entry.requester_id === page.props.auth.user.id" v-bind="InventoryAdjustmentController.withdraw.form(entry.id)" v-slot="{ errors, processing }" class="flex flex-wrap items-end gap-2">
+            <Form v-if="page.props.auth.can?.requestInventory && entry.status === 'pending' && entry.requester_id === page.props.auth.user.id" v-bind="InventoryAdjustmentController.withdraw.form(entry.id)" v-slot="{ errors, processing }" class="flex flex-wrap items-end gap-2">
                 <label class="text-sm">Withdrawal reason<Input name="reason" required minlength="5" maxlength="2000" /></label>
                 <Button type="submit" variant="outline" :disabled="processing">Withdraw request</Button>
                 <InputError :message="errors.reason || errors.withdrawal" />
             </Form>
-            <Form v-if="entry.status === 'withdrawn' && !entry.replacement_id && entry.requester_id === page.props.auth.user.id" v-bind="InventoryAdjustmentController.replace.form(entry.id)" v-slot="{ errors, processing }" class="grid gap-2 sm:grid-cols-2">
+            <Form v-if="page.props.auth.can?.requestInventory && entry.status === 'withdrawn' && !entry.replacement_id && entry.requester_id === page.props.auth.user.id" v-bind="InventoryAdjustmentController.replace.form(entry.id)" v-slot="{ errors, processing }" class="grid gap-2 sm:grid-cols-2">
                 <label class="text-sm">Replacement quantity<Input name="quantity" type="number" min="0" required :default-value="entry.target_quantity" /></label>
                 <label v-if="entry.initial_reorder_level !== null" class="text-sm">Initial reorder level<Input name="reorder_level" type="number" min="0" :default-value="entry.initial_reorder_level" /></label>
                 <label class="text-sm sm:col-span-2">New request reason<Input name="reason" required minlength="5" maxlength="2000" /></label>

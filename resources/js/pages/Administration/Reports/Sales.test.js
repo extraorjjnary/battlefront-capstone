@@ -84,7 +84,7 @@ function salesFixture(empty = false) {
 
 function salesHarness(t, empty = false) {
     const props = Vue.reactive(salesFixture(empty));
-    const page = Vue.reactive({ props: { errors: {} } });
+    const page = Vue.reactive({ props: { errors: {}, auth: { can: { exportReports: true } } } });
     const visits = [];
     const route = (format) => ({
         url({ query }) {
@@ -241,6 +241,28 @@ test('export links update after applied filters change and omit cleared cross fi
             period: 'day',
         });
     }
+});
+
+test('cross-filter reload refreshes transaction and refund sections with the charts', (t) => {
+    const harness = salesHarness(t);
+    const product = findNodes(
+        harness.tree(),
+        (node) => node.type === 'button' && 'aria-pressed' in node.props,
+    )[0];
+
+    product.props.onClick();
+
+    assert.deepEqual(harness.visits[0][1].only, [
+        'filters',
+        'active_filters',
+        'kpis',
+        'timeline',
+        'top_products',
+        'categories',
+        'products',
+        'sale_transactions',
+        'refund_measures',
+    ]);
 });
 
 function resetControl(harness) {

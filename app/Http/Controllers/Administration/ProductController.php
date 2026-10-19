@@ -226,6 +226,7 @@ class ProductController extends Controller
                     'is_featured',
                     'discount_price',
                     'is_active',
+                    'edit_version',
                 ]),
                 'image_url' => $product->image_url,
                 'tag_ids' => $product->tags->pluck('id')->all(),

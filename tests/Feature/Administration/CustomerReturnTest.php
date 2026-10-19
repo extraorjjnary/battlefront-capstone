@@ -34,6 +34,10 @@ test('a completed purchase can be returned and manually refunded without rewriti
     $this->actingAs($requester)->post(route('administration.customer-refunds.payments.store', $refundId), [
         'amount' => '60.00', 'payment_method' => 'cash', 'external_reference' => 'CASH-1',
     ])->assertSessionHasNoErrors();
+    $paymentId = DB::table('customer_refund_payments')->where('customer_refund_id', $refundId)->value('id');
+    $this->assertDatabaseHas('audit_logs', [
+        'action' => 'customer_refund.paid', 'subject_type' => 'refund_payment', 'subject_id' => $paymentId,
+    ]);
     $this->actingAs($requester)->post(route('administration.customer-refunds.payments.store', $refundId), [
         'amount' => '40.00', 'payment_method' => 'cash', 'external_reference' => 'CASH-2',
     ])->assertSessionHasNoErrors();
@@ -131,5 +135,8 @@ test('another administrator can reconcile a recorded refund payment without chan
 
     $this->assertDatabaseHas('customer_refund_payment_reviews', ['customer_refund_payment_id' => $paymentId, 'decision' => 'verified']);
     expect((float) DB::table('customer_refunds')->where('id', $refundId)->value('paid_amount'))->toBe(30.0);
+    $this->assertDatabaseHas('audit_logs', [
+        'action' => 'customer_refund.payment_reviewed', 'subject_type' => 'refund_payment', 'subject_id' => $paymentId,
+    ]);
     $this->assertDatabaseCount('customer_refund_payments', 1);
 });

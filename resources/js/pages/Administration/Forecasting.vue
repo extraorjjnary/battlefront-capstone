@@ -43,7 +43,8 @@ const props = defineProps({
     forecasts: { type: Object, required: true },
 });
 
-const initialResult = usePage().flash?.forecast_result ?? null;
+const page = usePage();
+const initialResult = page.flash?.forecast_result ?? null;
 const result = ref(initialResult);
 const resultMessage = computed(() =>
     result.value?.status === 'ready'
@@ -378,7 +379,7 @@ const chartOptions = {
                         are excluded. Dates use {{ readiness.timezone }}.
                     </p>
                 </div>
-                <form class="mt-5 space-y-3" @submit.prevent="generate">
+                <form v-if="page.props.auth.can?.manageForecast" class="mt-5 space-y-3" @submit.prevent="generate">
                     <InputError :message="form.errors.product_id" />
                     <InputError :message="form.errors.forecast" />
                     <Button

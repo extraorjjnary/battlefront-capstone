@@ -458,7 +458,7 @@ defineOptions({
                     </div>
 
                     <Form
-                        v-if="product.inventory"
+                        v-if="product.inventory && $page.props.auth.can?.requestInventory"
                         v-bind="
                             InventoryController.update.form(
                                 product.inventory.id,
@@ -510,7 +510,7 @@ defineOptions({
                         </Button>
                     </Form>
 
-                    <Form v-if="product.inventory && $page.props.auth.can?.approveInventory" v-bind="InventoryController.updateReorderLevel.form(product.inventory.id)" v-slot="{ errors, processing }" class="flex flex-wrap items-end gap-3">
+                    <Form v-if="product.inventory && $page.props.auth.can?.reorderInventory" v-bind="InventoryController.updateReorderLevel.form(product.inventory.id)" v-slot="{ errors, processing }" class="flex flex-wrap items-end gap-3">
                         <label class="text-sm">New reorder level<Input name="reorder_level" type="number" min="0" required :default-value="product.inventory.reorder_level" /></label>
                         <label class="text-sm">Reason<Input name="reason" required minlength="5" maxlength="2000" /></label>
                         <Button type="submit" variant="outline" :disabled="processing">Update reorder level</Button>
@@ -518,7 +518,7 @@ defineOptions({
                     </Form>
 
                     <Form
-                        v-if="!product.inventory"
+                        v-if="!product.inventory && $page.props.auth.can?.requestInventory"
                         v-bind="InventoryController.store.form(product.id)"
                         :options="{
                             preserveScroll: true,

@@ -69,7 +69,7 @@ function loadPage(path, inlineTemplate = false) {
             '@inertiajs/vue3': {
                 Head: primitive,
                 Link: primitive,
-                usePage: () => ({ props: { auth: { can: { assignOrders: true } } } }),
+                usePage: () => ({ props: { auth: { can: { assignOrders: true, processOrders: true } } } }),
                 useForm(initial) {
                     const form = Vue.reactive({
                         ...initial,

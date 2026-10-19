@@ -49,7 +49,8 @@ test('imported codes are visible and protected from changes and forged origin fl
     $product = Product::factory()->create(['product_code' => '000123', 'is_catalog_imported' => true]);
 
     $this->actingAs($administrator)->get(route('administration.products.edit', $product))
-        ->assertInertia(fn (Assert $page) => $page->where('product.product_code', '000123')->where('product.is_catalog_imported', true));
+        ->assertInertia(fn (Assert $page) => $page->where('product.product_code', '000123')->where('product.is_catalog_imported', true)
+            ->where('product.edit_version', $product->edit_version));
     $this->put(route('administration.products.update', $product), [
         'edit_version' => $product->edit_version,
         'product_code' => 'CHANGED', 'is_catalog_imported' => false,

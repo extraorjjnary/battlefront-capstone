@@ -91,6 +91,10 @@ const isUpdatingReport = computed(
         isResettingFilters.value,
 );
 const exportActions = computed(() => {
+    if (page.props.auth.can?.exportReports !== true) {
+        return [];
+    }
+
     const query = {
         from: props.filters.from,
         to: props.filters.to,
@@ -457,6 +461,8 @@ function updateCrossFilters(product, category) {
                 'top_products',
                 'categories',
                 'products',
+                'sale_transactions',
+                'refund_measures',
             ],
             preserveScroll: true,
             preserveState: true,
@@ -545,6 +551,7 @@ defineOptions({
                 </div>
             </div>
             <div
+                v-if="page.props.auth.can?.exportReports"
                 class="mt-5 flex flex-wrap gap-2"
                 role="group"
                 aria-label="Sales report print and export"

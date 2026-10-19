@@ -194,7 +194,7 @@ class HandleCustomerReturn
             if (DB::table('customer_refund_payments')->where('customer_refund_id', $refundId)->where('external_reference', $externalReference)->exists()) {
                 throw ValidationException::withMessages(['external_reference' => 'This refund reference is already recorded.']);
             }
-            DB::table('customer_refund_payments')->insert([
+            $paymentId = DB::table('customer_refund_payments')->insertGetId([
                 'customer_refund_id' => $refundId,
                 'recorded_by' => $actor->id,
                 'amount' => $amount,
@@ -210,7 +210,7 @@ class HandleCustomerReturn
                 'paid_at' => now(),
                 'updated_at' => now(),
             ]);
-            $this->audit($actor, 'customer_refund.paid', $refundId, ['amount' => $amount, 'method' => $method, 'external_reference' => $externalReference], null);
+            $this->audit($actor, 'customer_refund.paid', $paymentId, ['amount' => $amount, 'method' => $method, 'external_reference' => $externalReference], null, 'refund_payment');
         }, attempts: 3);
     }
 
@@ -242,7 +242,7 @@ class HandleCustomerReturn
             $this->audit($reviewer, 'customer_refund.payment_reviewed', $paymentId, [
                 'decision' => $decision,
                 'previous_decision' => $latest?->decision,
-            ], $reason);
+            ], $reason, 'refund_payment');
         }, attempts: 3);
     }
 
@@ -267,12 +267,12 @@ class HandleCustomerReturn
     /**
      * @param  array<string, mixed>  $changes
      */
-    private function audit(User $actor, string $action, int $id, array $changes, ?string $reason): void
+    private function audit(User $actor, string $action, int $id, array $changes, ?string $reason, string $subjectType = 'customer_return'): void
     {
         DB::table('audit_logs')->insert([
             'actor_id' => $actor->id,
             'action' => $action,
-            'subject_type' => 'customer_return',
+            'subject_type' => $subjectType,
             'subject_id' => $id,
             'reason' => $reason,
             'changes' => json_encode($changes, JSON_THROW_ON_ERROR),

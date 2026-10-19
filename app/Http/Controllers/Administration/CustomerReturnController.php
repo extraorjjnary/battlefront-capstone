@@ -19,6 +19,14 @@ class CustomerReturnController extends Controller
     public function index(Request $request): Response
     {
         $case = $request->validate(['case' => ['nullable', 'integer', 'min:1']])['case'] ?? null;
+        $paymentId = $request->validate(['payment_id' => ['nullable', 'integer', 'min:1']])['payment_id'] ?? null;
+        if ($paymentId !== null) {
+            $returnId = DB::table('customer_refund_payments as payments')
+                ->join('customer_refunds as refunds', 'refunds.id', '=', 'payments.customer_refund_id')
+                ->where('payments.id', $paymentId)->value('refunds.customer_return_id');
+            abort_if($returnId === null || ($case !== null && (int) $case !== (int) $returnId), 404);
+            $case = (int) $returnId;
+        }
         $orderId = $request->integer('order_id');
         $order = $orderId > 0 ? Order::query()->whereKey($orderId)->where('status', OrderStatus::Completed->value)
             ->with('items.product:id,name')->first() : null;
@@ -57,6 +65,7 @@ class CustomerReturnController extends Controller
         return Inertia::render('Administration/CustomerReturns', [
             'returns' => $returns,
             'selected_case' => $case,
+            'selected_payment' => $paymentId === null ? null : (int) $paymentId,
             'evidence' => DB::table('administration_evidence')->where('subject_type', 'customer_return')
                 ->whereIn('subject_id', $returns->getCollection()->pluck('id'))
                 ->get(['id', 'subject_id', 'original_name'])->groupBy('subject_id'),

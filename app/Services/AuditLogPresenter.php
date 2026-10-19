@@ -69,6 +69,7 @@ class AuditLogPresenter
             'damage_report' => route('administration.damage-reports.index', ['case' => $subjectId]),
             'supplier_return' => route('administration.supplier-returns.index', ['case' => $subjectId]),
             'customer_return' => route('administration.customer-returns.index', ['case' => $subjectId]),
+            'refund_payment' => route('administration.customer-returns.index', ['payment_id' => $subjectId]),
             default => null,
         };
     }

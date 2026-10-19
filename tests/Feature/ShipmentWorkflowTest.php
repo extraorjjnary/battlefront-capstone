@@ -478,7 +478,7 @@ test('manual shipment setup leaves unknown estimates null through preparation', 
         ->eta_timezone->toBeNull()
         ->estimated_delivery_start->toBeNull()
         ->estimated_delivery_end->toBeNull();
-    expect($order->user->notifications()->pluck('data')->pluck('event')->all())
+    expect($order->user->notifications()->pluck('data')->pluck('event')->sort()->values()->all())
         ->toBe(['shipment.manual_created', 'shipment.preparing']);
 });
 

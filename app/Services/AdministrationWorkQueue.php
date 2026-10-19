@@ -37,16 +37,37 @@ class AdministrationWorkQueue
         }
         if ($actor->can('orders.view') && $actor->can('returns.record_payment')) {
             $queries[] = DB::table('customer_refunds as work')
+                ->join('customer_returns as returns', 'returns.id', '=', 'work.customer_return_id')
                 ->leftJoin('users', 'users.id', '=', 'work.approved_by')
-                ->select('work.id', 'work.created_at', 'users.name as responsible_name')
+                ->select('work.id', 'work.customer_return_id as case_id', 'work.created_at', 'users.name as responsible_name')
                 ->selectRaw('null as responsible_active')
                 ->selectRaw("'unpaid' as status, 'refund' as kind")
                 ->whereColumn('work.paid_amount', '<', 'work.approved_amount');
         }
+        if ($actor->can('orders.view') && $actor->can('returns.reconcile')) {
+            $queries[] = DB::table('customer_refund_payments as work')
+                ->join('customer_refunds as refunds', 'refunds.id', '=', 'work.customer_refund_id')
+                ->join('customer_returns as returns', 'returns.id', '=', 'refunds.customer_return_id')
+                ->leftJoin('users', 'users.id', '=', 'work.recorded_by')
+                ->select('work.id', 'returns.id as case_id')
+                ->selectRaw('work.paid_at as created_at')
+                ->addSelect('users.name as responsible_name')
+                ->selectRaw('null as responsible_active')
+                ->selectRaw("'unreviewed' as status, 'refund_reconciliation' as kind")
+                ->where('work.recorded_by', '<>', $actor->id)
+                ->whereNotExists(fn (Builder $query) => $query->selectRaw('1')->from('customer_refund_payment_reviews as reviews')
+                    ->whereColumn('reviews.customer_refund_payment_id', 'work.id')
+                    ->whereRaw('reviews.id = (select max(latest.id) from customer_refund_payment_reviews as latest where latest.customer_refund_payment_id = work.id)')
+                    ->where('reviews.decision', 'verified'));
+        }
+        if ($actor->can('orders.view') && $actor->can('returns.approve')) {
+            $queries[] = $this->entries('customer_returns as work', 'customer_return', 'pending')
+                ->where('work.requester_id', '<>', $actor->id);
+        }
         if ($actor->can('orders.view') && ($actor->can('orders.process') || $actor->can('orders.assign'))) {
             $queries[] = DB::table('orders as work')
                 ->leftJoin('users', 'users.id', '=', 'work.assigned_handler_id')
-                ->select('work.id', 'work.created_at', 'users.name as responsible_name', 'users.is_active as responsible_active', 'work.status')
+                ->select('work.id', 'work.id as case_id', 'work.created_at', 'users.name as responsible_name', 'users.is_active as responsible_active', 'work.status')
                 ->selectRaw("'order' as kind")
                 ->whereIn('work.status', ['pending', 'processing'])
                 ->when(! $actor->can('orders.assign'), fn (Builder $query) => $query->where(fn (Builder $query) => $query
@@ -73,7 +94,7 @@ class AdministrationWorkQueue
     {
         return DB::table($table)
             ->leftJoin('users', 'users.id', '=', 'work.requester_id')
-            ->select('work.id', 'work.created_at', 'users.name as responsible_name')
+            ->select('work.id', 'work.id as case_id', 'work.created_at', 'users.name as responsible_name')
             ->selectRaw('null as responsible_active')
             ->addSelect('work.status')
             ->selectRaw('? as kind', [$kind])
@@ -95,6 +116,8 @@ class AdministrationWorkQueue
             },
             'customer_handover' => ['Hand goods back to customer', 'administration.customer-returns.index'],
             'refund' => ['Record outstanding refund payment', 'administration.customer-returns.index'],
+            'refund_reconciliation' => ['Reconcile refund payment', 'administration.customer-returns.index'],
+            'customer_return' => ['Review customer return', 'administration.customer-returns.index'],
             'order' => [$entry->responsible_active !== null && ! (bool) $entry->responsible_active ? 'Reassign inactive handler' : ($entry->status === 'pending' ? 'Review payment and assign or process order' : 'Review active fulfillment'), 'administration.orders.show'],
             default => throw new LogicException('Unknown administration work queue item.'),
         };
@@ -109,7 +132,10 @@ class AdministrationWorkQueue
             'responsible_name' => $entry->responsible_name === null ? 'Unassigned' : ($entry->responsible_active !== null && ! (bool) $entry->responsible_active ? $entry->responsible_name.' (inactive)' : $entry->responsible_name),
             'reference' => $entry->kind === 'order' ? sprintf('BF-%06d', $id) : strtoupper(str_replace('_', ' ', $entry->kind)).' #'.$id,
             'required_action' => $action,
-            'href' => $route === 'administration.orders.show' ? route($route, $id) : route($route, ['case' => $id]),
+            'href' => $route === 'administration.orders.show' ? route($route, $id) : route($route, [
+                'case' => $entry->case_id ?? $id,
+                ...($entry->kind === 'refund_reconciliation' ? ['payment_id' => $id] : []),
+            ]).($entry->kind === 'refund_reconciliation' ? '#refund-payment-'.$id : ''),
         ];
     }
 }

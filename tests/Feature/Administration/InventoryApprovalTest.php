@@ -80,6 +80,29 @@ test('owners cannot approve their own stock request', function () {
     $this->assertDatabaseHas('inventory_adjustment_requests', ['id' => $requestId, 'status' => 'pending']);
 });
 
+test('an authorized reviewer may reject a pending request after its requester is deactivated', function () {
+    $requester = User::factory()->administrator()->create();
+    $reviewer = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'manager')->value('id'),
+    ]);
+    $product = Product::factory()->available()->create();
+    $before = $product->inventory->quantity;
+    $this->actingAs($requester)->patch(route('administration.inventory.update', $product->inventory), [
+        'quantity' => $before + 1,
+        'reorder_level' => $product->inventory->reorder_level,
+        'reason' => 'Physical count correction',
+    ])->assertSessionHasNoErrors();
+    $requestId = DB::table('inventory_adjustment_requests')->where('product_id', $product->id)->value('id');
+    $requester->update(['is_active' => false]);
+
+    $this->actingAs($reviewer)->post(route('administration.inventory-adjustments.decide', $requestId), [
+        'decision' => 'reject', 'reason' => 'Requester account is no longer active',
+    ])->assertRedirect();
+
+    $this->assertDatabaseHas('inventory_adjustment_requests', ['id' => $requestId, 'status' => 'rejected']);
+    expect($product->inventory->fresh()->quantity)->toBe($before);
+});
+
 test('a requester can withdraw and replace a pending stock request without changing stock', function () {
     $staff = User::factory()->administrator()->create([
         'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),

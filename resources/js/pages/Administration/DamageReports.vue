@@ -17,7 +17,7 @@ defineOptions({ layout: { breadcrumbs: [{ title: 'Damage reports', href: DamageR
     <main class="mx-auto flex w-full max-w-5xl flex-col gap-7 p-6 lg:p-10">
         <p v-if="selected_case" class="text-sm">Showing damage report #{{ selected_case }} · <Link :href="DamageReportController.index()" class="text-primary underline">Show all</Link></p>
         <div><p class="text-primary text-xs font-semibold tracking-widest uppercase">Inventory control</p><h1 class="mt-2 text-2xl font-bold">Damaged stock</h1><p class="text-muted-foreground mt-2 text-sm">Reported units leave sellable stock immediately and remain in quarantine until disposition.</p></div>
-        <Form v-bind="DamageReportController.store.form()" v-slot="{ errors, processing }" class="border-border bg-card grid gap-4 border p-5 sm:grid-cols-2">
+        <Form v-if="page.props.auth.can?.requestReturns" v-bind="DamageReportController.store.form()" v-slot="{ errors, processing }" class="border-border bg-card grid gap-4 border p-5 sm:grid-cols-2">
             <div class="space-y-2"><Label for="damage-product">Product</Label><select id="damage-product" name="product_id" required class="border-border bg-background w-full border p-2"><option value="">Select product</option><option v-for="product in products" :key="product.id" :value="product.id">{{ product.name }}</option></select><InputError :message="errors.product_id" /></div>
             <div class="space-y-2"><Label for="damage-quantity">Damaged units</Label><Input id="damage-quantity" name="quantity" type="number" min="1" required /><InputError :message="errors.quantity" /></div>
             <div class="space-y-2 sm:col-span-2"><Label for="damage-reason">Reason</Label><Input id="damage-reason" name="reason" required minlength="5" maxlength="2000" /><InputError :message="errors.reason" /></div>
@@ -30,7 +30,7 @@ defineOptions({ layout: { breadcrumbs: [{ title: 'Damage reports', href: DamageR
                 <p class="text-sm">Held in quarantine for this case: {{ report.held_quantity }} units</p>
                 <p v-if="report.decision_reason" class="text-sm">Decision reason: {{ report.decision_reason }}</p>
                 <div v-if="evidence[report.id]?.length" class="flex flex-wrap gap-3 text-sm"><a v-for="file in evidence[report.id]" :key="file.id" :href="AdministrationEvidenceController.show(file.id).url" class="text-primary underline">{{ file.original_name }}</a></div>
-                <Form v-if="(evidence[report.id]?.length ?? 0) < 5" v-bind="AdministrationEvidenceController.store.form({ subjectType: 'damage_report', subjectId: report.id })" v-slot="{ errors, processing }" class="flex flex-wrap items-end gap-2">
+                <Form v-if="page.props.auth.can?.requestReturns && (evidence[report.id]?.length ?? 0) < 5" v-bind="AdministrationEvidenceController.store.form({ subjectType: 'damage_report', subjectId: report.id })" v-slot="{ errors, processing }" class="flex flex-wrap items-end gap-2">
                     <label class="text-sm">Inspection evidence<input name="files[]" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.pdf" class="mt-1 block" /></label><Button type="submit" variant="outline" :disabled="processing">Add evidence</Button><InputError :message="errors.files || errors['files.0']" />
                 </Form>
                 <Form v-if="report.status === 'pending' && report.requester_id !== page.props.auth.user.id && page.props.auth.can?.approveReturns" v-bind="DamageReportController.decide.form(report.id)" v-slot="{ errors, processing }" class="grid gap-3 sm:grid-cols-3">

@@ -29,7 +29,7 @@ class DecideInventoryAdjustment
                 abort(403);
             }
             $requester = User::query()->whereKey($request->requester_id)->firstOrFail();
-            if (! $requester->is_active) {
+            if ($approve && ! $requester->is_active) {
                 throw ValidationException::withMessages(['decision' => 'The requester account is inactive.']);
             }
 
