@@ -610,7 +610,7 @@ const chartOptions = {
             >
                 <table class="w-full min-w-3xl text-left text-sm">
                     <caption class="sr-only">
-                        Persisted product demand forecasts
+                        Saved product demand forecasts
                     </caption>
                     <thead>
                         <tr

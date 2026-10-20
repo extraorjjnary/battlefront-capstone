@@ -20,6 +20,10 @@ class DeleteCategory
                     throw ValidationException::withMessages(['deletion' => self::PROTECTED_MESSAGE]);
                 }
 
+                $lockedCategory->is_active = false;
+                $lockedCategory->deleted_by_id = auth()->id();
+                $lockedCategory->save();
+
                 DB::table('audit_logs')->insert([
                     'actor_id' => auth()->id(),
                     'action' => 'category.deleted',

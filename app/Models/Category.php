@@ -9,7 +9,9 @@ use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * @property int $id
@@ -24,6 +26,8 @@ class Category extends Model
 
     /** @use HasFactory<CategoryFactory> */
     use HasFactory;
+
+    use SoftDeletes;
 
     /**
      * Indicates if the model should be timestamped.
@@ -52,6 +56,16 @@ class Category extends Model
     }
 
     /**
+     * Get the administrator who moved the category to Deleted categories.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function deletedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'deleted_by_id');
+    }
+
+    /**
      * Scope a query to active categories.
      *
      * @param  Builder<Category>  $query
@@ -71,6 +85,7 @@ class Category extends Model
     {
         return [
             'is_active' => 'boolean',
+            'deleted_at' => 'datetime',
         ];
     }
 }

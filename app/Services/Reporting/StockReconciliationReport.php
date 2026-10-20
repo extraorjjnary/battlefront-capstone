@@ -12,6 +12,7 @@ class StockReconciliationReport
     {
         $inventories = DB::table('inventories')
             ->join('products', 'products.id', '=', 'inventories.product_id')
+            ->whereNull('products.deleted_at')
             ->select('inventories.product_id', 'inventories.quantity', 'inventories.quarantined_quantity', 'products.name', 'products.product_code')
             ->orderBy('products.name')->orderBy('products.id')
             ->paginate(20)->withQueryString();

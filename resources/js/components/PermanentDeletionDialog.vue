@@ -21,7 +21,6 @@ defineProps({
     name: { type: String, required: true },
     form: { type: Object, required: true },
     errorBag: { type: String, required: true },
-    imported: { type: Boolean, default: false },
 });
 
 const open = ref(false);
@@ -38,7 +37,7 @@ function showError(errors) {
         <DialogTrigger as-child>
             <Button variant="destructive-outline" size="sm">
                 <Trash2 />
-                Delete
+                Move to deleted
             </Button>
         </DialogTrigger>
         <DialogContent>
@@ -51,10 +50,10 @@ function showError(errors) {
                 v-slot="{ errors, processing }"
             >
                 <DialogHeader>
-                    <DialogTitle>Delete {{ name }} permanently?</DialogTitle>
+                    <DialogTitle>Move {{ name }} to deleted items?</DialogTitle>
                     <DialogDescription>
-                        This cannot be undone. Only records with no protected
-                        references can be deleted.
+                        This removes it from the active catalog and records who
+                        moved it. An owner can restore it later as inactive.
                     </DialogDescription>
                 </DialogHeader>
                 <InputError class="mt-4" :message="errors.deletion" />
@@ -75,7 +74,7 @@ function showError(errors) {
                     >
                         <Spinner v-if="processing" />
                         <Trash2 v-else />
-                        Delete permanently
+                        Move to deleted
                     </Button>
                 </DialogFooter>
             </Form>

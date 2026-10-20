@@ -81,7 +81,7 @@ class SaveProductRequest extends FormRequest
                 'bail',
                 'required',
                 'integer',
-                Rule::exists(Category::class, 'id'),
+                Rule::exists(Category::class, 'id')->whereNull('deleted_at'),
             ],
             'brand' => ['bail', 'nullable', 'string', 'max:255'],
             'price' => [

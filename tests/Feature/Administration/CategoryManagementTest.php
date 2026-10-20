@@ -10,6 +10,26 @@ test('guests are redirected when viewing catalog categories', function () {
         ->assertRedirect(route('login'));
 });
 
+test('owners can restore deleted categories as inactive', function () {
+    $owner = User::factory()->administrator()->create();
+    $category = Category::factory()->create(['name' => 'Archived category', 'is_active' => true]);
+
+    $this->actingAs($owner)->delete(route('administration.categories.destroy', $category))
+        ->assertRedirect(route('administration.categories.index'));
+
+    expect(Category::query()->find($category->id))->toBeNull();
+    $this->get(route('administration.categories.index', ['deleted' => 1]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('deleted', true)
+            ->where('categories.data.0.name', 'Archived category')
+            ->where('categories.data.0.deleted_by', $owner->name));
+
+    $this->post(route('administration.categories.restore', $category->id))
+        ->assertRedirect(route('administration.categories.index', ['deleted' => 1]));
+
+    expect(Category::query()->findOrFail($category->id)->is_active)->toBeFalse();
+});
+
 test('customers are forbidden from catalog category actions', function () {
     $customer = User::factory()->customer()->create();
 

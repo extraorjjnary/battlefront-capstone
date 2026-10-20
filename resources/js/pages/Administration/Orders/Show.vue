@@ -613,7 +613,7 @@ defineOptions({
                 <section aria-labelledby="processing-details-heading">
                     <div class="mb-4">
                         <p class="text-muted-foreground text-sm">
-                            Order snapshot
+                            Order details at purchase
                         </p>
                         <h2
                             id="processing-details-heading"
@@ -666,7 +666,7 @@ defineOptions({
                                 />
                                 <div>
                                     <p class="text-muted-foreground text-sm">
-                                        Recipient snapshot
+                                        Recipient details at purchase
                                     </p>
                                     <p class="mt-1 font-medium">
                                         {{ order.recipient.name }}

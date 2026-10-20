@@ -128,6 +128,7 @@ const dateFormatter = new Intl.DateTimeFormat('en-PH', {
     timeZone: 'UTC',
 });
 const presets = [7, 30, 90];
+const todayDate = formatDateInput(new Date());
 const hasSales = computed(() => props.kpis.total_sales > 0);
 const chartTextColor = ref('#9CA3AF');
 const chartBorderColor = ref('#2A2E36');
@@ -664,7 +665,7 @@ defineOptions({
                     class="text-muted-foreground flex items-center gap-2 text-sm"
                 >
                     <CalendarRange class="text-primary size-4" />
-                    Inclusive date range
+                    {{ rangeLabel }} · Philippine time
                 </div>
             </div>
             <div
@@ -714,8 +715,8 @@ defineOptions({
                         Reporting period
                     </h2>
                     <p class="text-muted-foreground mt-1 text-sm">
-                        Choose inclusive dates and how the timeline groups
-                        recorded sales.
+                        Both the start and end dates are included. Choose how
+                        the timeline groups recorded sales.
                     </p>
                 </div>
             </div>
@@ -726,7 +727,7 @@ defineOptions({
             >
                 <div class="grid gap-2">
                     <Label for="sales-report-from">Start date</Label>
-                    <Input id="sales-report-from" v-model="from" type="date" />
+                    <Input id="sales-report-from" v-model="from" type="date" :max="to || todayDate" />
                     <p
                         v-if="page.props.errors.from"
                         class="text-destructive text-xs"
@@ -736,7 +737,7 @@ defineOptions({
                 </div>
                 <div class="grid gap-2">
                     <Label for="sales-report-to">End date</Label>
-                    <Input id="sales-report-to" v-model="to" type="date" />
+                    <Input id="sales-report-to" v-model="to" type="date" :min="from" :max="todayDate" />
                     <p
                         v-if="page.props.errors.to"
                         class="text-destructive text-xs"

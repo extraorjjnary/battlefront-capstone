@@ -158,6 +158,9 @@ Route::middleware(['auth', 'can:access-administration'])
         Route::patch('notifications/{notification}/read', [AdministrationNotificationController::class, 'update'])->whereUuid('notification')->name('notifications.update');
 
         // products
+        Route::post('products/{product}/restore', [ProductController::class, 'restore'])
+            ->middleware('can:catalog.delete')
+            ->name('products.restore');
         Route::resource('products', ProductController::class)
             ->middleware('can:products.manage');
         Route::patch('products/{product}/activation', ProductActivationController::class)
@@ -170,6 +173,9 @@ Route::middleware(['auth', 'can:access-administration'])
             ->name('products.inventory.store');
 
         // categories
+        Route::post('categories/{category}/restore', [CategoryController::class, 'restore'])
+            ->middleware('can:catalog.delete')
+            ->name('categories.restore');
         Route::resource('categories', CategoryController::class)
             ->middleware('can:products.manage')
             ->except(['show']);

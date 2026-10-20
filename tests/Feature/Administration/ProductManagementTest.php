@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -77,6 +78,63 @@ test('administration product and inventory search returns matching product codes
 test('guests are redirected when viewing catalog products', function () {
     $this->get(route('administration.products.index'))
         ->assertRedirect(route('login'));
+});
+
+test('owners can restore a deleted product with its inventory while keeping it inactive', function () {
+    $owner = User::factory()->administrator()->create();
+    $product = Product::factory()->has(Inventory::factory()->state(['quantity' => 8]))->create([
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($owner)->delete(route('administration.products.destroy', $product))
+        ->assertRedirect(route('administration.products.index'));
+
+    expect(Product::query()->find($product->id))->toBeNull();
+    $this->assertDatabaseHas('products', ['id' => $product->id, 'is_active' => false, 'deleted_by_id' => $owner->id]);
+    $this->assertDatabaseHas('inventories', ['product_id' => $product->id, 'quantity' => 8]);
+
+    $this->get(route('administration.products.index', ['deleted' => 1]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('deleted', true)
+            ->where('products.data.0.name', $product->name)
+            ->where('products.data.0.deleted_by', $owner->name));
+
+    $this->post(route('administration.products.restore', $product->id))
+        ->assertRedirect(route('administration.products.index', ['deleted' => 1]));
+
+    $restored = Product::query()->findOrFail($product->id);
+    expect($restored->is_active)->toBeFalse();
+    $this->assertDatabaseHas('inventories', ['product_id' => $product->id, 'quantity' => 8]);
+});
+
+test('only owners can view or restore deleted products', function () {
+    $managerRoleId = DB::table('administration_roles')->where('code', 'manager')->value('id');
+    $manager = User::factory()->administrator()->create(['administration_role_id' => $managerRoleId]);
+    $product = Product::factory()->create();
+    $product->delete();
+
+    $this->actingAs($manager)->get(route('administration.products.index', ['deleted' => 1]))->assertForbidden();
+    $this->post(route('administration.products.restore', $product->id))->assertForbidden();
+});
+
+test('a deleted product waits for its deleted category to be restored', function () {
+    $owner = User::factory()->administrator()->create();
+    $category = Category::factory()->create();
+    $product = Product::factory()->for($category)->create();
+
+    $this->actingAs($owner)->delete(route('administration.products.destroy', $product));
+    $this->delete(route('administration.categories.destroy', $category));
+
+    $this->get(route('administration.products.index', ['deleted' => 1]))
+        ->assertInertia(fn (Assert $page) => $page->where('products.data.0.category.is_deleted', true));
+
+    $this->post(route('administration.products.restore', $product->id))
+        ->assertSessionHasErrors(['restore' => 'Restore the product category before restoring this product.']);
+
+    $this->post(route('administration.categories.restore', $category->id));
+    $this->post(route('administration.products.restore', $product->id))->assertSessionHasNoErrors();
+
+    expect(Product::query()->findOrFail($product->id)->is_active)->toBeFalse();
 });
 
 test('administrators can view a product with its catalog details and low stock', function () {

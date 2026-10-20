@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 
@@ -64,6 +65,7 @@ use Illuminate\Support\Facades\Storage;
 class Product extends Model
 {
     use HasCatalogNameKey;
+    use SoftDeletes;
 
     public const CODE_PATTERN = '/^[A-Za-z0-9]{1,64}$/D';
 
@@ -125,6 +127,16 @@ class Product extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    /**
+     * Get the administrator who moved the product to Deleted products.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function deletedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'deleted_by_id');
     }
 
     /**
@@ -260,6 +272,7 @@ class Product extends Model
             'discount_price' => 'decimal:2',
             'is_active' => 'boolean',
             'edit_version' => 'integer',
+            'deleted_at' => 'datetime',
         ];
     }
 }

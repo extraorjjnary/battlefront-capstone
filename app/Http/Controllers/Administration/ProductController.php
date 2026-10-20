@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Administration;
 
 use App\Actions\Product\CreateProduct;
 use App\Actions\Product\DeleteProduct;
+use App\Actions\Product\RestoreProduct;
 use App\Actions\Product\UpdateProduct;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\ProductIndexRequest;
@@ -29,6 +30,49 @@ class ProductController extends Controller
     public function index(ProductIndexRequest $request): Response
     {
         $filters = $request->validated();
+        if ((bool) ($filters['deleted'] ?? false)) {
+            $this->authorize('catalog.delete');
+
+            $products = Product::onlyTrashed()
+                ->with([
+                    'category' => fn ($query) => $query->withTrashed()->select(['id', 'name', 'is_active', 'deleted_at']),
+                    'deletedBy:id,name',
+                    'inventory:id,product_id,quantity,quarantined_quantity',
+                ])
+                ->orderByDesc('deleted_at')->orderBy('id')
+                ->paginate(12)->withQueryString()
+                ->through(fn (Product $product): array => [
+                    'id' => $product->id,
+                    'product_code' => $product->product_code,
+                    'is_catalog_imported' => $product->is_catalog_imported,
+                    'name' => $product->name,
+                    'brand' => $product->brand,
+                    'price' => $product->price,
+                    'discount_price' => $product->discount_price,
+                    'image_url' => $product->image_url,
+                    'is_featured' => $product->is_featured,
+                    'is_active' => false,
+                    'deleted_at' => $product->deleted_at?->toDateTimeString(),
+                    'deleted_by' => $product->deletedBy?->name,
+                    'inventory' => $product->inventory === null ? null : [
+                        'quantity' => $product->inventory->quantity,
+                        'quarantined_quantity' => $product->inventory->quarantined_quantity,
+                    ],
+                    'category' => [
+                        'name' => $product->category->name,
+                        'is_active' => $product->category->is_active,
+                        'is_deleted' => $product->category->trashed(),
+                    ],
+                    'tags' => [],
+                ]);
+
+            return Inertia::render('Administration/Products/Index', [
+                'products' => $products,
+                'deleted' => true,
+                'filters' => ['q' => null, 'category_id' => null, 'brand' => null, 'tag_id' => null, 'status' => null],
+                'filter_options' => ['categories' => [], 'tags' => [], 'brands' => []],
+            ]);
+        }
         $filters['category_id'] = $request->filled('category_id')
             ? $request->integer('category_id')
             : null;
@@ -279,10 +323,20 @@ class ProductController extends Controller
 
         Inertia::flash('toast', [
             'type' => 'success',
-            'message' => __('Product permanently deleted.'),
+            'message' => __('Product moved to Deleted products. An owner can restore it.'),
         ]);
 
         return to_route('administration.products.index');
+    }
+
+    public function restore(int $product, RestoreProduct $restoreProduct): RedirectResponse
+    {
+        $this->authorize('catalog.delete');
+        $restoreProduct->execute($product);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Product restored as inactive.')]);
+
+        return to_route('administration.products.index', ['deleted' => 1]);
     }
 
     /**

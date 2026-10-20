@@ -78,7 +78,6 @@ defineOptions({
                     :name="product.name"
                     :form="ProductController.destroy.form(product.id)"
                     :error-bag="`deleteProduct${product.id}`"
-                    :imported="product.is_catalog_imported"
                 />
             </div>
         </div>

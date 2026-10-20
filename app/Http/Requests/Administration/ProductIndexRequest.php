@@ -29,6 +29,7 @@ class ProductIndexRequest extends FormRequest
             'brand' => ['nullable', 'string', 'max:255'],
             'tag_id' => ['nullable', 'integer', 'exists:tags,id'],
             'status' => ['nullable', 'string', Rule::in(['active', 'inactive'])],
+            'deleted' => ['sometimes', 'boolean'],
             'page' => ['nullable', 'integer', 'min:1'],
         ];
     }

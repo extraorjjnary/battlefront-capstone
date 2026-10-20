@@ -18,6 +18,36 @@ function applyFilters() {
 }
 const hasGrant = (role, code) => props.grants.some((grant) => grant.role === role && grant.permission === code);
 const roleLabel = (role) => role === 'it' ? 'IT Administrator' : role ? role.charAt(0).toUpperCase() + role.slice(1) : 'Unassigned';
+const permissionLabels = {
+    'orders.view': 'View orders',
+    'orders.process': 'Update order status',
+    'orders.assign': 'Assign orders',
+    'inventory.view': 'View inventory',
+    'inventory.request': 'Request stock changes',
+    'inventory.approve': 'Approve stock changes',
+    'inventory.reorder': 'Manage reorders',
+    'products.manage': 'Manage product details',
+    'products.price': 'Manage product prices',
+    'catalog.delete': 'Delete products and categories',
+    'customers.view': 'View customers',
+    'reports.view': 'View sales reports',
+    'reports.export': 'Export reports',
+    'reports.profit': 'View profit reports',
+    'forecast.manage': 'Manage forecasts',
+    'returns.request': 'Request returns',
+    'returns.approve': 'Approve returns',
+    'returns.record_payment': 'Record return payments',
+    'returns.dispatch': 'Dispatch returns',
+    'returns.resolve': 'Resolve returns',
+    'returns.reconcile': 'Reconcile returns',
+    'suppliers.manage': 'Manage suppliers',
+    'staff_reports.view': 'View staff reports',
+    'audit.view': 'View audit log',
+    'audit.export': 'Export audit log',
+    'users.manage': 'Manage user accounts',
+    'permissions.manage': 'Manage role permissions',
+};
+const permissionLabel = (permission) => permissionLabels[permission.code] ?? permission.name.replaceAll('.', ' ');
 
 defineOptions({ layout: { breadcrumbs: [{ title: 'Team', href: TeamController.index() }] } });
 </script>
@@ -28,24 +58,24 @@ defineOptions({ layout: { breadcrumbs: [{ title: 'Team', href: TeamController.in
         <div>
             <p class="text-primary text-xs font-semibold tracking-widest uppercase">Access control</p>
             <h1 class="mt-2 text-2xl font-bold">Team access</h1>
-            <p class="text-muted-foreground mt-2 text-sm">Each team member has an individual account. Changes take effect on their next request.</p>
+            <p class="text-muted-foreground mt-2 text-sm">Each team member has an individual account. Saved role or access changes apply the next time they use the system.</p>
         </div>
 
         <section class="border-border bg-card space-y-4 border p-5">
-            <h2 class="text-lg font-semibold">Create administrator account</h2>
+            <h2 class="text-lg font-semibold">Add team member</h2>
             <Form v-bind="TeamController.store.form()" v-slot="{ errors, processing }" class="grid gap-4 md:grid-cols-2">
                 <div class="space-y-2"><Label for="team-name">Name</Label><Input id="team-name" name="name" required /><InputError :message="errors.name" /></div>
                 <div class="space-y-2"><Label for="team-email">Email</Label><Input id="team-email" name="email" type="email" required /><InputError :message="errors.email" /></div>
                 <div class="space-y-2"><Label for="team-role">Role</Label><select id="team-role" name="role" class="border-border bg-background w-full border p-2" required><option v-for="role in availableRoles" :key="role" :value="role">{{ roleLabel(role) }}</option></select><InputError :message="errors.role" /></div>
-                <div class="space-y-2"><Label for="team-password">Temporary password</Label><Input id="team-password" name="password" type="password" autocomplete="new-password" required /><InputError :message="errors.password" /></div>
-                <div class="space-y-2"><Label for="team-password-confirmation">Confirm temporary password</Label><Input id="team-password-confirmation" name="password_confirmation" type="password" autocomplete="new-password" required /></div>
+                <div class="space-y-2"><Label for="team-password">Initial password</Label><Input id="team-password" name="password" type="password" autocomplete="new-password" required /><InputError :message="errors.password" /></div>
+                <div class="space-y-2"><Label for="team-password-confirmation">Confirm initial password</Label><Input id="team-password-confirmation" name="password_confirmation" type="password" autocomplete="new-password" required /></div>
                 <div class="flex items-end"><Button type="submit" :disabled="processing">Create account</Button></div>
             </Form>
-            <p class="text-muted-foreground text-sm">Give the account password to the team member privately. Their assigned role controls which features they can access.</p>
+            <p class="text-muted-foreground text-sm">Share the initial password privately. The assigned role controls which features the team member can access. Password changes are not currently required at first sign-in.</p>
         </section>
 
         <section class="space-y-4">
-            <h2 class="text-lg font-semibold">Administrators</h2>
+            <h2 class="text-lg font-semibold">Team members</h2>
             <form class="border-border bg-card flex flex-wrap items-end gap-3 border p-4" @submit.prevent="applyFilters">
                 <div class="space-y-1"><Label for="team-search">Name or email</Label><Input id="team-search" v-model="search" maxlength="100" /></div>
                 <div class="space-y-1"><Label for="team-status">Status</Label><select id="team-status" v-model="status" class="border-border bg-background block border p-2"><option value="all">All</option><option value="active">Active</option><option value="inactive">Inactive</option></select></div>
@@ -61,19 +91,20 @@ defineOptions({ layout: { breadcrumbs: [{ title: 'Team', href: TeamController.in
                     <Button type="submit" variant="outline" :disabled="processing">Save</Button>
                     <InputError :message="errors.user || errors.role || errors.is_active" />
                 </Form>
-                <p v-else class="text-muted-foreground text-sm">This role cannot change Owner or IT accounts.</p>
+                <p v-else class="text-muted-foreground text-sm">Only an owner can edit Owner and IT Administrator accounts.</p>
             </div>
             <div v-if="users.last_page > 1" class="flex justify-between text-sm"><Link v-if="users.prev_page_url" :href="users.prev_page_url" class="text-primary underline">Previous</Link><span v-else></span><Link v-if="users.next_page_url" :href="users.next_page_url" class="text-primary underline">Next</Link></div>
         </section>
 
         <section v-if="canManagePermissions" class="space-y-4">
             <h2 class="text-lg font-semibold">Role permissions</h2>
+            <p class="text-muted-foreground text-sm">These permissions apply to every team member assigned to that role.</p>
             <Form v-for="role in ['staff', 'manager']" :key="role" v-bind="RolePermissionController.update.form(role)" v-slot="{ errors, processing }" class="border-border bg-card space-y-4 border p-5">
                 <h3 class="font-semibold capitalize">{{ role }}</h3>
                 <input type="hidden" name="edit_version" :value="roleVersions[role]" />
                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <label v-for="permission in permissions.filter((entry) => !['users.manage', 'permissions.manage', 'audit.export'].includes(entry.code))" :key="permission.code" class="flex items-center gap-2 text-sm">
-                        <input type="checkbox" name="permissions[]" :value="permission.code" :checked="hasGrant(role, permission.code)" />{{ permission.name }}
+                        <input type="checkbox" name="permissions[]" :value="permission.code" :checked="hasGrant(role, permission.code)" />{{ permissionLabel(permission) }}
                     </label>
                 </div>
                 <InputError :message="errors.permissions" />
