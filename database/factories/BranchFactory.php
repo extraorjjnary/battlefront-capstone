@@ -24,6 +24,14 @@ class BranchFactory extends Factory
             'contact_number' => fake()->numerify('09## ### ####'),
             'latitude' => fake()->latitude(),
             'longitude' => fake()->longitude(),
+            'email' => null,
+            'operating_hours' => '8:00 AM–6:00 PM',
+            'is_published' => true,
         ];
+    }
+
+    public function unpublished(): static
+    {
+        return $this->state(fn (): array => ['is_published' => false]);
     }
 }

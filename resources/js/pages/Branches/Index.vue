@@ -51,7 +51,7 @@ const phoneUrl = (phoneNumber) => `tel:${phoneNumber.replaceAll(' ', '')}`;
                     <article
                         v-for="branch in branches"
                         :key="branch.id"
-                        class="surface-card bg-card border p-4 sm:p-6"
+                        class="surface-card bg-card min-w-0 border p-4 wrap-anywhere sm:p-6"
                         :class="
                             branch.is_operational
                                 ? 'border-primary/50 lg:col-span-2'

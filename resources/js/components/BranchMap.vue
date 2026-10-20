@@ -18,7 +18,10 @@ let mapInstance = null;
 let isUnmounted = false;
 
 const hasValidCoordinates = (branch) => {
-    if (branch.latitude === null || branch.longitude === null) {
+    if (
+        branch.latitude == null || branch.longitude == null ||
+        String(branch.latitude).trim() === '' || String(branch.longitude).trim() === ''
+    ) {
         return false;
     }
 

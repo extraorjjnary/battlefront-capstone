@@ -10,6 +10,48 @@ import { setTimeout as delay } from 'node:timers/promises';
 const baseUrl = process.env.BATTLEFRONT_UI_URL;
 const executable = process.env.BATTLEFRONT_UI_BROWSER;
 const widths = [320, 375, 390, 428, 768, 1024, 1440];
+
+test('branch management forms and directories fit both themes and keep publication explicit', {
+    skip: !baseUrl || !executable,
+}, async (t) => {
+    const browser = await openBrowser(t);
+    const branch = {
+        id: 7, name: 'Battlefront ' + 'LongStoreName'.repeat(15), city: 'New City',
+        address: '12 Confirmed Street, Poblacion, Negros Occidental',
+        email: 'verified-store@example.test', contact_number: '0912 345 6789',
+        operating_hours: 'Mon–Sat, 9 AM–5 PM', latitude: null, longitude: null,
+        is_published: false, is_operational: false, operational_notice: null,
+    };
+    for (const theme of ['light', 'dark']) {
+        for (const [component, props, audience] of [
+            ['Administration/Branches/Index', { branches: { data: [branch], total: 1, current_page: 1, last_page: 1 } }, 'admin'],
+            ['Administration/Branches/Create', {}, 'admin'],
+            ['Administration/Branches/Edit', { branch }, 'admin'],
+            ['Administration/Branches/Show', { branch }, 'admin'],
+            ['Branches/Index', { branches: [{ ...branch, is_published: true, city: 'Location' + 'x'.repeat(90) }] }, false],
+        ]) {
+            await browser.show(component, props, audience, theme);
+            for (const width of [320, 375, 768, 1440]) {
+                await browser.resize(width);
+                await assertFits(browser, component + ' ' + theme + ' ' + width);
+            }
+        }
+    }
+
+    await browser.show('Administration/Branches/Create', {}, 'admin');
+    assert.equal(await browser.evaluate(`!!document.querySelector('[data-sidebar="menu"] a[href="/administration/branches"]')`), true);
+    assert.equal(await browser.evaluate(`new FormData(document.querySelector('main form')).get('is_published')`), '0');
+    assert.equal(await browser.evaluate(`document.querySelector('#address').required`), false);
+    await browser.evaluate(`document.querySelector('#is-published').click()`);
+    assert.equal(await browser.evaluate(`new FormData(document.querySelector('main form')).get('is_published')`), '1');
+    assert.equal(await browser.evaluate(`document.querySelector('#address').required && document.querySelector('#operating-hours').required`), true);
+
+    await browser.show('Administration/Branches/Edit', { branch: { ...branch, city: 'Sagay City', is_published: true, is_operational: true } }, 'admin');
+    assert.equal(await browser.evaluate(`document.querySelector('#city').readOnly && document.querySelector('#is-published').disabled`), true);
+    assert.equal(await browser.evaluate(`new FormData(document.querySelector('main form')).get('is_published')`), '1');
+    assert.deepEqual(browser.exceptions, []);
+});
+
 const longName = 'Battlefront Ultra Performance Graphics Card With Extended Cooling';
 const product = {
     id: 7, name: longName, brand: 'Battlefront', category: { id: 3, name: 'Graphics Cards & Accessories' },

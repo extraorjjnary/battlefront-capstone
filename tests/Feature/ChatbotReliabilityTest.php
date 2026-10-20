@@ -17,7 +17,12 @@ use Laravel\Ai\Exceptions\AiException;
 test('provider outage returns only the requested confirmed branch information', function () {
     Http::preventStrayRequests();
     ChatbotResponseAgent::fake(fn () => throw new AiException('private error'))->preventStrayPrompts();
-    Branch::factory()->create(['city' => 'Sagay City', 'contact_number' => '0938 647 6046', 'address' => 'Unrequested address']);
+    Branch::factory()->create([
+        'city' => 'Sagay City',
+        'contact_number' => '0938 647 6046',
+        'email' => 'battlefrontcomputertrading@gmail.com',
+        'address' => 'Unrequested address',
+    ]);
 
     $this->postJson(route('chatbot.store'), ['message' => 'How can I contact the Sagay store?'])
         ->assertOk()->assertJsonPath('source', 'fallback')

@@ -59,7 +59,7 @@ class ChatbotConversation
             && in_array($category, [ChatbotQueryCategory::Unsupported, ChatbotQueryCategory::Store], true)
             && ! $this->categorizer->requiresLiveFacts($message)
             && preg_match('/^(?:what|how) about\b/iu', $message) === 1) {
-            $namedCity = Branch::query()->pluck('city')->first(
+            $namedCity = Branch::query()->published()->pluck('city')->first(
                 fn (string $city): bool => str_contains(Str::lower($message), Str::lower(Str::before($city, ' City'))),
             );
             if ($namedCity !== null) {
@@ -156,7 +156,7 @@ class ChatbotConversation
 
         $normalized = Str::of($message)->lower()->replaceMatches('/[^\p{L}\p{N}\s]+/u', ' ')->squish()->toString();
         if ($category === ChatbotQueryCategory::Store) {
-            return Branch::query()->pluck('city')->contains(function (string $city) use ($normalized): bool {
+            return Branch::query()->published()->pluck('city')->contains(function (string $city) use ($normalized): bool {
                 $city = Str::lower(Str::before($city, ' City'));
 
                 return str_contains(" {$normalized} ", " {$city} ");

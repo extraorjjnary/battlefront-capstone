@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Branch;
 use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\Product;
@@ -144,6 +145,22 @@ test('checkout renders current customer items, pickup location, and supported op
 
     expect(collect($response->inertiaProps('cart.items'))->pluck('product.id'))
         ->not->toContain($otherProduct->id);
+});
+
+test('checkout shows managed Sagay hours without offering informational branches', function () {
+    $this->seed(BranchSeeder::class);
+    Branch::operational()->sole()->update(['operating_hours' => 'Mon–Sat, 10 AM–4 PM']);
+    Branch::factory()->create(['city' => 'Additional City']);
+    $customer = User::factory()->customer()->create();
+    $product = Product::factory()->create();
+    Inventory::factory()->for($product)->create(['quantity' => 5]);
+    $item = app(CartService::class)->add($customer, $product->id, 1);
+
+    $this->actingAs($customer)->get(route('checkout.index', ['cart_item_ids' => [$item->id]]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('pickupLocation.name', 'Battlefront Computer Trading — Sagay City')
+            ->where('pickupLocation.operating_hours', 'Mon–Sat, 10 AM–4 PM')
+            ->missing('branches'));
 });
 
 test('checkout provides the saved default delivery address for prefill', function () {

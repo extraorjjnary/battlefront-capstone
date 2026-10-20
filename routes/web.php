@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Administration\BranchController as AdministrationBranchController;
 use App\Http\Controllers\Administration\CategoryActivationController;
 use App\Http\Controllers\Administration\CategoryController;
 use App\Http\Controllers\Administration\ChatbotKnowledgeActivationController;
@@ -137,6 +138,10 @@ Route::middleware(['auth', 'can:access-administration'])
     ->prefix('administration')
     ->name('administration.')
     ->group(function () {
+        Route::resource('branches', AdministrationBranchController::class)
+            ->except('destroy')
+            ->where(['branch' => '[0-9]+']);
+
         // notifications
         Route::get('notifications', [AdministrationNotificationController::class, 'index'])->name('notifications.index');
         Route::get('notifications/summary', [AdministrationNotificationController::class, 'summary'])->name('notifications.summary');

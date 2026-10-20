@@ -4,7 +4,7 @@ use App\Actions\Chatbot\Context\ResolveStoreContext;
 use App\Models\Branch;
 use Database\Seeders\BranchSeeder;
 
-test('returns confirmed configured data for a named branch', function () {
+test('returns confirmed stored data for a named branch', function () {
     $this->seed(BranchSeeder::class);
 
     $context = (new ResolveStoreContext)->execute('Where is the Sagay store?');
@@ -16,7 +16,7 @@ test('returns confirmed configured data for a named branch', function () {
             'address' => "A, E Mara\u{00F1}on St., Brgy. Poblacion II, Sagay City, Negros Occidental (beside LBC Sagay City), Sagay, Philippines 6122",
             'contact_number' => '0938 647 6046',
             'email' => 'battlefrontcomputertrading@gmail.com',
-            'operating_hours' => config('battlefront.operating_hours'),
+            'operating_hours' => '8:00 AM–6:00 PM',
             'is_operational' => true,
         ]);
 });
@@ -43,4 +43,18 @@ test('returns explicit empty store context when no branch data exists', function
     $context = (new ResolveStoreContext)->execute('Where are your branches?');
 
     expect($context)->toBe(['branches' => []]);
+});
+
+test('store context uses managed details and excludes unpublished records', function () {
+    $published = Branch::factory()->create(['city' => 'Published City', 'email' => 'managed@example.test', 'operating_hours' => '11 AM–5 PM']);
+    Branch::factory()->unpublished()->create(['city' => 'Private City', 'address' => 'Private draft address']);
+    config(['battlefront.operating_hours' => 'Obsolete hours', 'battlefront.branch_emails' => ['Published City' => 'obsolete@example.test']]);
+
+    $context = (new ResolveStoreContext)->execute('Where are the stores?');
+
+    expect($context['branches'])->toHaveCount(1);
+    expect($context['branches'][0])->toMatchArray(['city' => $published->city, 'email' => 'managed@example.test', 'operating_hours' => '11 AM–5 PM']);
+
+    $published->update(['is_published' => false]);
+    expect((new ResolveStoreContext)->execute('Where is Published City?'))->toBe(['branches' => []]);
 });

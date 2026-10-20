@@ -13,6 +13,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/** | .ai/rules/app-models.md |
 | app/Http/Controllers/**,app/Actions/**,app/Services/**,app/Repositories/** | .ai/rules/application-architecture.md |
 | app/Models/User.php,config/fortify.php,routes/**,app/Providers/FortifyServiceProvider.php,resources/js/pages/{auth,settings,Administration/Customers}/**,tests/Feature/{Auth,Settings,Administration}/** | .ai/rules/auth-settings-administration.md |
+| app/Models/Branch.php,app/Services/BranchDirectory.php,app/Http/Requests/Administration/*Branch*,database/seeders/BranchSeeder.php,config/battlefront.php,resources/js/pages/**/Branches/** | .ai/rules/branches.md |
 | app/Actions/{Cart,Checkout}/**,app/Services/Cart/**,app/Http/Controllers/*Checkout*,app/Http/Requests/ValidateCheckoutRequest.php,resources/js/pages/{Cart,Checkout}/**/*.vue | .ai/rules/cart-checkout.md |
 | app/Actions/Cart/**,app/Services/Cart/** | .ai/rules/cart.md |
 | resources/js/{pages/Cart,components/cart}/**/*.vue | .ai/rules/cartcomponents-cart.md |

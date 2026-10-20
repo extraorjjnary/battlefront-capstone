@@ -13,12 +13,16 @@ test('the branch schema follows the current application design', function () {
         'contact_number',
         'latitude',
         'longitude',
+        'email',
+        'operating_hours',
+        'is_published',
+        'seed_key',
     ])->and(Schema::hasColumn('users', 'branch_id'))->toBeFalse();
 });
 
 test('branch reference data can be seeded repeatedly', function () {
     $this->seed();
-    Branch::query()->where('city', 'Sagay City')->update(['contact_number' => 'outdated']);
+    Branch::query()->where('city', 'Sagay City')->update(['contact_number' => '0999 123 4567']);
 
     $this->seed();
 
@@ -26,7 +30,7 @@ test('branch reference data can be seeded repeatedly', function () {
         ->and(User::query()->where('email', 'test@example.com')->count())->toBe(1);
     $this->assertDatabaseHas('branches', [
         'city' => 'Sagay City',
-        'contact_number' => '0938 647 6046',
+        'contact_number' => '0999 123 4567',
     ]);
     $this->assertDatabaseHas('branches', [
         'city' => 'San Carlos City',
@@ -70,7 +74,7 @@ test('branch reference data can be seeded repeatedly', function () {
         ->toEqualWithDelta(122.9470409276533, 0.0000001);
 });
 
-test('branches expose configured reference information', function () {
+test('seeded branches expose stored reference information', function () {
     $this->seed();
 
     $branches = Branch::query()->get()->keyBy('city');
