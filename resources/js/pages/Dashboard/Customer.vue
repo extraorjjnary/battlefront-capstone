@@ -1,4 +1,5 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import {
     ArrowRight,
@@ -60,65 +61,36 @@ defineOptions({
 
 <template>
     <div class="contents">
-        <Head title="Customer dashboard" />
+        <Head title="Dashboard" />
 
         <main
-            class="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 p-6 lg:p-10"
+            class="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
         >
-            <section
-                class="surface-panel border-border bg-card relative overflow-hidden border p-6 sm:p-8"
-                aria-labelledby="customer-dashboard-heading"
+            <PageHeader
+                :title="`${props.is_first_visit ? 'Welcome' : 'Welcome back'}, ${user.name}!`"
+                heading-id="customer-dashboard-heading"
             >
-                <div
-                    class="bg-primary absolute inset-y-0 left-0 w-1"
-                    aria-hidden="true"
-                />
-                <div
-                    class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between"
-                >
-                    <div class="max-w-2xl">
-                        <p
-                            class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
-                        >
-                            Customer dashboard
-                        </p>
-                        <h1
-                            id="customer-dashboard-heading"
-                            class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
-                        >
-                            {{ props.is_first_visit ? 'Welcome' : 'Welcome back' }},
-                            {{ user.name }}!
-                        </h1>
-                        <p class="text-muted-foreground mt-2 text-sm leading-6">
-                            {{
-                                props.is_first_visit
-                                    ? 'Explore our products, find your next upgrade, and start shopping with Battlefront.'
-                                    : 'Continue shopping, check your cart, or track your latest Battlefront order.'
-                            }}
-                        </p>
-                    </div>
-                    <div class="flex flex-wrap gap-3">
-                        <Button as-child>
-                            <Link :href="productIndex()">
-                                <PackageSearch aria-hidden="true" />
-                                Browse products
-                            </Link>
-                        </Button>
-                        <Button variant="outline" as-child>
-                            <Link :href="cartIndex()">
-                                <ShoppingCart aria-hidden="true" />
-                                View cart
-                            </Link>
-                        </Button>
-                        <Button variant="outline" as-child>
-                            <Link :href="orderIndex()">
-                                <ReceiptText aria-hidden="true" />
-                                View orders
-                            </Link>
-                        </Button>
-                    </div>
-                </div>
-            </section>
+                <template #actions>
+                    <Button as-child>
+                        <Link :href="productIndex()">
+                            <PackageSearch aria-hidden="true" />
+                            Browse products
+                        </Link>
+                    </Button>
+                    <Button variant="outline" as-child>
+                        <Link :href="cartIndex()">
+                            <ShoppingCart aria-hidden="true" />
+                            View cart
+                        </Link>
+                    </Button>
+                    <Button variant="outline" as-child>
+                        <Link :href="orderIndex()">
+                            <ReceiptText aria-hidden="true" />
+                            View orders
+                        </Link>
+                    </Button>
+                </template>
+            </PageHeader>
 
             <section aria-labelledby="shopping-summary-heading">
                 <h2 id="shopping-summary-heading" class="sr-only">

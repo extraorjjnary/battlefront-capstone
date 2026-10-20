@@ -1,4 +1,5 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import {
     ArrowLeft,
@@ -9,7 +10,6 @@ import {
     ExternalLink,
     MapPin,
     PackageCheck,
-    ReceiptText,
     ShieldCheck,
     Truck,
     UserRound,
@@ -49,8 +49,12 @@ import { Spinner } from '@/components/ui/spinner';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCurrency } from '@/lib/currency';
 import { orderStatusBadgeClass } from '@/lib/orderStatus';
-import { store as confirmCodCollection } from '@/routes/administration/orders/cod-collection';
-import { store as confirmPickup } from '@/routes/administration/orders/pickup-confirmation';
+import {
+    store as confirmCodCollection,
+} from '@/routes/administration/orders/cod-collection';
+import {
+    store as confirmPickup,
+} from '@/routes/administration/orders/pickup-confirmation';
 
 const props = defineProps({
     order: { type: Object, required: true },
@@ -343,59 +347,31 @@ defineOptions({
 </script>
 
 <template>
-    <Head :title="order.reference" />
-
     <main
-        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
+        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
     >
-        <section class="surface-panel border-border bg-card relative overflow-hidden border">
-            <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
-            <div
-                class="flex flex-col gap-5 p-6 sm:flex-row sm:items-start sm:justify-between"
-            >
-                <div class="flex min-w-0 items-start gap-4">
-                    <span
-                        class="bg-secondary text-primary-ink flex size-11 shrink-0 items-center justify-center rounded-md"
-                    >
-                        <ReceiptText class="size-5" />
-                    </span>
-                    <div>
-                        <p
-                            class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
-                        >
-                            Administrator order record
-                        </p>
-                        <div class="mt-2 flex flex-wrap items-center gap-3">
-                            <h1
-                                class="text-2xl font-bold tracking-tight tabular-nums sm:text-3xl"
-                            >
-                                {{ order.reference }}
-                            </h1>
-                            <Badge
-                                variant="outline"
-                                :class="
-                                    orderStatusBadgeClass(order.status.value)
-                                "
-                            >
-                                {{ order.status.label }}
-                            </Badge>
-                        </div>
-                        <p class="text-muted-foreground mt-2 text-sm">
-                            Placed
-                            {{
-                                dateFormatter.format(new Date(order.created_at))
-                            }}
-                        </p>
-                    </div>
-                </div>
+        <Head :title="order.reference" />
+        <PageHeader :title="order.reference">
+            <template #metadata>
+                <Badge
+                    variant="outline"
+                    :class="
+                        orderStatusBadgeClass(order.status.value)
+                        "
+                >
+                    {{ order.status.label }}
+                </Badge>
+                <span>Placed {{ dateFormatter.format(new Date(order.created_at)) }}</span>
+            </template>
+            <template #actions>
                 <Button variant="outline" size="sm" as-child>
                     <Link :href="OrderController.index()">
                         <ArrowLeft />
                         Back to orders
                     </Link>
                 </Button>
-            </div>
-        </section>
+            </template>
+        </PageHeader>
 
         <div
             class="grid gap-8 xl:grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.8fr)]"
@@ -411,15 +387,12 @@ defineOptions({
                         order.delivery_quote?.pricing_configured === false &&
                         !order.shipment
                     "
-                    class="border-border bg-secondary/40 grid gap-3 border p-5 text-sm"
+                    class="border-border grid gap-2 border-l-2 pl-3 text-sm"
                     role="status"
                 >
                     <p class="font-semibold">No configured delivery rate</p>
                     <p class="text-muted-foreground leading-6">
-                        This order remains at its saved product subtotal with
-                        no delivery fee. No LBC quote, booking, or estimate is
-                        implied. Recording a manually arranged LBC shipment
-                        will not change the saved order amount or add a fee.
+                        Product subtotal only; no delivery fee, LBC quote, booking, or estimate. Arrange delivery separately. Manual shipment setup does not change the saved total or add a fee.
                     </p>
                     <p class="text-muted-foreground text-xs leading-5">
                         {{ order.delivery_quote.assumption_label }}
@@ -541,11 +514,7 @@ defineOptions({
                                                 for="manual-arrangement-confirmed"
                                                 class="text-sm leading-5 font-normal"
                                             >
-                                                I confirm LBC has accepted this
-                                                delivery arrangement. I
-                                                understand no delivery fee or
-                                                estimate is added unless
-                                                explicitly entered above.
+                                                I confirm LBC accepted this arrangement. No fee is added; an estimate applies only if entered above.
                                             </Label>
                                         </div>
                                         <InputError
@@ -1060,8 +1029,8 @@ defineOptions({
                                 <p class="leading-5 font-medium">
                                     {{
                                         selectedOrderStatus === 'completed'
-                                            ? 'Completed is a terminal order status and cannot be undone.'
-                                            : 'Cancelled is a terminal order status and cannot be undone.'
+                                            ? 'Completing this order cannot be undone.'
+                                            : 'Cancelling this order cannot be undone.'
                                     }}
                                 </p>
                             </div>
@@ -1188,9 +1157,7 @@ defineOptions({
                         <p class="font-semibold">Payment and pickup confirmation</p>
                         <p class="text-muted-foreground text-sm leading-6">
                             {{ order.payment.method.description }}
-                            Move the order to Processing to prepare it. Confirm payment
-                            and product handover together when the customer collects it.
-                            This completes pickup and records the sale once.
+                            Move to Processing to prepare pickup. Confirm payment and product handover together to complete the order and record its sale.
                         </p>
                         <p v-if="order.payment.status.value === 'verified'" class="text-muted-foreground text-sm">
                             Payment is already verified. Confirm product handover to complete pickup.
@@ -1262,11 +1229,7 @@ defineOptions({
                     >
                         <p class="font-semibold">COD — Awaiting Collection</p>
                         <p class="text-muted-foreground text-sm leading-6">
-                            Payment is collected upon delivery. Marking the
-                            shipment Delivered does not verify payment or
-                            record a sale. Confirm collection only after
-                            manually verifying that LBC collected the total COD
-                            amount of {{ formatCurrency(order.total) }}.
+                            Delivered does not verify payment or record a sale. Confirm collection only after checking that LBC collected the full COD amount of {{ formatCurrency(order.total) }}.
                         </p>
                         <Button
                             v-if="order.payment.can_confirm_cod_collection"
@@ -1281,10 +1244,7 @@ defineOptions({
                             shipment reaches Delivered.
                         </p>
                         <p class="text-muted-foreground text-xs leading-5">
-                            Failed delivery, uncollected payment, and returns
-                            require separate manual follow-up. This workflow
-                            does not cancel, refund, return, or restore stock
-                            automatically. No live LBC settlement is verified.
+                            Handle failed delivery, unpaid orders, and returns manually. No automatic cancellation, refund, return, or stock restoration; no live LBC settlement check.
                         </p>
                         <Dialog v-model:open="codConfirmationOpen">
                             <DialogContent>
@@ -1420,8 +1380,7 @@ defineOptions({
                                     for="manual-verification-confirmed"
                                     class="text-sm leading-5 font-normal"
                                 >
-                                    I manually cross-checked and confirmed this
-                                    payment.
+                                    I checked and confirmed payment in the receiving account.
                                 </Label>
                             </div>
                             <InputError

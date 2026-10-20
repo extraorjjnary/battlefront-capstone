@@ -1,3 +1,4 @@
+import { pageHeaderModule } from '../pageHeaderTestHelpers.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -44,6 +45,7 @@ function loadComponent(
     );
     const modules = new Proxy(
         {
+            '@/components/PageHeader.vue': pageHeaderModule,
             vue: realSearch
                 ? { ...Vue, onBeforeUnmount: Vue.onScopeDispose }
                 : Vue,
@@ -278,7 +280,7 @@ test('catalog renders recommendations above all products and outside ordinary re
     assert.ok(
         html.indexOf('Recommended for you') < html.indexOf('All products'),
     );
-    assert.ok(html.indexOf('All products') < html.indexOf('Search products'));
+    assert.ok(html.indexOf('Search products') < html.indexOf('Recommended for you'));
     assert.ok(
         html.indexOf('Behavioral suggestion') <
             html.indexOf('data-catalog-results'),
@@ -287,6 +289,48 @@ test('catalog renders recommendations above all products and outside ordinary re
     assert.match(html, /Showing 1 of 13/);
     assert.match(html, /Ordinary catalog product/);
     assert.doesNotMatch(html, /View all recommendations/);
+});
+
+test('mobile filter disclosure preserves selections and individual clearing keeps search and sorting', async (t) => {
+    const visits = [];
+    const props = Vue.reactive(catalogProps({
+        filters: { q: 'graphics', category_id: 3, brand: 'Atlas', tag_id: 7, sort: 'price_asc' },
+        filter_options: {
+            categories: [{ id: 3, name: 'Graphics cards' }],
+            brands: ['Atlas'],
+            tags: [{ id: 7, name: 'Gaming' }],
+        },
+    }));
+    const component = loadComponent('../../pages/Products/Index.vue', {
+        inlineTemplate: false,
+        router: { visit: (...args) => visits.push(args) },
+    });
+    const scope = Vue.effectScope();
+    t.after(() => scope.stop());
+    const page = scope.run(() => component.setup(props, { expose() {} }));
+
+    assert.equal(page.mobileFiltersOpen.value, false);
+    assert.deepEqual(page.activeFilters.value.map((filter) => filter.label), ['Graphics cards', 'Atlas', 'Gaming']);
+    page.mobileFiltersOpen.value = true;
+    page.mobileFiltersOpen.value = false;
+    await Vue.nextTick();
+    assert.equal(visits.length, 0);
+    assert.equal(page.activeFilters.value.length, 3);
+
+    page.clearFilter('brand');
+    await Vue.nextTick();
+    const url = new URL(visits[0][0].url, 'https://battlefront.test');
+    assert.deepEqual(Object.fromEntries(url.searchParams), {
+        q: 'graphics', category_id: '3', tag_id: '7', sort: 'price_asc',
+    });
+    assert.deepEqual(visits[0][1].reset, ['products']);
+    assert.equal(page.activeFilters.value.length, 2);
+
+    page.clearFilters();
+    await Vue.nextTick();
+    assert.equal(page.activeFilters.value.length, 0);
+    assert.equal(page.search.value, 'graphics');
+    assert.equal(page.sort.value, 'price_asc');
 });
 
 for (const [filter, value] of Object.entries({
@@ -399,7 +443,10 @@ for (const [firstVisit, heading, message] of [
         );
 
         assert.ok(html.includes(heading));
-        assert.ok(html.includes(message));
+        assert.doesNotMatch(html, new RegExp(message));
+        assert.match(html, /Browse products/);
+        assert.match(html, /View cart/);
+        assert.match(html, /View orders/);
     });
 }
 
@@ -589,7 +636,7 @@ test('profile settings explain disabled discovery sections and remaining context
     );
     assert.match(
         html,
-        /hides recommendation sections on your dashboard and product catalog/,
+        /hides dashboard and catalog recommendations/,
     );
     assert.match(
         html,

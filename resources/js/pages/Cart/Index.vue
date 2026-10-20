@@ -1,12 +1,8 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
-import {
-    ArrowRight,
-    PackageOpen,
-    ShoppingCart,
-    TriangleAlert,
-} from '@lucide/vue';
+import { ArrowRight, PackageOpen, TriangleAlert } from '@lucide/vue';
 import CartItemRow from '@/components/cart/CartItemRow.vue';
 import RecommendationSection from '@/components/recommendations/RecommendationSection.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -101,48 +97,12 @@ defineOptions({
 
 <template>
     <div class="contents">
-        <Head title="Cart" />
+        <Head title="Your cart" />
 
         <main
-            class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
+            class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
         >
-            <section
-                class="surface-panel border-border bg-card relative overflow-hidden border p-6 sm:p-8"
-                aria-labelledby="cart-heading"
-            >
-                <div
-                    class="bg-primary absolute inset-y-0 left-0 w-1"
-                    aria-hidden="true"
-                />
-                <div class="flex items-start gap-4">
-                    <span
-                        class="bg-secondary text-primary-ink flex size-11 shrink-0 items-center justify-center rounded-md"
-                    >
-                        <ShoppingCart class="size-5" aria-hidden="true" />
-                    </span>
-                    <div>
-                        <p
-                            class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
-                        >
-                            Customer cart
-                        </p>
-                        <h1
-                            id="cart-heading"
-                            class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
-                        >
-                            Your hardware selection
-                        </h1>
-                        <p
-                            class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6"
-                        >
-                            Review current Battlefront pricing, stock, and
-                            quantities before continuing to checkout.
-                            Cart items do not reserve stock. Availability is
-                            checked again at checkout.
-                        </p>
-                    </div>
-                </div>
-            </section>
+            <PageHeader title="Your cart" heading-id="cart-heading" />
 
             <Alert v-if="selectionError" variant="destructive">
                 <AlertTitle>Select items for checkout</AlertTitle>
@@ -164,8 +124,7 @@ defineOptions({
                         Your cart is empty
                     </h2>
                     <p class="text-muted-foreground mt-2 text-sm leading-6">
-                        Browse the catalog to compare current hardware details
-                        and add available products to your cart.
+                        Find products for your next setup.
                     </p>
                     <Button as-child class="mt-6">
                         <Link :href="productIndex()">
@@ -189,9 +148,7 @@ defineOptions({
                         attention
                     </AlertTitle>
                     <AlertDescription>
-                        Review the marked stock conflicts. Update an eligible
-                        quantity, remove an unavailable item, or deselect it to
-                        purchase other items.
+                        Update the marked quantities, remove unavailable items, or deselect them to buy other items.
                     </AlertDescription>
                 </Alert>
 
@@ -296,8 +253,7 @@ defineOptions({
                         </dl>
 
                         <p class="text-muted-foreground mt-4 text-sm leading-6">
-                            Only selected items will be purchased. Review their
-                            subtotal and delivery fees at checkout.
+                            Only selected items will be purchased. Delivery fees and stock are checked at checkout; cart items do not reserve stock.
                         </p>
 
                         <p
@@ -307,13 +263,6 @@ defineOptions({
                             The selected subtotal includes items with
                             availability conflicts. Update their quantities or
                             deselect them.
-                        </p>
-                        <p
-                            v-else
-                            class="text-muted-foreground mt-4 text-sm leading-6"
-                        >
-                            Prices and quantities shown here are refreshed from
-                            the server after every cart change.
                         </p>
 
                         <Button v-if="canCheckout" as-child class="mt-6 w-full">
@@ -361,7 +310,7 @@ defineOptions({
             <RecommendationSection
                 :recommendations="recommendations"
                 placement="cart"
-                title="Keep building your selection"
+                title="You may also like"
                 :description="
                     is_personalized
                         ? 'Suggestions based on items in your cart, completed orders, and product activity you chose to share.'

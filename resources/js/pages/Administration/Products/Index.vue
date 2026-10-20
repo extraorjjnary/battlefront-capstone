@@ -1,4 +1,5 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Form, Head, Link, router } from '@inertiajs/vue3';
 import {
     Eye,
@@ -7,7 +8,6 @@ import {
     Plus,
     RotateCcw,
     Search,
-    SlidersHorizontal,
     Star,
     X,
 } from '@lucide/vue';
@@ -160,74 +160,31 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Products" />
-
     <main
-        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
+        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
     >
-        <section class="surface-panel border-border bg-card relative overflow-hidden border">
-            <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
-            <div
-                class="flex flex-col gap-5 p-6 sm:flex-row sm:items-start sm:justify-between"
-            >
-                <div class="flex items-start gap-4">
-                    <span
-                        class="bg-secondary text-primary-ink flex size-11 shrink-0 items-center justify-center rounded-md"
-                    >
-                        <PackageSearch class="size-5" />
-                    </span>
-                    <div>
-                        <p
-                            class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
-                        >
-                            Sagay City catalog
-                        </p>
-                        <h1
-                            class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
-                        >
-                            Product management
-                        </h1>
-                        <p
-                            class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6"
-                        >
-                            Maintain the hardware details, pricing, categories,
-                            and tags used across Battlefront catalog workflows.
-                        </p>
-                    </div>
-                </div>
+        <Head title="Products" />
+        <PageHeader title="Products">
+            <template #actions>
                 <Button as-child class="shrink-0">
                     <Link :href="ProductController.create()">
                         <Plus />
                         Add product
                     </Link>
                 </Button>
-            </div>
-            <CatalogNavigation />
-        </section>
+            </template>
+        </PageHeader>
+
+        <CatalogNavigation />
 
         <section
-            class="surface-panel border-border bg-card border p-5"
+            class="space-y-3"
             aria-labelledby="product-query-heading"
         >
-            <div class="flex items-start gap-3">
-                <span
-                    class="bg-secondary text-primary-ink flex size-10 shrink-0 items-center justify-center rounded-md"
-                >
-                    <SlidersHorizontal class="size-4" />
-                </span>
-                <div>
-                    <h2 id="product-query-heading" class="font-semibold">
-                        Find catalog records
-                    </h2>
-                    <p class="text-muted-foreground mt-1 text-sm">
-                        Search immediately; catalog attributes and lifecycle
-                        status update results as they change.
-                    </p>
-                </div>
-            </div>
+            <h2 id="product-query-heading" class="sr-only">Search and filters</h2>
 
             <div
-                class="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
+                class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
             >
                 <div class="grid gap-2">
                     <Label for="admin-product-search">Search products</Label>
@@ -244,19 +201,13 @@ defineOptions({
                             autocomplete="off"
                         />
                     </div>
-                    <p class="text-muted-foreground text-xs" aria-live="polite">
-                        {{
-                            isSearching
-                                ? 'Updating results...'
-                                : 'Results update automatically as you type.'
-                        }}
-                    </p>
+                    <span class="sr-only" role="status">{{ isSearching ? "Updating results..." : "" }}</span>
                 </div>
                 <Button
                     v-if="hasSearchInput"
                     type="button"
                     variant="outline"
-                    class="sm:mb-5"
+
                     @click="clearSearch"
                 >
                     <X />
@@ -265,7 +216,7 @@ defineOptions({
             </div>
 
             <div
-                class="border-border mt-5 grid gap-4 border-t pt-5 md:grid-cols-2 xl:grid-cols-4"
+                class="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
             >
                 <div class="grid gap-2">
                     <Label for="admin-product-category">Category</Label>

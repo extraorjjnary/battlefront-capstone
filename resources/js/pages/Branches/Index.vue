@@ -1,6 +1,7 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Head } from '@inertiajs/vue3';
-import { Clock3, Mail, MapPin, Navigation, Phone } from '@lucide/vue';
+import { Clock3, Mail, MapPin, Phone } from '@lucide/vue';
 import BranchMap from '@/components/BranchMap.vue';
 import StorefrontHeader from '@/components/StorefrontHeader.vue';
 import { Badge } from '@/components/ui/badge';
@@ -18,71 +19,27 @@ const phoneUrl = (phoneNumber) => `tel:${phoneNumber.replaceAll(' ', '')}`;
 
 <template>
     <div class="bg-background text-foreground min-h-screen">
-        <Head title="Branches" />
+        <Head title="Our stores" />
 
         <StorefrontHeader active-section="branches" />
 
-        <main class="mx-auto max-w-7xl px-5 py-10 sm:px-8 sm:py-14">
-            <section
-                class="surface-panel border-border bg-card relative overflow-hidden border px-6 py-10 sm:px-10 lg:grid lg:grid-cols-[1.5fr_0.7fr] lg:items-end lg:gap-12 lg:px-14 lg:py-14"
-            >
-                <div
-                    class="bg-primary absolute inset-y-0 left-0 w-1.5"
-                    aria-hidden="true"
-                />
-                <div>
-                    <div
-                        class="border-primary/30 bg-primary/10 text-primary-ink mb-5 flex size-11 items-center justify-center border"
-                    >
-                        <Navigation class="size-5" aria-hidden="true" />
-                    </div>
-                    <p
-                        class="text-primary-ink mb-3 text-xs font-bold tracking-[0.2em] uppercase"
-                    >
-                        Battlefront locations
-                    </p>
-                    <h1
-                        class="max-w-3xl text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl"
-                    >
-                        Find a Battlefront branch near you
-                    </h1>
-                    <p
-                        class="text-muted-foreground mt-5 max-w-2xl text-base leading-7 sm:text-lg"
-                    >
-                        Review confirmed contact and location details before
-                        visiting a Battlefront branch.
-                    </p>
-                </div>
+        <main class="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+            <PageHeader
+                title="Our stores"
+                description="Contact the store to confirm availability before visiting."
+            />
 
-                <div
-                    class="border-border mt-8 border-t pt-6 lg:mt-0 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-10"
-                >
-                    <p class="text-muted-foreground text-sm font-medium">
-                        Before you visit
-                    </p>
-                    <p class="mt-1 text-2xl font-bold">Check branch details</p>
-                    <p class="text-muted-foreground mt-3 text-sm leading-6">
-                        Contact the branch before visiting to confirm its
-                        current availability.
-                    </p>
-                </div>
-            </section>
+            <BranchMap :branches="branches" />
 
-            <BranchMap :branches="branches" class="mt-12" />
-
-            <section class="mt-12" aria-labelledby="branch-list-heading">
+            <section aria-labelledby="branch-list-heading">
                 <div class="mb-6 flex items-end justify-between gap-6">
                     <div>
-                        <p
-                            class="text-primary-ink text-xs font-bold tracking-[0.18em] uppercase"
-                        >
-                            Branch directory
-                        </p>
+
                         <h2
                             id="branch-list-heading"
-                            class="mt-2 text-2xl font-bold tracking-tight"
+                            class="text-xl font-semibold tracking-tight"
                         >
-                            Confirmed branch information
+                            Store details
                         </h2>
                     </div>
                     <p class="text-muted-foreground hidden text-sm sm:block">
@@ -94,7 +51,7 @@ const phoneUrl = (phoneNumber) => `tel:${phoneNumber.replaceAll(' ', '')}`;
                     <article
                         v-for="branch in branches"
                         :key="branch.id"
-                        class="surface-card bg-card border p-6 sm:p-8"
+                        class="surface-card bg-card border p-4 sm:p-6"
                         :class="
                             branch.is_operational
                                 ? 'border-primary/50 lg:col-span-2'
@@ -124,7 +81,7 @@ const phoneUrl = (phoneNumber) => `tel:${phoneNumber.replaceAll(' ', '')}`;
                         </div>
 
                         <dl
-                            class="border-border mt-7 grid gap-x-8 gap-y-6 border-t pt-7 md:grid-cols-2"
+                            class="border-border mt-4 grid gap-x-6 gap-y-4 border-t pt-4 md:grid-cols-2"
                         >
                             <div class="flex gap-3">
                                 <MapPin

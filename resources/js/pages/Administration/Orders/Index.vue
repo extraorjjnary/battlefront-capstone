@@ -1,12 +1,11 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
     ArrowRight,
     CalendarDays,
     PackageCheck,
-    ReceiptText,
     Search,
-    SlidersHorizontal,
     UserRound,
     X,
 } from '@lucide/vue';
@@ -203,40 +202,13 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Orders" />
-
     <main
-        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
+        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
     >
-        <section class="surface-panel border-border bg-card relative overflow-hidden border">
-            <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
-            <div class="flex items-start gap-4 p-6">
-                <span
-                    class="bg-secondary text-primary-ink flex size-11 shrink-0 items-center justify-center rounded-md"
-                >
-                    <ReceiptText class="size-5" />
-                </span>
-                <div>
-                    <p
-                        class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
-                    >
-                        Sagay City order desk
-                    </p>
-                    <h1
-                        class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
-                    >
-                        Order processing
-                    </h1>
-                    <p
-                        class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6"
-                    >
-                        Work through active orders and retain completed and
-                        cancelled records for operational review.
-                    </p>
-                </div>
-            </div>
+        <Head title="Orders" />
+        <PageHeader title="Orders" />
 
-            <nav
+<nav
                 aria-label="Order views"
                 class="border-border flex gap-1 overflow-x-auto border-t px-5"
             >
@@ -262,31 +234,15 @@ defineOptions({
                     </span>
                 </Link>
             </nav>
-        </section>
 
         <section
-            class="surface-panel border-border bg-card border p-5"
+            class="space-y-3"
             aria-labelledby="order-query-heading"
         >
-            <div class="flex items-start gap-3">
-                <span
-                    class="bg-secondary text-primary-ink flex size-10 shrink-0 items-center justify-center rounded-md"
-                >
-                    <SlidersHorizontal class="size-4" />
-                </span>
-                <div>
-                    <h2 id="order-query-heading" class="font-semibold">
-                        Find order records
-                    </h2>
-                    <p class="text-muted-foreground mt-1 text-sm">
-                        Search references and people, or narrow the current view
-                        by payment and fulfillment details.
-                    </p>
-                </div>
-            </div>
+            <h2 id="order-query-heading" class="sr-only">Search and filters</h2>
 
             <div
-                class="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
+                class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
             >
                 <div class="grid gap-2">
                     <Label for="admin-order-search">Search orders</Label>
@@ -303,19 +259,13 @@ defineOptions({
                             autocomplete="off"
                         />
                     </div>
-                    <p class="text-muted-foreground text-xs" aria-live="polite">
-                        {{
-                            isSearching
-                                ? 'Updating results...'
-                                : 'Results update automatically as you type.'
-                        }}
-                    </p>
+                    <span class="sr-only" role="status">{{ isSearching ? "Updating results..." : "" }}</span>
                 </div>
                 <Button
                     v-if="hasSearchInput"
                     type="button"
                     variant="outline"
-                    class="sm:mb-5"
+
                     @click="clearSearch"
                 >
                     <X />
@@ -324,7 +274,7 @@ defineOptions({
             </div>
 
             <div
-                class="border-border mt-5 grid gap-4 border-t pt-5 md:grid-cols-3"
+                class="grid gap-3 md:grid-cols-3"
             >
                 <div class="grid gap-2">
                     <Label for="admin-order-payment-status">

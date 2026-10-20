@@ -1,4 +1,5 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Form, Head, Link, router } from '@inertiajs/vue3';
 import {
     Boxes,
@@ -152,43 +153,11 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Inventory" />
-
     <main
-        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
+        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
     >
-        <section
-            class="surface-panel border-border bg-card relative overflow-hidden border p-6"
-        >
-            <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
-            <div class="flex items-start gap-4">
-                <span
-                    class="bg-secondary text-primary-ink flex size-11 shrink-0 items-center justify-center rounded-md"
-                >
-                    <Boxes class="size-5" />
-                </span>
-                <div>
-                    <p
-                        class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
-                    >
-                        Sagay City operation
-                    </p>
-                    <h1
-                        class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
-                    >
-                        Inventory management
-                    </h1>
-                    <p
-                        class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6"
-                    >
-                        Review current product stock and maintain the quantity
-                        and reorder level used by Battlefront operations. Stock
-                        is low when it has units remaining below its reorder
-                        level.
-                    </p>
-                </div>
-            </div>
-        </section>
+        <Head title="Inventory" />
+        <PageHeader title="Inventory" description="Sagay City stock" />
 
         <section aria-labelledby="inventory-ledger-heading">
             <div
@@ -247,7 +216,7 @@ defineOptions({
             </div>
 
             <section
-                class="surface-panel border-border bg-card mb-5 border p-5"
+                class="space-y-3"
                 aria-labelledby="inventory-query-heading"
             >
                 <div class="flex items-start gap-3">
@@ -268,7 +237,7 @@ defineOptions({
                 </div>
 
                 <div
-                    class="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
+                    class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
                 >
                     <div class="grid gap-2">
                         <Label for="inventory-search">Search inventory</Label>
@@ -300,7 +269,7 @@ defineOptions({
                         v-if="hasSearchInput"
                         type="button"
                         variant="outline"
-                        class="sm:mb-5"
+
                         @click="clearSearch"
                     >
                         <X />
@@ -309,7 +278,7 @@ defineOptions({
                 </div>
 
                 <div
-                    class="border-border mt-5 grid gap-4 border-t pt-5 md:grid-cols-2"
+                    class="grid gap-3 md:grid-cols-2"
                 >
                     <div class="grid gap-2">
                         <Label for="inventory-category">Category</Label>

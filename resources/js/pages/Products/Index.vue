@@ -1,8 +1,13 @@
 <script setup>
+import PageHeader from "@/components/PageHeader.vue";
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { Head, InfiniteScroll, router, usePage } from "@inertiajs/vue3";
 import {
     Boxes,
-    PackageSearch,
     Search,
     SlidersHorizontal,
     X,
@@ -37,6 +42,7 @@ const props = defineProps({
     has_featured_fallback: { type: Boolean, default: false },
 });
 
+const mobileFiltersOpen = ref(false);
 const page = usePage();
 const isAuthenticated = computed(() => Boolean(page.props.auth?.user));
 const categoryId = ref(String(props.filters.category_id ?? "all"));
@@ -62,6 +68,38 @@ const tagPlaceholder = computed(() =>
         ? "Selected tag unavailable"
         : "All tags",
 );
+const activeFilters = computed(() =>
+    [
+        {
+            key: "category_id",
+            value: categoryId.value,
+            label: props.filter_options.categories.find(
+                (item) => String(item.id) === categoryId.value,
+            )?.name ?? categoryPlaceholder.value,
+        },
+        { key: "brand", value: brand.value, label: brand.value },
+        {
+            key: "tag_id",
+            value: tagId.value,
+            label: props.filter_options.tags.find(
+                (item) => String(item.id) === tagId.value,
+            )?.name ?? tagPlaceholder.value,
+        },
+    ].filter((filter) => filter.value !== "all"),
+);
+
+function clearFilter(key) {
+    if (key === "category_id") {
+        categoryId.value = "all";
+    }
+    if (key === "brand") {
+        brand.value = "all";
+    }
+    if (key === "tag_id") {
+        tagId.value = "all";
+    }
+}
+
 const catalogReloadProps = [
     "products",
     "filters",
@@ -190,7 +228,7 @@ watch(
 
 <template>
     <div class="bg-background text-foreground min-h-screen">
-        <Head title="Products">
+        <Head title="Shop products">
             <meta
                 head-key="description"
                 name="description"
@@ -200,54 +238,158 @@ watch(
 
         <StorefrontHeader active-section="products" />
 
-        <main class="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-10">
-            <section
-                class="surface-panel border-border bg-card relative overflow-hidden border px-6 py-8 sm:px-10 lg:grid lg:grid-cols-[1.45fr_0.55fr] lg:items-end lg:gap-10"
-                aria-labelledby="catalog-heading"
-            >
-                <div
-                    class="bg-primary absolute inset-y-0 left-0 w-1.5"
-                    aria-hidden="true"
-                />
-                <div>
-                    <div
-                        class="border-primary/30 bg-primary/10 text-primary-ink mb-4 flex size-11 items-center justify-center border"
-                    >
-                        <PackageSearch class="size-5" aria-hidden="true" />
-                    </div>
-                    <h1
-                        id="catalog-heading"
-                        class="text-primary-ink text-xs font-bold tracking-[0.2em] uppercase"
-                    >
-                        Customer catalog
-                    </h1>
-                    <p
-                        class="text-muted-foreground mt-4 max-w-2xl text-base leading-7"
-                    >
-                        Review current product details, pricing, and stock
-                        availability before choosing the right hardware for your
-                        setup.
-                    </p>
-                </div>
+        <main class="mx-auto max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+            <PageHeader title="Shop products" heading-id="catalog-heading" />
 
+            <section class="space-y-3" aria-label="Search and filter products">
+                <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_12rem]">
+                    <div class="grid min-w-0 gap-2">
+                        <Label for="catalog-search">Search products</Label>
+                        <div class="relative">
+                            <Search
+                                class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+                                aria-hidden="true"
+                            />
+                            <Input
+                                id="catalog-search"
+                                v-model="search"
+                                class="pl-9"
+                                maxlength="255"
+                                placeholder="Name, brand, or description"
+                                autocomplete="off"
+                            />
+                        </div>
+                        <span class="sr-only" role="status">
+                            {{ isSearching ? "Updating results..." : "" }}
+                        </span>
+                    </div>
+                    <div class="grid min-w-0 gap-2">
+                        <Label id="catalog-sort-label" for="catalog-sort">Sort by</Label>
+                        <Select v-model="sort">
+                            <SelectTrigger
+                                id="catalog-sort"
+                                aria-labelledby="catalog-sort-label"
+                                class="w-full"
+                            >
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="featured">Featured First</SelectItem>
+                                <SelectItem value="price_asc">Price: Low to High</SelectItem>
+                                <SelectItem value="price_desc">Price: High to Low</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                <Collapsible v-model:open="mobileFiltersOpen" class="space-y-3">
+                    <CollapsibleTrigger as-child class="md:hidden">
+                        <Button id="catalog-filters-toggle" type="button" variant="outline">
+                            <SlidersHorizontal aria-hidden="true" />
+                            Filters
+                            <span v-if="activeFilters.length">( {{ activeFilters.length }} )</span>
+                        </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent
+                        force-mount
+                        class="grid gap-3 data-[state=closed]:hidden md:grid-cols-3 md:data-[state=closed]:grid"
+                    >
+                        <div class="grid min-w-0 gap-2">
+                            <Label for="catalog-category">Category</Label>
+                            <Select v-model="categoryId">
+                                <SelectTrigger id="catalog-category" class="w-full">
+                                    <SelectValue :placeholder="categoryPlaceholder" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All categories</SelectItem>
+                                    <SelectItem
+                                        v-for="category in filter_options.categories"
+                                        :key="category.id"
+                                        :value="String(category.id)"
+                                    >
+                                        {{ category.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div class="grid min-w-0 gap-2">
+                            <Label for="catalog-brand">Brand</Label>
+                            <Select v-model="brand">
+                                <SelectTrigger id="catalog-brand" class="w-full">
+                                    <SelectValue :placeholder="brandPlaceholder" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All brands</SelectItem>
+                                    <SelectItem
+                                        v-for="brandOption in filter_options.brands"
+                                        :key="brandOption"
+                                        :value="brandOption"
+                                    >
+                                        {{ brandOption }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div class="grid min-w-0 gap-2">
+                            <Label for="catalog-tag">Tag</Label>
+                            <Select v-model="tagId">
+                                <SelectTrigger id="catalog-tag" class="w-full">
+                                    <SelectValue :placeholder="tagPlaceholder" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All tags</SelectItem>
+                                    <SelectItem
+                                        v-for="tag in filter_options.tags"
+                                        :key="tag.id"
+                                        :value="String(tag.id)"
+                                    >
+                                        {{ tag.name }}
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </CollapsibleContent>
+                </Collapsible>
                 <div
-                    class="border-border mt-8 border-t pt-6 lg:mt-0 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-10"
+                    v-if="hasSearchInput || activeFilters.length"
+                    class="flex flex-wrap items-center gap-2"
+                    aria-label="Active filters"
                 >
-                    <p class="text-muted-foreground text-sm font-medium">
-                        {{
-                            hasActiveQuery
-                                ? "Products matching your catalog query"
-                                : "Products available to browse"
-                        }}
-                    </p>
-                    <p class="mt-1 text-3xl font-bold">{{ products.total }}</p>
-                    <p class="text-muted-foreground mt-2 text-sm leading-6">
-                        Stock information reflects the current catalog record.
-                    </p>
+                    <Button
+                        v-if="hasSearchInput"
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        @click="clearSearch"
+                    >
+                        <X aria-hidden="true" />
+                        Clear search
+                    </Button>
+                    <Button
+                        v-for="filter in activeFilters"
+                        :key="filter.key"
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        class="h-auto min-h-10 max-w-full whitespace-normal text-left"
+                        :aria-label="`Remove filter: ${filter.label}`"
+                        @click="clearFilter(filter.key)"
+                    >
+                        {{ filter.label }}
+                        <X class="shrink-0" aria-hidden="true" />
+                    </Button>
+                    <Button
+                        v-if="hasAppliedFilters"
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        @click="clearFilters"
+                    >
+                        Clear filters
+                    </Button>
                 </div>
             </section>
 
-            <div v-if="recommendations_enabled && isDiscoveryView" class="mt-8">
+            <div v-if="recommendations_enabled && isDiscoveryView">
                 <DeferredContent
                     :data="[
                         'recommendations',
@@ -283,209 +425,13 @@ watch(
                 </DeferredContent>
             </div>
 
-            <div class="border-border mt-8 border-t pt-8">
-                <h2 class="text-2xl font-bold tracking-tight">All products</h2>
-            </div>
-
-            <section
-                class="surface-panel border-border bg-card mt-6 border p-5 sm:p-6"
-                aria-labelledby="catalog-filters-heading"
-            >
-                <div class="flex items-start gap-3">
-                    <span
-                        class="bg-secondary text-primary-ink flex size-10 shrink-0 items-center justify-center"
-                    >
-                        <SlidersHorizontal class="size-4" aria-hidden="true" />
-                    </span>
-                    <div>
-                        <h2 id="catalog-filters-heading" class="font-bold">
-                            Find the right hardware
-                        </h2>
-                        <p class="text-muted-foreground mt-1 text-sm">
-                            Search product details or narrow the catalog by
-                            category, brand, and tag.
-                        </p>
-                    </div>
-                </div>
-
-                <div
-                    class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
-                >
-                    <div class="grid gap-2">
-                        <Label for="catalog-search">Search products</Label>
-                        <div class="relative">
-                            <Search
-                                class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
-                                aria-hidden="true"
-                            />
-                            <Input
-                                id="catalog-search"
-                                v-model="search"
-                                class="pl-9"
-                                maxlength="255"
-                                placeholder="Name, brand, or description"
-                                autocomplete="off"
-                            />
-                        </div>
-                        <p
-                            class="text-muted-foreground text-xs"
-                            aria-live="polite"
-                        >
-                            {{
-                                isSearching
-                                    ? "Updating results..."
-                                    : "Results update automatically as you type."
-                            }}
-                        </p>
-                    </div>
-
-                    <Button
-                        v-if="hasSearchInput"
-                        type="button"
-                        variant="outline"
-                        class="sm:mb-5"
-                        @click="clearSearch"
-                    >
-                        <X aria-hidden="true" />
-                        Clear search
-                    </Button>
-                </div>
-
-                <div class="border-border mt-4 border-t pt-4">
-                    <div>
-                        <h3 class="font-semibold">Filter products</h3>
-                        <p class="text-muted-foreground mt-1 text-sm">
-                            Category, brand, and tag selections update results
-                            automatically and remain separate from search.
-                        </p>
-                    </div>
-
-                    <div class="mt-4 grid gap-4 md:grid-cols-3">
-                        <div class="grid gap-2">
-                            <Label for="catalog-category">Category</Label>
-                            <Select v-model="categoryId">
-                                <SelectTrigger
-                                    id="catalog-category"
-                                    class="w-full"
-                                >
-                                    <SelectValue
-                                        :placeholder="categoryPlaceholder"
-                                    />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All categories
-                                    </SelectItem>
-                                    <SelectItem
-                                        v-for="category in filter_options.categories"
-                                        :key="category.id"
-                                        :value="String(category.id)"
-                                    >
-                                        {{ category.name }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div class="grid gap-2">
-                            <Label for="catalog-brand">Brand</Label>
-                            <Select v-model="brand">
-                                <SelectTrigger
-                                    id="catalog-brand"
-                                    class="w-full"
-                                >
-                                    <SelectValue
-                                        :placeholder="brandPlaceholder"
-                                    />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">
-                                        All brands
-                                    </SelectItem>
-                                    <SelectItem
-                                        v-for="brandOption in filter_options.brands"
-                                        :key="brandOption"
-                                        :value="brandOption"
-                                    >
-                                        {{ brandOption }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div class="grid gap-2">
-                            <Label for="catalog-tag">Tag</Label>
-                            <Select v-model="tagId">
-                                <SelectTrigger id="catalog-tag" class="w-full">
-                                    <SelectValue
-                                        :placeholder="tagPlaceholder"
-                                    />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all"
-                                        >All tags</SelectItem
-                                    >
-                                    <SelectItem
-                                        v-for="tag in filter_options.tags"
-                                        :key="tag.id"
-                                        :value="String(tag.id)"
-                                    >
-                                        {{ tag.name }}
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div
-                            class="flex flex-wrap gap-2 md:col-span-3 md:justify-end"
-                        >
-                            <Button
-                                v-if="hasAppliedFilters"
-                                type="button"
-                                variant="outline"
-                                @click="clearFilters"
-                            >
-                                <X aria-hidden="true" />
-                                Clear filters
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section class="mt-8" aria-labelledby="product-list-heading">
-                <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
-                    <div>
-                        <p
-                            class="text-primary-ink text-xs font-bold tracking-[0.18em] uppercase"
-                        >
-                            Product lineup
-                        </p>
-                        <h2
-                            id="product-list-heading"
-                            class="mt-2 text-2xl font-bold tracking-tight"
-                        >
-                            Browse the catalog
-                        </h2>
-                    </div>
-                    <div class="grid w-full gap-2 sm:ml-auto sm:w-52">
-                        <Label id="catalog-sort-label" for="catalog-sort">Sort by</Label>
-                        <Select v-model="sort">
-                            <SelectTrigger id="catalog-sort" aria-labelledby="catalog-sort-label" class="w-full">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="featured">Featured First</SelectItem>
-                                <SelectItem value="price_asc">Price: Low to High</SelectItem>
-                                <SelectItem value="price_desc">Price: High to Low</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <p
-                        v-if="products.total"
-                        class="text-muted-foreground hidden text-sm sm:block"
-                    >
-                        Showing {{ products.data.length }} of
+            <section aria-labelledby="product-list-heading">
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+                    <h2 id="product-list-heading" class="text-lg font-semibold">All products</h2>
+                    <p v-if="products.total" class="text-muted-foreground text-sm" role="status">
+                        Showing
+                        {{ products.data.length }}
+                        of
                         {{ products.total }}
                     </p>
                 </div>

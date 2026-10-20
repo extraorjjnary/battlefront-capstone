@@ -162,7 +162,7 @@ function returnToCatalog() {
 
         <StorefrontHeader active-section="products" />
 
-        <main class="mx-auto max-w-7xl px-5 py-8 sm:px-8 sm:py-12">
+        <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
             <Button
                 v-if="canReturnToCatalog"
                 type="button"
@@ -181,10 +181,10 @@ function returnToCatalog() {
             </Button>
 
             <article
-                class="surface-panel border-border bg-card mt-6 grid overflow-hidden border lg:grid-cols-[minmax(0,1.3fr)_minmax(22rem,1fr)]"
+                class="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(22rem,1fr)]"
             >
                 <div
-                    class="border-border aspect-square overflow-hidden border-b sm:aspect-4/3 lg:relative lg:aspect-auto lg:min-h-[min(36rem,70vh)] lg:border-r lg:border-b-0"
+                    class="surface-card border-border bg-card aspect-square overflow-hidden border sm:aspect-4/3 lg:relative lg:aspect-auto lg:min-h-[min(36rem,70vh)]"
                 >
                     <ProductImage
                         :image-url="product.image_url"
@@ -195,7 +195,7 @@ function returnToCatalog() {
                     />
                 </div>
 
-                <div class="flex flex-col p-6 sm:p-9">
+                <div class="surface-card border-border bg-card flex min-w-0 flex-col border p-4 sm:p-6">
                     <div class="flex flex-wrap items-center gap-2">
                         <Badge variant="secondary">
                             {{ product.category.name }}
@@ -205,7 +205,7 @@ function returnToCatalog() {
 
                     <p
                         v-if="product.brand"
-                        class="text-primary-ink mt-7 text-xs font-bold tracking-[0.18em] uppercase"
+                        class="text-primary-ink mt-4 text-xs font-bold tracking-[0.18em] uppercase"
                     >
                         {{ product.brand }}
                     </p>
@@ -221,12 +221,8 @@ function returnToCatalog() {
                         class="mt-6"
                     />
 
-                    <div class="border-border mt-7 border-y py-6">
-                        <p
-                            class="text-muted-foreground mb-3 text-xs font-bold tracking-wide uppercase"
-                        >
-                            Current availability
-                        </p>
+                    <div class="mt-4">
+
                         <StockAvailability :inventory="product.inventory" />
                         <p
                             v-if="
@@ -250,15 +246,14 @@ function returnToCatalog() {
 
                     <section
                         v-if="hasAvailableStock && canUseCustomerCart"
-                        class="mt-7"
+                        class="mt-4"
                         aria-labelledby="add-to-cart-heading"
                     >
                         <h2 id="add-to-cart-heading" class="font-semibold">
-                            Add this product to your cart
+                            Choose quantity
                         </h2>
                         <p class="text-muted-foreground mt-1 text-sm leading-6">
-                            Choose a quantity. Current stock is checked again
-                            when you add it.
+                            Stock is checked when you add it.
                         </p>
                         <AddToCartForm
                             class="mt-4"
@@ -269,11 +264,11 @@ function returnToCatalog() {
 
                     <section
                         v-else-if="hasAvailableStock && !isAuthenticated"
-                        class="border-border bg-secondary/40 mt-7 border p-4"
+                        class="mt-4"
                         aria-labelledby="customer-cart-heading"
                     >
                         <h2 id="customer-cart-heading" class="font-semibold">
-                            Ready to add this product?
+                            Choose quantity
                         </h2>
                         <p class="text-muted-foreground mt-1 text-sm leading-6">
                             Choose a quantity, then log in or register to add it
@@ -289,11 +284,11 @@ function returnToCatalog() {
                 </div>
 
                 <div
-                    class="border-border grid gap-8 border-t p-6 sm:p-9 lg:col-span-2 lg:grid-cols-[minmax(0,1.3fr)_minmax(22rem,1fr)]"
+                    class="grid gap-6 lg:col-span-2 lg:grid-cols-[minmax(0,1.3fr)_minmax(22rem,1fr)]"
                 >
                     <section aria-labelledby="description-heading">
                         <h2 id="description-heading" class="font-semibold">
-                            Product description
+                            Description
                         </h2>
                         <p
                             v-if="product.description"
@@ -325,7 +320,7 @@ function returnToCatalog() {
                                 class="text-primary-ink size-4"
                                 aria-hidden="true"
                             />
-                            Product tags
+                            Tags
                         </h2>
                         <div
                             v-if="product.tags.length"

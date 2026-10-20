@@ -1,4 +1,5 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Form, Head, Link, useHttp } from '@inertiajs/vue3';
 import {
     ChevronDown,
@@ -75,48 +76,23 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Chatbot FAQs" />
-
     <main
-        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
+        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
     >
-        <section class="surface-panel border-border bg-card relative overflow-hidden border">
-            <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
-            <div
-                class="flex flex-col gap-5 p-6 sm:flex-row sm:items-start sm:justify-between"
-            >
-                <div class="flex items-start gap-4">
-                    <span
-                        class="bg-secondary text-primary-ink flex size-11 shrink-0 items-center justify-center rounded-md"
-                    >
-                        <MessageSquareText class="size-5" />
-                    </span>
-                    <div>
-                        <p
-                            class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
-                        >
-                            Customer support content
-                        </p>
-                        <h1
-                            class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
-                        >
-                            Chatbot FAQs
-                        </h1>
-                        <p
-                            class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6"
-                        >
-                            Manage approved support FAQs. Live facts and application rules are answered automatically.
-                        </p>
-                    </div>
-                </div>
+        <Head title="Chatbot FAQs" />
+        <PageHeader
+            title="Chatbot FAQs"
+            description="Manage support FAQs. Live facts and store rules are answered automatically."
+        >
+            <template #actions>
                 <Button as-child class="shrink-0">
                     <Link :href="ChatbotKnowledgeController.create()">
                         <Plus />
                         Add FAQ
                     </Link>
                 </Button>
-            </div>
-        </section>
+            </template>
+        </PageHeader>
 
         <Collapsible
             v-model:open="previewOpen"
@@ -141,11 +117,7 @@ defineOptions({
             </h2>
             <CollapsibleContent class="px-6 pb-6">
                 <p class="text-muted-foreground max-w-3xl text-sm leading-6">
-                    Enter a customer question to see its category and matching
-                    active eligible FAQs across all records. This
-                    checks routing and saved FAQs only; it does not
-                    retrieve live product, branch, or customer order data, or
-                    generate a chatbot reply.
+                    Test a question against routing and active FAQs. This preview excludes live product, store, and order data and does not generate a reply.
                 </p>
                 <form class="mt-5 space-y-3" @submit.prevent="testQuestion">
                     <Label for="knowledge-preview-message"

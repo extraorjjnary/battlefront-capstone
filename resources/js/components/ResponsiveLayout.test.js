@@ -147,6 +147,7 @@ async function openBrowser(t, { built = true } = {}) {
     let fixtureNumber = 0;
     const navigationFixtures = new Map();
     const navigationRequests = [];
+    const filterRequests = [];
     const appearanceRequests = [];
     const fixturePage = (current = fixture) => ({ ...initialPage, component: current.component, flash: current.flash, scrollProps: current.component === 'Products/Index' ? { products: { pageName: 'page', currentPage: 1, previousPage: null, nextPage: null } } : {}, props: { ...initialPage.props, is_personalized: false, has_featured_fallback: false, guest_recommendation_scope: null, recommendations_enabled: true, ...current.props,
         appearance: current.appearance, auth: current.auth ?? { user: null, can: {} }, errors: {}, notificationSummary: { unread_count: 0, recent: [] }, responsiveFixtureNumber: current.number,
@@ -190,6 +191,7 @@ async function openBrowser(t, { built = true } = {}) {
                 responseHeaders: [{ name: 'Content-Type', value: 'application/json' }, { name: 'X-Inertia', value: 'true' }], body: Buffer.from(JSON.stringify(page)).toString('base64') });
         } else if (request.method === 'GET' && navigationFixtures.has(new URL(request.url).pathname)) {
             navigationRequests.push(new URL(request.url).pathname);
+            if (new URL(request.url).pathname === '/products') filterRequests.push(request.url);
             const page = fixturePage(navigationFixtures.get(new URL(request.url).pathname));
             await command('Fetch.fulfillRequest', { requestId, responseCode: 200,
                 responseHeaders: [{ name: 'Content-Type', value: 'application/json' }, { name: 'X-Inertia', value: 'true' }], body: Buffer.from(JSON.stringify(page)).toString('base64') });
@@ -202,7 +204,7 @@ async function openBrowser(t, { built = true } = {}) {
     };
     await command('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }, { urlPattern: '*/__responsive_fixture', requestStage: 'Response' }] });
     return {
-        command, evaluate, exceptions, diagnostics, navigationRequests, appearanceRequests,
+        command, evaluate, exceptions, diagnostics, navigationRequests, appearanceRequests, filterRequests,
         registerPage(url, component, props, appearance, auth = fixture.auth) {
             navigationFixtures.set(url, { ...fixture, url, component, props, appearance, auth, flash: {} });
         },
@@ -248,6 +250,68 @@ async function assertFits(browser, label) {
     })()`);
     assert.deepEqual(clipped, [], `${label}: content must fit the viewport even when the shell clips overflow`);
 }
+
+test('compact catalog filters support keyboard disclosure and clear individual selections on mobile', {
+    skip: !baseUrl || !executable ? 'Set the local app and browser environment variables' : false,
+    timeout: 90000,
+}, async t => {
+    const browser = await openBrowser(t);
+    const catalog = {
+        products: { data: [product], total: 1, current_page: 1, last_page: 1, next_page_url: null, prev_page_url: null },
+        filters: { q: 'graphics', category_id: 3, brand: 'Atlas', tag_id: 7, sort: 'price_asc' },
+        filter_options: { categories: [{ id: 3, name: 'Graphics cards' }], brands: ['Atlas'], tags: [{ id: 7, name: 'Gaming' }] },
+        recommendations: [],
+    };
+    const visible = id => `!!document.querySelector('#${id}')?.getBoundingClientRect().height`;
+    async function pressSpace() {
+        for (const type of ['keyDown', 'keyUp']) {
+            await browser.command('Input.dispatchKeyEvent', { type, key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
+        }
+    }
+    for (const theme of ['light', 'dark']) {
+        await browser.resize(375);
+        await browser.show('Products/Index', catalog, true, theme);
+        assert.equal(await browser.evaluate(visible('catalog-search')), true);
+        assert.equal(await browser.evaluate(visible('catalog-sort')), true);
+        assert.equal(await browser.evaluate(visible('catalog-category')), false);
+        assert.equal(await browser.evaluate(`document.querySelector('#catalog-filters-toggle').getAttribute('aria-expanded')`), 'false');
+        assert.equal(await browser.evaluate(`document.querySelectorAll('[aria-label^="Remove filter:"]').length`), 3);
+
+        await browser.evaluate(`document.querySelector('#catalog-filters-toggle').focus()`);
+        assert.equal(await browser.evaluate(`document.activeElement.id`), 'catalog-filters-toggle');
+        await pressSpace();
+        assert.equal(await browser.evaluate(`document.querySelector('#catalog-filters-toggle').getAttribute('aria-expanded')`), 'true', await browser.evaluate(`document.querySelector('#catalog-filters-toggle').outerHTML`));
+        for (const id of ['catalog-category', 'catalog-brand', 'catalog-tag']) {
+            assert.equal(await browser.evaluate(visible(id)), true);
+        }
+        await pressSpace();
+        assert.equal(await browser.evaluate(visible('catalog-category')), false);
+        assert.equal(await browser.evaluate(`document.activeElement.id`), 'catalog-filters-toggle');
+
+        await browser.resize(768);
+        assert.equal(await browser.evaluate(visible('catalog-filters-toggle')), false);
+        assert.equal(await browser.evaluate(visible('catalog-category')), true);
+        await assertFits(browser, 'compact tablet catalog');
+        await browser.resize(375);
+        assert.equal(await browser.evaluate(visible('catalog-category')), false);
+        assert.equal(await browser.evaluate(`document.querySelectorAll('[aria-label^="Remove filter:"]').length`), 3);
+
+        const cleared = { ...catalog, filters: { ...catalog.filters, category_id: null } };
+        browser.registerPage('/products', 'Products/Index', cleared, theme);
+        const previous = browser.filterRequests.length;
+        await browser.evaluate(`document.querySelector('[aria-label="Remove filter: Graphics cards"]').click()`);
+        for (let attempt = 0; attempt < 100; attempt++) {
+            if (browser.filterRequests.length > previous && await browser.evaluate(`document.querySelectorAll('[aria-label^="Remove filter:"]').length === 2`)) break;
+            await delay(50);
+        }
+        assert.ok(browser.filterRequests.length > previous);
+        const request = new URL(browser.filterRequests.at(-1));
+        assert.deepEqual(Object.fromEntries(request.searchParams), { q: 'graphics', brand: 'Atlas', tag_id: '7', sort: 'price_asc' });
+        assert.equal(await browser.evaluate(`document.querySelectorAll('[aria-label^="Remove filter:"]').length`), 2);
+        await assertFits(browser, 'compact mobile catalog');
+    }
+    assert.deepEqual(browser.exceptions, []);
+});
 
 test('responsive shopping layouts remain usable in a real browser', {
     skip: !baseUrl || !executable ? 'Set BATTLEFRONT_UI_URL and BATTLEFRONT_UI_BROWSER to run browser geometry checks' : false,
@@ -756,6 +820,18 @@ test(
                 { forecast_result: forecast },
             ],
             ['settings/Appearance', {}, true],
+            ['settings/Profile', { canManageDefaultDeliveryAddress: false }, 'admin'],
+            ['settings/Security', { passwordRules: 'min:8' }, true],
+            ['Administration/Categories/Index', { categories: paginated([]) }, 'admin'],
+            ['Administration/ChatbotKnowledge/Index', { knowledge: paginated([]) }, 'admin'],
+            ['Administration/Customers/Index', { customers: paginated([]) }, 'admin'],
+            ['Administration/Customers/Show', { customer: { id: 9, name: 'Customer With A Long Name', email: 'customer@example.test', created_at: '2026-10-12T08:00:00Z' } }, 'admin'],
+            ['Administration/Orders/Index', {
+                orders: paginated([]),
+                filters: { status: 'active', q: null, payment_status: null, payment_method: null, fulfillment_method: null },
+                filter_options: { payment_statuses: [], payment_methods: [], fulfillment_methods: [] },
+                status_counts: { active: 0, completed: 0, cancelled: 0 },
+            }, 'admin'],
             [
                 'auth/Login',
                 { canResetPassword: true, canRegister: true },
@@ -807,11 +883,28 @@ test(
                     const surfaces = await browser.evaluate(
                         `(() => [...document.querySelectorAll('.surface-card, .surface-panel')].map(element => { const style = getComputedStyle(element); return { panel: element.classList.contains('surface-panel'), radii: [style.borderTopLeftRadius, style.borderTopRightRadius, style.borderBottomRightRadius, style.borderBottomLeftRadius], shadow: style.boxShadow, nested: !!element.parentElement.closest('.surface-card, .surface-panel') }; }))()`,
                     );
-                    if (component !== 'auth/Login') {
+                    if (!['auth/Login', 'Welcome', 'Branches/Index', 'settings/Appearance', 'settings/Profile', 'settings/Security'].includes(component)) {
                         assert.ok(
                             surfaces.length > 0,
                             component + ' uses the shared surface treatment',
                         );
+                    }
+                    if (!['auth/Login', 'Products/Show'].includes(component)) {
+                        const header = await browser.evaluate(`(() => {
+                            const header = document.querySelector('[data-page-header]');
+                            const style = getComputedStyle(header);
+                            const heading = header.querySelector('h1');
+                            return { count: document.querySelectorAll('h1').length, text: heading.textContent.trim(),
+                                background: style.backgroundColor, shadow: style.boxShadow,
+                                border: [style.borderTopWidth, style.borderRightWidth, style.borderBottomWidth, style.borderLeftWidth],
+                                fontSize: parseFloat(getComputedStyle(heading).fontSize) };
+                        })()`);
+                        assert.equal(header.count, 1, component + ' has one page title');
+                        assert.ok(header.text.length > 0);
+                        assert.equal(header.background, 'rgba(0, 0, 0, 0)', component + ' has an unboxed heading');
+                        assert.equal(header.shadow, 'none');
+                        assert.deepEqual(header.border, ['0px', '0px', '0px', '0px']);
+                        assert.ok(header.fontSize >= 24 && header.fontSize <= 30);
                     }
                     for (const surface of surfaces) {
                         assert.ok(

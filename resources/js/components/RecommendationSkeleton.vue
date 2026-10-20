@@ -3,14 +3,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 </script>
 
 <template>
-    <section class="border-border border-t pt-10" aria-hidden="true">
-        <p class="text-primary-ink text-xs font-bold tracking-[0.18em] uppercase">
-            Product recommendations
-        </p>
-        <h2 class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
+    <section class="space-y-4" aria-hidden="true">
+
+        <h2 class="text-xl font-semibold tracking-tight">
             Suggestions for you
         </h2>
-        <p class="text-muted-foreground mt-2 text-sm leading-6">
+        <p class="text-muted-foreground mt-1 text-sm leading-6">
             Finding available products for you.
         </p>
         <div

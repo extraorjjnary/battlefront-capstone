@@ -1,3 +1,4 @@
+import { pageHeaderModule } from '../../components/pageHeaderTestHelpers.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -64,6 +65,7 @@ function loadPage(path, inlineTemplate = false) {
     );
     const modules = new Proxy(
         {
+            '@/components/PageHeader.vue': pageHeaderModule,
             vue: Vue,
             '@inertiajs/vue3': {
                 Head: primitive,
@@ -323,9 +325,11 @@ test('admin detail flags unconfigured delivery logistics without offering LBC tr
         Vue.h(loaded.component, { order: props.order }),
     );
 
-    assert.match(html, /Delivery pricing and logistics not configured/);
-    assert.match(html, /product subtotal only/);
-    assert.match(html, /Coordinate its\s+fulfillment separately/);
+    assert.match(html, /No configured delivery rate/);
+    assert.match(html, /Product subtotal only/);
+    assert.match(html, /Arrange delivery separately/);
+    assert.match(html, /no delivery fee, LBC quote, booking, or estimate/);
+    assert.match(html, /Manual shipment setup does not change the saved total or add a fee/);
     assert.doesNotMatch(html, /Shipment progress/);
 });
 
@@ -530,7 +534,9 @@ test('admin COD controls show collection confirmation only when eligible and hid
         const loaded = loadPage('../Administration/Orders/Show.vue', true);
         const html = await renderToString(Vue.h(loaded.component, codOrderProps(eligible)));
         assert.match(html, /COD — Awaiting Collection/);
-        assert.match(html, /Failed delivery, uncollected payment, and returns/);
+        assert.match(html, /Handle failed delivery, unpaid orders, and returns manually/);
+        assert.match(html, /Delivered does not verify payment or record a sale/);
+        assert.match(html, /No automatic cancellation, refund, return, or stock restoration/);
         assert.doesNotMatch(html, /Apply payment decision|manually at the store|decision is final/);
         assert.equal(html.includes('Confirm COD Collection'), eligible);
     }

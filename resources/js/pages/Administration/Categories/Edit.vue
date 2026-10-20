@@ -1,6 +1,7 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Head } from '@inertiajs/vue3';
-import { FolderPen } from '@lucide/vue';
+
 import CategoryController from '@/actions/App/Http/Controllers/Administration/CategoryController';
 import CategoryForm from '@/components/CategoryForm.vue';
 import { Badge } from '@/components/ui/badge';
@@ -20,47 +21,21 @@ defineOptions({
 </script>
 
 <template>
-    <Head :title="`Edit ${category.name}`" />
-
     <main
-        class="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 p-6 lg:p-10"
+        class="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
     >
-        <section
-            class="surface-panel border-border bg-card relative overflow-hidden border p-6"
-        >
-            <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
-            <div class="flex items-start gap-4">
-                <span
-                    class="bg-secondary text-primary-ink flex size-11 shrink-0 items-center justify-center rounded-md"
+        <Head :title="`Edit ${category.name}`" />
+        <PageHeader :title="`Edit ${category.name}`">
+            <template #metadata>
+                <Badge
+                    :variant="
+                        category.is_active ? 'secondary' : 'outline'
+                        "
                 >
-                    <FolderPen class="size-5" />
-                </span>
-                <div>
-                    <div class="flex flex-wrap items-center gap-2">
-                        <p
-                            class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
-                        >
-                            Sagay City catalog
-                        </p>
-                        <Badge
-                            :variant="
-                                category.is_active ? 'secondary' : 'outline'
-                            "
-                        >
-                            {{ category.is_active ? 'Active' : 'Inactive' }}
-                        </Badge>
-                    </div>
-                    <h1 class="mt-2 text-2xl font-bold tracking-tight">
-                        Edit {{ category.name }}
-                    </h1>
-                    <p class="text-muted-foreground mt-2 text-sm leading-6">
-                        Update the category label and customer-facing
-                        description. Activation is managed from the category
-                        list.
-                    </p>
-                </div>
-            </div>
-        </section>
+                    {{ category.is_active ? 'Active' : 'Inactive' }}
+                </Badge>
+            </template>
+        </PageHeader>
 
         <section class="surface-panel border-border bg-card border p-6 sm:p-8">
             <CategoryForm

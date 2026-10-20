@@ -1,3 +1,4 @@
+import { pageHeaderModule } from '../components/pageHeaderTestHelpers.js';
 import { readFileSync } from 'node:fs';
 import { compileScript, parse } from '@vue/compiler-sfc';
 import * as Vue from 'vue';
@@ -38,6 +39,7 @@ export function loadAddressComponent(path, inlineTemplate = false, options = {})
         get: (_, key) => ['store', 'index', 'edit', 'show'].includes(key) ? route : primitive,
     });
     const modules = new Proxy({
+        '@/components/PageHeader.vue': pageHeaderModule,
         vue: Vue,
         '@inertiajs/vue3': {
             Head: primitive, Link: primitive, Form: primitive,

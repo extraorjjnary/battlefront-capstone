@@ -1,4 +1,5 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Form, Head, Link } from '@inertiajs/vue3';
 import { FolderTree, Pencil, Plus, RotateCcw } from '@lucide/vue';
 import CategoryActivationController from '@/actions/App/Http/Controllers/Administration/CategoryActivationController';
@@ -28,50 +29,22 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Categories" />
-
     <main
-        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
+        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
     >
-        <section class="surface-panel border-border bg-card relative overflow-hidden border">
-            <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
-            <div
-                class="flex flex-col gap-5 p-6 sm:flex-row sm:items-start sm:justify-between"
-            >
-                <div class="flex items-start gap-4">
-                    <span
-                        class="bg-secondary text-primary-ink flex size-11 shrink-0 items-center justify-center rounded-md"
-                    >
-                        <FolderTree class="size-5" />
-                    </span>
-                    <div>
-                        <p
-                            class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
-                        >
-                            Sagay City catalog
-                        </p>
-                        <h1
-                            class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
-                        >
-                            Category management
-                        </h1>
-                        <p
-                            class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6"
-                        >
-                            Maintain the approved groups used to organize
-                            Battlefront hardware and peripherals.
-                        </p>
-                    </div>
-                </div>
+        <Head title="Categories" />
+        <PageHeader title="Categories">
+            <template #actions>
                 <Button as-child class="shrink-0">
                     <Link :href="CategoryController.create()">
                         <Plus />
                         Add category
                     </Link>
                 </Button>
-            </div>
-            <CatalogNavigation />
-        </section>
+            </template>
+        </PageHeader>
+
+<CatalogNavigation />
 
         <section aria-labelledby="category-list-heading">
             <div class="mb-4">

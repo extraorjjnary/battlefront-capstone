@@ -1,5 +1,6 @@
 <script setup>
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import PageHeader from '@/components/PageHeader.vue';
+import { Head, Link } from '@inertiajs/vue3';
 import {
     ArrowRight,
     Boxes,
@@ -11,7 +12,7 @@ import {
     ReceiptText,
     WalletCards,
 } from '@lucide/vue';
-import { computed } from 'vue';
+
 import InventoryController from '@/actions/App/Http/Controllers/Administration/InventoryController';
 import OrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
@@ -30,8 +31,6 @@ const props = defineProps({
     dashboard: { type: Object },
 });
 
-const page = usePage();
-const user = computed(() => page.props.auth.user);
 const quickLinks = [
     {
         title: 'Orders',
@@ -81,35 +80,16 @@ defineOptions({
 
 <template>
     <div class="contents">
-        <Head title="Administration dashboard" />
+        <Head title="Dashboard" />
 
         <main
-            class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
+            class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
         >
-            <section
-                class="surface-panel border-border bg-card relative overflow-hidden border px-6 py-5"
-                aria-labelledby="admin-dashboard-heading"
-            >
-                <div
-                    class="bg-primary absolute inset-y-0 left-0 w-1"
-                    aria-hidden="true"
-                />
-                <p
-                    class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
-                >
-                    Sagay City operations
-                </p>
-                <h1
-                    id="admin-dashboard-heading"
-                    class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
-                >
-                    Welcome, {{ user.name }}
-                </h1>
-                <p class="text-muted-foreground mt-2 text-sm leading-6">
-                    Review today’s operational priorities and continue where
-                    attention is needed.
-                </p>
-            </section>
+            <PageHeader
+                title="Dashboard"
+                heading-id="administration-dashboard-heading"
+                description="Sagay City operations"
+            />
 
             <section aria-labelledby="operations-summary-heading">
                 <h2 id="operations-summary-heading" class="sr-only">

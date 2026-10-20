@@ -1,3 +1,4 @@
+import { pageHeaderModule } from '../../../components/pageHeaderTestHelpers.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -99,6 +100,7 @@ function salesHarness(t, empty = false) {
     });
     const modules = new Proxy(
         {
+            '@/components/PageHeader.vue': pageHeaderModule,
             vue: Vue,
             '@inertiajs/vue3': {
                 Head: primitive,
@@ -164,7 +166,9 @@ function findNodes(node, predicate) {
     if (!node || typeof node !== 'object') return [];
     const children = Array.isArray(node.children)
         ? node.children
-        : (node.children?.default?.() ?? []);
+        : Object.values(node.children ?? {})
+            .filter((slot) => typeof slot === 'function')
+            .flatMap((slot) => slot());
     return [
         ...(predicate(node) ? [node] : []),
         ...children.flatMap((child) => findNodes(child, predicate)),

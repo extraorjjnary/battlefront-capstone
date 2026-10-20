@@ -1,4 +1,5 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Head, router, usePage } from '@inertiajs/vue3';
 import {
     ArcElement,
@@ -523,93 +524,45 @@ defineOptions({
 
 <template>
     <main
-        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
+        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
     >
         <Head title="Sales reports" />
-        <section
-            class="surface-panel border-border bg-card relative overflow-hidden border p-6 sm:p-8"
-        >
-            <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
-            <div
-                class="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between"
-            >
-                <div class="max-w-2xl">
-                    <p
-                        class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
+        <PageHeader title="Sales reports" :description="rangeLabel">
+            <template #actions>
+                <div class="flex flex-wrap gap-2" role="group" aria-label="Sales report print and export">
+                    <Button
+                        v-for="action in exportActions"
+                        :key="action.label"
+                        variant="outline"
+                        size="sm"
+                        as-child
                     >
-                        Administration · Sagay operations
-                    </p>
-                    <h1
-                        class="mt-3 text-3xl font-bold tracking-tight sm:text-4xl"
-                    >
-                        Sales dashboard
-                    </h1>
-                    <p class="text-muted-foreground mt-3 leading-7">
-                        Monitor sales, product performance, and recommendation
-                        engagement for {{ rangeLabel }}.
-                    </p>
-                </div>
-                <div
-                    class="text-muted-foreground flex items-center gap-2 text-sm"
-                >
-                    <CalendarRange class="text-primary-ink size-4" />
-                    Inclusive date range
-                </div>
-            </div>
-            <div
-                class="mt-5 flex flex-wrap gap-2"
-                role="group"
-                aria-label="Sales report print and export"
-            >
-                <Button
-                    v-for="action in exportActions"
-                    :key="action.label"
-                    variant="outline"
-                    size="sm"
-                    as-child
-                >
-                    <a
-                        :href="action.href"
-                        :target="action.print ? '_blank' : undefined"
-                        :rel="action.print ? 'noopener' : undefined"
-                        :aria-disabled="isUpdatingReport"
-                        :tabindex="isUpdatingReport ? -1 : undefined"
-                        :class="{ 'opacity-50': isUpdatingReport }"
-                        @click="guardExport"
-                    >
-                        <component :is="action.icon" aria-hidden="true" />
-                        {{ action.label }}
-                        <span v-if="action.print" class="sr-only"
-                            >(opens in a new tab)</span
+                        <a
+                            :href="action.href"
+                            :target="action.print ? '_blank' : undefined"
+                            :rel="action.print ? 'noopener' : undefined"
+                            :aria-disabled="isUpdatingReport"
+                            :tabindex="isUpdatingReport ? -1 : undefined"
+                            :class="{ 'opacity-50': isUpdatingReport }"
+                            @click="guardExport"
                         >
-                    </a>
-                </Button>
-            </div>
-        </section>
+                            <component :is="action.icon" aria-hidden="true" />
+                            {{ action.label }}
+                            <span v-if="action.print" class="sr-only">(opens in a new tab)</span>
+                        </a>
+                    </Button>
+                </div>
+            </template>
+        </PageHeader>
 
         <section
-            class="surface-panel border-border bg-card border p-5"
+            class="space-y-3"
             aria-labelledby="sales-filter-heading"
         >
-            <div class="flex items-start gap-3">
-                <span
-                    class="bg-secondary text-primary-ink flex size-10 shrink-0 items-center justify-center rounded-md"
-                >
-                    <CalendarRange class="size-4" />
-                </span>
-                <div>
-                    <h2 id="sales-filter-heading" class="font-semibold">
-                        Reporting period
-                    </h2>
-                    <p class="text-muted-foreground mt-1 text-sm">
-                        Choose inclusive dates and how the timeline groups
-                        recorded sales.
-                    </p>
-                </div>
-            </div>
+            <h2 id="sales-filter-heading" class="text-sm font-semibold">Date range (inclusive)</h2>
 
             <form
-                class="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end"
+                class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end"
                 @submit.prevent="submitFilters"
             >
                 <div class="grid gap-2">

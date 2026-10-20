@@ -23,7 +23,7 @@ const storefrontLinks = [
         href: productIndex(),
     },
     {
-        title: 'Branches',
+        title: 'Our stores',
         mobileTitle: 'Stores',
         section: 'branches',
         href: branchIndex(),

@@ -1,4 +1,5 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Form, Head, Link } from '@inertiajs/vue3';
 import {
     ArrowLeft,
@@ -6,7 +7,6 @@ import {
     Clock3,
     CreditCard,
     MapPin,
-    PackageCheck,
     Phone,
     ShieldCheck,
     Store,
@@ -15,7 +15,9 @@ import {
 } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
 import { show as deliveryQuoteShow } from '@/routes/checkout/delivery-quote';
-import { store as storeOrder } from '@/actions/App/Http/Controllers/OrderController';
+import {
+    store as storeOrder,
+} from '@/actions/App/Http/Controllers/OrderController';
 import DeliveryAddressFields from '@/components/DeliveryAddressFields.vue';
 import InputError from '@/components/InputError.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -155,43 +157,9 @@ defineOptions({
         <Head title="Checkout" />
 
         <main
-            class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
+            class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
         >
-            <section
-                class="surface-panel border-border bg-card relative overflow-hidden border p-6 sm:p-8"
-                aria-labelledby="checkout-heading"
-            >
-                <div
-                    class="bg-primary absolute inset-y-0 left-0 w-1"
-                    aria-hidden="true"
-                />
-                <div class="flex items-start gap-4">
-                    <span
-                        class="bg-secondary text-primary-ink flex size-11 shrink-0 items-center justify-center rounded-md"
-                    >
-                        <PackageCheck class="size-5" aria-hidden="true" />
-                    </span>
-                    <div>
-                        <p
-                            class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
-                        >
-                            Customer checkout
-                        </p>
-                        <h1
-                            id="checkout-heading"
-                            class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
-                        >
-                            Confirm fulfillment and payment
-                        </h1>
-                        <p
-                            class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6"
-                        >
-                            Review your current hardware selection and validate
-                            the details Battlefront will need for your order.
-                        </p>
-                    </div>
-                </div>
-            </section>
+            <PageHeader title="Checkout" heading-id="checkout-heading" />
 
             <Form
                 v-bind="storeOrder.form()"

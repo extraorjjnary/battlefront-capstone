@@ -1,9 +1,8 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import {
     ArrowRight,
-    BadgeCheck,
-    CalendarDays,
     CircleAlert,
     CreditCard,
     PackageCheck,
@@ -100,106 +99,35 @@ function submitReplacementProof() {
         <Head :title="`Order ${order.reference}`" />
 
         <main
-            class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
+            class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
         >
-            <section
-                class="surface-panel border-border bg-card relative overflow-hidden border p-6 sm:p-8"
-                aria-labelledby="confirmation-heading"
-            >
-                <div
-                    class="bg-primary absolute inset-y-0 left-0 w-1"
-                    aria-hidden="true"
-                />
-                <div
-                    class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between"
-                >
-                    <div class="flex items-start gap-4">
-                        <span
-                            class="bg-secondary text-primary-ink flex size-12 shrink-0 items-center justify-center rounded-md"
-                        >
-                            <BadgeCheck class="size-6" aria-hidden="true" />
+            <div class="space-y-3">
+                <PageHeader :title="`Order ${order.reference}`" heading-id="confirmation-heading">
+                    <template #metadata>
+                        <span v-if="isConfirmation" class="text-foreground font-medium">
+                            Thank you for your order. Order confirmed.
                         </span>
-                        <div>
-                            <p
-                                class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
-                            >
-                                {{
-                                    isConfirmation
-                                        ? 'Order confirmed'
-                                        : 'Customer order'
-                                }}
-                            </p>
-                            <h1
-                                id="confirmation-heading"
-                                class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
-                            >
-                                {{
-                                    isConfirmation
-                                        ? 'Thank you for your order'
-                                        : `Order ${order.reference}`
-                                }}
-                            </h1>
-                            <p
-                                class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6"
-                            >
-                                <template v-if="isConfirmation">
-                                    Battlefront received your order. Keep the
-                                    reference below when asking about its
-                                    progress.
-                                </template>
-                                <template v-else>
-                                    Review the latest order and payment status
-                                    recorded by Battlefront.
-                                </template>
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="sm:text-right">
-                        <p
-                            class="text-muted-foreground text-xs font-semibold tracking-wide uppercase"
-                        >
-                            Order reference
-                        </p>
-                        <p class="mt-1 text-2xl font-bold tabular-nums">
-                            {{ order.reference }}
-                        </p>
-                        <Badge
-                            variant="outline"
-                            class="mt-2"
-                            :class="orderStatusBadgeClass(order.status.value)"
-                        >
+                        <Badge variant="outline" :class="orderStatusBadgeClass(order.status.value)">
                             {{ order.status.label }}
                         </Badge>
-                    </div>
-                </div>
-
-                <div
-                    class="border-border mt-6 flex flex-wrap items-center justify-between gap-3 border-t pt-4"
-                >
-                    <p
-                        class="text-muted-foreground flex items-center gap-2 text-sm"
-                    >
-                        <CalendarDays class="size-4" aria-hidden="true" />
-                        Submitted {{ formatOrderDate(order.created_at) }}
-                    </p>
-                    <Button
-                        v-if="order.can_cancel"
-                        type="button"
-                        variant="destructive-outline"
-                        size="sm"
-                        :disabled="cancellationForm.processing"
-                        @click="requestCancellation"
-                    >
-                        <Spinner v-if="cancellationForm.processing" />
-                        Cancel order
-                    </Button>
-                </div>
-                <InputError
-                    class="mt-3"
-                    :message="cancellationForm.errors.status"
-                />
-            </section>
+                        <span>Submitted {{ formatOrderDate(order.created_at) }}</span>
+                    </template>
+                    <template #actions>
+                        <Button
+                            v-if="order.can_cancel"
+                            type="button"
+                            variant="destructive-outline"
+                            size="sm"
+                            :disabled="cancellationForm.processing"
+                            @click="requestCancellation"
+                        >
+                            <Spinner v-if="cancellationForm.processing" />
+                            Cancel order
+                        </Button>
+                    </template>
+                </PageHeader>
+<InputError :message="cancellationForm.errors.status" />
+</div>
 
             <Dialog v-model:open="cancellationOpen">
                 <DialogContent>

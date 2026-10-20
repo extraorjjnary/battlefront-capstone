@@ -1,6 +1,7 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowLeft, CalendarDays, Mail, UserRound } from '@lucide/vue';
+import { ArrowLeft, CalendarDays, Mail } from '@lucide/vue';
 import CustomerController from '@/actions/App/Http/Controllers/Administration/CustomerController';
 import UserInfo from '@/components/UserInfo.vue';
 import { Button } from '@/components/ui/button';
@@ -34,49 +35,20 @@ defineOptions({
 </script>
 
 <template>
-    <Head :title="customer.name" />
-
     <main
-        class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 p-6 lg:p-10"
+        class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
     >
-        <section class="surface-panel border-border bg-card relative overflow-hidden border">
-            <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
-            <div
-                class="flex flex-col gap-5 p-6 sm:flex-row sm:items-start sm:justify-between"
-            >
-                <div class="flex min-w-0 items-start gap-4">
-                    <span
-                        class="bg-secondary text-primary-ink flex size-11 shrink-0 items-center justify-center rounded-md"
-                    >
-                        <UserRound class="size-5" />
-                    </span>
-                    <div class="min-w-0">
-                        <p
-                            class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
-                        >
-                            Read-only customer record
-                        </p>
-                        <h1
-                            class="mt-2 truncate text-2xl font-bold tracking-tight sm:text-3xl"
-                        >
-                            {{ customer.name }}
-                        </h1>
-                        <p
-                            class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6"
-                        >
-                            View the approved account details used to identify
-                            this Battlefront customer.
-                        </p>
-                    </div>
-                </div>
+        <Head :title="customer.name" />
+        <PageHeader :title="customer.name" description="Account details are read-only.">
+            <template #actions>
                 <Button variant="outline" size="sm" as-child>
                     <Link :href="CustomerController.index()">
                         <ArrowLeft />
                         Back to customers
                     </Link>
                 </Button>
-            </div>
-        </section>
+            </template>
+        </PageHeader>
 
         <section aria-labelledby="account-details-heading">
             <div class="mb-4">

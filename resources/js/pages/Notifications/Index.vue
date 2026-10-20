@@ -1,10 +1,13 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Bell, Check, ArrowRight } from '@lucide/vue';
 import { ref } from 'vue';
 import CatalogPagination from '@/components/CatalogPagination.vue';
 import { Button } from '@/components/ui/button';
-import { useNotificationNavigation } from '@/composables/useNotificationNavigation';
+import {
+    useNotificationNavigation,
+} from '@/composables/useNotificationNavigation';
 
 defineProps({ notifications: { type: Object, required: true } });
 const navigation = useNotificationNavigation();
@@ -42,39 +45,16 @@ function markRead(id = null) {
     <div class="contents">
         <Head title="Notifications" />
         <main
-            class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-6 lg:p-10"
+            class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
         >
-            <header class="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                    <p
-                        class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
-                    >
-                        {{
-                            isAdministrator
-                                ? 'Order operations'
-                                : 'Your Battlefront orders'
-                        }}
-                    </p>
-                    <h1 class="mt-2 text-2xl font-bold tracking-tight">
-                        Notifications
-                    </h1>
-                    <p class="text-muted-foreground mt-2 text-sm">
-                        {{ summary.unread_count }} unread ·
-                        {{
-                            isAdministrator
-                                ? 'New orders and payment evidence needing review.'
-                                : 'Payment and shipment updates, shared across your devices.'
-                        }}
-                    </p>
-                </div>
-                <Button
-                    variant="outline"
-                    :disabled="busy || !summary.unread_count"
-                    @click="markRead()"
-                >
-                    <Check class="size-4" aria-hidden="true" /> Mark all as read
-                </Button>
-            </header>
+            <PageHeader title="Notifications" :description="`${summary.unread_count} unread`">
+                <template #actions>
+                    <Button variant="outline" :disabled="busy || !summary.unread_count" @click="markRead()">
+                        <Check class="size-4" aria-hidden="true" />
+                        Mark all as read
+                    </Button>
+                </template>
+            </PageHeader>
             <p v-if="error" class="text-destructive text-sm" role="alert">
                 {{ error }}
             </p>
