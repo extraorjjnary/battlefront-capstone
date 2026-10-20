@@ -8,6 +8,35 @@ use App\Models\Product;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia as Assert;
+
+test('customer return cases can be searched by product, requester, order, or reason', function () {
+    $administrator = User::factory()->administrator()->create();
+    $product = Product::factory()->create(['name' => 'Search return product']);
+    $order = Order::factory()->create();
+    $item = OrderItem::factory()->for($order)->for($product)->create();
+    $returnId = DB::table('customer_returns')->insertGetId([
+        'order_id' => $order->id,
+        'requester_id' => $administrator->id,
+        'status' => 'pending',
+        'reason' => 'Search return reason',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    DB::table('customer_return_items')->insert([
+        'customer_return_id' => $returnId,
+        'order_item_id' => $item->id,
+        'quantity' => 1,
+        'condition' => 'sealed',
+    ]);
+
+    $response = $this->actingAs($administrator)->get(route('administration.customer-returns.index', ['q' => 'Search return product']));
+
+    $response->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('filters.q', 'Search return product')
+        ->where('returns.total', 1)
+        ->where('returns.data.0.id', $returnId));
+});
 
 test('a completed purchase can be returned and manually refunded without rewriting its sale', function () {
     $requester = User::factory()->administrator()->create();

@@ -4,18 +4,29 @@ import DamageReportController from '@/actions/App/Http/Controllers/Administratio
 import AdministrationEvidenceController from '@/actions/App/Http/Controllers/Administration/AdministrationEvidenceController';
 import InputError from '@/components/InputError.vue';
 import SearchableProductSelect from '@/components/administration/SearchableProductSelect.vue';
+import SearchField from '@/components/SearchField.vue';
+import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { watch } from 'vue';
 
-defineProps({
+const props = defineProps({
     reports: Object,
     products: Array,
     suppliers: Array,
     evidence: Object,
     selected_case: { type: Number, default: null },
+    filters: Object,
 });
 const page = usePage();
+const { search, isSearching, clearSearch } = useDebouncedSearch({
+    initialSearch: props.filters?.q,
+    currentSearch: () => props.filters?.q,
+    route: DamageReportController.index,
+    query: () => ({ case: props.selected_case ?? undefined }),
+});
+watch(() => props.filters?.q, (query) => { search.value = query ?? ''; });
 defineOptions({
     layout: {
         breadcrumbs: [
@@ -86,6 +97,15 @@ defineOptions({
             >
         </Form>
         <section class="space-y-3" aria-label="Damage cases">
+            <SearchField
+                id="damage-search"
+                v-model="search"
+                class="mb-3 max-w-xl"
+                label="Search damage reports"
+                placeholder="Product, requester, or reason"
+                :is-searching="isSearching"
+                @clear="clearSearch"
+            />
             <p
                 v-if="reports.data.length === 0"
                 class="text-muted-foreground text-sm"

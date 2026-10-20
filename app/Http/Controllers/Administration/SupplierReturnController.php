@@ -16,6 +16,7 @@ class SupplierReturnController extends Controller
 {
     public function index(Request $request): Response
     {
+        $filters = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
         $case = $request->validate(['case' => ['nullable', 'integer', 'min:1']])['case'] ?? null;
         $returns = DB::table('supplier_returns as returns')
             ->join('products', 'products.id', '=', 'returns.product_id')
@@ -24,6 +25,12 @@ class SupplierReturnController extends Controller
             ->leftJoin('supplier_return_resolutions as resolutions', 'resolutions.supplier_return_id', '=', 'returns.id')
             ->select('returns.*', 'products.name as product_name', 'suppliers.name as supplier_name', 'users.name as requester_name', 'resolutions.outcome as resolution_outcome', 'resolutions.external_reference as resolution_reference', 'resolutions.notes as resolution_notes')
             ->when($case, fn ($query, $id) => $query->where('returns.id', $id))
+            ->when($filters['q'] ?? null, fn ($query, $search) => $query->where(fn ($query) => $query
+                ->where('products.name', 'like', '%'.$search.'%')
+                ->orWhere('suppliers.name', 'like', '%'.$search.'%')
+                ->orWhere('users.name', 'like', '%'.$search.'%')
+                ->orWhere('returns.reason', 'like', '%'.$search.'%')
+                ->orWhere('returns.external_reference', 'like', '%'.$search.'%')))
             ->orderByDesc('returns.created_at')->paginate(20)->withQueryString();
         $returns->getCollection()->transform(function ($return) {
             $return->held_quantity = in_array($return->status, ['pending', 'approved', 'rejected_follow_up'], true) ? $return->quantity : 0;
@@ -33,6 +40,7 @@ class SupplierReturnController extends Controller
 
         return Inertia::render('Administration/SupplierReturns', [
             'returns' => $returns,
+            'filters' => ['q' => $filters['q'] ?? null],
             'selected_case' => $case,
             'products' => Product::query()->whereHas('inventory', fn ($query) => $query->where('quantity', '>', 0))
                 ->with('inventory:id,product_id,quantity')->orderBy('name')->get(['id', 'product_code', 'name'])

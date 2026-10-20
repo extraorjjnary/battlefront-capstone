@@ -37,9 +37,15 @@ function showError(errors) {
 <template>
     <Dialog v-model:open="open">
         <DialogTrigger as-child>
-            <Button variant="destructive-outline" size="sm">
+            <Button
+                variant="destructive-outline"
+                size="sm"
+                class="gap-1.5 px-2 whitespace-nowrap"
+                :aria-label="`Move to ${collectionName}`"
+                :title="`Move to ${collectionName}`"
+            >
                 <Trash2 />
-                Move to {{ collectionName }}
+                Move to Deleted
             </Button>
         </DialogTrigger>
         <DialogContent>

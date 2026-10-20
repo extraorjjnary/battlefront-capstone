@@ -59,6 +59,25 @@ test('audit events show readable changes only to a role allowed to view the reco
             ->where('entries.data.0.subject_url', null));
 });
 
+test('audit log can search action, actor, reason, and recorded changes', function () {
+    $owner = User::factory()->administrator()->create(['name' => 'Searchable Owner']);
+    DB::table('audit_logs')->insert([
+        'actor_id' => $owner->id,
+        'action' => 'product.updated',
+        'subject_type' => 'product',
+        'subject_id' => 456,
+        'reason' => 'Search fixture',
+        'changes' => json_encode(['name' => 'Target hardware'], JSON_THROW_ON_ERROR),
+        'created_at' => now(),
+    ]);
+
+    $this->actingAs($owner)->get(route('administration.reports.audit', ['q' => 'Target hardware']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.q', 'Target hardware')
+            ->where('entries.total', 1)
+            ->where('entries.data.0.subject_id', 456));
+});
+
 test('audit timestamps are serialized in UTC and exported in Philippine time', function () {
     $owner = User::factory()->administrator()->create();
     DB::table('audit_logs')->insert([

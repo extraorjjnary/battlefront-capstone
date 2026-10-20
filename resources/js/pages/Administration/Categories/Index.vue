@@ -7,17 +7,27 @@ import CatalogNavigation from '@/components/CatalogNavigation.vue';
 import CatalogPagination from '@/components/CatalogPagination.vue';
 import DeactivationDialog from '@/components/DeactivationDialog.vue';
 import RecoverableDeletionDialog from '@/components/RecoverableDeletionDialog.vue';
+import SearchField from '@/components/SearchField.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { computed } from 'vue';
+import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
+import { computed, watch } from 'vue';
 
-defineProps({
+const props = defineProps({
     categories: { type: Object, required: true },
     deleted: { type: Boolean, default: false },
+    filters: { type: Object, required: true },
 });
 const page = usePage();
 const canDeleteCatalog = computed(() => page.props.auth?.can?.deleteCatalog === true);
+const { search, isSearching, clearSearch } = useDebouncedSearch({
+    initialSearch: props.filters.q,
+    currentSearch: () => props.filters.q,
+    route: CategoryController.index,
+    query: () => ({ deleted: props.deleted ? 1 : undefined }),
+});
+watch(() => props.filters.q, (query) => { search.value = query ?? ''; });
 
 defineOptions({
     layout: {
@@ -94,6 +104,16 @@ defineOptions({
                     {{ deleted ? 'Deleted categories' : 'Catalog categories' }}
                 </h2>
             </div>
+
+            <SearchField
+                id="category-search"
+                v-model="search"
+                class="mb-4 max-w-xl"
+                label="Search categories"
+                placeholder="Name or description"
+                :is-searching="isSearching"
+                @clear="clearSearch"
+            />
 
             <div
                 v-if="categories.data.length === 0"

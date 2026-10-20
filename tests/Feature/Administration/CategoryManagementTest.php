@@ -86,6 +86,19 @@ test('catalog categories are paginated in stable name order', function () {
         ->where('categories.data.14.name', 'Category 15'));
 });
 
+test('administrators can search category names and descriptions in the selected catalog', function () {
+    $administrator = User::factory()->administrator()->create();
+    Category::factory()->create(['name' => 'Processors', 'description' => 'Desktop compute']);
+    Category::factory()->create(['name' => 'Graphics', 'description' => 'Video hardware']);
+
+    $this->actingAs($administrator)
+        ->get(route('administration.categories.index', ['q' => 'Video']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.q', 'Video')
+            ->where('categories.total', 1)
+            ->where('categories.data.0.name', 'Graphics'));
+});
+
 test('administrators can open category create and edit pages', function () {
     $administrator = User::factory()->administrator()->create();
     $category = Category::factory()->inactive()->create([

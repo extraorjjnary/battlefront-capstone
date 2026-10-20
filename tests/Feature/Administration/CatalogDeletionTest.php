@@ -29,6 +29,22 @@ function emptyProductInventory(Product $product): void
     $product->inventory?->update(['quantity' => 0, 'quarantined_quantity' => 0]);
 }
 
+test('administrators can search deleted products by name and catalog code', function () {
+    $administrator = User::factory()->administrator()->create();
+    $product = Product::factory()->available()->create([
+        'name' => 'Deleted search target',
+        'product_code' => 'DEL-SEARCH-01',
+    ]);
+    $product->delete();
+
+    $this->actingAs($administrator)
+        ->get(route('administration.products.index', ['deleted' => 1, 'q' => 'DEL-SEARCH-01']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.q', 'DEL-SEARCH-01')
+            ->where('products.total', 1)
+            ->where('products.data.0.name', 'Deleted search target'));
+});
+
 test('product deletion retains linked inventory and activity for restoration', function (bool $imported) {
     Storage::fake('local');
     $administrator = User::factory()->administrator()->create();

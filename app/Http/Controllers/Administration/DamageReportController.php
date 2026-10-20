@@ -16,12 +16,17 @@ class DamageReportController extends Controller
 {
     public function index(Request $request): Response
     {
+        $filters = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
         $case = $request->validate(['case' => ['nullable', 'integer', 'min:1']])['case'] ?? null;
         $reports = DB::table('damage_reports as reports')
             ->join('products', 'products.id', '=', 'reports.product_id')
             ->join('users', 'users.id', '=', 'reports.requester_id')
             ->select('reports.*', 'products.name as product_name', 'users.name as requester_name')
             ->when($case, fn ($query, $id) => $query->where('reports.id', $id))
+            ->when($filters['q'] ?? null, fn ($query, $search) => $query->where(fn ($query) => $query
+                ->where('products.name', 'like', '%'.$search.'%')
+                ->orWhere('users.name', 'like', '%'.$search.'%')
+                ->orWhere('reports.reason', 'like', '%'.$search.'%')))
             ->orderByDesc('reports.created_at')->paginate(20)->withQueryString();
         $heldBySupplierReturn = DB::table('supplier_returns')->whereIn('damage_report_id', $reports->getCollection()->pluck('id'))
             ->whereIn('status', ['pending', 'approved', 'rejected_follow_up'])->pluck('damage_report_id')->flip();
@@ -34,6 +39,7 @@ class DamageReportController extends Controller
 
         return Inertia::render('Administration/DamageReports', [
             'reports' => $reports,
+            'filters' => ['q' => $filters['q'] ?? null],
             'selected_case' => $case,
             'evidence' => DB::table('administration_evidence')->where('subject_type', 'damage_report')
                 ->whereIn('subject_id', $reports->getCollection()->pluck('id'))

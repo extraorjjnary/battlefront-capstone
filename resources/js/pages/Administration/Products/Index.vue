@@ -19,6 +19,7 @@ import CatalogPagination from '@/components/CatalogPagination.vue';
 import DeactivationDialog from '@/components/DeactivationDialog.vue';
 import InputError from '@/components/InputError.vue';
 import RecoverableDeletionDialog from '@/components/RecoverableDeletionDialog.vue';
+import SearchField from '@/components/SearchField.vue';
 import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -111,6 +112,7 @@ function productPage(options) {
 
 function selectedFilters() {
     return {
+        deleted: props.deleted ? 1 : undefined,
         category_id: selectedValue(categoryId.value),
         brand: selectedValue(brand.value),
         tag_id: selectedValue(tagId.value),
@@ -383,6 +385,22 @@ defineOptions({
                     </Button>
                 </div>
             </div>
+        </section>
+
+        <section
+            v-else
+            class="border-border bg-card border p-5"
+            aria-label="Search deleted products"
+        >
+            <SearchField
+                id="deleted-product-search"
+                v-model="search"
+                class="max-w-xl"
+                label="Search deleted products"
+                placeholder="Code, name, brand, or description"
+                :is-searching="isSearching"
+                @clear="clearSearch"
+            />
         </section>
 
         <section aria-labelledby="product-list-heading">

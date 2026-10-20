@@ -22,12 +22,16 @@ class CategoryController extends Controller
     public function index(Request $request): Response
     {
         $showDeleted = $request->boolean('deleted');
+        $filters = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
         if ($showDeleted) {
             $this->authorize('catalog.delete');
         }
 
         $query = $showDeleted ? Category::onlyTrashed() : Category::query();
         $categories = $query
+            ->when($filters['q'] ?? null, fn ($query, $search) => $query->where(fn ($query) => $query
+                ->where('name', 'like', '%'.$search.'%')
+                ->orWhere('description', 'like', '%'.$search.'%')))
             ->select(['id', 'name', 'description', 'is_active', ...($showDeleted ? ['deleted_at', 'deleted_by_id'] : [])])
             ->when($showDeleted, fn ($query) => $query->with('deletedBy:id,name'))
             ->withCount($showDeleted
@@ -52,6 +56,7 @@ class CategoryController extends Controller
         return Inertia::render('Administration/Categories/Index', [
             'categories' => $categories,
             'deleted' => $showDeleted,
+            'filters' => ['q' => $filters['q'] ?? null],
         ]);
     }
 

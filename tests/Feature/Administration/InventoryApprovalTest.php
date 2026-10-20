@@ -5,6 +5,28 @@ use App\Models\Sale;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia;
+
+test('inventory adjustment requests can be searched by product, requester, or reason', function () {
+    $administrator = User::factory()->administrator()->create();
+    $product = Product::factory()->create(['name' => 'Search adjustment product']);
+    $requestId = DB::table('inventory_adjustment_requests')->insertGetId([
+        'product_id' => $product->id,
+        'requester_id' => $administrator->id,
+        'observed_quantity' => 1,
+        'target_quantity' => 2,
+        'status' => 'pending',
+        'reason' => 'Search adjustment reason',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $this->actingAs($administrator)->get(route('administration.inventory-adjustments.index', ['q' => 'Search adjustment product']))
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('filters.q', 'Search adjustment product')
+            ->where('requests.total', 1)
+            ->where('requests.data.0.id', $requestId));
+});
 
 test('manager can update the reorder level separately while staff cannot', function () {
     $staff = User::factory()->administrator()->create([

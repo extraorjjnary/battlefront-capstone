@@ -3,11 +3,21 @@ import { Form, Head, Link, usePage } from '@inertiajs/vue3';
 import InventoryAdjustmentController from '@/actions/App/Http/Controllers/Administration/InventoryAdjustmentController';
 import InventoryController from '@/actions/App/Http/Controllers/Administration/InventoryController';
 import InputError from '@/components/InputError.vue';
+import SearchField from '@/components/SearchField.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
+import { watch } from 'vue';
 
-defineProps({ requests: { type: Object, required: true }, selected_case: { type: Number, default: null } });
+const props = defineProps({ requests: { type: Object, required: true }, selected_case: { type: Number, default: null }, filters: Object });
 const page = usePage();
+const { search, isSearching, clearSearch } = useDebouncedSearch({
+    initialSearch: props.filters?.q,
+    currentSearch: () => props.filters?.q,
+    route: InventoryAdjustmentController.index,
+    query: () => ({ case: props.selected_case ?? undefined }),
+});
+watch(() => props.filters?.q, (query) => { search.value = query ?? ''; });
 
 defineOptions({
     layout: {
@@ -27,7 +37,16 @@ defineOptions({
             </div>
             <Link :href="InventoryController.index()" class="text-primary underline">Back to inventory</Link>
         </div>
-        <p v-if="requests.data.length === 0" class="border-border bg-card border p-6 text-sm text-muted-foreground">No stock requests yet.</p>
+        <SearchField
+            id="adjustment-search"
+            v-model="search"
+            class="max-w-xl"
+            label="Search stock requests"
+            placeholder="Product, requester, or reason"
+            :is-searching="isSearching"
+            @clear="clearSearch"
+        />
+        <p v-if="requests.data.length === 0" class="border-border bg-card border p-6 text-sm text-muted-foreground">No stock requests found.</p>
         <article v-for="entry in requests.data" :key="entry.id" class="border-border bg-card space-y-4 border p-5">
             <div class="flex flex-wrap justify-between gap-3">
                 <div>

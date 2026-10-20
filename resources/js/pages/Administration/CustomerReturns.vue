@@ -4,14 +4,23 @@ import CustomerReturnController from '@/actions/App/Http/Controllers/Administrat
 import AdministrationEvidenceController from '@/actions/App/Http/Controllers/Administration/AdministrationEvidenceController';
 import OrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
 import InputError from '@/components/InputError.vue';
+import SearchField from '@/components/SearchField.vue';
+import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { reactive } from 'vue';
+import { reactive, watch } from 'vue';
 
-defineProps({ returns: Object, selected_order: Object, suppliers: Array, refundPayments: Object, evidence: Object, paymentEvidence: Object, selected_case: { type: Number, default: null }, selected_payment: { type: Number, default: null } });
+const props = defineProps({ returns: Object, selected_order: Object, suppliers: Array, refundPayments: Object, evidence: Object, paymentEvidence: Object, selected_case: { type: Number, default: null }, selected_payment: { type: Number, default: null }, filters: Object });
 const page = usePage();
 const decisions = reactive({});
+const { search, isSearching, clearSearch } = useDebouncedSearch({
+    initialSearch: props.filters?.q,
+    currentSearch: () => props.filters?.q,
+    route: CustomerReturnController.index,
+    query: () => ({ case: props.selected_case ?? undefined, payment_id: props.selected_payment ?? undefined }),
+});
+watch(() => props.filters?.q, (query) => { search.value = query ?? ''; });
 defineOptions({ layout: { breadcrumbs: [{ title: 'Customer returns', href: CustomerReturnController.index() }] } });
 </script>
 
@@ -34,6 +43,15 @@ defineOptions({ layout: { breadcrumbs: [{ title: 'Customer returns', href: Custo
             <p v-else class="text-muted-foreground text-sm">Find a completed order to select its purchased items.</p>
         </section>
         <section class="space-y-3" aria-label="Return cases">
+            <SearchField
+                id="return-search"
+                v-model="search"
+                class="max-w-xl"
+                label="Search return cases"
+                placeholder="Product, customer, order ID, or reason"
+                :is-searching="isSearching"
+                @clear="clearSearch"
+            />
             <p v-if="returns.data.length === 0" class="text-muted-foreground text-sm">No customer returns recorded.</p>
             <article v-for="entry in returns.data" :key="entry.id" class="border-border bg-card space-y-3 border p-5">
                 <div class="flex flex-wrap justify-between gap-2"><div><h2 class="font-semibold">{{ entry.product_name }} · {{ entry.quantity }} units</h2><p class="text-muted-foreground text-sm">Order <Link :href="OrderController.show(entry.purchase_order_id)" class="text-primary underline">#{{ entry.purchase_order_id }}</Link> · {{ entry.condition }} · Received by {{ entry.requester_name }}</p><p class="mt-1 text-sm">{{ entry.reason }}</p></div><span class="text-sm capitalize">{{ entry.status.replaceAll('_', ' ') }}</span></div>

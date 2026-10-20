@@ -18,6 +18,7 @@ class CustomerReturnController extends Controller
 {
     public function index(Request $request): Response
     {
+        $filters = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
         $case = $request->validate(['case' => ['nullable', 'integer', 'min:1']])['case'] ?? null;
         $paymentId = $request->validate(['payment_id' => ['nullable', 'integer', 'min:1']])['payment_id'] ?? null;
         if ($paymentId !== null) {
@@ -41,6 +42,15 @@ class CustomerReturnController extends Controller
                 'products.name as product_name', 'orders.id as purchase_order_id', 'refunds.id as refund_id',
                 'refunds.approved_amount', 'refunds.paid_amount')
             ->when($case, fn ($query, $id) => $query->where('returns.id', $id))
+            ->when($filters['q'] ?? null, fn ($query, $search) => $query->where(function ($query) use ($search): void {
+                $query->where('products.name', 'like', '%'.$search.'%')
+                    ->orWhere('users.name', 'like', '%'.$search.'%')
+                    ->orWhere('returns.reason', 'like', '%'.$search.'%');
+
+                if (preg_match('/^(?:BF-)?(\d+)$/i', $search, $matches) === 1) {
+                    $query->orWhere('orders.id', (int) $matches[1]);
+                }
+            }))
             ->orderByDesc('returns.created_at')->paginate(20)->withQueryString();
         $heldBySupplierReturn = DB::table('supplier_returns')->whereIn('customer_return_item_id', DB::table('customer_return_items')
             ->whereIn('customer_return_id', $returns->getCollection()->pluck('id'))->pluck('id'))
@@ -64,6 +74,7 @@ class CustomerReturnController extends Controller
 
         return Inertia::render('Administration/CustomerReturns', [
             'returns' => $returns,
+            'filters' => ['q' => $filters['q'] ?? null],
             'selected_case' => $case,
             'selected_payment' => $paymentId === null ? null : (int) $paymentId,
             'evidence' => DB::table('administration_evidence')->where('subject_type', 'customer_return')

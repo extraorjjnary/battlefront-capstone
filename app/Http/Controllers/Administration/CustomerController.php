@@ -17,13 +17,17 @@ class CustomerController extends Controller
     /**
      * Display the customer account directory.
      */
-    public function index(): Response
+    public function index(Request $request): Response
     {
         $this->authorize('viewAny', User::class);
+        $filters = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
 
         $customers = User::query()
             ->select(['id', 'name', 'email', 'created_at'])
             ->where('role', UserRole::Customer)
+            ->when($filters['q'] ?? null, fn ($query, $search) => $query->where(fn ($query) => $query
+                ->where('name', 'like', '%'.$search.'%')
+                ->orWhere('email', 'like', '%'.$search.'%')))
             ->orderBy('name')
             ->orderBy('id')
             ->paginate(25)
@@ -32,6 +36,7 @@ class CustomerController extends Controller
 
         return Inertia::render('Administration/Customers/Index', [
             'customers' => $customers,
+            'filters' => ['q' => $filters['q'] ?? null],
         ]);
     }
 

@@ -1,12 +1,23 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3';
 import StockReconciliationController from '@/actions/App/Http/Controllers/Administration/StockReconciliationController';
+import SearchField from '@/components/SearchField.vue';
+import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
+import { watch } from 'vue';
 
-defineProps({
+const props = defineProps({
     inventories: { type: Object, required: true },
     selected_product_id: { type: Number, default: null },
     movements: { type: Object, default: null },
+    filters: { type: Object, required: true },
 });
+const { search, isSearching, clearSearch } = useDebouncedSearch({
+    initialSearch: props.filters.q,
+    currentSearch: () => props.filters.q,
+    route: StockReconciliationController.index,
+    query: () => ({ product_id: props.selected_product_id ?? undefined }),
+});
+watch(() => props.filters.q, (query) => { search.value = query ?? ''; });
 
 defineOptions({
     layout: { breadcrumbs: [{ title: 'Stock reconciliation', href: StockReconciliationController.index() }] },
@@ -21,12 +32,21 @@ defineOptions({
             <h1 class="mt-2 text-2xl font-bold">Stock reconciliation</h1>
             <p class="text-muted-foreground mt-2 text-sm">Compare current stock with recorded movement balances and open quarantine cases. Discrepancies require investigation; this view never changes stock.</p>
         </header>
+        <SearchField
+            id="reconciliation-search"
+            v-model="search"
+            class="max-w-xl"
+            label="Search inventory"
+            placeholder="Product name or code"
+            :is-searching="isSearching"
+            @clear="clearSearch"
+        />
         <div class="border-border bg-card overflow-x-auto border">
             <table class="w-full min-w-220 text-left text-sm">
                 <thead class="bg-secondary text-xs uppercase"><tr><th class="p-3">Product</th><th class="p-3">Current sellable</th><th class="p-3">Movement balance</th><th class="p-3">Current held</th><th class="p-3">Movement held</th><th class="p-3">Open cases</th><th class="p-3">Result</th></tr></thead>
                 <tbody>
                     <tr v-for="item in inventories.data" :key="item.product_id" class="border-border border-t">
-                        <td class="p-3"><Link :href="StockReconciliationController.index({ query: { product_id: item.product_id, page: inventories.current_page } })" class="text-primary font-semibold underline">{{ item.name }}</Link><br><span class="text-muted-foreground text-xs">{{ item.product_code }}</span></td>
+                        <td class="p-3"><Link :href="StockReconciliationController.index({ query: { product_id: item.product_id, q: filters.q, page: inventories.current_page } })" class="text-primary font-semibold underline">{{ item.name }}</Link><br><span class="text-muted-foreground text-xs">{{ item.product_code }}</span></td>
                         <td class="p-3 tabular-nums">{{ item.sellable }}</td><td class="p-3 tabular-nums">{{ item.ledger_sellable ?? 'Unknown' }}</td>
                         <td class="p-3 tabular-nums">{{ item.quarantined }}</td><td class="p-3 tabular-nums">{{ item.ledger_quarantined ?? 'Unknown' }}</td><td class="p-3 tabular-nums">{{ item.case_expected }}</td>
                         <td class="p-3" :class="item.status === 'discrepancy' ? 'text-destructive font-semibold' : 'text-muted-foreground'">{{ item.status === 'legacy_unknown' ? 'No movement baseline' : item.status }}</td>

@@ -32,6 +32,12 @@ test('registration creates a customer and returns a 30-day bearer token', functi
         'name' => 'Mobile Customer',
         'email' => 'mobile@example.com',
         'default_delivery_address' => null,
+        'default_delivery_address_prefill' => [
+            'delivery_destination' => '',
+            'delivery_barangay_code' => '',
+            'delivery_address_details' => '',
+        ],
+        'default_delivery_contact_number' => null,
         'search_recommendations_enabled' => true,
         'product_view_recommendations_enabled' => true,
         'personalized_recommendations_enabled' => true,

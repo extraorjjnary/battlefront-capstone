@@ -17,12 +17,17 @@ class InventoryAdjustmentController extends Controller
 {
     public function index(Request $request): Response
     {
+        $filters = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
         $case = $request->validate(['case' => ['nullable', 'integer', 'min:1']])['case'] ?? null;
         $requests = DB::table('inventory_adjustment_requests as requests')
             ->join('products', 'products.id', '=', 'requests.product_id')
             ->join('users', 'users.id', '=', 'requests.requester_id')
             ->select('requests.id', 'requests.requester_id', 'requests.replaces_request_id', 'requests.observed_quantity', 'requests.target_quantity', 'requests.initial_reorder_level', 'requests.reason', 'requests.decision_reason', 'requests.status', 'requests.created_at', 'products.name as product_name', 'users.name as requester_name')
             ->when($case, fn ($query, $id) => $query->where('requests.id', $id))
+            ->when($filters['q'] ?? null, fn ($query, $search) => $query->where(fn ($query) => $query
+                ->where('products.name', 'like', '%'.$search.'%')
+                ->orWhere('users.name', 'like', '%'.$search.'%')
+                ->orWhere('requests.reason', 'like', '%'.$search.'%')))
             ->orderByRaw("CASE WHEN requests.status = 'pending' THEN 0 ELSE 1 END")
             ->orderByDesc('requests.created_at')
             ->paginate(20)->withQueryString();
@@ -35,7 +40,11 @@ class InventoryAdjustmentController extends Controller
             return $entry;
         });
 
-        return Inertia::render('Administration/InventoryAdjustments', ['requests' => $requests, 'selected_case' => $case]);
+        return Inertia::render('Administration/InventoryAdjustments', [
+            'requests' => $requests,
+            'selected_case' => $case,
+            'filters' => ['q' => $filters['q'] ?? null],
+        ]);
     }
 
     public function decide(Request $request, int $adjustment, DecideInventoryAdjustment $decision): RedirectResponse

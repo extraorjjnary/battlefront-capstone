@@ -406,7 +406,6 @@ const topProductsOptions = computed(() => ({
 const categoryOptions = computed(() => ({
     responsive: true,
     maintainAspectRatio: false,
-    indexAxis: 'y',
     onClick(_event, elements) {
         if (elements.length === 0 || isUpdatingReport.value) {
             return;
@@ -434,20 +433,6 @@ const categoryOptions = computed(() => ({
                 label: (context) =>
                     `${context.label}: ${formatCurrency(context.raw)}`,
             },
-        },
-    },
-    scales: {
-        x: {
-            beginAtZero: true,
-            ticks: {
-                color: chartTextColor.value,
-                callback: (value) => formatCurrency(value),
-            },
-            grid: { color: chartBorderColor.value },
-        },
-        y: {
-            ticks: { color: chartTextColor.value },
-            grid: { display: false },
         },
     },
 }));
@@ -987,7 +972,6 @@ defineOptions({
                         </Bar>
                     </div>
                 </section>
-
                 <section
                     class="border-border bg-card min-w-0 border p-5"
                     aria-labelledby="category-sales-heading"

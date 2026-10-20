@@ -14,6 +14,7 @@ class StockReconciliationController extends Controller
     public function index(Request $request, StockReconciliationReport $report): Response
     {
         $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
             'product_id' => ['nullable', 'integer', Rule::exists('products', 'id')],
             'page' => ['nullable', 'integer', 'min:1'],
             'movement_page' => ['nullable', 'integer', 'min:1'],
@@ -22,6 +23,7 @@ class StockReconciliationController extends Controller
         return Inertia::render('Administration/Reports/StockReconciliation', $report->page(
             isset($filters['product_id']) ? (int) $filters['product_id'] : null,
             $request->user(),
+            $filters['q'] ?? null,
         ));
     }
 }

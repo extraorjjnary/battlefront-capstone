@@ -1,10 +1,12 @@
 <script setup>
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import AuditLogController from '@/actions/App/Http/Controllers/Administration/AuditLogController';
+import SearchField from '@/components/SearchField.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
 import { formatDateTime } from '@/lib/dateTime';
 
 const props = defineProps({
@@ -15,6 +17,21 @@ const props = defineProps({
     subjectTypes: { type: Array, required: true },
 });
 const page = usePage();
+const { search, isSearching, clearSearch, cancelPendingSearch } = useDebouncedSearch({
+    initialSearch: props.filters.q,
+    currentSearch: () => props.filters.q,
+    route: AuditLogController.index,
+    query: () => ({
+        action: props.filters.action ?? undefined,
+        actor_id: props.filters.actor_id ?? undefined,
+        actor_type: props.filters.actor_type ?? undefined,
+        subject_type: props.filters.subject_type ?? undefined,
+        subject_id: props.filters.subject_id ?? undefined,
+        from: props.filters.from ?? undefined,
+        to: props.filters.to ?? undefined,
+    }),
+});
+watch(() => props.filters.q, (query) => { search.value = query ?? ''; });
 const action = ref(props.filters.action ?? '');
 const actorId = ref(String(props.filters.actor_id ?? ''));
 const actorType = ref(props.filters.actor_type ?? '');
@@ -23,7 +40,9 @@ const subjectId = ref(props.filters.subject_id ?? '');
 const from = ref(props.filters.from ?? '');
 const to = ref(props.filters.to ?? '');
 function applyFilters() {
+    cancelPendingSearch();
     router.get(AuditLogController.index(), {
+        q: search.value.trim() || undefined,
         action: action.value || undefined,
         actor_id: actorId.value || undefined,
         actor_type: actorType.value || undefined,
@@ -72,6 +91,15 @@ defineOptions({
                 class="border-border bg-card grid gap-4 border p-5 sm:grid-cols-2 lg:grid-cols-3"
                 @submit.prevent="applyFilters"
             >
+                <SearchField
+                    id="audit-search"
+                    v-model="search"
+                    class="sm:col-span-2 lg:col-span-3"
+                    label="Search audit entries"
+                    placeholder="Actor, action, record type, reason, or changes"
+                    :is-searching="isSearching"
+                    @clear="clearSearch"
+                />
                 <div class="space-y-1">
                     <Label for="audit-from">From</Label
                     ><Input id="audit-from" v-model="from" type="date" />

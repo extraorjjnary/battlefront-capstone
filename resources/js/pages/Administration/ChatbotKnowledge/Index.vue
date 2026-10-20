@@ -8,13 +8,15 @@ import {
     Plus,
     RotateCcw,
 } from '@lucide/vue';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import ChatbotKnowledgeActivationController from '@/actions/App/Http/Controllers/Administration/ChatbotKnowledgeActivationController';
 import ChatbotKnowledgeController from '@/actions/App/Http/Controllers/Administration/ChatbotKnowledgeController';
 import ChatbotKnowledgePreviewController from '@/actions/App/Http/Controllers/Administration/ChatbotKnowledgePreviewController';
 import CatalogPagination from '@/components/CatalogPagination.vue';
 import DeactivationDialog from '@/components/DeactivationDialog.vue';
 import InputError from '@/components/InputError.vue';
+import SearchField from '@/components/SearchField.vue';
+import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -26,8 +28,9 @@ import {
     CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 
-defineProps({
+const props = defineProps({
     knowledge: { type: Object, required: true },
+    filters: { type: Object, required: true },
 });
 
 const previewOpen = ref(false);
@@ -35,6 +38,12 @@ const preview = useHttp({ message: '' });
 const previewResult = ref(null);
 const previewError = ref('');
 const testedQuestion = ref('');
+const { search, isSearching, clearSearch } = useDebouncedSearch({
+    initialSearch: props.filters.q,
+    currentSearch: () => props.filters.q,
+    route: ChatbotKnowledgeController.index,
+});
+watch(() => props.filters.q, (query) => { search.value = query ?? ''; });
 const categoryLabels = {
     faq: 'FAQ',
     product: 'Product',
@@ -116,6 +125,16 @@ defineOptions({
                     </Link>
                 </Button>
             </div>
+
+            <SearchField
+                id="knowledge-search"
+                v-model="search"
+                class="mt-5 max-w-xl"
+                label="Search FAQs"
+                placeholder="Question or response"
+                :is-searching="isSearching"
+                @clear="clearSearch"
+            />
         </section>
 
         <Collapsible

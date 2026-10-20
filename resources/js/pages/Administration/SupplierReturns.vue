@@ -2,19 +2,30 @@
 import { Form, Head, Link, usePage } from '@inertiajs/vue3';
 import SupplierReturnController from '@/actions/App/Http/Controllers/Administration/SupplierReturnController';
 import SupplierController from '@/actions/App/Http/Controllers/Administration/SupplierController';
+import SearchField from '@/components/SearchField.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import InputError from '@/components/InputError.vue';
 import SearchableProductSelect from '@/components/administration/SearchableProductSelect.vue';
 import { Label } from '@/components/ui/label';
+import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
+import { watch } from 'vue';
 
-defineProps({
+const props = defineProps({
     returns: Object,
     products: Array,
     suppliers: Array,
     selected_case: { type: Number, default: null },
+    filters: Object,
 });
 const page = usePage();
+const { search, isSearching, clearSearch } = useDebouncedSearch({
+    initialSearch: props.filters?.q,
+    currentSearch: () => props.filters?.q,
+    route: SupplierReturnController.index,
+    query: () => ({ case: props.selected_case ?? undefined }),
+});
+watch(() => props.filters?.q, (query) => { search.value = query ?? ''; });
 defineOptions({
     layout: {
         breadcrumbs: [
@@ -112,6 +123,15 @@ defineOptions({
             >
         </Form>
         <section class="space-y-3" aria-label="Supplier return cases">
+            <SearchField
+                id="supplier-return-search"
+                v-model="search"
+                class="mb-3 max-w-xl"
+                label="Search supplier returns"
+                placeholder="Product, supplier, requester, reason, or reference"
+                :is-searching="isSearching"
+                @clear="clearSearch"
+            />
             <p
                 v-if="returns.data.length === 0"
                 class="text-muted-foreground text-sm"

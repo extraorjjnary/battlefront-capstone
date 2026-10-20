@@ -95,6 +95,25 @@ test('chatbot knowledge is paginated without assigning meaning to priority', fun
         ->where('knowledge.last_page', 2));
 });
 
+test('administrators can search chatbot questions and response text', function () {
+    $administrator = User::factory()->administrator()->create();
+    ChatbotKnowledge::factory()->create([
+        'question_pattern' => 'How do I find a graphics card?',
+        'response_template' => 'Use the product catalog.',
+    ]);
+    ChatbotKnowledge::factory()->create([
+        'question_pattern' => 'Where is the store?',
+        'response_template' => 'Visit the Sagay branch.',
+    ]);
+
+    $this->actingAs($administrator)
+        ->get(route('administration.chatbot-knowledge.index', ['q' => 'catalog']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.q', 'catalog')
+            ->where('knowledge.total', 1)
+            ->where('knowledge.data.0.question_pattern', 'How do I find a graphics card?'));
+});
+
 test('administrators can open create view and edit pages', function () {
     $administrator = User::factory()->administrator()->create();
     $knowledge = ChatbotKnowledge::factory()->inactive()->create([

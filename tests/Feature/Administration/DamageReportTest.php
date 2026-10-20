@@ -3,6 +3,7 @@
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('reported damage immediately quarantines stock and another person decides its disposition', function () {
@@ -48,4 +49,24 @@ test('damage cannot quarantine more than sellable quantity', function () {
 
     expect($product->inventory->fresh()->quantity)->toBe($quantity);
     expect(DB::table('damage_reports')->where('product_id', $product->id)->count())->toBe(0);
+});
+
+test('damage reports can be searched by product, requester, or reason', function () {
+    $administrator = User::factory()->administrator()->create();
+    $product = Product::factory()->create(['name' => 'Search damage product']);
+    $reportId = DB::table('damage_reports')->insertGetId([
+        'product_id' => $product->id,
+        'requester_id' => $administrator->id,
+        'quantity' => 1,
+        'status' => 'pending',
+        'reason' => 'Search damage reason',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $this->actingAs($administrator)->get(route('administration.damage-reports.index', ['q' => 'Search damage product']))
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('filters.q', 'Search damage product')
+            ->where('reports.total', 1)
+            ->where('reports.data.0.id', $reportId));
 });

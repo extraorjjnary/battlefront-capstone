@@ -8,11 +8,14 @@ use Illuminate\Support\Facades\DB;
 class StockReconciliationReport
 {
     /** @return array<string, mixed> */
-    public function page(?int $productId, User $actor): array
+    public function page(?int $productId, User $actor, ?string $search = null): array
     {
         $inventories = DB::table('inventories')
             ->join('products', 'products.id', '=', 'inventories.product_id')
             ->whereNull('products.deleted_at')
+            ->when($search, fn ($query, $search) => $query->where(fn ($query) => $query
+                ->where('products.name', 'like', '%'.$search.'%')
+                ->orWhere('products.product_code', 'like', '%'.$search.'%')))
             ->select('inventories.product_id', 'inventories.quantity', 'inventories.quarantined_quantity', 'products.name', 'products.product_code')
             ->orderBy('products.name')->orderBy('products.id')
             ->paginate(20)->withQueryString();
@@ -94,7 +97,12 @@ class StockReconciliationReport
                 'quarantined_after' => $movement->quarantined_after,
             ]);
 
-        return ['inventories' => $inventories, 'selected_product_id' => $productId, 'movements' => $movements];
+        return [
+            'inventories' => $inventories,
+            'selected_product_id' => $productId,
+            'movements' => $movements,
+            'filters' => ['q' => $search],
+        ];
     }
 
     private function sourceLink(?string $type, ?int $id, User $actor): ?string

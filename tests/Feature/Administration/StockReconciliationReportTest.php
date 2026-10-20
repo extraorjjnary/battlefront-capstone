@@ -42,6 +42,18 @@ test('customers cannot inspect stock movement history', function () {
         ->get(route('administration.reports.stock-reconciliation'))->assertForbidden();
 });
 
+test('stock reconciliation can search by product name or product code', function () {
+    $owner = User::factory()->administrator()->create();
+    $match = Product::factory()->available()->create(['name' => 'Radeon Search Target', 'product_code' => 'GPU-SEARCH-1']);
+    Product::factory()->available()->create(['name' => 'Other product', 'product_code' => 'OTHER-1']);
+
+    $this->actingAs($owner)->get(route('administration.reports.stock-reconciliation', ['q' => 'GPU-SEARCH-1']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.q', 'GPU-SEARCH-1')
+            ->where('inventories.total', 1)
+            ->where('inventories.data.0.product_id', $match->id));
+});
+
 test('linked supplier return owns held stock after a damage decision without double counting', function () {
     $owner = User::factory()->administrator()->create();
     $product = Product::factory()->available()->create();

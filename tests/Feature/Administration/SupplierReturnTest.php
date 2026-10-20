@@ -3,6 +3,32 @@
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia as Assert;
+
+test('supplier returns can be searched by product, supplier, requester, reason, or reference', function () {
+    $administrator = User::factory()->administrator()->create();
+    $product = Product::factory()->create(['name' => 'Search supplier return product']);
+    $supplierId = DB::table('suppliers')->insertGetId([
+        'name' => 'Search supplier', 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $returnId = DB::table('supplier_returns')->insertGetId([
+        'supplier_id' => $supplierId,
+        'product_id' => $product->id,
+        'requester_id' => $administrator->id,
+        'quantity' => 1,
+        'status' => 'pending',
+        'external_reference' => 'SEARCH-REF',
+        'reason' => 'Search supplier return reason',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    $this->actingAs($administrator)->get(route('administration.supplier-returns.index', ['q' => 'SEARCH-REF']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.q', 'SEARCH-REF')
+            ->where('returns.total', 1)
+            ->where('returns.data.0.id', $returnId));
+});
 
 test('supplier return reserves stock, requires another reviewer, and dispatches once', function () {
     $requester = User::factory()->administrator()->create();

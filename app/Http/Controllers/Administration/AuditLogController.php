@@ -78,6 +78,7 @@ class AuditLogController extends Controller
     private function filters(Request $request): array
     {
         return $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
             'action' => ['nullable', 'string', 'max:100'],
             'actor_id' => ['nullable', 'integer', 'min:1'],
             'actor_type' => ['nullable', 'string', 'in:customer,administrator,system'],
@@ -97,6 +98,12 @@ class AuditLogController extends Controller
             ->leftJoin('users', 'users.id', '=', 'audit_logs.actor_id')
             ->select('audit_logs.*', 'users.name as actor_name')
             ->addSelect(DB::raw("CASE WHEN audit_logs.actor_id IS NULL OR users.id IS NULL THEN 'system' WHEN users.role = 'administrator' THEN 'administrator' ELSE 'customer' END as actor_type"))
+            ->when($filters['q'] ?? null, fn ($query, $search) => $query->where(fn (Builder $query) => $query
+                ->where('users.name', 'like', '%'.$search.'%')
+                ->orWhere('audit_logs.action', 'like', '%'.$search.'%')
+                ->orWhere('audit_logs.subject_type', 'like', '%'.$search.'%')
+                ->orWhere('audit_logs.reason', 'like', '%'.$search.'%')
+                ->orWhere('audit_logs.changes', 'like', '%'.$search.'%')))
             ->when($filters['action'] ?? null, fn ($query, $action) => $query->where('audit_logs.action', $action))
             ->when($filters['actor_id'] ?? null, fn ($query, $actor) => $query->where('audit_logs.actor_id', $actor))
             ->when($filters['actor_type'] ?? null, fn ($query, $type) => match ($type) {
