@@ -127,7 +127,7 @@ async function submitMessage() {
             :class="
                 isOpen
                     ? 'inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] flex justify-end sm:inset-x-auto sm:w-96'
-                    : 'inset-x-0 bottom-0 flex h-(--mobile-support-height) items-center justify-end border-t border-border bg-card px-4 pb-[env(safe-area-inset-bottom)] sm:inset-x-auto sm:h-auto sm:border-0 sm:bg-transparent sm:p-0'
+                    : 'pointer-events-none inset-x-0 bottom-0 flex h-(--mobile-support-height) items-center justify-end px-4 pb-[env(safe-area-inset-bottom)] sm:inset-x-auto sm:h-auto sm:p-0'
             "
         >
             <Button
@@ -135,13 +135,13 @@ async function submitMessage() {
                 ref="launcher"
                 type="button"
                 size="lg"
-                class="min-h-12 rounded-full px-5 shadow-card"
+                class="pointer-events-auto size-12 min-h-12 rounded-full p-0 shadow-card sm:w-auto sm:px-5"
                 aria-controls="battlefront-chat-panel"
                 aria-expanded="false"
                 @click="openPanel"
             >
                 <MessageSquareText class="size-5" aria-hidden="true" />
-                Ask Battlefront
+                <span class="sr-only sm:not-sr-only">Ask Battlefront</span>
             </Button>
 
             <section

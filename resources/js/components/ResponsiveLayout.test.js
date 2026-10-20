@@ -251,6 +251,333 @@ async function assertFits(browser, label) {
     assert.deepEqual(clipped, [], `${label}: content must fit the viewport even when the shell clips overflow`);
 }
 
+test('website branding stays transparent and fits public and authenticated layouts in both themes', {
+    skip: !baseUrl || !executable ? 'Set the local app and browser environment variables' : false,
+    timeout: 120000,
+}, async t => {
+    const browser = await openBrowser(t);
+    const manifest = JSON.parse(await readFile(new URL('../../../public/build/manifest.json', import.meta.url), 'utf8'));
+    const assets = Object.fromEntries(['logo', 'logo-dark', 'symbol'].map(name => [name, `/build/${manifest[`docs/assets/battlefront-${name}.webp`].file}`]));
+    const alpha = await browser.evaluate(`(async () => {
+        const pixels = {};
+        const details = {};
+        for (const [name, url] of Object.entries(${JSON.stringify(assets)})) {
+            const image = new Image();
+            image.src = url;
+            await image.decode();
+            const canvas = document.createElement('canvas');
+            canvas.width = image.naturalWidth;
+            canvas.height = image.naturalHeight;
+            const context = canvas.getContext('2d');
+            context.drawImage(image, 0, 0);
+            const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+            let transparent = 0;
+            let internalWhite = 0;
+            for (let i = 0; i < data.length; i += 4) {
+                if (data[i + 3] === 0) transparent++;
+                const x = (i / 4) % canvas.width;
+                if (x < 300 && data[i] > 230 && data[i + 1] > 230 && data[i + 2] > 230 && data[i + 3] > 250) internalWhite++;
+            }
+            pixels[name] = data;
+            details[name] = { dimensions: [canvas.width, canvas.height], corners: [data[3], data[canvas.width * 4 - 1], data[data.length - 1]], transparent, internalWhite };
+        }
+        let alphaChanges = 0;
+        let monogramChanges = 0;
+        for (let i = 0; i < pixels.logo.length; i += 4) {
+            if (pixels.logo[i + 3] !== pixels['logo-dark'][i + 3]) alphaChanges++;
+            if ((i / 4) % 1200 < 300 && pixels.logo[i + 3] > 0 && [0, 1, 2].some(channel => pixels.logo[i + channel] !== pixels['logo-dark'][i + channel])) monogramChanges++;
+        }
+        return { details, alphaChanges, monogramChanges };
+    })()`);
+    for (const [name, details] of Object.entries(alpha.details)) {
+        assert.deepEqual(details.dimensions, name === 'symbol' ? [512, 512] : [1200, 303]);
+        assert.deepEqual(details.corners, [0, 0, 0], `${name}: no opaque background rectangle`);
+        assert.ok(details.transparent > 10000, `${name}: retain genuine transparency`);
+        assert.ok(details.internalWhite > 1000, `${name}: keep the white artwork inside the monogram`);
+    }
+    assert.equal(alpha.alphaChanges, 0, 'Theme variants must preserve identical lettering geometry');
+    assert.equal(alpha.monogramChanges, 0, 'The dark wordmark must leave the BCT artwork unchanged');
+
+    const readBrands = () => browser.evaluate(`(async () => {
+        const images = [...document.querySelectorAll('img[alt="Battlefront Computer Trading"]')].filter(image => image.getBoundingClientRect().width && image.getBoundingClientRect().height);
+        await Promise.all(images.map(image => image.decode()));
+        return images.map(image => ({ src: image.currentSrc, natural: [image.naturalWidth, image.naturalHeight], rect: image.getBoundingClientRect().toJSON(), parent: image.parentElement.getBoundingClientRect().toJSON(), fit: getComputedStyle(image).objectFit, background: getComputedStyle(image).backgroundColor }));
+    })()`);
+    const assertBrands = async (theme, width, expected, label) => {
+        const brands = await readBrands();
+        assert.ok(brands.length > 0, `${label}: show the branding`);
+        assert.ok(brands.some(brand => brand.src.includes(`/battlefront-${expected}-`)), `${label}: use the appropriate brand asset`);
+        for (const brand of brands) {
+            const symbol = brand.src.includes('/battlefront-symbol-');
+            assert.deepEqual(brand.natural, symbol ? [512, 512] : [1200, 303], label);
+            if (!symbol) assert.equal(brand.src.includes('/battlefront-logo-dark-'), theme === 'dark', label);
+            assert.equal(brand.fit, 'contain', label);
+            assert.equal(brand.background, 'rgba(0, 0, 0, 0)', label);
+            assert.ok(brand.rect.left >= -1 && brand.rect.right <= width + 1, `${label}: logos fit the viewport`);
+            assert.ok(brand.rect.height <= brand.parent.height + 1, `${label}: logos fit their existing container (${JSON.stringify(brand)})`);
+            assert.ok(Math.abs(brand.rect.height - brand.rect.width * (symbol ? 1 : 303 / 1200)) < 1, `${label}: preserve logo proportions`);
+        }
+        return brands;
+    };
+    const preview = async (name, theme, width) => {
+        if (!process.env.BATTLEFRONT_UI_PREVIEW || ![375, 1440].includes(width)) return;
+        const screenshot = await browser.command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+        await writeFile(`${process.env.BATTLEFRONT_UI_PREVIEW}-${name}-${theme}-${width}.png`, Buffer.from(screenshot.data, 'base64'));
+    };
+
+    for (const theme of ['light', 'dark']) {
+        for (const width of [320, 375, 768, 1440]) {
+            await browser.resize(width);
+            await browser.show('Welcome', {}, false, theme);
+            const label = `${theme} ${width}px storefront`;
+            const brands = await assertBrands(theme, width, width < 640 ? 'symbol' : theme === 'dark' ? 'logo-dark' : 'logo', label);
+            assert.equal(brands.filter(brand => !brand.src.includes('/battlefront-symbol-')).length, width < 640 ? 1 : 2, `${label}: retain footer and desktop header wordmarks`);
+            await assertFits(browser, label);
+            await preview('storefront', theme, width);
+            await browser.evaluate('window.scrollTo(0, document.documentElement.scrollHeight)');
+            await preview('footer', theme, width);
+            if (width === 1440) {
+                const before = await browser.evaluate('document.querySelector("header").getBoundingClientRect().height');
+                await browser.evaluate('document.querySelector("header [role=switch]").click()');
+                await browser.evaluate('new Promise(requestAnimationFrame)');
+                const next = theme === 'dark' ? 'light' : 'dark';
+                await assertBrands(next, width, next === 'dark' ? 'logo-dark' : 'logo', 'switching theme updates both wordmarks');
+                assert.equal(await browser.evaluate('document.querySelector("header").getBoundingClientRect().height'), before);
+            }
+        }
+        await browser.resize(375);
+        await browser.show('auth/Login', { canResetPassword: true }, false, theme);
+        await assertBrands(theme, 375, 'symbol', `${theme} sign-in branding`);
+        await preview('signin', theme, 375);
+
+        for (const role of [true, 'admin']) {
+            const component = role === 'admin' ? 'Dashboard/Administration' : 'Dashboard/Customer';
+            const dashboard = role === 'admin'
+                ? { kpis: { recorded_revenue: '0', recorded_sales: 0, pending_orders: 0, processing_orders: 0, low_stock_products: 0, out_of_stock_products: 0 }, needs_attention: { pending_payment_reviews: 0, payment_orders: [], low_stock_products: [], out_of_stock_products: [] }, recent_orders: [] }
+                : { summary: { cart_items: 0, cart_units: 0, active_orders: 0, total_orders: 0 }, latest_order: null };
+            for (const width of [375, 768, 1440]) {
+                await browser.resize(width);
+                await browser.show(component, { dashboard, sidebarOpen: true, recommendations: [] }, role, theme);
+                if (width < 768) {
+                    await browser.evaluate('document.querySelector("[data-sidebar=trigger]").click()');
+                    await delay(350);
+                }
+                await assertBrands(theme, width, theme === 'dark' ? 'logo-dark' : 'logo', `${theme} ${width}px ${component}`);
+                await preview(role === 'admin' ? 'admin' : 'customer', theme, width);
+                if (width >= 768) {
+                    await browser.evaluate('document.querySelector("[data-sidebar=trigger]").click()');
+                    await delay(350);
+                    await assertBrands(theme, width, 'symbol', `${theme} ${width}px collapsed sidebar`);
+                }
+            }
+        }
+    }
+    assert.deepEqual(browser.exceptions, []);
+});
+
+test('landing hero artwork skips mobile downloads and preserves the tablet and desktop layout in both themes', {
+    skip: !baseUrl || !executable ? 'Set the local app and browser environment variables' : false,
+    timeout: 120000,
+}, async t => {
+    const browser = await openBrowser(t);
+    const imagePath = '/images/hero/battlefront-mouse-finger.webp';
+    const heroWidths = [...widths, 639, 640, 1280, 1920, 2560].sort((a, b) => a - b);
+    const asset = await fetch(new URL(imagePath, baseUrl));
+    assert.equal(asset.status, 200);
+    assert.match(asset.headers.get('content-type'), /image\/webp/);
+    assert.ok((await asset.arrayBuffer()).byteLength < 300000, 'Keep the hero artwork lightweight');
+
+    const readLayout = `(() => {
+        const heading = document.getElementById('hero-heading');
+        const hero = heading.closest('section');
+        const image = hero.querySelector('img');
+        const css = getComputedStyle(image);
+        return {
+            image: image.getBoundingClientRect().toJSON(),
+            copy: heading.parentElement.getBoundingClientRect().toJSON(),
+            hero: hero.getBoundingClientRect().toJSON(),
+            next: hero.nextElementSibling.getBoundingClientRect().top,
+            natural: [image.naturalWidth, image.naturalHeight],
+            source: image.currentSrc,
+            artworkDownloads: performance.getEntriesByType('resource').filter(entry => entry.name.endsWith('/images/hero/battlefront-mouse-finger.webp')).length,
+            alt: image.alt,
+            fit: css.objectFit,
+            mask: css.maskImage,
+            background: css.backgroundColor,
+            pageBackground: getComputedStyle(document.body).backgroundColor,
+            dark: document.documentElement.classList.contains('dark'),
+            links: [...hero.querySelectorAll('a')].map(link => ({ text: link.textContent.trim(), path: new URL(link.href).pathname })),
+            oldCard: /Build station|Start with the essentials/.test(hero.textContent),
+            overflow: document.documentElement.scrollWidth > innerWidth,
+        };
+    })()`;
+
+    await browser.resize(768);
+    await browser.command('Network.setCacheDisabled', { cacheDisabled: true });
+    await browser.command('Network.setBlockedURLs', { urls: [`*${imagePath}`] });
+    await browser.show('Welcome', {}, false);
+    const unloaded = await browser.evaluate(readLayout);
+    assert.deepEqual(unloaded.natural, [0, 0]);
+    assert.ok(unloaded.image.height > 0, 'Reserve artwork space before it loads');
+    await browser.command('Network.setBlockedURLs', { urls: [] });
+    await browser.evaluate(`(async () => {
+        const image = document.querySelector('main section img');
+        image.src = image.src;
+        await image.decode();
+    })()`);
+    const loaded = await browser.evaluate(readLayout);
+    assert.equal(loaded.image.height, unloaded.image.height);
+    assert.equal(loaded.next, unloaded.next, 'Image loading must not shift the following content');
+
+    for (const theme of ['light', 'dark']) {
+        for (const customer of [false, true]) {
+            for (const width of heroWidths) {
+                const label = `${theme} ${customer ? 'customer' : 'guest'} ${width}px hero`;
+                await browser.resize(width);
+                await browser.show('Welcome', {}, customer, theme);
+                await browser.evaluate(`document.querySelector('main section img').decode()`);
+                const layout = await browser.evaluate(readLayout);
+
+                assert.ok(layout.alt.includes('mouse') && layout.alt.includes('finger'), label);
+                assert.equal(layout.fit, 'contain', label);
+                assert.equal(layout.background, 'rgba(0, 0, 0, 0)', label);
+                assert.equal(layout.dark, theme === 'dark', label);
+                assert.equal(layout.pageBackground, theme === 'dark' ? 'rgb(9, 11, 16)' : 'rgb(250, 247, 244)', label);
+                assert.equal(layout.oldCard, false, label);
+                assert.equal(layout.overflow, false, label);
+                assert.deepEqual(layout.links, [
+                    { text: customer ? 'Go to dashboard' : 'Create an account', path: customer ? '/dashboard' : '/register' },
+                    { text: 'Find a branch', path: '/branches' },
+                ], label);
+                if (width < 640) {
+                    assert.equal(layout.image.width, 0, `${label}: hide the artwork`);
+                    assert.equal(layout.image.height, 0, `${label}: reserve no artwork space`);
+                    assert.ok(layout.source.startsWith('data:'), `${label}: use a network-free mobile fallback`);
+                    assert.equal(layout.artworkDownloads, 0, `${label}: do not download the hero WebP`);
+                    assert.ok(layout.hero.height <= layout.copy.height + 50, `${label}: keep mobile hero padding compact`);
+                    assert.ok(Math.abs(layout.next - layout.hero.bottom) < 1, `${label}: following content flows directly after the hero`);
+                } else {
+                    assert.deepEqual(layout.natural, [1597, 985], label);
+                    assert.ok(layout.image.width > 0 && layout.image.height > 0, `${label}: artwork remains visible`);
+                    assert.ok(Math.abs(layout.image.height - layout.image.width * 985 / 1597) < 1, `${label}: preserve image proportions`);
+                    assert.ok(layout.image.left >= layout.hero.left, label);
+                    assert.ok(layout.image.right <= layout.hero.right, `${label}: keep the compact artwork within the hero`);
+                    assert.notEqual(layout.mask, 'none', `${label}: soften the hand's source edge with transparency`);
+                    const mouse = {
+                        left: layout.image.left + layout.image.width * 80 / 1597,
+                        right: layout.image.left + layout.image.width * 1255 / 1597,
+                        top: layout.image.top + layout.image.height * 610 / 985,
+                        bottom: layout.image.top + layout.image.height * 952 / 985,
+                    };
+                    const fingerTip = {
+                        x: layout.image.left + layout.image.width * 670 / 1597,
+                        y: layout.image.top + layout.image.height * 550 / 985,
+                    };
+                    assert.ok(mouse.left >= layout.hero.left && mouse.right <= layout.hero.right && mouse.top >= layout.hero.top && mouse.bottom <= layout.hero.bottom, `${label}: retain the complete mouse`);
+                    assert.ok(fingerTip.x >= layout.hero.left && fingerTip.x <= layout.hero.right && fingerTip.y >= layout.hero.top && fingerTip.y <= layout.hero.bottom, `${label}: retain the hovering fingertip`);
+                    assert.ok(layout.image.top >= layout.hero.top && layout.image.bottom <= layout.hero.bottom, label);
+                    if (width < 1024) {
+                        assert.ok(layout.image.top >= layout.copy.bottom, `${label}: artwork follows the CTAs`);
+                        assert.ok(layout.image.top - layout.copy.bottom <= 40, `${label}: keep the artwork close to the CTAs`);
+                        assert.ok(layout.image.width <= 416, `${label}: keep the stacked artwork compact`);
+                    } else {
+                        assert.ok(layout.image.left >= layout.copy.right, `${label}: artwork sits beside the copy`);
+                        assert.ok(layout.image.width <= 576, `${label}: cap the artwork on wide screens`);
+                        assert.ok(layout.image.height <= layout.copy.height, `${label}: artwork must not increase the compact hero height`);
+                        assert.ok(layout.hero.height <= layout.copy.height + 130, `${label}: retain the previous section spacing`);
+                        assert.ok(Math.abs(layout.image.top + layout.image.height / 2 - layout.copy.top - layout.copy.height / 2) < 1, `${label}: center the artwork vertically`);
+                    }
+                }
+                await assertFits(browser, label);
+
+                if (!customer && [375, 768, 1440, 1920, 2560].includes(width) && process.env.BATTLEFRONT_UI_PREVIEW) {
+                    const screenshot = await browser.command('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+                    await writeFile(`${process.env.BATTLEFRONT_UI_PREVIEW}-hero-${theme}-${width}.png`, Buffer.from(screenshot.data, 'base64'));
+                }
+            }
+        }
+    }
+    assert.deepEqual(browser.exceptions, []);
+});
+
+test('landing footer keeps verified Sagay contacts and shopping links clear of customer support', {
+    skip: !baseUrl || !executable ? 'Set the local app and browser environment variables' : false,
+    timeout: 90000,
+}, async t => {
+    const browser = await openBrowser(t);
+
+    for (const theme of ['light', 'dark']) {
+        for (const width of widths) {
+            const label = `${theme} ${width}px landing footer`;
+            await browser.resize(width);
+            await browser.show('Welcome', {}, false, theme);
+            await browser.evaluate(`(async () => {
+                await Promise.all([...document.images].map(image => image.decode()));
+                window.scrollTo(0, document.documentElement.scrollHeight);
+                await new Promise(requestAnimationFrame);
+            })()`);
+            const footer = await browser.evaluate(`(() => {
+                const footer = document.querySelector('footer');
+                const links = [...footer.querySelectorAll('a')];
+                return {
+                    links: links.map(link => ({ text: link.textContent.trim(), href: link.getAttribute('href'), target: link.target, rel: link.rel })),
+                    obstructed: links.filter(link => {
+                        const rect = link.getBoundingClientRect();
+                        const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+                        return hit?.closest('a') !== link;
+                    }).map(link => link.textContent.trim()),
+                    sections: [...footer.firstElementChild.children].map(section => section.getBoundingClientRect().toJSON()),
+                    logo: footer.querySelector('img')?.alt,
+                    socialHeading: footer.querySelector('#footer-social-heading')?.textContent.trim(),
+                    features: [...document.querySelectorAll('[aria-labelledby=shopping-heading] article h3')].map(heading => heading.textContent.trim()),
+                    chatCount: document.querySelectorAll('[data-customer-chat]').length,
+                    footerControls: footer.querySelectorAll('button, form, input').length,
+                    overflow: document.documentElement.scrollWidth > innerWidth,
+                    branchLinks: document.querySelectorAll('[aria-labelledby=branch-heading] a').length,
+                };
+            })()`);
+
+            assert.deepEqual(footer.links, [
+                { text: 'Shop Products', href: '/products', target: '', rel: '' },
+                { text: 'Our Stores', href: '/branches', target: '', rel: '' },
+                { text: 'battlefrontcomputertrading@gmail.com', href: 'mailto:battlefrontcomputertrading@gmail.com', target: '', rel: '' },
+                { text: '0938 647 6046', href: 'tel:09386476046', target: '', rel: '' },
+                { text: 'Facebook', href: 'https://www.facebook.com/BattlefrontComputer', target: '_blank', rel: 'noopener noreferrer' },
+                { text: 'TikTok', href: 'https://www.tiktok.com/@ralphpgonzaga', target: '_blank', rel: 'noopener noreferrer' },
+            ], label);
+            assert.equal(footer.logo, 'Battlefront Computer Trading', label);
+            assert.equal(footer.socialHeading, 'Follow our Sagay branch', label);
+            assert.deepEqual(footer.features, ['Find the right hardware', 'Choose with confidence', 'Keep track of your order'], label);
+            assert.equal(footer.chatCount, 1, label);
+            assert.equal(footer.footerControls, 0, label);
+            assert.equal(footer.branchLinks, 1, label);
+            assert.equal(footer.overflow, false, label);
+            assert.deepEqual(footer.obstructed, [], `${label}: every footer link remains visible and clickable`);
+            if (width >= 1024) {
+                assert.ok(footer.sections.every(section => Math.abs(section.top - footer.sections[0].top) < 1), `${label}: use compact desktop columns`);
+            } else if (width < 640) {
+                assert.ok(footer.sections[1].top >= footer.sections[0].bottom && footer.sections[2].top >= footer.sections[1].bottom, `${label}: stack mobile sections`);
+            }
+            assert.deepEqual(await browser.evaluate(`(() => {
+                const links = [...document.querySelectorAll('footer a')];
+                return links.map(link => {
+                    link.focus({ preventScroll: true });
+                    return document.activeElement === link;
+                });
+            })()`), Array(6).fill(true), `${label}: footer links accept keyboard focus`);
+            await assertFits(browser, label);
+
+            if ([375, 1440].includes(width) && process.env.BATTLEFRONT_UI_PREVIEW) {
+                const screenshot = await browser.command('Page.captureScreenshot', {
+                    format: 'png', captureBeyondViewport: false,
+                });
+                await writeFile(`${process.env.BATTLEFRONT_UI_PREVIEW}-footer-${theme}-${width}.png`, Buffer.from(screenshot.data, 'base64'));
+            }
+        }
+    }
+    assert.deepEqual(browser.exceptions, []);
+});
+
 test('compact catalog filters support keyboard disclosure and clear individual selections on mobile', {
     skip: !baseUrl || !executable ? 'Set the local app and browser environment variables' : false,
     timeout: 90000,
@@ -1310,9 +1637,13 @@ test(
                     const element = document.querySelector('[data-customer-chat]');
                     const rect = element.getBoundingClientRect();
                     const button = element.querySelector('button');
+                    const target = button.getBoundingClientRect();
+                    const label = button.querySelector('span').getBoundingClientRect();
                     return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, height: rect.height, clientWidth: document.documentElement.clientWidth,
                         clearance: parseFloat(getComputedStyle(document.body).paddingBottom),
-                        target: button.getBoundingClientRect().height,
+                        target: target.height, targetWidth: target.width, labelWidth: label.width,
+                        name: button.textContent.trim(),
+                        reachable: document.elementFromPoint(target.left + target.width / 2, target.top + target.height / 2)?.closest('button') === button,
                         shadow: getComputedStyle(button).boxShadow };
                 })()`);
                     assert.ok(
@@ -1322,7 +1653,12 @@ test(
                         `${component} support fits at ${width}`,
                     );
                     assert.ok(dock.target >= 44);
+                    assert.equal(dock.name, 'Ask Battlefront');
+                    assert.equal(dock.reachable, true, 'The support launcher remains clickable');
                     if (width < 640) {
+                        assert.equal(dock.targetWidth, dock.target, 'Use a compact circular mobile launcher');
+                        assert.ok(dock.targetWidth <= 48, 'Keep the icon button compact');
+                        assert.ok(dock.labelWidth <= 1, 'Keep the mobile label available to screen readers without visible text');
                         assert.equal(dock.left, 0);
                         assert.equal(dock.right, dock.clientWidth);
                         assert.ok(
@@ -1330,6 +1666,7 @@ test(
                             'The mobile support dock has reserved page clearance',
                         );
                     } else {
+                        assert.ok(dock.labelWidth > 1, 'Keep the desktop support label visible');
                         assert.equal(
                             dock.clearance,
                             0,
