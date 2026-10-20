@@ -19,6 +19,7 @@ class RestoreProduct
 
             $product->deleted_by_id = null;
             $product->is_active = false;
+            $product->edit_version++;
             $product->restore();
             DB::table('audit_logs')->insert([
                 'actor_id' => auth()->id(), 'action' => 'product.restored', 'subject_type' => 'product',

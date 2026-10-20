@@ -69,6 +69,7 @@ class PrepareCheckout
             'customer' => [
                 'name' => $customer->name,
                 'default_delivery_address' => $customer->default_delivery_address,
+                'default_delivery_contact_number' => $customer->default_delivery_contact_number,
             ],
             'pickupLocation' => [
                 'name' => "{$pickupBranch->name} — {$pickupBranch->city}",

@@ -3,6 +3,7 @@
 namespace App\Actions\User;
 
 use App\Models\User;
+use App\Support\PhilippineMobileNumber;
 
 class UpdateProfile
 {
@@ -13,6 +14,10 @@ class UpdateProfile
      */
     public function __invoke(User $user, array $validated): User
     {
+        if (isset($validated['default_delivery_contact_number'])) {
+            $validated['default_delivery_contact_number'] = PhilippineMobileNumber::normalize($validated['default_delivery_contact_number']);
+        }
+
         $user->fill($validated);
 
         if ($user->isDirty('email')) {

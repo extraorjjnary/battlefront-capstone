@@ -42,7 +42,7 @@ const open = ref(false);
                 <input type="hidden" name="is_active" value="0" />
                 <DialogHeader>
                     <DialogTitle>Deactivate {{ name }}?</DialogTitle>
-                    <DialogDescription>{{ description }}</DialogDescription>
+                    <DialogDescription>{{ description }} You can reactivate it later from Catalog products.</DialogDescription>
                 </DialogHeader>
                 <DialogFooter class="mt-6 gap-2">
                     <DialogClose as-child>

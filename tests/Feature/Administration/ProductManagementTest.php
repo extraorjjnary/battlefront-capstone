@@ -82,7 +82,7 @@ test('guests are redirected when viewing catalog products', function () {
 
 test('owners can restore a deleted product with its inventory while keeping it inactive', function () {
     $owner = User::factory()->administrator()->create();
-    $product = Product::factory()->has(Inventory::factory()->state(['quantity' => 8]))->create([
+    $product = Product::factory()->has(Inventory::factory()->state(['quantity' => 0]))->create([
         'is_active' => true,
     ]);
 
@@ -91,7 +91,7 @@ test('owners can restore a deleted product with its inventory while keeping it i
 
     expect(Product::query()->find($product->id))->toBeNull();
     $this->assertDatabaseHas('products', ['id' => $product->id, 'is_active' => false, 'deleted_by_id' => $owner->id]);
-    $this->assertDatabaseHas('inventories', ['product_id' => $product->id, 'quantity' => 8]);
+    $this->assertDatabaseHas('inventories', ['product_id' => $product->id, 'quantity' => 0]);
 
     $this->get(route('administration.products.index', ['deleted' => 1]))
         ->assertInertia(fn (Assert $page) => $page
@@ -104,7 +104,7 @@ test('owners can restore a deleted product with its inventory while keeping it i
 
     $restored = Product::query()->findOrFail($product->id);
     expect($restored->is_active)->toBeFalse();
-    $this->assertDatabaseHas('inventories', ['product_id' => $product->id, 'quantity' => 8]);
+    $this->assertDatabaseHas('inventories', ['product_id' => $product->id, 'quantity' => 0]);
 });
 
 test('only owners can view or restore deleted products', function () {

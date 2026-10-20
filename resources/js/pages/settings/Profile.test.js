@@ -12,6 +12,7 @@ import {
 function profileProps(overrides = {}) {
     return {
         canManageDefaultDeliveryAddress: true,
+        defaultDeliveryContactNumber: '',
         defaultDeliveryAddress: 'Saved legacy address <script>unsafe</script>',
         deliveryLocations,
         defaultDeliveryAddressPrefill: emptyDeliveryAddress(),
@@ -52,6 +53,7 @@ test('profile shows optional shared fields and keeps name email and recommendati
     const component = loadAddressComponent('../pages/settings/Profile.vue', true);
     const html = await renderToString(Vue.h(component, profileProps()));
     assert.match(html, /Default delivery address \(optional\)/);
+    assert.match(html, /name="default_delivery_contact_number"/);
     assert.match(html, /name="default_delivery_address_action" value="keep"/);
     assert.match(html, /name="default_delivery_destination"/);
     assert.match(html, /name="default_delivery_barangay_code"/);

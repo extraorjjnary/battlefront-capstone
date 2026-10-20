@@ -30,6 +30,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property UserRole $role
  * @property AppearancePreference $appearance
  * @property string|null $default_delivery_address
+ * @property string|null $default_delivery_contact_number
  * @property array{destination: string, city_code: string, barangay_code: string, details: string}|null $default_delivery_address_components
  * @property bool $search_recommendations_enabled
  * @property bool $product_view_recommendations_enabled
@@ -44,10 +45,11 @@ use Laravel\Sanctum\HasApiTokens;
  * @property-read Cart|null $cart
  * @property-read Collection<int, Order> $orders
  */
-#[Fillable(['name', 'email', 'password', 'default_delivery_address', 'default_delivery_address_components', 'appearance', 'search_recommendations_enabled', 'product_view_recommendations_enabled', 'personalized_recommendations_enabled'])]
+#[Fillable(['name', 'email', 'password', 'default_delivery_address', 'default_delivery_contact_number', 'default_delivery_address_components', 'appearance', 'search_recommendations_enabled', 'product_view_recommendations_enabled', 'personalized_recommendations_enabled'])]
 #[Hidden([
     'password',
     'default_delivery_address',
+    'default_delivery_contact_number',
     'default_delivery_address_components',
     'two_factor_secret',
     'two_factor_recovery_codes',

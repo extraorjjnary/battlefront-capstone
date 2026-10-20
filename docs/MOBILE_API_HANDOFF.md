@@ -180,6 +180,12 @@ GET returns:
         "name": "Example Customer",
         "email": "customer@example.test",
         "default_delivery_address": null,
+        "default_delivery_address_prefill": {
+            "delivery_destination": "",
+            "delivery_barangay_code": "",
+            "delivery_address_details": ""
+        },
+        "default_delivery_contact_number": null,
         "search_recommendations_enabled": true,
         "product_view_recommendations_enabled": true,
         "personalized_recommendations_enabled": true
@@ -187,7 +193,7 @@ GET returns:
 }
 ```
 
-PATCH requires `name` and `email` (same length/email/uniqueness rules, excluding the current user). Legacy mobile `default_delivery_address` remains nullable/max 255: omit to preserve, send null/blank to clear. Existing v1 structured clients may send `default_delivery_destination`, `default_delivery_barangay_code`, and `default_delivery_address_details`. Nationwide clients also send `default_delivery_region_code`, nullable `default_delivery_province_code`, and `default_delivery_city_code`; the destination may be omitted and resolved from the city code. Complete parent membership is validated locally. Optional `default_delivery_address_action` explicitly selects `keep`, `save`, or `clear`; structured keys without an action imply `save`. Keep leaves the saved address untouched, save stores validated components plus a server-formatted string, and clear clears both. Structured saves ignore a supplied assembled address. Profile responses retain their existing JSON shape; checkout's `delivery_address_prefill` uses saved components directly. Legacy free-text updates clear stale components and populate new ones only when matching is unambiguous. No existing text is guessed or silently discarded by migration.
+PATCH requires `name` and `email` (same length/email/uniqueness rules, excluding the current user). `default_delivery_contact_number` is optional and nullable: omit to preserve, send null/blank to clear. Accept Philippine mobile numbers in `09XXXXXXXXX` or `+639XXXXXXXXX` form, with optional spaces/hyphens; responses and saved values use `+639XXXXXXXXX`. The number prefills checkout, where customers may override it per order. Legacy mobile `default_delivery_address` remains nullable/max 255: omit to preserve, send null/blank to clear. Existing v1 structured clients may send `default_delivery_destination`, `default_delivery_barangay_code`, and `default_delivery_address_details`. Nationwide clients also send `default_delivery_region_code`, nullable `default_delivery_province_code`, and `default_delivery_city_code`; the destination may be omitted and resolved from the city code. Complete parent membership is validated locally. Optional `default_delivery_address_action` explicitly selects `keep`, `save`, or `clear`; structured keys without an action imply `save`. Keep leaves the saved address untouched, save stores validated components plus a server-formatted string, and clear clears both. Structured saves ignore a supplied assembled address. Profile responses include `default_delivery_address_prefill` for structured form hydration. Checkout's `delivery_address_prefill` uses saved components directly. Legacy free-text updates clear stale components and populate new ones only when matching is unambiguous. No existing text is guessed or silently discarded by migration.
 
 New customers have `search_recommendations_enabled` and `product_view_recommendations_enabled` enabled by default, so no profile setup is needed. PATCH can independently disable either preference; turning one off pauses its recording/ranking and retains unexpired history. The global `personalized_recommendations_enabled` switch pauses all personal ranking and new search/view recording; all three preferences default to true. Re-enabling uses retained unexpired history. Retained activity expires after 90 days. Email changes clear the stored email verification timestamp; verification is currently optional/disabled.
 
@@ -196,6 +202,7 @@ New customers have `search_recommendations_enabled` and `product_view_recommenda
     "name": "Example Customer",
     "email": "customer@example.test",
     "default_delivery_address": "Example delivery address",
+    "default_delivery_contact_number": "+639171234567",
     "search_recommendations_enabled": true,
     "product_view_recommendations_enabled": true,
     "personalized_recommendations_enabled": true

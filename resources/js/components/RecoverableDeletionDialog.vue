@@ -21,6 +21,8 @@ defineProps({
     name: { type: String, required: true },
     form: { type: Object, required: true },
     errorBag: { type: String, required: true },
+    collectionName: { type: String, required: true },
+    resourceName: { type: String, required: true },
 });
 
 const open = ref(false);
@@ -37,7 +39,7 @@ function showError(errors) {
         <DialogTrigger as-child>
             <Button variant="destructive-outline" size="sm">
                 <Trash2 />
-                Move to deleted
+                Move to {{ collectionName }}
             </Button>
         </DialogTrigger>
         <DialogContent>
@@ -50,10 +52,13 @@ function showError(errors) {
                 v-slot="{ errors, processing }"
             >
                 <DialogHeader>
-                    <DialogTitle>Move {{ name }} to deleted items?</DialogTitle>
+                    <DialogTitle>Move {{ name }} to {{ collectionName }}?</DialogTitle>
                     <DialogDescription>
-                        This removes it from the active catalog and records who
-                        moved it. An owner can restore it later as inactive.
+                        This hides the {{ resourceName }} from its normal list and records who moved it.
+                        It keeps its history and can be restored by an owner as inactive.
+                        <template v-if="resourceName === 'product'">
+                            Deactivate it instead if you may sell it again before resolving its stock or open work.
+                        </template>
                     </DialogDescription>
                 </DialogHeader>
                 <InputError class="mt-4" :message="errors.deletion" />
@@ -74,7 +79,7 @@ function showError(errors) {
                     >
                         <Spinner v-if="processing" />
                         <Trash2 v-else />
-                        Move to deleted
+                        Move to {{ collectionName }}
                     </Button>
                 </DialogFooter>
             </Form>

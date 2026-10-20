@@ -3,7 +3,7 @@ import { Head, Link, usePage } from '@inertiajs/vue3';
 import { ArrowLeft, PackageSearch, Pencil } from '@lucide/vue';
 import { computed } from 'vue';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
-import PermanentDeletionDialog from '@/components/PermanentDeletionDialog.vue';
+import RecoverableDeletionDialog from '@/components/RecoverableDeletionDialog.vue';
 import { Badge } from '@/components/ui/badge';
 import ShippingHandling from '@/components/catalog/ShippingHandling.vue';
 import { Button } from '@/components/ui/button';
@@ -73,9 +73,11 @@ defineOptions({
                         Edit product
                     </Link>
                 </Button>
-                <PermanentDeletionDialog
+                <RecoverableDeletionDialog
                     v-if="canDeleteProduct"
                     :name="product.name"
+                    resource-name="product"
+                    collection-name="Deleted products"
                     :form="ProductController.destroy.form(product.id)"
                     :error-bag="`deleteProduct${product.id}`"
                 />

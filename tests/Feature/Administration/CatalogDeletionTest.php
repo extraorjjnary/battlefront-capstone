@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Cart\BuildCartViewData;
 use App\Actions\Category\DeleteCategory;
 use App\Actions\Product\DeleteProduct;
 use App\Models\CartItem;
@@ -23,10 +24,16 @@ use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\HistoricalSalesCatalogFixtures;
 
+function emptyProductInventory(Product $product): void
+{
+    $product->inventory?->update(['quantity' => 0, 'quarantined_quantity' => 0]);
+}
+
 test('product deletion retains linked inventory and activity for restoration', function (bool $imported) {
     Storage::fake('local');
     $administrator = User::factory()->administrator()->create();
     $product = Product::factory()->available()->create(['is_catalog_imported' => $imported]);
+    emptyProductInventory($product);
     $inventory = $product->inventory;
     $tag = Tag::factory()->create();
     $product->tags()->attach($tag);
@@ -91,8 +98,9 @@ test('product deletion preserves shared manifest and unrelated images', function
     'another product owner' => ['products/admin/999/'.str_repeat('a', 64).'.webp', false],
 ]);
 
-test('product deletion retains order history for every order status', function (string $status) {
+test('product deletion retains order history when orders are terminal', function (string $status) {
     $product = Product::factory()->available()->create();
+    emptyProductInventory($product);
     $order = Order::factory()->create(['status' => $status]);
     $item = OrderItem::factory()->for($order)->for($product)->create();
 
@@ -102,7 +110,30 @@ test('product deletion retains order history for every order status', function (
     expect($product->fresh()->trashed())->toBeTrue();
     $this->assertModelExists($product->inventory);
     $this->assertModelExists($item);
-})->with(['pending', 'processing', 'completed', 'cancelled']);
+})->with(['completed', 'cancelled']);
+
+test('product deletion is blocked while a customer order is unfinished', function (string $status) {
+    $product = Product::factory()->create();
+    $order = Order::factory()->create(['status' => $status]);
+    OrderItem::factory()->for($order)->for($product)->create();
+
+    $this->actingAs(User::factory()->administrator()->create())
+        ->delete(route('administration.products.destroy', $product))
+        ->assertSessionHasErrors('deletion');
+
+    expect($product->fresh()->trashed())->toBeFalse();
+})->with(['pending', 'processing']);
+
+test('product deletion is blocked while sellable or quarantined stock remains', function (string $column) {
+    $product = Product::factory()->available()->create();
+    $product->inventory()->update([$column => 1]);
+
+    $this->actingAs(User::factory()->administrator()->create())
+        ->delete(route('administration.products.destroy', $product))
+        ->assertSessionHasErrors('deletion');
+
+    expect($product->fresh()->trashed())->toBeFalse();
+})->with(['quantity', 'quarantined_quantity']);
 
 test('product deletion retains recorded sales and forecasts', function (string $reference) {
     $product = Product::factory()->create(['is_catalog_imported' => true]);
@@ -126,6 +157,7 @@ test('product deletion retains recorded sales and forecasts', function (string $
 test('product deletion retains existing cart items', function () {
     $product = Product::factory()->available()->create(['is_catalog_imported' => true]);
     $item = CartItem::factory()->for($product)->create();
+    emptyProductInventory($product);
     $product->update(['is_active' => false]);
 
     $this->actingAs(User::factory()->administrator()->create())->delete(route('administration.products.destroy', $product))
@@ -133,6 +165,8 @@ test('product deletion retains existing cart items', function () {
 
     expect($product->fresh()->trashed())->toBeTrue();
     $this->assertModelExists($item);
+    expect(app(BuildCartViewData::class)->execute($item->cart->user)['items'][0]['availability']['status'])
+        ->toBe('product_ineligible');
 });
 
 test('soft deleting seeded products retains historical transactions and inventory', function (bool $keepCoverage) {
@@ -144,6 +178,7 @@ test('soft deleting seeded products retains historical transactions and inventor
         app(SalesHistoryCoverageRepository::class)->clearDevelopment();
     }
     $product = $products['10003'];
+    emptyProductInventory($product);
     $inventory = $product->inventory->toArray();
     $items = $product->orderItems()->with('order.sale')->get()->toArray();
 
@@ -181,10 +216,12 @@ test('soft deleting a product preserves historical coverage metadata', function 
 test('a concurrent order item remains attached when a product is soft deleted', function () {
     Storage::fake('public');
     $product = Product::factory()->available()->create(['image_path' => 'products/owned.jpg']);
+    emptyProductInventory($product);
+    emptyProductInventory($product);
     Storage::disk('public')->put($product->image_path, 'owned bytes');
     $tag = Tag::factory()->create();
     $product->tags()->attach($tag);
-    $order = Order::factory()->create();
+    $order = Order::factory()->create(['status' => 'completed']);
     $event = 'eloquent.deleting: '.Product::class;
     Event::listen($event, function (Product $deleting) use ($order): void {
         OrderItem::factory()->for($order)->for($deleting, 'product')->create();
@@ -207,6 +244,7 @@ test('a concurrent order item remains attached when a product is soft deleted', 
 test('unreadable history metadata does not block recoverable product deletion', function () {
     Storage::fake('local');
     $product = Product::factory()->available()->create();
+    emptyProductInventory($product);
     Storage::disk('local')->put(config('forecasting.development_manifest'), '{invalid json');
 
     $this->actingAs(User::factory()->administrator()->create())->delete(route('administration.products.destroy', $product))

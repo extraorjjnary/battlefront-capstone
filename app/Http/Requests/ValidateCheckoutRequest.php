@@ -7,6 +7,7 @@ use App\Enums\FulfillmentMethod;
 use App\Enums\PaymentMethod;
 use App\Services\Order\DeliveryRules;
 use App\Services\Order\PsgcDeliveryLocations;
+use App\Support\PhilippineMobileNumber;
 use DomainException;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rule;
@@ -45,7 +46,7 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
         return [
             'cart_item_ids' => $this->cartItemIds(),
             'recipient_name' => $this->string('recipient_name')->toString(),
-            'contact_number' => $this->string('contact_number')->toString(),
+            'contact_number' => PhilippineMobileNumber::normalize($this->string('contact_number')->toString()),
             'fulfillment_method' => $this->string('fulfillment_method')->toString(),
             'delivery_address' => $deliveryAddress,
             'delivery_address_components' => $this->input('fulfillment_method') === 'delivery' && $this->usesStructuredAddress()
@@ -77,7 +78,11 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
             ...parent::rules(),
             ...$this->geographyRules('delivery', $isDelivery && $this->usesNationwideAddress('delivery'), $isPickup),
             'recipient_name' => ['bail', 'required', 'string', 'max:255'],
-            'contact_number' => ['bail', 'required', 'string', 'max:20'],
+            'contact_number' => ['bail', 'required', 'string', 'max:20', function (string $attribute, mixed $value, \Closure $fail): void {
+                if (! PhilippineMobileNumber::isValid($value)) {
+                    $fail('Enter a valid Philippine mobile number.');
+                }
+            }],
             'fulfillment_method' => ['bail', 'required', new Enum(FulfillmentMethod::class)],
             'delivery_destination' => [
                 'bail',

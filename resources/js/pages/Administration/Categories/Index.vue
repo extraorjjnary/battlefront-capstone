@@ -6,7 +6,7 @@ import CategoryController from '@/actions/App/Http/Controllers/Administration/Ca
 import CatalogNavigation from '@/components/CatalogNavigation.vue';
 import CatalogPagination from '@/components/CatalogPagination.vue';
 import DeactivationDialog from '@/components/DeactivationDialog.vue';
-import PermanentDeletionDialog from '@/components/PermanentDeletionDialog.vue';
+import RecoverableDeletionDialog from '@/components/RecoverableDeletionDialog.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -203,9 +203,11 @@ defineOptions({
                                 Restore inactive
                             </Button>
                         </Form>
-                        <PermanentDeletionDialog
+                        <RecoverableDeletionDialog
                             v-if="!deleted && canDeleteCatalog"
                             :name="category.name"
+                            resource-name="category"
+                            collection-name="Deleted categories"
                             :form="CategoryController.destroy.form(category.id)"
                             :error-bag="`deleteCategory${category.id}`"
                         />

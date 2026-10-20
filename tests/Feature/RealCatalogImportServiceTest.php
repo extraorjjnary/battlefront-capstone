@@ -32,6 +32,7 @@ test('soft deleting imported catalog records preserves sources and images for ex
         $manifestBytes = file_get_contents($manifest);
         $mappingBytes = file_get_contents($mapping);
         $importedImagePath = $product->image_path;
+        $product->inventory()->update(['quantity' => 0, 'quarantined_quantity' => 0]);
         $imageBytes = Storage::disk('public')->get($importedImagePath);
         Storage::disk('local')->put('catalog/original.csv', 'original catalog CSV bytes');
         Storage::disk('local')->put('catalog/original.xlsx', 'original workbook bytes');
@@ -66,7 +67,7 @@ test('soft deleting imported catalog records preserves sources and images for ex
         expect($restored->product_code)->toBe('00123');
         expect($restored->name)->toBe('Exact Product™');
         expect($restored->is_catalog_imported)->toBeTrue();
-        expect($restored->inventory->quantity)->toBe(5);
+        expect($restored->inventory->quantity)->toBe(0);
         expect($restored->category->name)->toBe('Graphics Card');
         expect($restored->tags)->toHaveCount(3);
         expect(file_get_contents($manifest))->toBe($manifestBytes);

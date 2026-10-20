@@ -56,6 +56,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/{Models/User.php,Services/TeamAccessService.php,Http/Controllers/Administration/TeamController.php},database/**,resources/js/pages/Administration/Team.vue | .ai/rules/pages-administration.md |
 | app/Actions/{Cart,Checkout,Order,Inventory}/**,app/Services/{Cart,Order}/**,app/Http/Controllers/OrderController.php,resources/js/pages/Checkout/** | .ai/rules/pages-checkout.md |
 | app/Models/Order.php,app/Http/Controllers/OrderController.php,resources/js/pages/Orders/** | .ai/rules/pages-orders.md |
+| app/Http/Requests/Settings/ProfileUpdateRequest.php,app/Support/PhilippineMobileNumber.php,resources/js/pages/settings/Profile.vue,resources/js/pages/Checkout/Index.vue | .ai/rules/pages-settings-js-pages-checkout.md |
 | resources/js/app.js,resources/js/pages/** | .ai/rules/pages.md |
 | app/Services/RealCatalogImportService.php,app/Services/CatalogShippingClassification.php,app/Actions/Product/** | .ai/rules/product.md |
 | app/Models/{Product,Category}.php,database/migrations/**,app/Actions/{Product,Category}/**,resources/js/pages/Administration/{Products,Categories}/** | .ai/rules/products-categories.md |

@@ -18,7 +18,7 @@ import CatalogNavigation from '@/components/CatalogNavigation.vue';
 import CatalogPagination from '@/components/CatalogPagination.vue';
 import DeactivationDialog from '@/components/DeactivationDialog.vue';
 import InputError from '@/components/InputError.vue';
-import PermanentDeletionDialog from '@/components/PermanentDeletionDialog.vue';
+import RecoverableDeletionDialog from '@/components/RecoverableDeletionDialog.vue';
 import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -221,7 +221,7 @@ defineOptions({
                 <Button v-if="canDeleteProduct" variant="outline" as-child class="shrink-0">
                     <Link :href="ProductController.index({ query: { deleted: deleted ? undefined : 1 } })">
                         <RotateCcw />
-                        {{ deleted ? 'Back to active products' : 'Restore deleted products' }}
+                        {{ deleted ? 'Back to Catalog products' : 'Restore deleted products' }}
                     </Link>
                 </Button>
                 <Button v-if="canCreateProduct && !deleted" as-child class="shrink-0">
@@ -591,7 +591,7 @@ defineOptions({
                             v-if="!deleted && canManageProducts && product.is_active"
                             :name="product.name"
                             :form="ProductActivationController.form(product.id)"
-                            description="This product will no longer appear in customer catalog, cart, or recommendation workflows. Its record, category, tags, and inventory are preserved."
+                            description="This temporarily hides the product from customer browsing and recommendations. It remains in Catalog products and its inventory and history are preserved. Existing cart lines stay visible as unavailable."
                         />
 
                         <Form
@@ -621,9 +621,11 @@ defineOptions({
                             </Button>
                             <InputError :message="errors.restore" />
                         </Form>
-                        <PermanentDeletionDialog
+                        <RecoverableDeletionDialog
                             v-if="canDeleteProduct && !deleted"
                             :name="product.name"
+                            resource-name="product"
+                            collection-name="Deleted products"
                             :form="ProductController.destroy.form(product.id)"
                             :error-bag="`deleteProduct${product.id}`"
                         />
