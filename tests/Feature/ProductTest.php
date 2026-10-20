@@ -27,6 +27,8 @@ test('the product schema follows the approved ERD decisions', function () {
         'is_active',
         'edit_version',
         'created_at',
+        'deleted_at',
+        'deleted_by_id',
     ]);
 });
 
@@ -91,8 +93,12 @@ test('a product belongs to a required category', function () {
     $product = Product::factory()->for($category)->create();
 
     expect($product->category->is($category))->toBeTrue()
-        ->and($category->products->sole()->is($product))->toBeTrue()
-        ->and(fn () => $category->delete())->toThrow(QueryException::class);
+        ->and($category->products->sole()->is($product))->toBeTrue();
+
+    $category->delete();
+
+    expect($category->trashed())->toBeTrue()
+        ->and(Product::query()->find($product->id))->not->toBeNull();
 });
 
 test('required product fields cannot be omitted', function (string $missingField) {

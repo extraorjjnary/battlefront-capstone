@@ -98,16 +98,17 @@ test('deleting a tag removes its owned pivot rows', function () {
     $this->assertModelExists($product);
 });
 
-test('deleting a product removes its owned pivot rows', function () {
+test('soft deleting a product preserves its tag pivot rows for restoration', function () {
     $product = Product::factory()->create();
     $tag = Tag::factory()->create();
     $product->tags()->attach($tag);
 
     $product->delete();
 
-    $this->assertDatabaseMissing('product_tag', [
+    $this->assertDatabaseHas('product_tag', [
         'product_id' => $product->id,
         'tag_id' => $tag->id,
     ]);
+    $this->assertModelExists($product);
     $this->assertModelExists($tag);
 });

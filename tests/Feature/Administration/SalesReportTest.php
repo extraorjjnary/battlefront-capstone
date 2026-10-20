@@ -114,6 +114,29 @@ test('sales report separates sale dates from refund payment dates and calculates
         ->where('refund_measures.outstanding_at_cutoff', '0.00'));
 });
 
+test('sales reports retain historical product revenue after product deletion', function () {
+    $administrator = User::factory()->administrator()->create();
+    $product = Product::factory()->create(['name' => 'Retired Graphics Card']);
+    createSalesReportEntry('2026-09-05', '2500.00', [
+        ['product' => $product, 'quantity' => 2, 'price' => '1250.00'],
+    ]);
+    $product->delete();
+
+    $this->actingAs($administrator)
+        ->get(route('administration.reports.sales', [
+            'from' => '2026-09-01',
+            'to' => '2026-09-30',
+            'period' => 'month',
+        ]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('kpis.total_sales', 1)
+            ->where('kpis.total_revenue', '2500.00')
+            ->where('kpis.total_items_sold', 2)
+            ->where('top_products.labels', ['Retired Graphics Card'])
+            ->where('products.data.0.name', 'Retired Graphics Card')
+            ->where('products.data.0.item_revenue', '2500.00'));
+});
+
 test('guests are redirected from sales reports and customers are forbidden', function () {
     $customer = User::factory()->customer()->create();
 

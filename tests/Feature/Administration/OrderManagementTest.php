@@ -158,6 +158,30 @@ test('administrators can review authoritative order processing details', functio
         ->missing('order.payment_proof_path'));
 });
 
+test('administrator and customer order histories retain deleted product details', function () {
+    $administrator = User::factory()->administrator()->create();
+    $customer = User::factory()->customer()->create();
+    $product = Product::factory()->create(['name' => 'Retired Graphics Card']);
+    $order = Order::factory()->for($customer)->create();
+    OrderItem::factory()->for($order)->for($product)->create([
+        'quantity' => 2,
+        'price_at_time' => '1250.00',
+    ]);
+    $product->delete();
+
+    $this->actingAs($administrator)
+        ->get(route('administration.orders.show', $order))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('order.items.0.product.id', $product->id)
+            ->where('order.items.0.product.name', 'Retired Graphics Card'));
+
+    $this->actingAs($customer)
+        ->get(route('orders.show', $order))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('order.items.0.product.id', $product->id)
+            ->where('order.items.0.product.name', 'Retired Graphics Card'));
+});
+
 test('administrator processing details expose the saved delivery destination without inferring legacy or pickup destinations', function (string $scenario, ?string $destination, ?string $address) {
     $factory = match ($scenario) {
         'quoted delivery' => Order::factory()->withDeliverySnapshot('Calatrava'),

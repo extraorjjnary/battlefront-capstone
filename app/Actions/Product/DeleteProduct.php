@@ -9,14 +9,17 @@ class DeleteProduct
 {
     public function execute(Product $product): void
     {
-        DB::transaction(function () use ($product): void {
+        $actorId = auth()->id();
+        $actorId = $actorId === null ? null : max(0, (int) $actorId);
+
+        DB::transaction(function () use ($product, $actorId): void {
             $lockedProduct = Product::query()->lockForUpdate()->findOrFail($product->id);
             $lockedProduct->is_active = false;
-            $lockedProduct->deleted_by_id = auth()->id();
+            $lockedProduct->deleted_by_id = $actorId;
             $lockedProduct->save();
 
             DB::table('audit_logs')->insert([
-                'actor_id' => auth()->id(),
+                'actor_id' => $actorId,
                 'action' => 'product.deleted',
                 'subject_type' => 'product',
                 'subject_id' => $lockedProduct->id,

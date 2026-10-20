@@ -38,9 +38,11 @@ test('a product has at most one inventory record', function () {
     expect($inventory->product->is($product))->toBeTrue()
         ->and($product->inventory->is($inventory))->toBeTrue()
         ->and(fn () => Inventory::factory()->for($product)->create())
-        ->toThrow(QueryException::class)
-        ->and(fn () => $product->delete())
         ->toThrow(QueryException::class);
+
+    $product->delete();
+    expect($product->fresh()->trashed())->toBeTrue()
+        ->and($product->inventory->is($inventory))->toBeTrue();
 });
 
 test('a product may exist without an inventory record', function () {

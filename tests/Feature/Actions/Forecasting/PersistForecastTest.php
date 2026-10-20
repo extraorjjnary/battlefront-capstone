@@ -360,15 +360,15 @@ test('database rejects duplicate keys, missing products, invalid methods, negati
     'required product' => [['product_id' => null]],
 ]);
 
-test('database protects existing forecasts on updates and product deletion', function () {
+test('product deletion preserves existing forecasts', function () {
     $product = Product::factory()->create();
     $forecast = Forecast::factory()->for($product)->create();
 
     expect(fn () => DB::table('forecasts')->where('id', $forecast->id)->update(['predicted_demand' => '-1.00']))->toThrow(QueryException::class);
-    expect(fn () => $product->delete())->toThrow(QueryException::class);
+    $product->delete();
 
     $this->assertModelExists($forecast);
-    $this->assertModelExists($product);
+    expect($product->fresh()->trashed())->toBeTrue();
 });
 
 test('database rejects noncanonical values when updating an existing forecast', function (array $attributes) {
