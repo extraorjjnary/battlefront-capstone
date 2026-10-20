@@ -30,17 +30,6 @@ function Read-ZipXml {
     }
 }
 
-function Get-ReferenceImage {
-    param([string] $Category)
-
-    switch ($Category) {
-        { $_ -in @('Graphics Card', 'PC Case', 'Power Supply', 'Cooling Components') } { return 'images/demo-products/graphics-card.png' }
-        { $_ -in @('Processor', 'RAM', 'Motherboard', 'DIY Electronics & Microcontrollers') } { return 'images/demo-products/processor.png' }
-        { $_ -in @('Storage', 'Cables & Adapters', 'Power Accessories', 'Cleaning & Maintenance Supplies', 'Office & Packaging Supplies', 'Vending & Coin-Op Machine Parts', 'Service') } { return 'images/demo-products/storage.png' }
-        default { return 'images/demo-products/peripherals.png' }
-    }
-}
-
 function Get-CellValue {
     param([System.Xml.XmlNode] $Row, [string] $Column, [System.Xml.XmlNamespaceManager] $Namespaces, [string[]] $SharedStrings)
 
@@ -138,11 +127,6 @@ foreach ($file in $files) {
                 throw "Category folder collision for $category."
             }
             $slugs[$slug] = $category
-            $reference = Get-ReferenceImage $category
-            if (-not (Test-Path -LiteralPath (Join-Path $projectRoot "public/$reference"))) {
-                throw "Missing approved reference $reference."
-            }
-
             $subject = if ($category -eq 'Service') {
                 'one enclosure in a restrained diagnostic workbench scene'
             } elseif ($category -eq 'Bundles & Packages') {
@@ -150,7 +134,7 @@ foreach ($file in $files) {
             } else {
                 'one product matching the named category and physical form'
             }
-            $prompt = "Premium realistic square studio product photograph. Exact catalog name: `"$name`". Category: $category. Show $subject, centered and clearly visible on a dark black background with restrained Battlefront red accent lighting. Follow the visual style of $reference. Preserve brand or model identity naturally on the physical product only when supported by the name. Do not invent features. No collage, grid, large promotional text, or watermark."
+            $prompt = "Premium realistic square studio product photograph. Exact catalog name: `"$name`". Category: $category. Show $subject, centered and clearly visible on a dark black background with restrained Battlefront red accent lighting. Preserve brand or model identity naturally on the physical product only when supported by the name. Do not invent features. No collage, grid, large promotional text, or watermark."
             $importIssues = [string[]] @()
             if (-not $quantity) {
                 $importIssues = [string[]] @('missing_quantity')
@@ -170,7 +154,6 @@ foreach ($file in $files) {
                 price_tier_tags = (Get-CellValue $row 'F' $namespaces $sharedStrings)
                 use_case_tags = (Get-CellValue $row 'G' $namespaces $sharedStrings)
                 special_traits_tags = (Get-CellValue $row 'H' $namespaces $sharedStrings)
-                reference_image = $reference
                 prompt = $prompt
                 image_path = "products/$slug/$code.webp"
                 status = 'pending'
