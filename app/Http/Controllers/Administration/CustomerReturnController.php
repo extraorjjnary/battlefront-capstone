@@ -7,6 +7,7 @@ use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
+use BcMath\Number;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -96,11 +97,14 @@ class CustomerReturnController extends Controller
             foreach ($refundPayments as $payment) {
                 $decision = $reviews->get($payment->id)?->decision;
                 if ($decision === 'verified') {
-                    $verified = bcadd($verified, (string) $payment->amount, 2);
+                    $verified = (new Number(self::numericAmount($verified)))
+                        ->add(self::numericAmount($payment->amount), 2)->value;
                 } elseif ($decision === 'disputed') {
-                    $disputed = bcadd($disputed, (string) $payment->amount, 2);
+                    $disputed = (new Number(self::numericAmount($disputed)))
+                        ->add(self::numericAmount($payment->amount), 2)->value;
                 } elseif ($decision !== 'voided') {
-                    $awaitingReview = bcadd($awaitingReview, (string) $payment->amount, 2);
+                    $awaitingReview = (new Number(self::numericAmount($awaitingReview)))
+                        ->add(self::numericAmount($payment->amount), 2)->value;
                 }
             }
 
@@ -114,12 +118,15 @@ class CustomerReturnController extends Controller
             $return->verified_paid_amount = $balance['verified'];
             $return->awaiting_review_amount = $balance['awaiting_review'];
             $return->disputed_amount = $balance['disputed'];
-            $return->refund_balance = bcsub((string) $return->approved_amount, $balance['verified'], 2);
-            $return->refund_fully_verified = bccomp($balance['verified'], (string) $return->approved_amount, 2) >= 0;
-            $return->refund_has_verified_payment = bccomp($balance['verified'], '0.00', 2) > 0;
-            $return->refund_has_unreviewed_payment = bccomp($balance['awaiting_review'], '0.00', 2) > 0;
-            $return->refund_has_disputed_payment = bccomp($balance['disputed'], '0.00', 2) > 0;
-            $return->refund_has_outstanding_balance = bccomp((string) $return->refund_balance, '0.00', 2) > 0;
+            $approvedAmount = self::numericAmount($return->approved_amount ?? '0.00');
+            $refundBalance = (new Number($approvedAmount))
+                ->sub(self::numericAmount($balance['verified']), 2);
+            $return->refund_balance = $refundBalance->value;
+            $return->refund_fully_verified = (new Number(self::numericAmount($balance['verified'])))->compare($approvedAmount) >= 0;
+            $return->refund_has_verified_payment = (new Number(self::numericAmount($balance['verified'])))->compare('0.00') > 0;
+            $return->refund_has_unreviewed_payment = (new Number(self::numericAmount($balance['awaiting_review'])))->compare('0.00') > 0;
+            $return->refund_has_disputed_payment = (new Number(self::numericAmount($balance['disputed'])))->compare('0.00') > 0;
+            $return->refund_has_outstanding_balance = $refundBalance->compare('0.00') > 0;
             $return->age_days = (int) now()->startOfDay()->diffInDays($return->created_at, true);
             $return->inspection_overdue = in_array($return->status, ['pending', 'rejected_pending_handover'], true)
                 && Carbon::parse($return->created_at)->lt($overdueCutoff);
@@ -217,5 +224,31 @@ class CustomerReturnController extends Controller
         $returns->reviewPayment($payment, $request->user(), $validated['decision'], $validated['reason']);
 
         return back();
+    }
+
+    /**
+     * @return numeric-string
+     */
+    private static function numericAmount(mixed $amount): string
+    {
+        if (! is_string($amount) && ! is_int($amount)) {
+            throw new \UnexpectedValueException('A stored monetary amount is not a decimal string.');
+        }
+
+        $decimal = (string) $amount;
+
+        if (! self::isDecimalAmount($decimal)) {
+            throw new \UnexpectedValueException('A stored monetary amount is not a valid decimal.');
+        }
+
+        return $decimal;
+    }
+
+    /**
+     * @phpstan-assert-if-true numeric-string $amount
+     */
+    private static function isDecimalAmount(string $amount): bool
+    {
+        return preg_match('/^-?\d+(?:\.\d+)?$/D', $amount) === 1;
     }
 }

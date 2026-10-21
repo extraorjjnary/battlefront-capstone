@@ -11,6 +11,7 @@ return [
 
     'timezone' => 'Asia/Manila',
 
+    /** Legacy bootstrap defaults; published branch information is database-backed. */
     'operating_hours' => '8:00 AM–6:00 PM',
 
     /**

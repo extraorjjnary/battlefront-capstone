@@ -165,8 +165,13 @@ test('quantity guidance follows changing availability without resetting the chos
     const scope = Vue.effectScope();
     try {
         const props = Vue.reactive({ productId: 7, availableQuantity: 4 });
-        const form = scope.run(() => loadComponent('./AddToCartForm.vue', componentModules(), false)
-            .setup(props, { expose() {} }));
+        const form = scope.run(() =>
+            loadComponent(
+                './AddToCartForm.vue',
+                componentModules(),
+                false,
+            ).setup(props, { expose() {} }),
+        );
         form.trackEnteredQuantity({ currentTarget: { valueAsNumber: 3 } });
         props.availableQuantity = 2;
         assert.equal(form.exceedsStock.value, true);
@@ -189,12 +194,19 @@ test('quantity guidance follows changing availability without resetting the chos
 test('quantity forms disable purchasing when stock is zero or missing', async () => {
     for (const availableQuantity of [0, null]) {
         const modules = componentModules();
-        const html = await renderToString(Vue.h(modules['@/components/cart/AddToCartForm.vue'].default, {
-            productId: 7, availableQuantity,
-        }));
+        const html = await renderToString(
+            Vue.h(modules['@/components/cart/AddToCartForm.vue'].default, {
+                productId: 7,
+                availableQuantity,
+            }),
+        );
         assert.match(html, /<button[^>]*disabled/);
         assert.match(html, /<input[^>]*name="quantity"[^>]*disabled/);
-        assert.ok(html.includes(availableQuantity === 0 ? 'Out of stock' : 'Stock unavailable'));
+        assert.ok(
+            html.includes(
+                availableQuantity === 0 ? 'Out of stock' : 'Stock unavailable',
+            ),
+        );
         assert.doesNotMatch(html, /null available|0 available/);
     }
 });

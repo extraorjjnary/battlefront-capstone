@@ -76,7 +76,7 @@ class User extends Authenticatable
      * @var array<string, mixed>
      */
     protected $attributes = [
-        'appearance' => 'system',
+        'appearance' => 'light',
         'role' => 'customer',
         'is_active' => true,
         'must_change_password' => false,

@@ -258,11 +258,19 @@ class HandleSupplierReturn
 
     private function hasLinkedEvidence(object $return): bool
     {
-        if ($return->damage_report_id !== null) {
-            return DB::table('administration_evidence')->where('subject_type', 'damage_report')->where('subject_id', $return->damage_report_id)->exists();
+        $damageReportId = data_get($return, 'damage_report_id');
+
+        if ($damageReportId !== null) {
+            return DB::table('administration_evidence')->where('subject_type', 'damage_report')->where('subject_id', $damageReportId)->exists();
         }
 
-        $customerReturnId = DB::table('customer_return_items')->where('id', $return->customer_return_item_id)->value('customer_return_id');
+        $customerReturnItemId = data_get($return, 'customer_return_item_id');
+
+        if ($customerReturnItemId === null) {
+            return false;
+        }
+
+        $customerReturnId = DB::table('customer_return_items')->where('id', $customerReturnItemId)->value('customer_return_id');
 
         return $customerReturnId !== null
             && DB::table('administration_evidence')->where('subject_type', 'customer_return')->where('subject_id', $customerReturnId)->exists();

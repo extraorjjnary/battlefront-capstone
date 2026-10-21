@@ -168,10 +168,10 @@ test('sends only matched catalog and Sagay inventory facts for a product inquiry
 test('sends only approved reference facts for the requested store', function () {
     Http::preventStrayRequests();
     ChatbotResponseAgent::fake(['The Sagay store is open during the listed hours.'])->preventStrayPrompts();
-    config()->set('battlefront.operating_hours', '08:00-18:00');
-    config()->set('battlefront.branch_emails', ['Sagay City' => 'approved-store@example.test']);
     Branch::factory()->create([
         'city' => 'Sagay City',
+        'operating_hours' => '08:00-18:00',
+        'email' => 'approved-store@example.test',
         'address' => 'Approved Sagay address',
         'contact_number' => '0938 647 6046',
         'latitude' => '10.123456',

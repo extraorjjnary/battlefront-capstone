@@ -1,3 +1,4 @@
+import { pageHeaderModule } from '../../components/pageHeaderTestHelpers.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -51,6 +52,7 @@ function loadNotificationComponent(
     } = {},
 ) {
     const modules = {
+        '@/components/PageHeader.vue': pageHeaderModule,
         vue: Vue,
         '@/lib/dateTime': { formatDateTime },
         '@inertiajs/vue3': { Head: primitive, Link: link, router },
@@ -160,7 +162,8 @@ test('administrator empty history explains operational events and disables read 
         }),
     );
 
-    assert.match(html, /Order operations/);
+    assert.match(html, /<h1[^>]*>Notifications<\/h1>/);
+    assert.match(html, /0 unread/);
     assert.match(html, /New orders and submitted wallet proofs/);
     assert.match(html, /disabled/);
 });

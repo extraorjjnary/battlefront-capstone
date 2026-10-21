@@ -21,6 +21,7 @@ class BranchDirectory
     public function all(): array
     {
         return Branch::query()
+            ->published()
             ->get()
             ->sortBy([
                 ['is_operational', 'desc'],
@@ -49,7 +50,7 @@ class BranchDirectory
                 ? round((float) $branch->longitude, 7)
                 : null,
             'email' => $branch->email,
-            'operating_hours' => $branch->operating_hours,
+            'operating_hours' => $branch->operating_hours ?? '',
             'is_operational' => $branch->is_operational,
             'operational_notice' => $branch->is_operational
                 && $branch->city === config('battlefront.operational_branch_city')

@@ -1,4 +1,5 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import {
     ArrowRight,
@@ -56,65 +57,36 @@ defineOptions({
 
 <template>
     <div class="contents">
-        <Head title="Customer dashboard" />
+        <Head title="Dashboard" />
 
         <main
-            class="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 p-6 lg:p-10"
+            class="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
         >
-            <section
-                class="border-border bg-card relative overflow-hidden border p-6 sm:p-8"
-                aria-labelledby="customer-dashboard-heading"
+            <PageHeader
+                :title="`${props.is_first_visit ? 'Welcome' : 'Welcome back'}, ${user.name}!`"
+                heading-id="customer-dashboard-heading"
             >
-                <div
-                    class="bg-primary absolute inset-y-0 left-0 w-1"
-                    aria-hidden="true"
-                />
-                <div
-                    class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between"
-                >
-                    <div class="max-w-2xl">
-                        <p
-                            class="text-primary text-xs font-semibold tracking-widest uppercase"
-                        >
-                            Customer dashboard
-                        </p>
-                        <h1
-                            id="customer-dashboard-heading"
-                            class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
-                        >
-                            {{ props.is_first_visit ? 'Welcome' : 'Welcome back' }},
-                            {{ user.name }}!
-                        </h1>
-                        <p class="text-muted-foreground mt-2 text-sm leading-6">
-                            {{
-                                props.is_first_visit
-                                    ? 'Explore our products, find your next upgrade, and start shopping with Battlefront.'
-                                    : 'Continue shopping, check your cart, or track your latest Battlefront order.'
-                            }}
-                        </p>
-                    </div>
-                    <div class="flex flex-wrap gap-3">
-                        <Button as-child>
-                            <Link :href="productIndex()">
-                                <PackageSearch aria-hidden="true" />
-                                Browse products
-                            </Link>
-                        </Button>
-                        <Button variant="outline" as-child>
-                            <Link :href="cartIndex()">
-                                <ShoppingCart aria-hidden="true" />
-                                View cart
-                            </Link>
-                        </Button>
-                        <Button variant="outline" as-child>
-                            <Link :href="orderIndex()">
-                                <ReceiptText aria-hidden="true" />
-                                View orders
-                            </Link>
-                        </Button>
-                    </div>
-                </div>
-            </section>
+                <template #actions>
+                    <Button as-child>
+                        <Link :href="productIndex()">
+                            <PackageSearch aria-hidden="true" />
+                            Browse products
+                        </Link>
+                    </Button>
+                    <Button variant="outline" as-child>
+                        <Link :href="cartIndex()">
+                            <ShoppingCart aria-hidden="true" />
+                            View cart
+                        </Link>
+                    </Button>
+                    <Button variant="outline" as-child>
+                        <Link :href="orderIndex()">
+                            <ReceiptText aria-hidden="true" />
+                            View orders
+                        </Link>
+                    </Button>
+                </template>
+            </PageHeader>
 
             <section aria-labelledby="shopping-summary-heading">
                 <h2 id="shopping-summary-heading" class="sr-only">
@@ -128,7 +100,7 @@ defineOptions({
                     <template #fallback>
                         <div
                             aria-hidden="true"
-                            class="border-border bg-card grid border sm:grid-cols-2 lg:grid-cols-4"
+                            class="surface-panel border-border bg-card grid border sm:grid-cols-2 lg:grid-cols-4"
                         >
                             <StatSkeleton
                                 v-for="stat in 4"
@@ -138,7 +110,7 @@ defineOptions({
                         </div>
                     </template>
                     <dl
-                        class="border-border bg-card grid border sm:grid-cols-2 lg:grid-cols-4"
+                        class="surface-panel border-border bg-card grid border sm:grid-cols-2 lg:grid-cols-4"
                     >
                         <div
                             class="border-border border-b p-5 sm:border-r lg:border-b-0"
@@ -267,7 +239,7 @@ defineOptions({
                     <template #fallback>
                         <div
                             aria-hidden="true"
-                            class="border-border bg-card grid min-h-72 gap-6 border p-5 sm:p-6"
+                            class="surface-panel border-border bg-card grid min-h-72 gap-6 border p-5 sm:p-6"
                         >
                             <div class="grid gap-3">
                                 <Skeleton class="h-4 w-32" />
@@ -288,7 +260,7 @@ defineOptions({
                     </template>
                     <div
                         v-if="props.dashboard.latest_order"
-                        class="border-border bg-card border"
+                        class="surface-panel border-border bg-card border"
                     >
                         <div
                             class="border-border flex flex-col gap-5 border-b p-5 sm:flex-row sm:items-start sm:justify-between sm:p-6"
@@ -299,7 +271,9 @@ defineOptions({
                                 >
                                     Order reference
                                 </p>
-                                <h3 class="mt-1 text-2xl font-bold tabular-nums">
+                                <h3
+                                    class="mt-1 text-2xl font-bold tabular-nums"
+                                >
                                     {{ props.dashboard.latest_order.reference }}
                                 </h3>
                                 <p
@@ -311,7 +285,8 @@ defineOptions({
                                     />
                                     {{
                                         formatDate(
-                                            props.dashboard.latest_order.created_at,
+                                            props.dashboard.latest_order
+                                                .created_at,
                                         )
                                     }}
                                 </p>
@@ -326,7 +301,10 @@ defineOptions({
                                         )
                                     "
                                 >
-                                    {{ props.dashboard.latest_order.status.label }}
+                                    {{
+                                        props.dashboard.latest_order.status
+                                            .label
+                                    }}
                                 </Badge>
                                 <Badge
                                     variant="outline"
@@ -339,8 +317,8 @@ defineOptions({
                                 >
                                     Payment
                                     {{
-                                        props.dashboard.latest_order.payment.status
-                                            .label
+                                        props.dashboard.latest_order.payment
+                                            .status.label
                                     }}
                                 </Badge>
                             </div>
@@ -369,8 +347,8 @@ defineOptions({
                                     </dt>
                                     <dd class="mt-1 font-semibold">
                                         {{
-                                            props.dashboard.latest_order.fulfillment
-                                                .label
+                                            props.dashboard.latest_order
+                                                .fulfillment.label
                                         }}
                                     </dd>
                                 </div>
@@ -383,7 +361,8 @@ defineOptions({
                                 </dt>
                                 <dd class="mt-1 font-semibold">
                                     {{
-                                        props.dashboard.latest_order.payment.method
+                                        props.dashboard.latest_order.payment
+                                            .method
                                     }}
                                 </dd>
                             </div>
@@ -391,16 +370,19 @@ defineOptions({
                                 <dt
                                     class="text-muted-foreground text-xs font-medium"
                                 >
-                                    {{ props.dashboard.latest_order.item_count }}
                                     {{
-                                        props.dashboard.latest_order.item_count ===
-                                        1
+                                        props.dashboard.latest_order.item_count
+                                    }}
+                                    {{
+                                        props.dashboard.latest_order
+                                            .item_count === 1
                                             ? 'product'
                                             : 'products'
                                     }}
                                     ·
                                     {{
-                                        props.dashboard.latest_order.total_quantity
+                                        props.dashboard.latest_order
+                                            .total_quantity
                                     }}
                                     {{
                                         props.dashboard.latest_order
@@ -409,7 +391,9 @@ defineOptions({
                                             : 'units'
                                     }}
                                 </dt>
-                                <dd class="mt-1 text-2xl font-bold tabular-nums">
+                                <dd
+                                    class="mt-1 text-2xl font-bold tabular-nums"
+                                >
                                     {{
                                         formatCurrency(
                                             props.dashboard.latest_order.total,
@@ -422,18 +406,25 @@ defineOptions({
 
                     <div
                         v-else
-                        class="border-border bg-card flex min-h-72 items-center justify-center border border-dashed p-8 text-center"
+                        class="surface-panel border-border bg-card flex min-h-72 items-center justify-center border border-dashed p-8 text-center"
                     >
                         <div class="max-w-md">
                             <span
                                 class="border-border bg-secondary text-muted-foreground mx-auto flex size-14 items-center justify-center border"
                             >
-                                <PackageOpen class="size-6" aria-hidden="true" />
+                                <PackageOpen
+                                    class="size-6"
+                                    aria-hidden="true"
+                                />
                             </span>
-                            <h3 class="mt-5 text-xl font-bold">No orders yet</h3>
-                            <p class="text-muted-foreground mt-2 text-sm leading-6">
-                                Your latest order and its fulfillment progress will
-                                appear here after checkout.
+                            <h3 class="mt-5 text-xl font-bold">
+                                No orders yet
+                            </h3>
+                            <p
+                                class="text-muted-foreground mt-2 text-sm leading-6"
+                            >
+                                Your latest order and its fulfillment progress
+                                will appear here after checkout.
                             </p>
                             <Button as-child class="mt-6">
                                 <Link :href="productIndex()">

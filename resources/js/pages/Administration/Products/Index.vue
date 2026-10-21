@@ -7,7 +7,6 @@ import {
     Plus,
     RotateCcw,
     Search,
-    SlidersHorizontal,
     Star,
     X,
 } from '@lucide/vue';
@@ -175,10 +174,8 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Products" />
-
     <main
-        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
+        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
     >
         <section class="border-border bg-card relative overflow-hidden border">
             <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
@@ -260,7 +257,7 @@ defineOptions({
             </div>
 
             <div
-                class="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
+                class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
             >
                 <div class="grid gap-2">
                     <Label for="admin-product-search">Search products</Label>
@@ -277,19 +274,14 @@ defineOptions({
                             autocomplete="off"
                         />
                     </div>
-                    <p class="text-muted-foreground text-xs" aria-live="polite">
-                        {{
-                            isSearching
-                                ? 'Updating results...'
-                                : 'Results update automatically as you type.'
-                        }}
-                    </p>
+                    <span class="sr-only" role="status">{{
+                        isSearching ? 'Updating results...' : ''
+                    }}</span>
                 </div>
                 <Button
                     v-if="hasSearchInput"
                     type="button"
                     variant="outline"
-                    class="sm:mb-5"
                     @click="clearSearch"
                 >
                     <X />
@@ -297,9 +289,7 @@ defineOptions({
                 </Button>
             </div>
 
-            <div
-                class="border-border mt-5 grid gap-4 border-t pt-5 md:grid-cols-2 xl:grid-cols-4"
-            >
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <div class="grid gap-2">
                     <Label for="admin-product-category">Category</Label>
                     <Select v-model="categoryId">
@@ -415,7 +405,7 @@ defineOptions({
 
             <div
                 v-if="products.data.length === 0"
-                class="border-border bg-card flex min-h-52 items-center justify-center border p-6 text-center"
+                class="surface-panel border-border bg-card flex min-h-52 items-center justify-center border p-6 text-center"
             >
                 <div>
                     <PackageSearch
@@ -452,7 +442,7 @@ defineOptions({
 
             <div
                 v-else
-                class="border-border bg-card divide-border divide-y border"
+                class="surface-panel border-border bg-card divide-border divide-y border"
             >
                 <article
                     v-for="product in products.data"

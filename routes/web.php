@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Administration\AdministrationEvidenceController;
 use App\Http\Controllers\Administration\AuditLogController;
+use App\Http\Controllers\Administration\BranchController as AdministrationBranchController;
 use App\Http\Controllers\Administration\CategoryActivationController;
 use App\Http\Controllers\Administration\CategoryController;
 use App\Http\Controllers\Administration\ChatbotKnowledgeActivationController;
@@ -151,6 +152,9 @@ Route::middleware(['auth', 'can:access-administration'])
     ->name('administration.')
     ->group(function () {
         Route::get('work-queue', [WorkQueueController::class, 'index'])->name('work-queue.index');
+        Route::resource('branches', AdministrationBranchController::class)
+            ->except('destroy')
+            ->where(['branch' => '[0-9]+']);
         // notifications
         Route::get('notifications', [AdministrationNotificationController::class, 'index'])->name('notifications.index');
         Route::get('notifications/summary', [AdministrationNotificationController::class, 'summary'])->name('notifications.summary');

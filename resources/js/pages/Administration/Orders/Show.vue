@@ -1312,10 +1312,7 @@ defineOptions({
                             shipment reaches Delivered.
                         </p>
                         <p class="text-muted-foreground text-xs leading-5">
-                            Failed delivery, uncollected payment, and returns
-                            require separate manual follow-up. This workflow
-                            does not cancel, refund, return, or restore stock
-                            automatically. No live LBC settlement is verified.
+                            Handle failed delivery, unpaid orders, and returns manually. No automatic cancellation, refund, return, or stock restoration occurs. No live LBC settlement is verified.
                         </p>
                         <Dialog v-model:open="codConfirmationOpen">
                             <DialogContent>

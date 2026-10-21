@@ -2,52 +2,44 @@
 import { Head, Link } from '@inertiajs/vue3';
 import {
     ArrowRight,
-    Cpu,
-    HardDrive,
-    Headphones,
-    Keyboard,
+    ArrowUpRight,
+    Mail,
     MapPinned,
-    Monitor,
     PackageCheck,
+    Phone,
     Search,
     SlidersHorizontal,
 } from '@lucide/vue';
+import AppLogo from '@/components/AppLogo.vue';
 import StorefrontHeader from '@/components/StorefrontHeader.vue';
 import { Button } from '@/components/ui/button';
 import { dashboard, register } from '@/routes';
 import { index as branchIndex } from '@/routes/branches';
-
-const hardwareAreas = [
-    { name: 'Processors', icon: Cpu },
-    { name: 'Storage', icon: HardDrive },
-    { name: 'Displays', icon: Monitor },
-    { name: 'Peripherals', icon: Keyboard },
-];
+import { index as productIndex } from '@/routes/products';
 
 const customerHighlights = [
     {
         title: 'Find the right hardware',
-        description:
-            'Browse computer products by category, brand, and price using the catalog filters.',
+        description: 'Filter computer hardware by category, brand, and price.',
         icon: Search,
     },
     {
         title: 'Choose with confidence',
         description:
-            'Explore product suggestions shaped by your catalog searches, viewed products, cart, and completed purchases. You can disable search or view personalization in your profile.',
+            'Discover product suggestions, with personalization controls in your profile.',
         icon: SlidersHorizontal,
     },
     {
         title: 'Keep track of your order',
         description:
-            'Use your Battlefront account to manage purchases and follow order progress in one place.',
+            'Manage purchases and follow order progress from your account.',
         icon: PackageCheck,
     },
 ];
 </script>
 
 <template>
-    <div class="dark bg-background text-foreground min-h-screen">
+    <div class="bg-background text-foreground min-h-screen">
         <Head title="Home">
             <meta
                 head-key="description"
@@ -64,39 +56,33 @@ const customerHighlights = [
                 aria-labelledby="hero-heading"
             >
                 <div
-                    class="bg-size[48px_48px] pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,#2a2e36_1px,transparent_1px),linear-gradient(to_bottom,#2a2e36_1px,transparent_1px)] mask-[linear-gradient(to_bottom,black,transparent_82%)] opacity-35"
-                    aria-hidden="true"
-                />
-
-                <div
-                    class="relative mx-auto grid max-w-7xl gap-12 px-5 py-16 sm:px-8 sm:py-24 lg:grid-cols-[1.15fr_0.85fr] lg:items-center lg:gap-16 lg:py-28"
+                    class="mx-auto grid max-w-7xl gap-6 px-5 py-6 sm:gap-10 sm:px-8 sm:py-14 lg:grid-cols-2 lg:items-center lg:gap-12 lg:py-16"
                 >
                     <div>
-                        <div
-                            class="border-primary/40 bg-primary/10 mb-6 inline-flex items-center gap-2 border px-3 py-1.5 text-xs font-bold tracking-[0.18em] text-[#ef1b1b] uppercase"
+                        <p
+                            class="text-primary-ink mb-4 text-xs font-semibold tracking-[0.14em] uppercase sm:mb-5"
                         >
-                            <Cpu class="size-4" aria-hidden="true" />
-                            Computer hardware, made clearer
-                        </div>
+                            EXPLORE. CHOOSE. UPGRADE.
+                        </p>
 
                         <h1
                             id="hero-heading"
                             class="max-w-3xl text-4xl leading-[1.05] font-bold tracking-tight text-balance sm:text-6xl lg:text-7xl"
                         >
-                            Build your next setup with
-                            <span class="text-[#ef1b1b]">confidence.</span>
+                            Better <span class="text-primary-ink">tech</span>
+                            starts here.
                         </h1>
 
                         <p
-                            class="text-muted-foreground mt-6 max-w-2xl text-base leading-7 sm:text-lg sm:leading-8"
+                            class="text-muted-foreground mt-4 max-w-2xl text-base leading-7 sm:mt-6 sm:text-lg sm:leading-8"
                         >
-                            Battlefront Computer Trading brings computer
-                            hardware, guided product discovery, and local branch
-                            information together for a more focused buying
-                            experience.
+                            Discover computer hardware and accessories for every
+                            setup.
                         </p>
 
-                        <div class="mt-9 flex flex-col gap-3 sm:flex-row">
+                        <div
+                            class="mt-5 flex flex-col gap-3 sm:mt-7 sm:flex-row"
+                        >
                             <Button
                                 v-if="$page.props.auth.user"
                                 as-child
@@ -122,138 +108,75 @@ const customerHighlights = [
                         </div>
                     </div>
 
-                    <div
-                        class="border-border bg-card border shadow-2xl shadow-black/30"
-                        aria-label="Hardware categories"
-                    >
-                        <div
-                            class="border-border flex items-center justify-between border-b px-5 py-4"
-                        >
-                            <div>
-                                <p
-                                    class="text-xs font-bold tracking-[0.16em] text-[#ef1b1b] uppercase"
-                                >
-                                    Build station
-                                </p>
-                                <p class="mt-1 font-semibold">
-                                    Start with the essentials
-                                </p>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-2">
-                            <div
-                                v-for="(area, index) in hardwareAreas"
-                                :key="area.name"
-                                class="group border-border motion-safe:hover:bg-secondary/60 flex min-h-36 flex-col justify-between p-5 motion-safe:transition-colors sm:min-h-44 sm:p-6"
-                                :class="[
-                                    index % 2 === 0 ? 'border-r' : '',
-                                    index < 2 ? 'border-b' : '',
-                                ]"
-                            >
-                                <component
-                                    :is="area.icon"
-                                    class="text-muted-foreground size-7 motion-safe:transition-colors motion-safe:group-hover:text-[#ef1b1b]"
-                                    aria-hidden="true"
-                                />
-                                <p class="text-sm font-semibold sm:text-base">
-                                    {{ area.name }}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
+                    <picture class="hidden sm:contents">
+                        <source
+                            class="hidden"
+                            media="(min-width: 640px)"
+                            srcset="/images/hero/battlefront-mouse-finger.webp"
+                            type="image/webp"
+                        />
+                        <img
+                            src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1' height='1'/%3E"
+                            alt="White computer mouse with a finger hovering above it"
+                            width="1597"
+                            height="985"
+                            loading="eager"
+                            fetchpriority="high"
+                            decoding="async"
+                            class="mx-auto block h-auto w-[85%] max-w-xs mask-[linear-gradient(to_right,#000_92%,transparent_100%)] object-contain sm:max-w-[26rem] lg:mr-0 lg:w-full lg:max-w-xl"
+                        />
+                    </picture>
                 </div>
             </section>
 
             <section
-                class="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-24"
+                class="mx-auto max-w-7xl px-5 py-10 sm:px-8 sm:py-12"
                 aria-labelledby="shopping-heading"
             >
-                <div class="max-w-2xl">
-                    <p
-                        class="text-xs font-bold tracking-[0.18em] text-[#ef1b1b] uppercase"
-                    >
-                        A focused buying experience
-                    </p>
-                    <h2
-                        id="shopping-heading"
-                        class="mt-3 text-3xl font-bold tracking-tight sm:text-4xl"
-                    >
-                        From the first search to your order
-                    </h2>
-                    <p class="text-muted-foreground mt-4 leading-7">
-                        Battlefront is designed around the practical steps of
-                        choosing computer hardware and staying informed after
-                        checkout.
-                    </p>
-                </div>
+                <h2
+                    id="shopping-heading"
+                    class="text-2xl font-bold tracking-tight sm:text-3xl"
+                >
+                    From the first search to your order
+                </h2>
 
-                <div class="border-border mt-10 grid border-y lg:grid-cols-3">
+                <div class="mt-6 grid gap-6 sm:mt-8 sm:gap-8 md:grid-cols-3">
                     <article
-                        v-for="(highlight, index) in customerHighlights"
+                        v-for="highlight in customerHighlights"
                         :key="highlight.title"
-                        class="border-border py-8 lg:px-8"
-                        :class="[
-                            index > 0
-                                ? 'border-t lg:border-t-0 lg:border-l'
-                                : '',
-                            index === 0 ? 'lg:pl-0' : '',
-                            index === customerHighlights.length - 1
-                                ? 'lg:pr-0'
-                                : '',
-                        ]"
+                        class="flex items-start gap-3"
                     >
-                        <div
-                            class="border-primary/40 bg-primary/10 flex size-11 items-center justify-center border text-[#ef1b1b]"
-                        >
-                            <component
-                                :is="highlight.icon"
-                                class="size-5"
-                                aria-hidden="true"
-                            />
+                        <component
+                            :is="highlight.icon"
+                            class="text-primary-ink mt-0.5 size-5 shrink-0"
+                            aria-hidden="true"
+                        />
+                        <div>
+                            <h3 class="font-semibold">
+                                {{ highlight.title }}
+                            </h3>
+                            <p
+                                class="text-muted-foreground mt-2 text-sm leading-6"
+                            >
+                                {{ highlight.description }}
+                            </p>
                         </div>
-                        <h3 class="mt-6 text-xl font-bold">
-                            {{ highlight.title }}
-                        </h3>
-                        <p class="text-muted-foreground mt-3 text-sm leading-6">
-                            {{ highlight.description }}
-                        </p>
                     </article>
                 </div>
             </section>
 
-            <section class="border-border bg-card border-y">
+            <section
+                class="mx-auto max-w-7xl px-5 sm:px-8"
+                aria-labelledby="branch-heading"
+            >
                 <div
-                    class="mx-auto grid max-w-7xl gap-8 px-5 py-12 sm:px-8 sm:py-16 lg:grid-cols-[1fr_auto] lg:items-center"
+                    class="border-border flex flex-col items-start gap-4 border-t py-6 sm:flex-row sm:items-center sm:justify-between"
                 >
-                    <div class="flex gap-5">
-                        <div
-                            class="border-primary/40 bg-primary/10 hidden size-12 shrink-0 items-center justify-center border text-[#ef1b1b] sm:flex"
-                        >
-                            <MapPinned class="size-6" aria-hidden="true" />
-                        </div>
-                        <div>
-                            <p
-                                class="text-xs font-bold tracking-[0.18em] text-[#ef1b1b] uppercase"
-                            >
-                                Visit Battlefront
-                            </p>
-                            <h2
-                                class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
-                            >
-                                Find the branch that works for you
-                            </h2>
-                            <p
-                                class="text-muted-foreground mt-3 max-w-2xl text-sm leading-6"
-                            >
-                                Review confirmed locations, contact details,
-                                operating hours, and mapped branches before you
-                                visit.
-                            </p>
-                        </div>
-                    </div>
+                    <h2 id="branch-heading" class="text-lg font-semibold">
+                        Find your Battlefront branch
+                    </h2>
 
-                    <Button as-child size="lg" variant="outline">
+                    <Button as-child variant="outline">
                         <Link :href="branchIndex()">
                             View all branches
                             <ArrowRight aria-hidden="true" />
@@ -263,17 +186,98 @@ const customerHighlights = [
             </section>
         </main>
 
-        <footer class="mx-auto max-w-7xl px-5 py-8 sm:px-8">
+        <footer class="border-border bg-card border-t">
             <div
-                class="text-muted-foreground flex flex-col gap-4 text-sm sm:flex-row sm:items-center sm:justify-between"
+                class="mx-auto grid max-w-7xl gap-6 px-5 py-8 sm:grid-cols-2 sm:px-8 lg:grid-cols-[1fr_1.4fr_1fr] lg:gap-10"
             >
-                <p class="text-foreground font-medium">
-                    Battlefront Computer Trading
-                </p>
-                <p class="flex items-center gap-2">
-                    <Headphones class="size-4" aria-hidden="true" />
-                    Computer hardware and customer support
-                </p>
+                <div>
+                    <div class="w-44">
+                        <AppLogo />
+                    </div>
+                    <nav
+                        aria-label="Footer"
+                        class="text-muted-foreground mt-3 flex flex-wrap gap-x-5 text-sm"
+                    >
+                        <Link
+                            :href="productIndex()"
+                            class="hover:text-primary-ink focus-visible:outline-ring inline-flex min-h-11 items-center rounded-sm py-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4"
+                        >
+                            Shop Products
+                        </Link>
+                        <Link
+                            :href="branchIndex()"
+                            class="hover:text-primary-ink focus-visible:outline-ring inline-flex min-h-11 items-center rounded-sm py-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4"
+                        >
+                            Our Stores
+                        </Link>
+                    </nav>
+                </div>
+
+                <section
+                    aria-labelledby="footer-contact-heading"
+                    class="min-w-0"
+                >
+                    <h2
+                        id="footer-contact-heading"
+                        class="text-sm font-semibold"
+                    >
+                        Contact Us
+                    </h2>
+                    <p class="text-muted-foreground mt-1 text-xs">
+                        Sagay branch
+                    </p>
+                    <address
+                        class="text-muted-foreground mt-2 flex flex-col text-sm not-italic"
+                    >
+                        <a
+                            href="mailto:battlefrontcomputertrading@gmail.com"
+                            class="hover:text-primary-ink focus-visible:outline-ring inline-flex min-h-11 items-center gap-2 rounded-sm py-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4"
+                        >
+                            <Mail class="size-4 shrink-0" aria-hidden="true" />
+                            <span class="min-w-0 break-all"
+                                >battlefrontcomputertrading@gmail.com</span
+                            >
+                        </a>
+                        <a
+                            href="tel:09386476046"
+                            class="hover:text-primary-ink focus-visible:outline-ring inline-flex min-h-11 items-center gap-2 rounded-sm py-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4"
+                        >
+                            <Phone class="size-4 shrink-0" aria-hidden="true" />
+                            0938 647 6046
+                        </a>
+                    </address>
+                </section>
+
+                <section aria-labelledby="footer-social-heading">
+                    <h2
+                        id="footer-social-heading"
+                        class="text-sm font-semibold"
+                    >
+                        Follow our Sagay branch
+                    </h2>
+                    <div
+                        class="text-muted-foreground mt-2 flex flex-wrap gap-x-5 text-sm"
+                    >
+                        <a
+                            href="https://www.facebook.com/BattlefrontComputer"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="hover:text-primary-ink focus-visible:outline-ring inline-flex min-h-11 items-center gap-1 rounded-sm py-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4"
+                        >
+                            Facebook
+                            <ArrowUpRight class="size-4" aria-hidden="true" />
+                        </a>
+                        <a
+                            href="https://www.tiktok.com/@ralphpgonzaga"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="hover:text-primary-ink focus-visible:outline-ring inline-flex min-h-11 items-center gap-1 rounded-sm py-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4"
+                        >
+                            TikTok
+                            <ArrowUpRight class="size-4" aria-hidden="true" />
+                        </a>
+                    </div>
+                </section>
             </div>
         </footer>
     </div>

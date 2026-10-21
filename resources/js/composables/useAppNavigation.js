@@ -14,6 +14,7 @@ import {
 import { usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import CategoryController from '@/actions/App/Http/Controllers/Administration/CategoryController';
+import { index as administrationBranchIndex } from '@/actions/App/Http/Controllers/Administration/BranchController';
 import ChatbotKnowledgeController from '@/actions/App/Http/Controllers/Administration/ChatbotKnowledgeController';
 import CustomerController from '@/actions/App/Http/Controllers/Administration/CustomerController';
 import ForecastingController from '@/actions/App/Http/Controllers/Administration/ForecastingController';
@@ -58,7 +59,9 @@ export function useAppNavigation() {
             },
             {
                 title: 'Branches',
-                href: branchIndex(),
+                href: isAdministrator.value
+                    ? administrationBranchIndex()
+                    : branchIndex(),
                 icon: MapPin,
             },
         ];

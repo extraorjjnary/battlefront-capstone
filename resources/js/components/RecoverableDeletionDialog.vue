@@ -1,10 +1,10 @@
 <script setup>
-import { Form } from "@inertiajs/vue3";
-import { Trash2 } from "@lucide/vue";
-import { ref } from "vue";
-import { toast } from "vue-sonner";
-import InputError from "@/components/InputError.vue";
-import { Button } from "@/components/ui/button";
+import { Form } from '@inertiajs/vue3';
+import { Trash2 } from '@lucide/vue';
+import { ref } from 'vue';
+import { toast } from 'vue-sonner';
+import InputError from '@/components/InputError.vue';
+import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogClose,
@@ -14,8 +14,8 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from "@/components/ui/dialog";
-import { Spinner } from "@/components/ui/spinner";
+} from '@/components/ui/dialog';
+import { Spinner } from '@/components/ui/spinner';
 
 defineProps({
     name: { type: String, required: true },

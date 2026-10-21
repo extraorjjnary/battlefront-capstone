@@ -23,16 +23,9 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Security settings" />
-
-    <h1 class="sr-only">Security settings</h1>
-
     <div class="space-y-6">
-        <Heading
-            variant="small"
-            title="Update password"
-            description="Ensure your account is using a long, random password to stay secure"
-        />
+        <Head title="Security settings" />
+        <Heading variant="small" title="Update password" />
 
         <Form
             v-bind="SecurityController.update.form()"

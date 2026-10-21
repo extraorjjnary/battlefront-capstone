@@ -1,27 +1,26 @@
 <script setup>
-import { Monitor, Moon, Sun } from '@lucide/vue';
+import { Moon, Sun } from '@lucide/vue';
 import { useAppearance } from '@/composables/useAppearance';
 const { appearance, updateAppearance } = useAppearance();
 const tabs = [
     { value: 'light', Icon: Sun, label: 'Light' },
     { value: 'dark', Icon: Moon, label: 'Dark' },
-    { value: 'system', Icon: Monitor, label: 'System' },
 ];
 </script>
 
 <template>
-    <div
-        class="inline-flex max-w-full flex-wrap gap-1 rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800"
-    >
+    <div class="bg-muted inline-flex max-w-full flex-wrap gap-1 rounded-lg p-1">
         <button
             v-for="{ value, Icon, label } in tabs"
             :key="value"
+            type="button"
+            :aria-pressed="appearance === value"
             @click="updateAppearance(value)"
             :class="[
-                'flex min-h-11 items-center rounded-md px-3 py-1.5 transition-colors md:min-h-8 md:px-3.5',
+                'focus-visible:ring-ring flex min-h-11 items-center rounded-md px-3 py-1.5 transition-colors focus-visible:ring-2 focus-visible:outline-none md:min-h-8 md:px-3.5',
                 appearance === value
-                    ? 'bg-white shadow-xs dark:bg-neutral-700 dark:text-neutral-100'
-                    : 'text-neutral-500 hover:bg-neutral-200/60 hover:text-black dark:text-neutral-400 dark:hover:bg-neutral-700/60',
+                    ? 'bg-card text-foreground shadow-xs'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
             ]"
         >
             <component :is="Icon" class="-ml-1 h-4 w-4" />

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Administration;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Repositories\Reporting\SalesReportRepository;
+use BcMath\Number;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -87,12 +88,38 @@ class StaffPerformanceController extends Controller
                 'name' => $sale->name,
                 'orders_count' => (int) $sale->orders_count,
                 'gross_sales' => (string) $sale->gross_sales,
-                'refunds_paid' => bcadd((string) ($refunds[$sale->id] ?? '0.00'), '0.00', 2),
-                'net_sales' => bcsub((string) $sale->gross_sales, (string) ($refunds[$sale->id] ?? '0.00'), 2),
+                'refunds_paid' => (new Number(self::numericAmount($refunds[$sale->id] ?? '0.00')))->add('0.00', 2)->value,
+                'net_sales' => (new Number(self::numericAmount($sale->gross_sales)))->sub(self::numericAmount($refunds[$sale->id] ?? '0.00'), 2)->value,
             ]),
             'unattributed_count' => $canViewAll ? DB::table('sales')->whereNull('handler_id')
                 ->when($from, fn ($query) => $query->whereDate('sale_date', '>=', $from))
                 ->when($to, fn ($query) => $query->whereDate('sale_date', '<=', $to))->count() : 0,
         ]);
+    }
+
+    /**
+     * @return numeric-string
+     */
+    private static function numericAmount(mixed $amount): string
+    {
+        if (! is_string($amount) && ! is_int($amount)) {
+            throw new \UnexpectedValueException('A stored monetary amount is not a decimal string.');
+        }
+
+        $decimal = (string) $amount;
+
+        if (! self::isDecimalAmount($decimal)) {
+            throw new \UnexpectedValueException('A stored monetary amount is not a valid decimal.');
+        }
+
+        return $decimal;
+    }
+
+    /**
+     * @phpstan-assert-if-true numeric-string $amount
+     */
+    private static function isDecimalAmount(string $amount): bool
+    {
+        return preg_match('/^-?\d+(?:\.\d+)?$/D', $amount) === 1;
     }
 }

@@ -13,7 +13,7 @@ test('skeleton shapes retain custom sizing and respect reduced motion', async ()
     );
 
     assert.match(html, /motion-reduce:animate-none/);
-    assert.match(html, /bg-primary\/10/);
+    assert.match(html, /bg-muted/);
     assert.match(html, /h-8 w-full rounded-none/);
     assert.doesNotMatch(html, /rounded-md/);
 });
@@ -35,7 +35,7 @@ for (const name of ['ProductCardSkeleton', 'StatSkeleton', 'ListSkeleton']) {
         );
         if (name === 'ProductCardSkeleton') {
             assert.match(html, /aspect-square.*sm:aspect-3\/2/);
-            assert.match(html, /p-2\.5.*sm:p-4/);
+            assert.match(html, /class="product-card-content"/);
         }
     });
 }

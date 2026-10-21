@@ -271,23 +271,21 @@ onBeforeUnmount(() => {
 <template>
     <section
         v-if="recommendations.length > 0"
-        class="border-border border-t pt-10"
+        class="space-y-4"
         aria-labelledby="recommendation-section-heading"
     >
         <div class="flex flex-wrap items-end justify-between gap-4">
             <div class="max-w-2xl">
-                <p
-                    class="text-primary text-xs font-bold tracking-[0.18em] uppercase"
-                >
-                    Product recommendations
-                </p>
                 <h2
                     id="recommendation-section-heading"
-                    class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
+                    class="text-xl font-semibold tracking-tight"
                 >
                     {{ title }}
                 </h2>
-                <p class="text-muted-foreground mt-2 text-sm leading-6">
+                <p
+                    v-if="description"
+                    class="text-muted-foreground mt-1 text-sm leading-6"
+                >
                     {{ description }}
                 </p>
             </div>
@@ -303,7 +301,7 @@ onBeforeUnmount(() => {
         </p>
         <div
             v-else
-            class="mt-5 grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4"
+            class="mt-5 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4"
         >
             <article
                 v-for="(recommendation, index) in visibleRecommendations"
@@ -311,7 +309,7 @@ onBeforeUnmount(() => {
                 ref="recommendationCards"
                 :data-recommendation-position="index + 1"
                 :data-recommendation-product-id="recommendation.product.id"
-                class="border-border bg-card flex min-w-0 flex-col overflow-hidden border"
+                class="surface-card border-border bg-card flex min-w-0 flex-col overflow-hidden border"
             >
                 <Link
                     :href="productShow(recommendation.product.id)"
@@ -325,12 +323,13 @@ onBeforeUnmount(() => {
                         <ProductImage
                             :image-url="recommendation.product.image_url"
                             :product-name="recommendation.product.name"
-                            class="lg:[&_img]:object-cover"
+                            contain
+                            desktop-cover
                         />
                     </div>
                 </Link>
 
-                <div class="flex flex-1 flex-col gap-2 p-2.5 sm:gap-3 sm:p-4">
+                <div class="product-card-content">
                     <div class="min-w-0">
                         <p
                             class="text-muted-foreground text-xs font-semibold tracking-wide wrap-anywhere uppercase"
@@ -346,7 +345,7 @@ onBeforeUnmount(() => {
                                     index + 1,
                                 )
                             "
-                            class="focus-visible:ring-ring mt-1 line-clamp-2 rounded-sm text-sm leading-snug font-bold wrap-anywhere focus-visible:ring-2 focus-visible:outline-none sm:block sm:line-clamp-none sm:text-base"
+                            class="focus-visible:ring-ring mt-1 block rounded-sm text-sm leading-5 font-bold wrap-anywhere focus-visible:ring-2 focus-visible:outline-none sm:text-base"
                         >
                             {{ recommendation.product.name }}
                         </Link>

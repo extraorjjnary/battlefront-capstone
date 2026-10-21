@@ -1,11 +1,11 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Head, Link } from '@inertiajs/vue3';
 import {
     ArrowRight,
     CalendarDays,
     CreditCard,
     PackageOpen,
-    ReceiptText,
     Store,
     Truck,
 } from '@lucide/vue';
@@ -40,46 +40,12 @@ defineOptions({
 
 <template>
     <div class="contents">
-        <Head title="Order history" />
+        <Head title="My orders" />
 
         <main
-            class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
+            class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
         >
-            <section
-                class="border-border bg-card relative overflow-hidden border p-6 sm:p-8"
-                aria-labelledby="order-history-heading"
-            >
-                <div
-                    class="bg-primary absolute inset-y-0 left-0 w-1"
-                    aria-hidden="true"
-                />
-                <div class="flex items-start gap-4">
-                    <span
-                        class="bg-secondary text-primary flex size-11 shrink-0 items-center justify-center rounded-md"
-                    >
-                        <ReceiptText class="size-5" aria-hidden="true" />
-                    </span>
-                    <div>
-                        <p
-                            class="text-primary text-xs font-semibold tracking-widest uppercase"
-                        >
-                            Customer orders
-                        </p>
-                        <h1
-                            id="order-history-heading"
-                            class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
-                        >
-                            Order history
-                        </h1>
-                        <p
-                            class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6"
-                        >
-                            Review your Battlefront purchases, recorded totals,
-                            and the latest order and payment statuses.
-                        </p>
-                    </div>
-                </div>
-            </section>
+            <PageHeader title="My orders" heading-id="order-history-heading" />
 
             <section aria-labelledby="orders-heading">
                 <div class="mb-4">
@@ -87,14 +53,12 @@ defineOptions({
                         {{ orders.total }}
                         {{ orders.total === 1 ? 'order' : 'orders' }}
                     </p>
-                    <h2 id="orders-heading" class="text-xl font-semibold">
-                        Your orders
-                    </h2>
+                    <h2 id="orders-heading" class="sr-only">Your orders</h2>
                 </div>
 
                 <div
                     v-if="orders.data.length === 0"
-                    class="border-border bg-card flex min-h-80 items-center justify-center border border-dashed p-8 text-center"
+                    class="surface-panel border-border bg-card flex min-h-80 items-center justify-center border border-dashed p-8 text-center"
                 >
                     <div class="max-w-md">
                         <span
@@ -120,7 +84,7 @@ defineOptions({
                     <article
                         v-for="order in orders.data"
                         :key="order.id"
-                        class="border-border bg-card border p-5 sm:p-6"
+                        class="surface-card border-border bg-card border p-5 sm:p-6"
                     >
                         <div
                             class="border-border flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-start sm:justify-between"

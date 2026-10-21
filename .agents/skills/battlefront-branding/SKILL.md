@@ -5,14 +5,15 @@ description: Apply Battlefront Computer Trading's established visual identity to
 
 # Battlefront Branding
 
-Preserve a single recognizable Battlefront identity across the application. The supplied raster artwork is the visual source of truth; this skill interprets it but does not authorize changing it.
+Preserve a single recognizable Battlefront identity across the application. Warm Battlefront Light is the primary theme, with optional Dark Mode. The supplied logo artwork defines the brand identity; the semantic tokens in [app.css](../../../resources/css/app.css) define the current interface palette. This skill documents those approved choices rather than authorizing a new visual identity.
 
 ## Source Assets
 
-Before making a branding-sensitive decision, inspect both files rather than relying on memory:
+Before making a branding-sensitive decision, inspect the approved website assets rather than relying on memory:
 
-- Full horizontal logo: [battlefront-logo.png](../../../docs/assets/battlefront-logo.png) (`2172 x 724`, transparent canvas)
-- Compact symbol: [battlefront-symbol.png](../../../docs/assets/battlefront-symbol.png) (`1254 x 1254`, opaque black background)
+- Light Mode wordmark: [battlefront-logo.webp](../../../docs/assets/battlefront-logo.webp) (`1200 x 303`, transparent canvas)
+- Dark Mode wordmark: [battlefront-logo-dark.webp](../../../docs/assets/battlefront-logo-dark.webp) (`1200 x 303`, transparent canvas; approved white BATTLE lettering and subtitle)
+- Compact symbol: [battlefront-symbol.webp](../../../docs/assets/battlefront-symbol.webp) (`512 x 512`, transparent canvas for both themes)
 
 If an asset is moved, locate the same file in the repository and update these references. If the assets conflict with a written suggestion here, follow the assets and flag the discrepancy. Do not derive a new logo, mark, wordmark, or brand color without an explicit request.
 
@@ -22,12 +23,12 @@ If an asset is moved, locate the same file in the repository and update these re
 - Use the symbol for compact placements such as a collapsed sidebar, square brand tile, or small navigation header. At very small sizes, verify the internal `BCT` details remain readable; otherwise omit the mark instead of degrading it.
 - Keep each image's original aspect ratio and complete visible artwork. Do not crop, stretch, rotate, recolor, redraw, typeset a substitute wordmark, remove details, or add shadows, outlines, gradients, or effects.
 - Give the logo uncluttered surrounding space and strong contrast. Do not place competing text or controls over it.
-- Account for the symbol's baked-in black square background. Place it intentionally on a dark-compatible surface; do not simulate transparency or remove its background unless the user explicitly requests an asset edit.
+- Reuse `AppLogo.vue` and `AppLogoIcon.vue`. The wordmark component selects the approved variant using the existing appearance preference; the symbol is shared across themes. Preserve their transparency without adding a background rectangle or using CSS filters to recolor them.
 - Use accessible alt text appropriate to context. Use `Battlefront Computer Trading` when the logo conveys the site identity, and empty alt text when adjacent text already supplies the same identity.
 
 ## Two-Layer Color System
 
-Keep logo identity colors separate from interface colors. The first layer preserves the source artwork; the second provides a practical dark UI system for both customer and admin experiences.
+Keep logo identity colors separate from interface colors. The first layer preserves the approved artwork; the second provides the shared Warm Battlefront Light and Dark interface themes for customer and admin experiences.
 
 ### Brand Identity Layer
 
@@ -43,29 +44,39 @@ The artwork also contains antialiasing, highlights, shadows, and red/gray gradie
 
 ### Application UI Layer
 
-Use this approved dark palette for branded application interfaces:
+Use Warm Battlefront Light as the default. The main page background is warm off-white `#FAF7F4`; pure white `#FFFFFF` belongs to cards, popovers, navigation, and sidebar surfaces. Use subtle warm accents and red selectively for actions and emphasis.
 
-| Role          | Color     | Use                                                                                   |
-| ------------- | --------- | ------------------------------------------------------------------------------------- |
-| Primary red   | `#EF1B1B` | Brand accents, active indicators, icons, links where contrast passes, and focus rings |
-| Dark red      | `#B91C1C` | Solid primary-action surfaces and darker red interaction states                       |
-| Background    | `#090B10` | Main page and application shell background                                            |
-| Surface       | `#111318` | Cards, panels, dialogs, and navigation surfaces                                       |
-| Surface light | `#1B1E24` | Raised, selected, or secondary surfaces                                               |
-| Primary text  | `#F8FAFC` | Headings, body copy, labels, and high-emphasis content                                |
-| Muted text    | `#9CA3AF` | Supporting text, metadata, placeholders, and secondary content                        |
-| Border        | `#2A2E36` | Subtle dividers and nonessential surface separation                                   |
+These values match `:root` and `.dark` in `resources/css/app.css`. Reuse the semantic tokens instead of scattering hex values through components.
 
-Apply the UI layer through semantic roles rather than using raw values by convenience. Use red selectively so hierarchy remains clear, and never recolor the logo to match the softer UI reds. If a light theme is retained or introduced, keep its existing semantic neutral tokens until a separate light palette is explicitly approved; the logo identity layer remains unchanged.
+| Semantic token                                | Light (default) | Dark (optional) | Role                                           |
+| --------------------------------------------- | --------------- | --------------- | ---------------------------------------------- |
+| `--background`                                | `#FAF7F4`       | `#090B10`       | Main page and application background           |
+| `--card`, `--popover`, `--sidebar-background` | `#FFFFFF`       | `#111318`       | Cards, dialogs, menus, and navigation surfaces |
+| `--secondary`, `--accent`                     | `#F2EDE8`       | `#1B1E24`       | Secondary and selected surfaces                |
+| `--muted`                                     | `#F0EBE6`       | `#1B1E24`       | Muted surface areas                            |
+| `--warm-accent`                               | `#EBD6CC`       | `#2C2220`       | Subtle warm accents                            |
+| `--foreground`                                | `#242120`       | `#F8FAFC`       | Headings, body copy, and labels                |
+| `--muted-foreground`                          | `#6B625E`       | `#9CA3AF`       | Supporting text and metadata                   |
+| `--primary`                                   | `#B91C1C`       | `#B91C1C`       | Solid primary actions                          |
+| `--primary-foreground`                        | `#FFFFFF`       | `#F8FAFC`       | Text on primary actions                        |
+| `--primary-ink`                               | `#B91C1C`       | `#F87171`       | Emphasized text, links, and icons              |
+| `--brand-highlight`                           | `#EF1B1B`       | `#EF1B1B`       | Selective brand highlights                     |
+| `--border`                                    | `#E2DAD4`       | `#2A2E36`       | Subtle dividers                                |
+| `--input`                                     | `#94867D`       | `#687282`       | Visible input boundaries                       |
+| `--ring`                                      | `#B91C1C`       | `#EF1B1B`       | Keyboard focus indicators                      |
+
+### Appearance Behavior
+
+- Default to Light when no valid explicit preference exists; preserve explicit guest and account Dark selections.
+- Reuse the existing `useAppearance` composable and pre-paint initialization. Guest Light/Dark preferences and authenticated account preferences remain separate; do not introduce another theme store or operating-system override.
+- Apply both themes through the shared semantic tokens and existing `.dark` selector. Do not create a separate administrator palette or force a theme on individual pages.
 
 ### Contrast and State Rules
 
-- Primary text has strong contrast on the background and surface colors. Muted text is also suitable for readable secondary copy on those dark surfaces.
-- `#F8FAFC` on primary red `#EF1B1B` has approximately `4.14:1` contrast and does not meet WCAG AA for normal-sized text. Do not use that pairing for ordinary filled buttons or small labels.
-- Use dark red `#B91C1C` with primary text `#F8FAFC` for filled actions; the pairing has approximately `6.18:1` contrast.
-- Primary red against the background has approximately `4.54:1` contrast and is suitable for visible accents and focus indicators.
-- Border `#2A2E36` is intentionally subtle and has insufficient contrast to be the only visible boundary of an interactive control. Inputs and controls need additional surface contrast, labels, and clearly visible focus states.
-- Do not rely on red alone to distinguish brand actions, validation errors, destructive actions, or status. Pair meaning with labels, icons, placement, or other established cues.
+- Use `bg-primary` with `text-primary-foreground` for filled actions. The bright `#EF1B1B` highlight is not the default filled-button surface for normal-sized text.
+- Use `text-primary-ink` for red text and icons so their color follows the active theme. Keep supporting text on the matching semantic background and verify contrast when adding opacity or overlays.
+- Keep borders restrained. Subtle `--border` dividers must not be the only visible boundary of an interactive control; use the existing input surface, `--input` boundary, and visible focus ring.
+- Do not rely on red alone for validation errors, destructive actions, or status. Retain labels, icons, and the existing semantic state variants.
 
 ## Typography
 
@@ -76,7 +87,7 @@ Apply the UI layer through semantic roles rather than using raw values by conven
 
 ## Visual Style
 
-Aim for a confident computer-retail aesthetic: crisp geometry, strong contrast, structured spacing, and restrained red accents. Prefer clean surfaces and purposeful borders over decorative effects. Let product information and task hierarchy dominate; reserve the high-energy logo treatment for brand moments.
+Aim for a clean, approachable computer-retail aesthetic: warm off-white page backgrounds, white surfaces, readable charcoal text, compact spacing, and restrained red accents. Keep the same hierarchy and geometry in optional Dark Mode. Favor clear product imagery, concise copy, subtle elevation, and purposeful borders over decorative effects. Let product information and customer tasks dominate.
 
 Reuse established components and interaction patterns before creating variants. Keep corner radii, elevation, icon treatment, spacing rhythm, focus states, disabled states, and responsive behavior consistent with surrounding screens. Do not copy the logo's bevels, glow, speed lines, or gradients onto routine cards, buttons, tables, or form fields.
 
@@ -92,11 +103,12 @@ Reuse established components and interaction patterns before creating variants. 
 
 - This project uses Tailwind CSS v4 and CSS-first theme configuration. Preserve existing semantic utilities such as `bg-background`, `text-foreground`, `border-border`, and `text-muted-foreground` for general interface structure.
 - Map the application UI layer to the existing semantic CSS variables instead of scattering hex values through Vue templates: background to `--background`, primary text to `--foreground`, surface to card/popover/sidebar surfaces, muted text to `--muted-foreground`, and border to `--border` where a subtle divider is appropriate.
-- Map solid primary actions to dark red with primary text as the foreground. Use primary red for accent and ring roles. Do not map the logo-only `#FF0000` anchor into general component tokens.
-- When dedicated utilities are genuinely useful, define narrowly named Tailwind v4 theme variables such as `--color-brand-primary`, `--color-brand-primary-dark`, `--color-brand-surface`, and `--color-brand-surface-light` from the approved UI layer. Keep component behavior semantic rather than coupling every component to brand-specific utilities.
+- Use `bg-background` for the warm-neutral page shell, `bg-card` for white surfaces, `bg-secondary` for secondary areas, and `bg-warm-accent` sparingly. These utilities adapt through the existing theme tokens.
+- Use `bg-primary text-primary-foreground` for filled actions, `text-primary-ink` for emphasized text/icons, and `ring-ring` for focus. Do not substitute `--brand-highlight` or the logo-only `#FF0000` for those semantic roles.
+- Reuse the current CSS-first theme mappings before adding utilities; do not introduce a parallel palette that drifts from `resources/css/app.css`.
 - Prefer semantic component variants over scattering repeated arbitrary color values through Vue templates. Reuse the project's class-merging and component patterns.
 - Provide visible focus, hover, active, disabled, error, and loading states. Brand styling must not weaken keyboard navigation, readability, or contrast.
-- Follow the project's responsive and dark-mode conventions. The logo identity remains red/black/white in every mode; do not derive an unapproved light UI palette from the logo artwork.
+- Preserve responsive behavior, Light as the default, and optional Dark Mode through the existing appearance flow. Select the approved logo variant instead of recoloring the artwork or changing the interface palette to match it.
 
 ## Customer and Admin Consistency
 
@@ -109,4 +121,4 @@ Both experiences must share the same logo files, two-layer color system, typogra
 
 ## Decision Boundary
 
-When a requested treatment would recolor or redraw the logo, add a color beyond the approved two-layer system, choose an official brand typeface, or materially depart from these source assets, stop and ask for explicit direction. Present implementation-specific UI choices as applications of the existing identity, not as new brand standards.
+Using the approved Light/Dark tokens and logo variants is already authorized. When a new treatment would recolor or redraw the artwork beyond those variants, add an unapproved brand color, choose an official brand typeface, or materially depart from these source assets, ask for explicit direction. Present implementation-specific UI choices as applications of the existing identity, not as new brand standards.

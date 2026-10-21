@@ -62,6 +62,24 @@ test(
                     h(loadSkeletonComponent('ListSkeleton.vue')),
                 ]),
                 h(loadSkeletonComponent('RecommendationSkeleton.vue')),
+                h(
+                    loadSkeletonComponent('ui/card/Card.vue'),
+                    { class: 'w-80 max-w-full' },
+                    { default: () => h('p', 'Shared card surface') },
+                ),
+                h(
+                    'section',
+                    { class: 'surface-panel border border-border bg-card p-4' },
+                    [
+                        h(
+                            'button',
+                            {
+                                class: 'rounded-md border border-input bg-card px-3 py-2',
+                            },
+                            'Compact control',
+                        ),
+                    ],
+                ),
             ]),
         );
         const fixture = join(fixtureDir, 'skeletons.html');
@@ -97,6 +115,14 @@ test(
                     scrollWidth: doc.documentElement.scrollWidth, clientWidth: doc.documentElement.clientWidth,
                     imageRatio: image.getBoundingClientRect().width / image.getBoundingClientRect().height,
                     background: style(doc.body).backgroundColor,
+                    surfaces: [...doc.querySelectorAll('.surface-card, .surface-panel')].map(element => ({
+                        panel: element.classList.contains('surface-panel'),
+                        radius: style(element).borderTopLeftRadius,
+                        shadow: style(element).boxShadow,
+                        border: style(element).borderTopWidth,
+                    })),
+                    cardPadding: style(doc.querySelector('.product-card-content')).paddingLeft,
+                    controlRadius: style(doc.querySelector('button')).borderTopLeftRadius,
                     reduced: frame.contentWindow.matchMedia('(prefers-reduced-motion: reduce)').matches,
                     animations: [...doc.querySelectorAll('[data-slot="skeleton"]')].map((element) => style(element).animationName),
                 };
@@ -146,7 +172,41 @@ test(
                     result.background,
                     result.theme === 'dark'
                         ? 'rgb(9, 11, 16)'
-                        : 'rgb(255, 255, 255)',
+                        : 'rgb(250, 247, 244)',
+                );
+                assert.equal(
+                    result.cardPadding,
+                    result.width < 640 ? '12px' : '16px',
+                );
+                assert.ok(
+                    result.surfaces.length >= 3,
+                    'Shared cards, placeholders and panels render',
+                );
+                for (const surface of result.surfaces) {
+                    assert.equal(
+                        surface.radius,
+                        surface.panel ? '16px' : '12px',
+                    );
+                    assert.notEqual(
+                        surface.shadow,
+                        'none',
+                        'Surfaces have restrained depth',
+                    );
+                    assert.equal(
+                        surface.shadow.includes('inset'),
+                        result.theme === 'dark',
+                        'Dark surfaces use a subtle inner highlight',
+                    );
+                    assert.equal(
+                        surface.border,
+                        '1px',
+                        'Surface decoration keeps a single border',
+                    );
+                }
+                assert.equal(
+                    result.controlRadius,
+                    '6px',
+                    'Compact control proportions stay unchanged',
                 );
                 if (reduced) {
                     assert.equal(result.reduced, true);

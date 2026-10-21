@@ -18,7 +18,12 @@ let mapInstance = null;
 let isUnmounted = false;
 
 const hasValidCoordinates = (branch) => {
-    if (branch.latitude === null || branch.longitude === null) {
+    if (
+        branch.latitude == null ||
+        branch.longitude == null ||
+        String(branch.latitude).trim() === '' ||
+        String(branch.longitude).trim() === ''
+    ) {
         return false;
     }
 
@@ -141,7 +146,7 @@ onBeforeUnmount(() => {
         >
             <div>
                 <p
-                    class="text-primary text-xs font-bold tracking-[0.18em] uppercase"
+                    class="text-primary-ink text-xs font-bold tracking-[0.18em] uppercase"
                 >
                     Location map
                 </p>
@@ -158,7 +163,7 @@ onBeforeUnmount(() => {
         </div>
 
         <figure
-            class="border-border bg-card isolate overflow-hidden border shadow-sm"
+            class="surface-panel border-border bg-card isolate overflow-hidden border"
         >
             <div class="relative min-h-96">
                 <div
@@ -222,3 +227,28 @@ onBeforeUnmount(() => {
         </figure>
     </section>
 </template>
+
+<style scoped>
+:deep(.leaflet-popup-content-wrapper),
+:deep(.leaflet-popup-tip),
+:deep(.leaflet-tooltip),
+:deep(.leaflet-bar a),
+:deep(.leaflet-control-attribution) {
+    background: var(--popover);
+    color: var(--popover-foreground);
+}
+
+:deep(.leaflet-tooltip),
+:deep(.leaflet-bar) {
+    border-color: var(--input);
+}
+
+:deep(.leaflet-bar a:hover) {
+    background: var(--accent);
+}
+
+:deep(.leaflet-control-attribution a),
+:deep(.leaflet-popup-close-button) {
+    color: var(--primary-ink);
+}
+</style>

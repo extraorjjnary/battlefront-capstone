@@ -49,7 +49,7 @@ class PrepareCheckout
             }
         }
         $pickupBranch = Branch::query()
-            ->select(['name', 'address', 'city', 'contact_number'])
+            ->select(['name', 'address', 'city', 'contact_number', 'operating_hours'])
             ->operational()
             ->sole();
 

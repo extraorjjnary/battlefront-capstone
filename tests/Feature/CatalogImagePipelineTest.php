@@ -14,7 +14,6 @@ function catalogImageManifest(array $overrides = []): string
         'category_slug' => 'graphics-card',
         'source_file' => 'Graphics_Card.xlsx',
         'source_row' => 4,
-        'reference_image' => 'images/demo-products/graphics-card.png',
         'prompt' => 'One exact graphics card on a dark studio background.',
         'image_path' => 'products/graphics-card/A001.webp',
         'status' => 'pending',

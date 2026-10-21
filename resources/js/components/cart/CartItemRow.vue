@@ -49,15 +49,14 @@ const exceedsStock = computed(
     () => canUpdate.value && enteredQuantity.value > availableQuantity.value,
 );
 const isAtMaximum = computed(
-    () =>
-        canUpdate.value &&
-        enteredQuantity.value === availableQuantity.value,
+    () => canUpdate.value && enteredQuantity.value === availableQuantity.value,
 );
-const canUpdate = computed(() =>
-    availableQuantity.value > 0 &&
-    ['available', 'insufficient_stock'].includes(
-        props.item.availability.status,
-    ),
+const canUpdate = computed(
+    () =>
+        availableQuantity.value > 0 &&
+        ['available', 'insufficient_stock'].includes(
+            props.item.availability.status,
+        ),
 );
 const productIsBrowsable = computed(
     () => props.item.availability.status !== 'product_ineligible',
@@ -68,9 +67,10 @@ function trackEnteredQuantity(event) {
 }
 
 const availabilityCopy = computed(() => {
-    const status = isAvailable.value && !(availableQuantity.value > 0)
-        ? 'inventory_unavailable'
-        : props.item.availability.status;
+    const status =
+        isAvailable.value && !(availableQuantity.value > 0)
+            ? 'inventory_unavailable'
+            : props.item.availability.status;
     return {
         product_ineligible: {
             title: 'Product unavailable',
@@ -92,9 +92,10 @@ const availabilityCopy = computed(() => {
         },
         insufficient_stock: {
             title: 'Quantity exceeds stock',
-            description: availableQuantity.value === null
-                ? 'Current stock information is unavailable. Check again before continuing.'
-                : `Your cart has ${props.item.quantity}, but only ${availableQuantity.value} are currently available. Reduce the quantity to continue.`,
+            description:
+                availableQuantity.value === null
+                    ? 'Current stock information is unavailable. Check again before continuing.'
+                    : `Your cart has ${props.item.quantity}, but only ${availableQuantity.value} are currently available. Reduce the quantity to continue.`,
             icon: TriangleAlert,
         },
     }[status];
@@ -109,7 +110,10 @@ const availabilityCopy = computed(() => {
                 :model-value="selected"
                 @update:model-value="emit('update:selected', $event === true)"
             />
-            <Label :for="`select-cart-item-${item.id}`" class="min-h-11 md:min-h-0">
+            <Label
+                :for="`select-cart-item-${item.id}`"
+                class="min-h-11 md:min-h-0"
+            >
                 Select {{ item.product.name }} for checkout
             </Label>
         </div>
@@ -129,11 +133,24 @@ const availabilityCopy = computed(() => {
                         <Badge variant="secondary">
                             {{ item.product.category }}
                         </Badge>
-                        <Badge v-if="isAvailable && availableQuantity > 0" variant="outline">
-                            In stock<template v-if="availableQuantity > 0"> · {{ availableQuantity }} available</template>
+                        <Badge
+                            v-if="isAvailable && availableQuantity > 0"
+                            variant="outline"
+                        >
+                            In stock<template v-if="availableQuantity > 0">
+                                · {{ availableQuantity }} available</template
+                            >
                         </Badge>
                     </div>
-                    <p v-if="!isAvailable && item.availability.status !== 'product_ineligible' && availableQuantity !== null" class="text-muted-foreground mt-2 text-xs" aria-live="polite">
+                    <p
+                        v-if="
+                            !isAvailable &&
+                            item.availability.status !== 'product_ineligible' &&
+                            availableQuantity !== null
+                        "
+                        class="text-muted-foreground mt-2 text-xs"
+                        aria-live="polite"
+                    >
                         {{ availableQuantity }} available
                     </p>
                     <p
@@ -228,7 +245,11 @@ const availabilityCopy = computed(() => {
                             class="text-muted-foreground text-xs"
                             aria-live="polite"
                         >
-                            {{ exceedsStock ? `Only ${availableQuantity} available. Reduce the quantity to continue.` : 'Maximum available quantity reached.' }}
+                            {{
+                                exceedsStock
+                                    ? `Only ${availableQuantity} available. Reduce the quantity to continue.`
+                                    : 'Maximum available quantity reached.'
+                            }}
                         </p>
                         <InputError :message="errors.quantity" />
                     </div>

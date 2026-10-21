@@ -32,7 +32,13 @@ const modules = new Proxy(
         '@/lib/currency': { formatCurrency },
         '@/routes/products': { show: route },
         '@/actions/App/Http/Controllers/Administration/ProductController': {
-            default: { index: route, edit: route, create: route, store: { form: route }, destroy: { form: route } },
+            default: {
+                index: route,
+                edit: route,
+                create: route,
+                store: { form: route },
+                destroy: { form: route },
+            },
         },
         '@/lib/catalogReturn': {
             rememberCatalogVisit() {},
@@ -122,7 +128,10 @@ test('handling details display supplied pricing, preparation, and once per order
             ),
         );
         assert.ok(html.includes('once per delivery order, not per item'));
-        assert.doesNotMatch(html, /highest profile|configured destination fee|available delivery estimate/);
+        assert.doesNotMatch(
+            html,
+            /highest profile|configured destination fee|available delivery estimate/,
+        );
         assert.ok(html.includes('configured delivery routes'));
     }
 });
@@ -223,11 +232,14 @@ test('add product summaries retain each surcharge and profile without preparatio
 
 test('the add product page hides preparation wording and shows the zero surcharge', async () => {
     const html = await renderToString(
-        Vue.createSSRApp(loadComponent('../../pages/Administration/Products/Create.vue'), {
-            categories: formProps.categories,
-            tags: [],
-            shipping_profiles: profiles,
-        }),
+        Vue.createSSRApp(
+            loadComponent('../../pages/Administration/Products/Create.vue'),
+            {
+                categories: formProps.categories,
+                tags: [],
+                shipping_profiles: profiles,
+            },
+        ),
     );
     assert.ok(html.includes(formatCurrency('0.00')));
     assert.ok(html.includes('Standard'));

@@ -27,6 +27,21 @@ test('branch follow ups retain the intent and use the newly named city', functio
     ChatbotResponseAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, 'San Carlos address') && ! str_contains($prompt->prompt, 'Sagay address'));
 });
 
+test('branch follow ups stop exposing a branch after it is unpublished', function () {
+    Http::preventStrayRequests();
+    ChatbotResponseAgent::fake(['Confirmed store information.'])->preventStrayPrompts();
+    $branch = Branch::factory()->create(['city' => 'San Carlos City']);
+    $chat = app(ChatbotConversation::class);
+    $first = $chat->respond('Where is the San Carlos branch?', null, null, 'session-a');
+    $branch->update(['is_published' => false]);
+
+    $response = $chat->respond('What are its opening hours?', null, $first['context_token'], 'session-a');
+
+    expect($response['source'])->toBe('fallback');
+    ChatbotResponseAgent::assertPromptedTimes(1);
+    Http::assertNothingSent();
+});
+
 test('product follow ups requery inventory and stop after product deactivation', function () {
     Http::preventStrayRequests();
     ChatbotResponseAgent::fake(['Product price.', 'Current stock.'])->preventStrayPrompts();

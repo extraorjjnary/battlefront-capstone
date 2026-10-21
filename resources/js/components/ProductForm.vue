@@ -243,7 +243,7 @@ function firstTagError(errors) {
                         Add a category before creating a product.
                         <Link
                             :href="CategoryController.create()"
-                            class="text-primary underline underline-offset-4"
+                            class="text-primary-ink underline underline-offset-4"
                         >
                             Add category
                         </Link>

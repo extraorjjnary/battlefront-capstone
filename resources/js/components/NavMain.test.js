@@ -74,6 +74,9 @@ function navigationHarness({
             },
             '@/lib/utils': { cn },
             '@/routes': { dashboard: route('/dashboard') },
+            '@/actions/App/Http/Controllers/Administration/BranchController': {
+                index: route('/administration/branches'),
+            },
             '@/routes/branches': { index: route('/branches') },
             '@/routes/cart': { index: route('/cart') },
             '@/routes/orders': { index: route('/orders') },

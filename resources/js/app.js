@@ -6,6 +6,9 @@ import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { initializeFlashToast } from '@/lib/flashToast';
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 void createInertiaApp({
+    withApp: (_app, { page }) => {
+        initializeTheme(page.props);
+    },
     title: (title) => (title ? `${title} - ${appName}` : appName),
     layout: (name, page) => {
         switch (true) {
@@ -25,7 +28,5 @@ void createInertiaApp({
         color: '#EF1B1B',
     },
 });
-// This will set light / dark mode on page load...
-initializeTheme();
 // This will listen for flash toast data from the server...
 initializeFlashToast();

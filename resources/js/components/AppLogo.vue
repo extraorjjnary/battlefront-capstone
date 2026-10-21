@@ -1,11 +1,22 @@
 <script setup>
-import logoUrl from '../../../docs/assets/battlefront-logo.png';
+import darkLogoUrl from '../../../docs/assets/battlefront-logo-dark.webp';
+import logoUrl from '../../../docs/assets/battlefront-logo.webp';
+import { useAppearance } from '@/composables/useAppearance';
+import { cn } from '@/lib/utils';
+
+const props = defineProps({
+    class: { type: [String, Array, Object], default: '' },
+});
+
+const { resolvedAppearance } = useAppearance();
 </script>
 
 <template>
     <img
-        :src="logoUrl"
+        :src="resolvedAppearance === 'dark' ? darkLogoUrl : logoUrl"
         alt="Battlefront Computer Trading"
-        class="h-auto w-full object-contain"
+        width="1200"
+        height="303"
+        :class="cn('h-auto w-full object-contain', props.class)"
     />
 </template>

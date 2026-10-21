@@ -10,40 +10,92 @@ import {
 } from '../../lib/deliveryAddressTestHelpers.js';
 
 function loadPage(inlineTemplate = false, errors = {}) {
-    return loadAddressComponent('../pages/Checkout/Index.vue', inlineTemplate, { errors });
+    return loadAddressComponent('../pages/Checkout/Index.vue', inlineTemplate, {
+        errors,
+    });
 }
 
 function checkoutProps(prefill = {}) {
     return {
         cart: {
-            items: [{
-                id: 11, quantity: 1, product: { name: 'Battlefront Mouse', price: '100.00' }, line_total: '100.00',
-            }],
-            total: '100.00', total_quantity: 1, item_count: 1,
+            items: [
+                {
+                    id: 11,
+                    quantity: 1,
+                    product: { name: 'Battlefront Mouse', price: '100.00' },
+                    line_total: '100.00',
+                },
+            ],
+            total: '100.00',
+            total_quantity: 1,
+            item_count: 1,
         },
-        customer: { name: 'Customer', default_delivery_address: 'Saved address <script>unsafe</script>' },
+        customer: {
+            name: 'Customer',
+            default_delivery_address: 'Saved address <script>unsafe</script>',
+        },
         pickupLocation: { name: 'Sagay', address: 'Pickup address' },
         fulfillmentMethods: [
-            { value: 'pickup', label: 'Pickup' }, { value: 'delivery', label: 'Delivery' },
+            { value: 'pickup', label: 'Pickup' },
+            { value: 'delivery', label: 'Delivery' },
         ],
         paymentMethods: [
-            { value: 'cash', label: 'Cash (Pay at Pickup)', description: 'Pay cash when collecting your products at the store.', available_for: ['pickup'], requires_proof: false },
-            { value: 'card_at_store', label: 'Debit/Credit Card (Pay at Store)', description: 'Pay through a physical debit/credit card terminal during pickup at the store. This is not an online payment gateway.', available_for: ['pickup'], requires_proof: false },
             {
-                value: 'gcash', label: 'GCash', available_for: ['pickup', 'delivery'], requires_proof: true,
-                payment_account: { account_name: 'Demo', account_number: '09XX', is_demo: true },
+                value: 'cash',
+                label: 'Cash (Pay at Pickup)',
+                description:
+                    'Pay cash when collecting your products at the store.',
+                available_for: ['pickup'],
+                requires_proof: false,
             },
-            { value: 'cod', label: 'Cash on Delivery (COD)', available_for: ['delivery'], requires_proof: false, payment_account: null },
+            {
+                value: 'card_at_store',
+                label: 'Debit/Credit Card (Pay at Store)',
+                description:
+                    'Pay through a physical debit/credit card terminal during pickup at the store. This is not an online payment gateway.',
+                available_for: ['pickup'],
+                requires_proof: false,
+            },
+            {
+                value: 'gcash',
+                label: 'GCash',
+                available_for: ['pickup', 'delivery'],
+                requires_proof: true,
+                payment_account: {
+                    account_name: 'Demo',
+                    account_number: '09XX',
+                    is_demo: true,
+                },
+            },
+            {
+                value: 'cod',
+                label: 'Cash on Delivery (COD)',
+                available_for: ['delivery'],
+                requires_proof: false,
+                payment_account: null,
+            },
         ],
-        pickupQuote: { product_subtotal: '100.00', delivery_fee: '0.00', total: '100.00' },
+        pickupQuote: {
+            product_subtotal: '100.00',
+            delivery_fee: '0.00',
+            total: '100.00',
+        },
         deliveryQuotes: locations.map((location) => ({
             destination: location.destination,
-            product_subtotal: '100.00', delivery_fee: '80.00', total: '180.00', carrier: 'lbc',
-            base_fee: '80.00', handling_surcharge: '0.00', preparation_days: 1,
-            packing_expectation: 'Standard packing', is_demo: true,
-            assumption_label: 'Battlefront-configured demonstration estimates, not official LBC quotations.',
+            product_subtotal: '100.00',
+            delivery_fee: '80.00',
+            total: '180.00',
+            carrier: 'lbc',
+            base_fee: '80.00',
+            handling_surcharge: '0.00',
+            preparation_days: 1,
+            packing_expectation: 'Standard packing',
+            is_demo: true,
+            assumption_label:
+                'Battlefront-configured demonstration estimates, not official LBC quotations.',
             notice: 'Battlefront estimates, not live LBC quotations or tracking.',
-            estimated_delivery_start: '2026-10-13', estimated_delivery_end: '2026-10-14',
+            estimated_delivery_start: '2026-10-13',
+            estimated_delivery_end: '2026-10-14',
         })),
         deliveryLocations: locations,
         deliveryAddressPrefill: { ...emptyDeliveryAddress(), ...prefill },
@@ -54,13 +106,16 @@ test('nationwide quotes discard stale responses and use server payment eligibili
     const scope = Vue.effectScope();
     const originalFetch = globalThis.fetch;
     const pending = [];
-    globalThis.fetch = (url) => new Promise((resolve) => pending.push({ url, resolve }));
+    globalThis.fetch = (url) =>
+        new Promise((resolve) => pending.push({ url, resolve }));
     const settle = async () => {
         await new Promise((resolve) => setImmediate(resolve));
         await Vue.nextTick();
     };
     try {
-        const page = scope.run(() => loadPage().setup(checkoutProps(), { expose() {} }));
+        const page = scope.run(() =>
+            loadPage().setup(checkoutProps(), { expose() {} }),
+        );
         page.chooseFulfillment('delivery');
         page.deliveryAddress.value.delivery_destination = '1804523000';
         await Vue.nextTick();
@@ -68,19 +123,54 @@ test('nationwide quotes discard stale responses and use server payment eligibili
         assert.equal(page.selectedQuote.value, null);
         page.deliveryAddress.value.delivery_destination = '1380300000';
         await Vue.nextTick();
-        pending[1].resolve({ ok: true, json: async () => ({ data: { available: false, quote: null, notice: 'Delivery is unavailable for this location.' } }) });
+        pending[1].resolve({
+            ok: true,
+            json: async () => ({
+                data: {
+                    available: false,
+                    quote: null,
+                    notice: 'Delivery is unavailable for this location.',
+                },
+            }),
+        });
         await settle();
-        pending[0].resolve({ ok: true, json: async () => ({ data: { available: true, quote: { destination: '1804523000', total: '180.00' } } }) });
+        pending[0].resolve({
+            ok: true,
+            json: async () => ({
+                data: {
+                    available: true,
+                    quote: { destination: '1804523000', total: '180.00' },
+                },
+            }),
+        });
         await settle();
         assert.equal(page.selectedQuote.value, null);
-        assert.equal(page.quoteNotice.value, 'Delivery is unavailable for this location.');
+        assert.equal(
+            page.quoteNotice.value,
+            'Delivery is unavailable for this location.',
+        );
         assert.equal(page.quoteError.value, '');
         page.deliveryAddress.value.delivery_destination = '1804523000';
         await Vue.nextTick();
-        pending[2].resolve({ ok: true, json: async () => ({ data: { available: true, quote: { destination: '1804523000', total: '180.00', payment_methods: ['cod'] } } }) });
+        pending[2].resolve({
+            ok: true,
+            json: async () => ({
+                data: {
+                    available: true,
+                    quote: {
+                        destination: '1804523000',
+                        total: '180.00',
+                        payment_methods: ['cod'],
+                    },
+                },
+            }),
+        });
         await settle();
         assert.equal(page.selectedQuote.value.total, '180.00');
-        assert.deepEqual(page.availablePaymentMethods.value.map((method) => method.value), ['cod']);
+        assert.deepEqual(
+            page.availablePaymentMethods.value.map((method) => method.value),
+            ['cod'],
+        );
         assert.equal(page.paymentMethod.value, 'cod');
         assert.equal(page.requiresPaymentProof.value, false);
         page.chooseFulfillment('pickup');
@@ -224,7 +314,8 @@ test('unconfigured delivery addresses allow subtotal-only checkout without a quo
                     delivery_fee: '0.00',
                     total: '100.00',
                     notice: 'No delivery estimate is configured. Any delivery arrangement and charge must be confirmed separately.',
-                    assumption_label: 'The 0.00 placeholder is not a free-delivery offer or an LBC quotation.',
+                    assumption_label:
+                        'The 0.00 placeholder is not a free-delivery offer or an LBC quotation.',
                 },
             },
         }),
@@ -255,11 +346,17 @@ test('unconfigured delivery addresses allow subtotal-only checkout without a quo
 
         let html = await renderToString(root());
         assert.match(html, /No delivery estimate configured/);
-        assert.match(html, /delivery arrangement and any applicable charge separately/);
+        assert.match(
+            html,
+            /delivery arrangement and any applicable charge separately/,
+        );
         assert.match(html, /0\.00 placeholder is not a free-delivery offer/);
         assert.match(html, /value="gcash"/);
         assert.match(html, /value="cod"/);
-        assert.doesNotMatch(html, /Manual delivery quotation required|Request a delivery quotation before ordering/);
+        assert.doesNotMatch(
+            html,
+            /Manual delivery quotation required|Request a delivery quotation before ordering/,
+        );
         assert.doesNotMatch(html, /pays the carrier at\s+dispatch/);
         assert.doesNotMatch(html, /Refresh quote|Retry quote/);
         assert.doesNotMatch(html, /Not quoted<\/dd>[\s\S]*?disabled/);
@@ -282,9 +379,12 @@ test('checkout selects the supplied destination quote and resets delivery values
                 delivery_barangay_code: location.barangays[0].code,
                 delivery_address_details: '12 Mabini Street',
             };
-            assert.equal(page.selectedQuote.value, props.deliveryQuotes.find(
-                (quote) => quote.destination === location.destination,
-            ));
+            assert.equal(
+                page.selectedQuote.value,
+                props.deliveryQuotes.find(
+                    (quote) => quote.destination === location.destination,
+                ),
+            );
         }
         page.chooseFulfillment('pickup');
         assert.equal(page.deliveryAddress.value.delivery_destination, '');
@@ -298,11 +398,16 @@ test('checkout selects the supplied destination quote and resets delivery values
 test('verified profile parts prefill checkout without copying the full profile into street details', () => {
     const scope = Vue.effectScope();
     try {
-        const page = scope.run(() => loadPage().setup(checkoutProps({
-            delivery_destination: 'Sagay City',
-            delivery_barangay_code: '1804523018',
-            delivery_address_details: '12 Mabini Street',
-        }), { expose() {} }));
+        const page = scope.run(() =>
+            loadPage().setup(
+                checkoutProps({
+                    delivery_destination: 'Sagay City',
+                    delivery_barangay_code: '1804523018',
+                    delivery_address_details: '12 Mabini Street',
+                }),
+                { expose() {} },
+            ),
+        );
         page.chooseFulfillment('delivery');
         assert.deepEqual(page.deliveryAddress.value, {
             delivery_destination: 'Sagay City',
@@ -317,17 +422,26 @@ test('verified profile parts prefill checkout without copying the full profile i
 test('checkout renders shared structured fields and errors, and pickup submits no delivery inputs', async () => {
     const scope = Vue.effectScope();
     try {
-        const render = scope.run(() => loadPage(true, {
-            delivery_barangay_code: 'Select a barangay.',
-            delivery_address_details: 'Enter street details.',
-        }).setup(checkoutProps(), { expose() {} }));
-        const root = () => render({}, []);
-        const fulfillment = (value) => findNode(root(), (node) =>
-            node.props?.name === 'fulfillment_method' && node.props?.value === value,
+        const render = scope.run(() =>
+            loadPage(true, {
+                delivery_barangay_code: 'Select a barangay.',
+                delivery_address_details: 'Enter street details.',
+            }).setup(checkoutProps(), { expose() {} }),
         );
+        const root = () => render({}, []);
+        const fulfillment = (value) =>
+            findNode(
+                root(),
+                (node) =>
+                    node.props?.name === 'fulfillment_method' &&
+                    node.props?.value === value,
+            );
         fulfillment('delivery').props.onChange();
         let html = await renderToString(root());
-        assert.match(html, /Automatic checkout requires a configured delivery quote\./);
+        assert.match(
+            html,
+            /Automatic checkout requires a configured delivery quote\./,
+        );
         assert.match(html, /City \/ Municipality/);
         assert.match(html, /House \/ Building \/ Street \/ Landmark/);
         assert.match(html, /name="delivery_barangay_code"/);
@@ -337,7 +451,10 @@ test('checkout renders shared structured fields and errors, and pickup submits n
         assert.ok(html.includes('&lt;script&gt;unsafe&lt;/script&gt;'));
         assert.doesNotMatch(html, /name="delivery_address"/);
         assert.doesNotMatch(html, /name="(?:region|province)"/);
-        const fields = findNode(root(), (node) => node.props?.locations === locations);
+        const fields = findNode(
+            root(),
+            (node) => node.props?.locations === locations,
+        );
         fields.props['onUpdate:modelValue']({
             delivery_destination: 'Sagay City',
             delivery_barangay_code: '1804523018',
@@ -347,7 +464,10 @@ test('checkout renders shared structured fields and errors, and pickup submits n
         assert.match(html, /name="delivery_barangay_code" value="1804523018"/);
         fulfillment('pickup').props.onChange();
         html = await renderToString(root());
-        assert.doesNotMatch(html, /name="delivery_(?:destination|barangay_code|address_details)"/);
+        assert.doesNotMatch(
+            html,
+            /name="delivery_(?:destination|barangay_code|address_details)"/,
+        );
         assert.match(html, /Pickup address/);
     } finally {
         scope.stop();
@@ -357,8 +477,15 @@ test('checkout renders shared structured fields and errors, and pickup submits n
 test('COD selection resets wallet evidence and switches to an eligible method for pickup', () => {
     const scope = Vue.effectScope();
     try {
-        const page = scope.run(() => loadPage().setup(checkoutProps(), { expose() {} }));
-        assert.equal(page.availablePaymentMethods.value.some((method) => method.value === 'cod'), false);
+        const page = scope.run(() =>
+            loadPage().setup(checkoutProps(), { expose() {} }),
+        );
+        assert.equal(
+            page.availablePaymentMethods.value.some(
+                (method) => method.value === 'cod',
+            ),
+            false,
+        );
         page.chooseFulfillment('delivery');
         assert.equal(page.requiresPaymentProof.value, true);
         const proofKey = page.paymentProofKey.value;
@@ -378,12 +505,19 @@ test('COD selection resets wallet evidence and switches to an eligible method fo
 test('pickup checkout displays cash and physical card descriptions without requesting proof', async () => {
     const scope = Vue.effectScope();
     try {
-        const render = scope.run(() => loadPage(true).setup(checkoutProps(), { expose() {} }));
+        const render = scope.run(() =>
+            loadPage(true).setup(checkoutProps(), { expose() {} }),
+        );
         let html = await renderToString(render({}, []));
         assert.match(html, /Cash \(Pay at Pickup\)/);
         assert.match(html, /Debit\/Credit Card \(Pay at Store\)/);
         assert.match(html, /Pay cash when collecting/);
-        const card = findNode(render({}, []), (node) => node.props?.name === 'payment_method' && node.props?.value === 'card_at_store');
+        const card = findNode(
+            render({}, []),
+            (node) =>
+                node.props?.name === 'payment_method' &&
+                node.props?.value === 'card_at_store',
+        );
         card.props.onChange();
         html = await renderToString(render({}, []));
         assert.match(html, /physical debit\/credit card terminal/);
@@ -397,12 +531,29 @@ test('pickup checkout displays cash and physical card descriptions without reque
 test('COD checkout displays the server quote total with collection guidance and no proof input', async () => {
     const scope = Vue.effectScope();
     try {
-        const render = scope.run(() => loadPage(true).setup(checkoutProps({
-            delivery_destination: 'Sagay City', delivery_barangay_code: '1804523018', delivery_address_details: '12 Mabini Street',
-        }), { expose() {} }));
+        const render = scope.run(() =>
+            loadPage(true).setup(
+                checkoutProps({
+                    delivery_destination: 'Sagay City',
+                    delivery_barangay_code: '1804523018',
+                    delivery_address_details: '12 Mabini Street',
+                }),
+                { expose() {} },
+            ),
+        );
         const root = () => render({}, []);
-        findNode(root(), (node) => node.props?.name === 'fulfillment_method' && node.props?.value === 'delivery').props.onChange();
-        findNode(root(), (node) => node.props?.name === 'payment_method' && node.props?.value === 'cod').props.onChange();
+        findNode(
+            root(),
+            (node) =>
+                node.props?.name === 'fulfillment_method' &&
+                node.props?.value === 'delivery',
+        ).props.onChange();
+        findNode(
+            root(),
+            (node) =>
+                node.props?.name === 'payment_method' &&
+                node.props?.value === 'cod',
+        ).props.onChange();
         const html = await renderToString(root());
         assert.match(html, /Total COD amount payable/);
         assert.match(html, /180\.00/);

@@ -1,3 +1,4 @@
+import { pageHeaderModule } from '../../components/pageHeaderTestHelpers.js';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -56,6 +57,7 @@ function loadPage(path, inlineTemplate = false) {
     );
     const modules = new Proxy(
         {
+            '@/components/PageHeader.vue': pageHeaderModule,
             vue: Vue,
             '@inertiajs/vue3': {
                 Head: primitive,

@@ -1,4 +1,5 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Bell, Check, ArrowRight } from '@lucide/vue';
 import { ref } from 'vue';
@@ -38,46 +39,30 @@ function markRead(id = null) {
     <div class="contents">
         <Head title="Notifications" />
         <main
-            class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-6 lg:p-10"
+            class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
         >
-            <header class="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                    <p
-                        class="text-primary text-xs font-semibold tracking-widest uppercase"
+            <PageHeader
+                title="Notifications"
+                :description="`${summary.unread_count} unread`"
+            >
+                <template #actions>
+                    <Button
+                        variant="outline"
+                        :disabled="busy || !summary.unread_count"
+                        @click="markRead()"
                     >
-                        {{
-                            isAdministrator
-                                ? 'Order operations'
-                                : 'Your Battlefront orders'
-                        }}
-                    </p>
-                    <h1 class="mt-2 text-2xl font-bold tracking-tight">
-                        Notifications
-                    </h1>
-                    <p class="text-muted-foreground mt-2 text-sm">
-                        {{ summary.unread_count }} unread ·
-                        {{
-                            isAdministrator
-                                ? 'New orders and payment evidence needing review.'
-                                : 'Payment and shipment updates, shared across your devices.'
-                        }}
-                    </p>
-                </div>
-                <Button
-                    variant="outline"
-                    :disabled="busy || !summary.unread_count"
-                    @click="markRead()"
-                >
-                    <Check class="size-4" aria-hidden="true" /> Mark all as read
-                </Button>
-            </header>
+                        <Check class="size-4" aria-hidden="true" />
+                        Mark all as read
+                    </Button>
+                </template>
+            </PageHeader>
             <p v-if="error" class="text-destructive text-sm" role="alert">
                 {{ error }}
             </p>
             <section aria-label="Notification history" :aria-busy="busy">
                 <div
                     v-if="!notifications.data.length"
-                    class="border-border bg-card border border-dashed px-6 py-14 text-center"
+                    class="surface-panel border-border bg-card border border-dashed px-6 py-14 text-center"
                 >
                     <Bell
                         class="text-muted-foreground mx-auto size-8"
@@ -94,11 +79,14 @@ function markRead(id = null) {
                         }}
                     </p>
                 </div>
-                <div v-else class="border-border divide-border divide-y border">
+                <div
+                    v-else
+                    class="surface-panel border-border bg-card divide-border divide-y border"
+                >
                     <article
                         v-for="notification in notifications.data"
                         :key="notification.id"
-                        class="bg-card border-l-2 p-5"
+                        class="bg-card first:rounded-t-panel last:rounded-b-panel border-l-2 p-5"
                         :class="
                             notification.is_read
                                 ? 'border-l-transparent'
@@ -147,7 +135,7 @@ function markRead(id = null) {
                         <Link
                             v-if="notification.order"
                             :href="navigation.order(notification.order.id)"
-                            class="text-primary focus-visible:ring-ring mt-3 inline-flex items-center gap-2 rounded-sm text-sm font-medium focus-visible:ring-2"
+                            class="text-primary-ink focus-visible:ring-ring mt-3 inline-flex items-center gap-2 rounded-sm text-sm font-medium focus-visible:ring-2"
                         >
                             View {{ notification.order.reference }}
                             <ArrowRight class="size-4" aria-hidden="true" />

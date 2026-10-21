@@ -17,7 +17,7 @@ class HandleAppearance
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $appearance = $request->user()->appearance ?? AppearancePreference::System;
+        $appearance = $request->user()?->appearance->resolved() ?? AppearancePreference::Light;
 
         View::share('appearance', $appearance->value);
 

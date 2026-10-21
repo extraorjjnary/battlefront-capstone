@@ -24,14 +24,7 @@ import {
     ShoppingBasket,
     X,
 } from '@lucide/vue';
-import {
-    computed,
-    getCurrentInstance,
-    onBeforeUnmount,
-    onMounted,
-    ref,
-    watch,
-} from 'vue';
+import { computed, ref, watch } from 'vue';
 import { Bar, Doughnut, Line } from 'vue-chartjs';
 import SalesReportController from '@/actions/App/Http/Controllers/Administration/SalesReportController';
 import CustomerReturnController from '@/actions/App/Http/Controllers/Administration/CustomerReturnController';
@@ -54,6 +47,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { useChartTheme } from '@/composables/useChartTheme';
 import { formatCurrency } from '@/lib/currency';
 
 ChartJS.register(
@@ -130,33 +124,10 @@ const dateFormatter = new Intl.DateTimeFormat('en-PH', {
 const presets = [7, 30, 90];
 const todayDate = formatDateInput(new Date());
 const hasSales = computed(() => props.kpis.total_sales > 0);
-const chartTextColor = ref('#9CA3AF');
-const chartBorderColor = ref('#2A2E36');
+const chartColors = useChartTheme();
 const hasCrossFilter = computed(
     () => selectedProduct.value !== null || selectedCategory.value !== null,
 );
-let chartThemeObserver;
-
-function syncChartTheme() {
-    const styles = getComputedStyle(document.documentElement);
-    chartTextColor.value =
-        styles.getPropertyValue('--muted-foreground').trim() || '#9CA3AF';
-    chartBorderColor.value =
-        styles.getPropertyValue('--border').trim() || '#2A2E36';
-}
-
-if (getCurrentInstance()) {
-    onMounted(() => {
-        syncChartTheme();
-        chartThemeObserver = new MutationObserver(syncChartTheme);
-        chartThemeObserver.observe(document.documentElement, {
-            attributes: true,
-            attributeFilter: ['class'],
-        });
-    });
-
-    onBeforeUnmount(() => chartThemeObserver?.disconnect());
-}
 
 watch(
     () => props.filters,
@@ -239,9 +210,9 @@ const timelineData = computed(() => ({
         {
             label: 'Product revenue',
             data: props.timeline.revenue,
-            borderColor: '#EF1B1B',
+            borderColor: chartColors.value.highlight,
             backgroundColor: 'rgba(239, 27, 27, 0.12)',
-            pointBackgroundColor: '#EF1B1B',
+            pointBackgroundColor: chartColors.value.highlight,
             fill: true,
             tension: 0.25,
             yAxisID: 'revenue',
@@ -249,9 +220,9 @@ const timelineData = computed(() => ({
         {
             label: 'Sales',
             data: props.timeline.sales,
-            borderColor: chartTextColor.value,
-            backgroundColor: chartTextColor.value,
-            pointBackgroundColor: chartTextColor.value,
+            borderColor: chartColors.value.text,
+            backgroundColor: chartColors.value.text,
+            pointBackgroundColor: chartColors.value.text,
             tension: 0.25,
             yAxisID: 'sales',
         },
@@ -277,20 +248,20 @@ const topProductsData = computed(() => ({
             data: props.top_products.quantities,
             backgroundColor: props.top_products.ids.map((id) => {
                 if (selectedProduct.value === null) {
-                    return '#B91C1C';
+                    return chartColors.value.primary;
                 }
 
                 return selectedProduct.value.id === id
-                    ? '#EF1B1B'
+                    ? chartColors.value.highlight
                     : 'rgba(156, 163, 175, 0.32)';
             }),
             borderColor: props.top_products.ids.map((id) =>
-                selectedProduct.value?.id === id ? '#F8FAFC' : '#2A2E36',
+                selectedProduct.value?.id === id ? '#F8FAFC' : chartColors.value.border,
             ),
             borderWidth: props.top_products.ids.map((id) =>
                 selectedProduct.value?.id === id ? 3 : 1,
             ),
-            hoverBackgroundColor: '#EF1B1B',
+            hoverBackgroundColor: chartColors.value.highlight,
         },
     ],
 }));
@@ -303,20 +274,20 @@ const categoryData = computed(() => ({
             data: props.categories.revenue,
             backgroundColor: props.categories.ids.map((id) => {
                 if (selectedCategory.value === null) {
-                    return '#B91C1C';
+                    return chartColors.value.primary;
                 }
 
                 return selectedCategory.value.id === id
-                    ? '#EF1B1B'
+                    ? chartColors.value.highlight
                     : 'rgba(156, 163, 175, 0.32)';
             }),
             borderColor: props.categories.ids.map((id) =>
-                selectedCategory.value?.id === id ? '#F8FAFC' : '#111318',
+                selectedCategory.value?.id === id ? '#F8FAFC' : chartColors.value.surface,
             ),
             borderWidth: props.categories.ids.map((id) =>
                 selectedCategory.value?.id === id ? 3 : 2,
             ),
-            hoverBackgroundColor: '#EF1B1B',
+            hoverBackgroundColor: chartColors.value.highlight,
         },
     ],
 }));
@@ -325,19 +296,26 @@ const baseChartOptions = computed(() => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
+        tooltip: {
+            backgroundColor: chartColors.value.surface,
+            titleColor: chartColors.value.foreground,
+            bodyColor: chartColors.value.foreground,
+            borderColor: chartColors.value.border,
+            borderWidth: 1,
+        },
         legend: {
-            labels: { color: chartTextColor.value, usePointStyle: true },
+            labels: { color: chartColors.value.text, usePointStyle: true },
         },
     },
     scales: {
         x: {
-            ticks: { color: chartTextColor.value },
-            grid: { color: chartBorderColor.value },
+            ticks: { color: chartColors.value.text },
+            grid: { color: chartColors.value.border },
         },
         y: {
             beginAtZero: true,
-            ticks: { color: chartTextColor.value, precision: 0 },
-            grid: { color: chartBorderColor.value },
+            ticks: { color: chartColors.value.text, precision: 0 },
+            grid: { color: chartColors.value.border },
         },
     },
 }));
@@ -348,6 +326,7 @@ const timelineOptions = computed(() => ({
     plugins: {
         ...baseChartOptions.value.plugins,
         tooltip: {
+            ...baseChartOptions.value.plugins.tooltip,
             callbacks: {
                 label(context) {
                     if (context.dataset.label === 'Gross profit before returns') {
@@ -367,15 +346,15 @@ const timelineOptions = computed(() => ({
             beginAtZero: true,
             position: 'left',
             ticks: {
-                color: chartTextColor.value,
+                color: chartColors.value.text,
                 callback: (value) => formatCurrency(value),
             },
-            grid: { color: chartBorderColor.value },
+            grid: { color: chartColors.value.border },
         },
         sales: {
             beginAtZero: true,
             position: 'right',
-            ticks: { color: chartTextColor.value, precision: 0 },
+            ticks: { color: chartColors.value.text, precision: 0 },
             grid: { drawOnChartArea: false },
         },
     },
@@ -426,9 +405,10 @@ const categoryOptions = computed(() => ({
     plugins: {
         legend: {
             position: 'bottom',
-            labels: { color: chartTextColor.value, usePointStyle: true },
+            labels: { color: chartColors.value.text, usePointStyle: true },
         },
         tooltip: {
+            ...baseChartOptions.value.plugins.tooltip,
             callbacks: {
                 label: (context) =>
                     `${context.label}: ${formatCurrency(context.raw)}`,

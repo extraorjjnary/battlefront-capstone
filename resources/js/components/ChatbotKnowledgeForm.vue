@@ -45,13 +45,16 @@ async function checkQuestion() {
     previewResult.value = null;
     previewError.value = '';
     try {
-        const result = await preview.post(ChatbotKnowledgePreviewController.url());
+        const result = await preview.post(
+            ChatbotKnowledgePreviewController.url(),
+        );
         if (question.value.trim() === tested) {
             previewResult.value = result;
         }
     } catch {
         if (question.value.trim() === tested && !preview.errors.message) {
-            previewError.value = 'Unable to check this question. Please try again.';
+            previewError.value =
+                'Unable to check this question. Please try again.';
         } else if (question.value.trim() !== tested) {
             preview.clearErrors();
         }
@@ -62,11 +65,16 @@ async function checkQuestion() {
 <template>
     <Form v-bind="form" class="space-y-6" v-slot="{ errors, processing }">
         <p class="text-muted-foreground text-sm">
-            Maintain approved Battlefront support guidance. Current product facts,
-            branch details, personal orders, and payment or fulfillment rules are answered automatically.
+            Maintain approved Battlefront support guidance. Current product
+            facts, branch details, personal orders, and payment or fulfillment
+            rules are answered automatically.
         </p>
-        <p v-if="knowledge && !knowledge.eligible_for_faq" class="text-muted-foreground text-sm">
-            Needs review: {{ knowledge.eligibility_reason }} Saving valid guidance converts this record to FAQ.
+        <p
+            v-if="knowledge && !knowledge.eligible_for_faq"
+            class="text-muted-foreground text-sm"
+        >
+            Needs review: {{ knowledge.eligibility_reason }} Saving valid
+            guidance converts this record to FAQ.
         </p>
 
         <div class="grid gap-2">
@@ -82,19 +90,38 @@ async function checkQuestion() {
                 autofocus
             />
             <p class="text-muted-foreground text-xs">
-                Use one support question. Related wording can match; equally strong matches require clarification.
+                Use one support question. Related wording can match; equally
+                strong matches require clarification.
             </p>
             <InputError :message="errors.question_pattern" />
-            <Button type="button" variant="outline" class="justify-self-start" :disabled="preview.processing || !question.trim()" @click="checkQuestion">
+            <Button
+                type="button"
+                variant="outline"
+                class="justify-self-start"
+                :disabled="preview.processing || !question.trim()"
+                @click="checkQuestion"
+            >
                 <Spinner v-if="preview.processing" />
                 Check question
             </Button>
             <InputError :message="preview.errors.message || previewError" />
             <div aria-live="polite" :aria-busy="preview.processing">
                 <template v-if="previewResult">
-                    <p class="text-sm font-medium">{{ previewResult.eligible_for_faq ? 'Eligible for a support FAQ' : 'Handled outside managed FAQs' }}</p>
-                    <p class="text-muted-foreground mt-1 text-sm">{{ previewResult.explanation }}</p>
-                    <p v-for="match in previewResult.matches" :key="match.id" class="mt-2 text-sm">
+                    <p class="text-sm font-medium">
+                        {{
+                            previewResult.eligible_for_faq
+                                ? 'Eligible for a support FAQ'
+                                : 'Handled outside managed FAQs'
+                        }}
+                    </p>
+                    <p class="text-muted-foreground mt-1 text-sm">
+                        {{ previewResult.explanation }}
+                    </p>
+                    <p
+                        v-for="match in previewResult.matches"
+                        :key="match.id"
+                        class="mt-2 text-sm"
+                    >
                         Saved match: {{ match.question_pattern }}
                     </p>
                 </template>

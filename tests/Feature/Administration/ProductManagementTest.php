@@ -3,6 +3,7 @@
 use App\Enums\ShippingProfile;
 use App\Models\Category;
 use App\Models\Inventory;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\Tag;
 use App\Models\User;
@@ -110,7 +111,7 @@ test('owners can restore a deleted product with its inventory while keeping it i
 test('completed customer returns no longer block deleting a stockless product', function () {
     $owner = User::factory()->administrator()->create();
     $product = Product::factory()->has(Inventory::factory()->state(['quantity' => 0, 'quarantined_quantity' => 0]))->create();
-    $order = \App\Models\Order::factory()->create(['status' => 'completed']);
+    $order = Order::factory()->create(['status' => 'completed']);
     $itemId = DB::table('order_items')->insertGetId([
         'order_id' => $order->id, 'product_id' => $product->id, 'quantity' => 1, 'price_at_time' => '100.00',
     ]);

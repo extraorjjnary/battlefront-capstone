@@ -6,6 +6,7 @@ import { renderToString } from '@vue/server-renderer';
 import * as Reka from 'reka-ui';
 import * as Vue from 'vue';
 import { formatCurrency } from '../../lib/currency.js';
+import { pageHeaderModule } from '../pageHeaderTestHelpers.js';
 
 const primitive = {
     render() {
@@ -19,6 +20,21 @@ const generic = new Proxy(
 const modules = new Proxy(
     {
         vue: Vue,
+        '@/components/PageHeader.vue': pageHeaderModule,
+        '@/composables/useChartTheme': {
+            useChartTheme: () =>
+                Vue.ref({
+                    primary: 'red',
+                    secondary: 'gray',
+                    highlight: 'red',
+                    fill: 'pink',
+                    muted: 'gray',
+                    text: 'black',
+                    foreground: 'black',
+                    border: 'gray',
+                    surface: 'white',
+                }),
+        },
         'reka-ui': Reka,
         '@/lib/currency': { formatCurrency },
     },

@@ -71,6 +71,7 @@ function trackingProps(overrides = {}) {
             ...overrides,
         },
         quote: {
+            pricing_configured: true,
             destination: 'Bacolod City',
             delivery_fee: '250.00',
             base_fee: '250.00',

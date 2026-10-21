@@ -16,19 +16,19 @@ The original `psgc-delivery-2026-03-31.v1.json` remains a bounded compatibility 
 Official string codes and names are retained nationwide. The following **12 configured delivery routes** and their **300 barangays** also remain available in the compatibility payload. Destination aliases remain Battlefront's exact configured strings; for example, `E.B. Magalona` maps to official `Enrique B. Magalona`.
 
 | Destination key | Full locality code | Barangays |
-| --- | --- | --- |
-| Sagay City | 1804523000 | 25 |
-| Escalante City | 1804509000 | 21 |
-| Cadiz City | 1804504000 | 22 |
-| Toboso | 1804529000 | 9 |
-| Manapla | 1804518000 | 12 |
-| Calatrava | 1804505000 | 40 |
-| Victorias City | 1804531000 | 26 |
-| E.B. Magalona | 1804508000 | 23 |
-| San Carlos City | 1804524000 | 18 |
-| Silay City | 1804526000 | 16 |
-| Talisay City | 1804528000 | 27 |
-| Bacolod City | 1830200000 | 61 |
+| --------------- | ------------------ | --------- |
+| Sagay City      | 1804523000         | 25        |
+| Escalante City  | 1804509000         | 21        |
+| Cadiz City      | 1804504000         | 22        |
+| Toboso          | 1804529000         | 9         |
+| Manapla         | 1804518000         | 12        |
+| Calatrava       | 1804505000         | 40        |
+| Victorias City  | 1804531000         | 26        |
+| E.B. Magalona   | 1804508000         | 23        |
+| San Carlos City | 1804524000         | 18        |
+| Silay City      | 1804526000         | 16        |
+| Talisay City    | 1804528000         | 27        |
+| Bacolod City    | 1830200000         | 61        |
 
 ### Normalization and administrative identity
 
@@ -73,18 +73,18 @@ The bundled Q1 2026 PSGC registry contains **31 cities/municipalities with provi
 
 All amounts and day ranges below are **Battlefront demonstration estimates, not official LBC quotations or transit guarantees**. Existing rates and transit estimates are preserved exactly; new rates are configurable, proxy-derived demonstration values only, and must not be used as verified production shipping charges.
 
-| Routes | Base fee (PHP) | Transit days |
-| --- | --- | --- |
-| Sagay City | 80.00 | 0–1 |
-| Escalante City | 100.00 | 1 |
-| Cadiz City | 120.00 | 1 |
-| Toboso | 140.00 | 1 |
-| Manapla | 160.00 | 1 |
-| Calatrava, Victorias City | 180.00 | 1 |
-| E.B. Magalona | 200.00 | 1–2 |
-| San Carlos City, Silay City | 220.00 | 1–2 |
-| Talisay City | 240.00 | 1–2 |
-| Bacolod City | 250.00 | 1–2 |
+| Routes                      | Base fee (PHP) | Transit days |
+| --------------------------- | -------------- | ------------ |
+| Sagay City                  | 80.00          | 0–1          |
+| Escalante City              | 100.00         | 1            |
+| Cadiz City                  | 120.00         | 1            |
+| Toboso                      | 140.00         | 1            |
+| Manapla                     | 160.00         | 1            |
+| Calatrava, Victorias City   | 180.00         | 1            |
+| E.B. Magalona               | 200.00         | 1–2          |
+| San Carlos City, Silay City | 220.00         | 1–2          |
+| Talisay City                | 240.00         | 1–2          |
+| Bacolod City                | 250.00         | 1–2          |
 
 ### New Negros Occidental distance estimates
 
@@ -94,37 +94,37 @@ These are administrative-boundary centroids used only as geographic proxies. The
 
 The bands were reviewed against the unchanged configured provincial references with OSM boundary centroids: Sagay 0.0 km / PHP 80, Escalante 11.0 km / PHP 100, Cadiz 13.7 km / PHP 120, Toboso 22.6 km / PHP 140, Manapla 32.6 km / PHP 160, Calatrava 34.2 km / PHP 180, Victorias 37.6 km / PHP 180, San Carlos 45.6 km / PHP 220, E.B. Magalona 47.4 km / PHP 200, Silay 49.2 km / PHP 220, and Talisay 52.0 km / PHP 240. These reference fees are intentionally not normalized or recalculated. Bacolod's PHP 250 / 1–2-day HUC route is also unchanged; it is excluded from spatial calibration because the available point was not a verified OSM boundary centroid. New bands use modest fixed increments, not a fit claimed to model actual courier costs.
 
-| Distance interval from Sagay proxy (km) | Base estimate (PHP) | Demo transit days | Calibration / use |
-| --- | ---: | --- | --- |
-| (30, 45] | 180.00 | 1–2 | Around the unchanged PHP 160–180 references at 32.6–37.6 km |
-| (45, 60] | 220.00 | 1–2 | Around the unchanged PHP 200–240 references at 45.6–52.0 km |
-| (60, 100] | 280.00 | 2–3 | First conservative outward step beyond configured references |
-| (100, 125] | 320.00 | 2–3 | One further distance tier |
-| (125, 155] | 360.00 | 3–4 | One further distance tier |
-| (155, 180] | 400.00 | 3–4 | Longest reviewed proxy distances in the proposed coverage |
+| Distance interval from Sagay proxy (km) | Base estimate (PHP) | Demo transit days | Calibration / use                                            |
+| --------------------------------------- | ------------------: | ----------------- | ------------------------------------------------------------ |
+| (30, 45]                                |              180.00 | 1–2               | Around the unchanged PHP 160–180 references at 32.6–37.6 km  |
+| (45, 60]                                |              220.00 | 1–2               | Around the unchanged PHP 200–240 references at 45.6–52.0 km  |
+| (60, 100]                               |              280.00 | 2–3               | First conservative outward step beyond configured references |
+| (100, 125]                              |              320.00 | 2–3               | One further distance tier                                    |
+| (125, 155]                              |              360.00 | 3–4               | One further distance tier                                    |
+| (155, 180]                              |              400.00 | 3–4               | Longest reviewed proxy distances in the proposed coverage    |
 
-| Destination (PSGC name) | Full locality code | Barangays | OSM relation | Boundary centroid (lat, lon) | Great-circle km | Band | Base fee (PHP) | Transit days |
-| --- | --- | ---: | ---: | --- | ---: | --- | ---: | --- |
-| Binalbagan | 1804503000 | 16 | 11525661 | 10.1937474, 122.8587743 | 99.0 | (60, 100] | 280.00 | 2–3 |
-| Candoni | 1804506000 | 9 | 3740498 | 9.8306756, 122.6429611 | 145.5 | (125, 155] | 360.00 | 3–4 |
-| Cauayan | 1804507000 | 25 | 3740499 | 9.9733632, 122.6260198 | 134.1 | (125, 155] | 360.00 | 3–4 |
-| City of Bago | 1804502000 | 24 | 11366393 | 10.5376299, 122.8352802 | 74.9 | (60, 100] | 280.00 | 2–3 |
-| City of Himamaylan | 1804510000 | 19 | 11525214 | 10.0992841, 122.8705390 | 106.8 | (100, 125] | 320.00 | 2–3 |
-| City of Kabankalan | 1804515000 | 32 | 3740502 | 9.9888817, 122.8134501 | 120.5 | (100, 125] | 320.00 | 2–3 |
-| City of La Carlota | 1804516000 | 14 | 11984373 | 10.4268649, 122.9208074 | 75.1 | (60, 100] | 280.00 | 2–3 |
-| City of Sipalay | 1804527000 | 17 | 3740505 | 9.7491266, 122.4040602 | 168.8 | (155, 180] | 400.00 | 3–4 |
-| Hinigaran | 1804511000 | 24 | 12599665 | 10.2713832, 122.8519909 | 92.8 | (60, 100] | 280.00 | 2–3 |
-| Hinoba-an | 1804512000 | 13 | 3740500 | 9.6021766, 122.4670994 | 177.4 | (155, 180] | 400.00 | 3–4 |
-| Ilog | 1804513000 | 15 | 3740501 | 10.0242067, 122.7691808 | 120.0 | (100, 125] | 320.00 | 2–3 |
-| Isabela | 1804514000 | 30 | 18527747 | 10.2047969, 122.9892506 | 89.9 | (60, 100] | 280.00 | 2–3 |
-| La Castellana | 1804517000 | 13 | 17749026 | 10.3230498, 123.0187418 | 77.1 | (60, 100] | 280.00 | 2–3 |
-| Moises Padilla | 1804519000 | 15 | 18491788 | 10.2708302, 123.0733691 | 78.9 | (60, 100] | 280.00 | 2–3 |
-| Murcia | 1804520000 | 23 | 11366415 | 10.6066483, 123.0404676 | 52.1 | (45, 60] | 220.00 | 1–2 |
-| Pontevedra | 1804521000 | 20 | 12716470 | 10.3751168, 122.8668210 | 83.4 | (60, 100] | 280.00 | 2–3 |
-| Pulupandan | 1804522000 | 20 | 12245305 | 10.5192005, 122.8034563 | 78.9 | (60, 100] | 280.00 | 2–3 |
-| Salvador Benedicto | 1804532000 | 7 | 12717917 | 10.5770770, 123.2203670 | 41.4 | (30, 45] | 180.00 | 1–2 |
-| San Enrique | 1804525000 | 10 | 12599666 | 10.4196780, 122.8495462 | 81.4 | (60, 100] | 280.00 | 2–3 |
-| Valladolid | 1804530000 | 16 | 12599678 | 10.4615480, 122.8234493 | 80.7 | (60, 100] | 280.00 | 2–3 |
+| Destination (PSGC name) | Full locality code | Barangays | OSM relation | Boundary centroid (lat, lon) | Great-circle km | Band       | Base fee (PHP) | Transit days |
+| ----------------------- | ------------------ | --------: | -----------: | ---------------------------- | --------------: | ---------- | -------------: | ------------ |
+| Binalbagan              | 1804503000         |        16 |     11525661 | 10.1937474, 122.8587743      |            99.0 | (60, 100]  |         280.00 | 2–3          |
+| Candoni                 | 1804506000         |         9 |      3740498 | 9.8306756, 122.6429611       |           145.5 | (125, 155] |         360.00 | 3–4          |
+| Cauayan                 | 1804507000         |        25 |      3740499 | 9.9733632, 122.6260198       |           134.1 | (125, 155] |         360.00 | 3–4          |
+| City of Bago            | 1804502000         |        24 |     11366393 | 10.5376299, 122.8352802      |            74.9 | (60, 100]  |         280.00 | 2–3          |
+| City of Himamaylan      | 1804510000         |        19 |     11525214 | 10.0992841, 122.8705390      |           106.8 | (100, 125] |         320.00 | 2–3          |
+| City of Kabankalan      | 1804515000         |        32 |      3740502 | 9.9888817, 122.8134501       |           120.5 | (100, 125] |         320.00 | 2–3          |
+| City of La Carlota      | 1804516000         |        14 |     11984373 | 10.4268649, 122.9208074      |            75.1 | (60, 100]  |         280.00 | 2–3          |
+| City of Sipalay         | 1804527000         |        17 |      3740505 | 9.7491266, 122.4040602       |           168.8 | (155, 180] |         400.00 | 3–4          |
+| Hinigaran               | 1804511000         |        24 |     12599665 | 10.2713832, 122.8519909      |            92.8 | (60, 100]  |         280.00 | 2–3          |
+| Hinoba-an               | 1804512000         |        13 |      3740500 | 9.6021766, 122.4670994       |           177.4 | (155, 180] |         400.00 | 3–4          |
+| Ilog                    | 1804513000         |        15 |      3740501 | 10.0242067, 122.7691808      |           120.0 | (100, 125] |         320.00 | 2–3          |
+| Isabela                 | 1804514000         |        30 |     18527747 | 10.2047969, 122.9892506      |            89.9 | (60, 100]  |         280.00 | 2–3          |
+| La Castellana           | 1804517000         |        13 |     17749026 | 10.3230498, 123.0187418      |            77.1 | (60, 100]  |         280.00 | 2–3          |
+| Moises Padilla          | 1804519000         |        15 |     18491788 | 10.2708302, 123.0733691      |            78.9 | (60, 100]  |         280.00 | 2–3          |
+| Murcia                  | 1804520000         |        23 |     11366415 | 10.6066483, 123.0404676      |            52.1 | (45, 60]   |         220.00 | 1–2          |
+| Pontevedra              | 1804521000         |        20 |     12716470 | 10.3751168, 122.8668210      |            83.4 | (60, 100]  |         280.00 | 2–3          |
+| Pulupandan              | 1804522000         |        20 |     12245305 | 10.5192005, 122.8034563      |            78.9 | (60, 100]  |         280.00 | 2–3          |
+| Salvador Benedicto      | 1804532000         |         7 |     12717917 | 10.5770770, 123.2203670      |            41.4 | (30, 45]   |         180.00 | 1–2          |
+| San Enrique             | 1804525000         |        10 |     12599666 | 10.4196780, 122.8495462      |            81.4 | (60, 100]  |         280.00 | 2–3          |
+| Valladolid              | 1804530000         |        16 |     12599678 | 10.4615480, 122.8234493      |            80.7 | (60, 100]  |         280.00 | 2–3          |
 
 The nearest new locality is Salvador Benedicto at 41.4 proxy km; the farthest is Hinoba-an at 177.4 proxy km. Nearby cases were reviewed: Isabela/Hinigaran (89.9/92.8 km) share one band; Ilog/Kabankalan (120.0/120.5 km) also share one band, avoiding a sharp fee change for a half-kilometer proxy difference. No new locality exceeds the documented 180 km maximum. The resulting rates are suitable only for reproducible capstone demonstrations, not as verified production charges.
 
@@ -132,11 +132,11 @@ All 32 configured routes (the original 12 plus the 20 new city-code rules) expli
 
 The quote endpoint is `GET /checkout/delivery-quote` (web) or `GET /api/v1/checkout/delivery-quote` (mobile), with owned selected `cart_item_ids[]` and `delivery_city_code`. A configured route returns `{data:{available:true,quote:{pricing_configured:true,order_placement_allowed:true,...}}}`. An unconfigured valid route returns `{data:{available:true,quote:{pricing_configured:false,order_placement_allowed:true,delivery_fee:"0.00",payment_methods:["gcash","maya","cod"],carrier:null,estimated_delivery_start:null,estimated_delivery_end:null,...}}}`; `0.00` is only the absent-rate placeholder, not an offer or confirmed delivery charge. Product subtotal is the only amount in the placed order; no automatic Shipment is created. Explicitly disabled or malformed configured rules return `{data:{available:false,quote:null,notice}}`. Placement independently rechecks current configuration and payment eligibility under its existing transaction; preview results never authorize a client fee.
 
-| Profile | Once-per-order surcharge (PHP) | Preparation days |
-| --- | --- | --- |
-| Standard | 0.00 | 1 |
-| Fragile | 50.00 | 2 |
-| Bulky | 100.00 | 3 |
+| Profile  | Once-per-order surcharge (PHP) | Preparation days |
+| -------- | ------------------------------ | ---------------- |
+| Standard | 0.00                           | 1                |
+| Fragile  | 50.00                          | 2                |
+| Bulky    | 100.00                         | 3                |
 
 The highest profile in the selected cart applies once. Delivery fee = configured destination base fee + that surcharge; final total = product subtotal + delivery fee. No valuation, insurance, weight/dimension or live carrier pricing is implemented.
 

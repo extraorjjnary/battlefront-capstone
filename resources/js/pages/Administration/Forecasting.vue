@@ -1,4 +1,5 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import {
     CategoryScale,
@@ -9,7 +10,7 @@ import {
     PointElement,
     Tooltip,
 } from 'chart.js';
-import { ChartNoAxesCombined, Search } from '@lucide/vue';
+import { Search } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
 import { Line } from 'vue-chartjs';
 import ForecastingController from '@/actions/App/Http/Controllers/Administration/ForecastingController';
@@ -20,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
+import { useChartTheme } from '@/composables/useChartTheme';
 import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
 import { BUSINESS_TIMEZONE, formatDateTime } from '@/lib/dateTime';
 import { formatForecastUnits } from '@/lib/forecastUnits';
@@ -120,6 +122,8 @@ function generatedTime(value) {
     return formatDateTime(value);
 }
 
+const chartColors = useChartTheme();
+
 const chartData = computed(() => {
     const observations = result.value?.observations ?? [];
     const forecasts = result.value?.monthly_forecasts ?? [];
@@ -135,8 +139,8 @@ const chartData = computed(() => {
                     ...observations.map((item) => item.quantity_sold),
                     ...forecasts.map(() => null),
                 ],
-                borderColor: '#9CA3AF',
-                backgroundColor: '#9CA3AF',
+                borderColor: chartColors.value.secondary,
+                backgroundColor: chartColors.value.secondary,
                 pointRadius: 4,
                 tension: 0,
             },
@@ -150,8 +154,8 @@ const chartData = computed(() => {
                     ),
                     ...forecasts.map((item) => Number(item.forecast_quantity)),
                 ],
-                borderColor: '#EF1B1B',
-                backgroundColor: '#EF1B1B',
+                borderColor: chartColors.value.primary,
+                backgroundColor: chartColors.value.primary,
                 borderDash: [6, 4],
                 pointStyle: 'rectRot',
                 pointRadius: [
@@ -163,13 +167,20 @@ const chartData = computed(() => {
         ],
     };
 });
-const chartOptions = {
+const chartOptions = computed(() => ({
     responsive: true,
     maintainAspectRatio: false,
     animation: false,
     plugins: {
-        legend: { labels: { color: '#9CA3AF', usePointStyle: true } },
+        legend: {
+            labels: { color: chartColors.value.text, usePointStyle: true },
+        },
         tooltip: {
+            backgroundColor: chartColors.value.surface,
+            titleColor: chartColors.value.foreground,
+            bodyColor: chartColors.value.foreground,
+            borderColor: chartColors.value.border,
+            borderWidth: 1,
             callbacks: {
                 label: (item) =>
                     `${item.dataset.label}: ${formatForecastUnits(item.parsed.y)} units`,
@@ -181,42 +192,42 @@ const chartOptions = {
     },
     scales: {
         x: {
-            ticks: { color: '#9CA3AF', autoSkip: true, maxTicksLimit: 12 },
-            grid: { color: 'rgba(42, 46, 54, 0.55)' },
+            ticks: {
+                color: chartColors.value.text,
+                autoSkip: true,
+                maxTicksLimit: 12,
+            },
+            grid: { color: chartColors.value.border },
         },
         y: {
             beginAtZero: true,
-            title: { display: true, text: 'Units', color: '#9CA3AF' },
+            title: {
+                display: true,
+                text: 'Units',
+                color: chartColors.value.text,
+            },
             ticks: {
-                color: '#9CA3AF',
+                color: chartColors.value.text,
                 precision: 0,
                 callback: formatForecastUnits,
             },
-            grid: { color: 'rgba(42, 46, 54, 0.55)' },
+            grid: { color: chartColors.value.border },
         },
     },
-};
+}));
 </script>
 
 <template>
     <div class="flex flex-1 flex-col gap-6 p-4 lg:p-6">
         <Head title="Forecasting" />
-        <header>
-            <div class="flex items-center gap-3">
-                <ChartNoAxesCombined class="text-primary size-6" />
-                <h1 class="text-2xl font-semibold tracking-tight">
-                    Forecasting
-                </h1>
-            </div>
-            <p class="text-muted-foreground mt-2 text-sm">
-                Estimate quarterly product demand from completed monthly sales
-                to support stock planning.
-            </p>
-        </header>
+        <PageHeader
+            title="Forecasting"
+            description="Estimate quarterly demand for stock planning."
+        />
 
         <div class="grid gap-6 xl:grid-cols-2">
             <section
-                class="border-border bg-card rounded-xl border p-5"
+                class="surface-panel border-border bg-card border p-5"
                 aria-labelledby="product-heading"
             >
                 <h2 id="product-heading" class="text-lg font-semibold">
@@ -309,7 +320,7 @@ const chartOptions = {
             </section>
 
             <section
-                class="border-border bg-card rounded-xl border p-5"
+                class="surface-panel border-border bg-card border p-5"
                 aria-labelledby="generate-heading"
             >
                 <h2 id="generate-heading" class="text-lg font-semibold">
@@ -328,8 +339,7 @@ const chartOptions = {
                     v-if="selected_product?.is_synthetic"
                     class="text-muted-foreground mt-2 text-sm"
                 >
-                    Synthetic development history; not actual Battlefront client
-                    sales.
+                    Synthetic history, not actual client sales.
                 </p>
                 <div
                     v-if="isCheckingHistory"
@@ -417,15 +427,15 @@ const chartOptions = {
                     </Button>
                 </form>
                 <p class="text-muted-foreground mt-4 text-xs">
-                    Generating again replaces the saved result for the same
-                    product, method, and target quarter.
+                    Generating again replaces this product?s saved forecast for
+                    the same method and quarter.
                 </p>
             </section>
         </div>
 
         <section
             v-if="result"
-            class="border-border bg-card rounded-xl border p-5"
+            class="surface-panel border-border bg-card border p-5"
             aria-labelledby="result-heading"
             aria-live="polite"
         >
@@ -512,9 +522,8 @@ const chartOptions = {
                     </div>
                 </dl>
                 <p class="text-muted-foreground mt-3 text-xs">
-                    Demand estimates are rounded to whole units for display. The
-                    quarterly estimate is calculated before display rounding;
-                    rounded monthly estimates may not add up to it.
+                    Estimates are rounded to whole units for display. Rounded
+                    monthly estimates may not add up to the quarterly estimate.
                 </p>
                 <div class="mt-6 h-80 min-w-0">
                     <Line
@@ -574,7 +583,7 @@ const chartOptions = {
         </section>
 
         <section
-            class="border-border bg-card rounded-xl border p-5"
+            class="surface-panel border-border bg-card border p-5"
             aria-labelledby="saved-heading"
         >
             <div class="flex flex-wrap items-end justify-between gap-4">

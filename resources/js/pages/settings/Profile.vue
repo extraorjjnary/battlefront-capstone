@@ -42,9 +42,10 @@ const page = usePage();
 const user = computed(() => page.props.auth.user);
 const defaultAddress = ref({ ...props.defaultDeliveryAddressPrefill });
 const defaultAddressAction = ref('keep');
-const hasAddress = computed(() =>
-    Boolean(props.defaultDeliveryAddress) ||
-    Object.values(defaultAddress.value).some(Boolean),
+const hasAddress = computed(
+    () =>
+        Boolean(props.defaultDeliveryAddress) ||
+        Object.values(defaultAddress.value).some(Boolean),
 );
 
 function updateDefaultAddress(address) {
@@ -141,9 +142,7 @@ const productViewRecommendationsEnabled = ref(
                 v-if="props.canManageDefaultDeliveryAddress"
                 class="grid gap-4"
             >
-                <p class="font-medium">
-                    Default delivery address (optional)
-                </p>
+                <p class="font-medium">Default delivery address (optional)</p>
                 <input
                     type="hidden"
                     name="default_delivery_address_action"
@@ -160,7 +159,10 @@ const productViewRecommendationsEnabled = ref(
                     :required="defaultAddressAction === 'save'"
                 />
                 <p
-                    v-if="props.defaultDeliveryAddress && defaultAddressAction !== 'clear'"
+                    v-if="
+                        props.defaultDeliveryAddress &&
+                        defaultAddressAction !== 'clear'
+                    "
                     class="text-muted-foreground text-sm"
                 >
                     Saved address: {{ props.defaultDeliveryAddress }}
@@ -175,12 +177,10 @@ const productViewRecommendationsEnabled = ref(
                     Your saved address will be cleared when you save.
                 </p>
                 <p class="text-muted-foreground text-sm">
-                    This address will pre-fill delivery checkout and can still
-                    be changed for each order.
+                    Pre-fills delivery checkout. You can change it for each
+                    order.
                 </p>
-                <InputError
-                    :message="errors.default_delivery_address_action"
-                />
+                <InputError :message="errors.default_delivery_address_action" />
                 <Button
                     v-if="hasAddress && defaultAddressAction !== 'clear'"
                     type="button"
@@ -217,16 +217,14 @@ const productViewRecommendationsEnabled = ref(
                         class="border-input accent-primary mt-0.5 size-4"
                     />
                     <span
-                        >Use your activity and shopping history for personalized
-                        product recommendations. Turning this off hides
-                        recommendation sections on your dashboard and product
-                        catalog, pauses personalized suggestions, and stops
-                        recording searches and views. Popular picks can still
-                        appear on product pages and in your cart. Saved search
-                        and view history is kept until its 90-day expiry and can
-                        be used again if you turn personalization back on before
-                        then. Your cart and order records remain available for
-                        store services.</span
+                        >Use shopping activity for suggestions. Turning this off
+                        hides dashboard and catalog recommendations, pauses
+                        personalization, and stops recording searches and views.
+                        Popular picks can still appear on product pages and in
+                        your cart. Search and view history expires after 90 days
+                        and may be reused if you turn this back on sooner. Cart
+                        and order records remain available for store
+                        services.</span
                     >
                 </label>
                 <div class="border-border grid gap-3 border-l pl-4">
@@ -234,7 +232,7 @@ const productViewRecommendationsEnabled = ref(
                         {{
                             personalizedRecommendationsEnabled
                                 ? 'Choose which browsing signals to use while personalization is on.'
-                                : 'Turn on personalized recommendations to change which browsing signals may be used. These signals are currently off.'
+                                : 'Turn on personalization to change these options. Browsing signals are currently off.'
                         }}
                     </p>
                     <input
@@ -263,10 +261,9 @@ const productViewRecommendationsEnabled = ref(
                             class="border-input accent-primary mt-0.5 size-4"
                         />
                         <span
-                            >Use catalog searches. Turning this off pauses
-                            search-based suggestions and recording. Saved search
-                            history is kept until its 90-day expiry and used
-                            again if you turn this back on before then.</span
+                            >Use catalog searches for suggestions. Turning this
+                            off stops search recording and search-based
+                            suggestions.</span
                         >
                     </label>
                     <input
@@ -295,10 +292,9 @@ const productViewRecommendationsEnabled = ref(
                             class="border-input accent-primary mt-0.5 size-4"
                         />
                         <span
-                            >Use products you view. Turning this off pauses
-                            view-based suggestions and recording. Saved view
-                            history is kept until its 90-day expiry and used
-                            again if you turn this back on before then.</span
+                            >Use viewed products for suggestions. Turning this
+                            off stops view recording and view-based
+                            suggestions.</span
                         >
                     </label>
                 </div>

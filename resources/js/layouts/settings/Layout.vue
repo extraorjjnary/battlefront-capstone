@@ -1,6 +1,6 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
-import Heading from '@/components/Heading.vue';
+import PageHeader from '@/components/PageHeader.vue';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
@@ -26,16 +26,13 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
 </script>
 
 <template>
-    <div class="px-4 py-6">
-        <Heading
-            title="Settings"
-            description="Manage your profile and account settings"
-        />
+    <div class="space-y-6 p-4 sm:p-6 lg:p-8">
+        <PageHeader title="Settings" />
 
-        <div class="flex flex-col lg:flex-row lg:space-x-12">
+        <div class="flex flex-col gap-6 lg:flex-row lg:gap-8">
             <aside class="w-full max-w-xl lg:w-48 lg:shrink-0">
                 <nav
-                    class="flex flex-col space-y-1 space-x-0"
+                    class="flex flex-wrap gap-1 lg:flex-col"
                     aria-label="Settings"
                 >
                     <Button
@@ -43,7 +40,7 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
                         :key="toUrl(item.href)"
                         variant="ghost"
                         :class="[
-                            'w-full justify-start',
+                            'justify-start lg:w-full',
                             { 'bg-muted': isCurrentOrParentUrl(item.href) },
                         ]"
                         as-child
@@ -56,10 +53,10 @@ const { isCurrentOrParentUrl } = useCurrentUrl();
                 </nav>
             </aside>
 
-            <Separator class="my-6 lg:hidden" />
+            <Separator class="lg:hidden" />
 
             <div class="min-w-0 flex-1 md:max-w-2xl">
-                <section class="max-w-xl space-y-12">
+                <section class="max-w-xl space-y-6">
                     <slot />
                 </section>
             </div>

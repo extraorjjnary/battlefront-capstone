@@ -20,7 +20,7 @@ class StockReconciliationReport
             ->orderBy('products.name')->orderBy('products.id')
             ->paginate(20)->withQueryString();
         $ids = $inventories->getCollection()->pluck('product_id')->map(fn ($id): int => (int) $id)->all();
-        $held = array_fill_keys($ids, ['damage' => 0, 'customer_return' => 0, 'supplier_return' => 0]);
+        $held = array_fill_keys($ids, 0);
 
         $damage = DB::table('damage_reports')->select('product_id')
             ->selectRaw('SUM(quantity) as held')->where('status', 'pending')->whereIn('product_id', $ids)->groupBy('product_id')->get();
@@ -34,14 +34,14 @@ class StockReconciliationReport
             ->selectRaw('SUM(quantity) as held')
             ->whereIn('status', ['pending', 'approved', 'rejected_follow_up'])
             ->whereIn('product_id', $ids)->groupBy('product_id')->get();
-        foreach ([
-            'damage' => $damage,
-            'customer_return' => $customer,
-            'supplier_return' => $supplier,
-        ] as $kind => $cases) {
-            foreach ($cases as $case) {
-                $held[$case->product_id][$kind] += (int) $case->held;
-            }
+        foreach ($damage as $case) {
+            $held[$case->product_id] += (int) $case->held;
+        }
+        foreach ($customer as $case) {
+            $held[$case->product_id] += (int) $case->held;
+        }
+        foreach ($supplier as $case) {
+            $held[$case->product_id] += (int) $case->held;
         }
 
         $ledger = [];
@@ -65,7 +65,7 @@ class StockReconciliationReport
         $inventories->through(function ($inventory) use ($held, $ledger): array {
             $id = (int) $inventory->product_id;
             $last = $ledger[$id] ?? null;
-            $caseExpected = array_sum($held[$id]);
+            $caseExpected = $held[$id];
             $caseGap = (int) $inventory->quarantined_quantity !== $caseExpected;
             $findings = [];
 

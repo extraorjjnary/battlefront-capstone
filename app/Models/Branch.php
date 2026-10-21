@@ -5,6 +5,7 @@ namespace App\Models;
 use Database\Factories\BranchFactory;
 use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -20,12 +21,15 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $contact_number
  * @property string|null $latitude
  * @property string|null $longitude
- * @property-read string|null $email
- * @property-read string $operating_hours
+ * @property string|null $email
+ * @property string|null $operating_hours
+ * @property bool $is_published
+ * @property string|null $seed_key
  * @property-read bool $is_operational
  */
-#[Fillable(['name', 'address', 'city', 'contact_number', 'latitude', 'longitude'])]
-#[Appends(['email', 'operating_hours', 'is_operational'])]
+#[Fillable(['name', 'address', 'city', 'contact_number', 'email', 'operating_hours', 'latitude', 'longitude', 'is_published'])]
+#[Appends(['is_operational'])]
+#[Hidden(['seed_key'])]
 class Branch extends Model
 {
     /** @use HasFactory<BranchFactory> */
@@ -59,32 +63,18 @@ class Branch extends Model
         $query->where('city', config('battlefront.operational_branch_city'));
     }
 
-    /**
-     * Get the branch's confirmed reference email.
-     *
-     * @return Attribute<string, never>|Attribute<null, never>
-     */
-    protected function email(): Attribute
+    protected function casts(): array
     {
-        return Attribute::get(function (mixed $value, array $attributes): ?string {
-            $email = config('battlefront.branch_emails.'.$this->city);
-
-            return is_string($email) ? $email : null;
-        });
+        return ['is_published' => 'boolean'];
     }
 
     /**
-     * Get the branch's configured operating hours.
-     *
-     * @return Attribute<string, never>
+     * @param  Builder<Branch>  $query
      */
-    protected function operatingHours(): Attribute
+    #[Scope]
+    protected function published(Builder $query): void
     {
-        return Attribute::get(function (): string {
-            $operatingHours = config('battlefront.operating_hours');
-
-            return is_string($operatingHours) ? $operatingHours : '';
-        });
+        $query->where('is_published', true);
     }
 
     /**

@@ -53,7 +53,7 @@ const hasActivity = computed(() =>
     >
         <div>
             <p
-                class="text-primary text-xs font-semibold tracking-widest uppercase"
+                class="text-primary-ink text-xs font-semibold tracking-widest uppercase"
             >
                 Anonymous web and mobile events
             </p>

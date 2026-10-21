@@ -1,5 +1,7 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import {
     ArrowRight,
     Boxes,
@@ -11,7 +13,7 @@ import {
     ReceiptText,
     WalletCards,
 } from '@lucide/vue';
-import { computed } from 'vue';
+
 import InventoryController from '@/actions/App/Http/Controllers/Administration/InventoryController';
 import OrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
@@ -101,35 +103,16 @@ defineOptions({
 
 <template>
     <div class="contents">
-        <Head title="Administration dashboard" />
+        <Head title="Dashboard" />
 
         <main
-            class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
+            class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
         >
-            <section
-                class="border-border bg-card relative overflow-hidden border px-6 py-5"
-                aria-labelledby="admin-dashboard-heading"
-            >
-                <div
-                    class="bg-primary absolute inset-y-0 left-0 w-1"
-                    aria-hidden="true"
-                />
-                <p
-                    class="text-primary text-xs font-semibold tracking-widest uppercase"
-                >
-                    Sagay City operations
-                </p>
-                <h1
-                    id="admin-dashboard-heading"
-                    class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
-                >
-                    Welcome, {{ user.name }}
-                </h1>
-                <p class="text-muted-foreground mt-2 text-sm leading-6">
-                    Review today’s operational priorities and continue where
-                    attention is needed.
-                </p>
-            </section>
+            <PageHeader
+                title="Dashboard"
+                heading-id="administration-dashboard-heading"
+                description="Sagay City operations"
+            />
 
             <section
                 v-if="
@@ -310,7 +293,7 @@ defineOptions({
                         <template #fallback>
                             <div
                                 aria-hidden="true"
-                                class="border-border bg-card divide-border divide-y border"
+                                class="surface-panel border-border bg-card divide-border divide-y border"
                             >
                                 <div
                                     v-for="queue in 3"
@@ -332,7 +315,7 @@ defineOptions({
                                 >
                                     <div class="flex gap-3">
                                         <span
-                                            class="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center rounded-md"
+                                            class="bg-secondary text-primary-ink flex size-10 shrink-0 items-center justify-center rounded-md"
                                         >
                                             <WalletCards
                                                 class="size-5"
@@ -492,7 +475,7 @@ defineOptions({
                                 >
                                     <div class="flex gap-3">
                                         <span
-                                            class="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center rounded-md"
+                                            class="bg-secondary text-primary-ink flex size-10 shrink-0 items-center justify-center rounded-md"
                                         >
                                             <Boxes
                                                 class="size-5"
@@ -570,7 +553,7 @@ defineOptions({
                                         </div>
                                         <div class="shrink-0 text-right">
                                             <p
-                                                class="text-primary font-bold tabular-nums"
+                                                class="text-primary-ink font-bold tabular-nums"
                                             >
                                                 {{ product.quantity }} in stock
                                             </p>
@@ -603,12 +586,12 @@ defineOptions({
                         <template #fallback>
                             <div
                                 aria-hidden="true"
-                                class="border-border bg-card min-h-64 border p-4"
+                                class="surface-panel border-border bg-card min-h-64 border p-4"
                             >
                                 <ListSkeleton :rows="3" />
                             </div>
                         </template>
-                        <div class="border-border bg-card border">
+                        <div class="surface-panel border-border bg-card border">
                             <div
                                 v-if="
                                     props.dashboard.recent_orders.length === 0
@@ -708,7 +691,7 @@ defineOptions({
                     </h2>
                 </div>
                 <div
-                    class="border-border bg-card grid border md:grid-cols-2 xl:grid-cols-4"
+                    class="surface-panel border-border bg-card grid border md:grid-cols-2 xl:grid-cols-4"
                 >
                     <Link
                         v-for="item in quickLinks"
@@ -718,7 +701,7 @@ defineOptions({
                     >
                         <component
                             :is="item.icon"
-                            class="text-primary mt-0.5 size-5 shrink-0"
+                            class="text-primary-ink mt-0.5 size-5 shrink-0"
                             aria-hidden="true"
                         />
                         <span class="min-w-0 flex-1">

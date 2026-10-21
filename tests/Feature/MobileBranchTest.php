@@ -3,7 +3,7 @@
 use App\Models\Branch;
 use Database\Seeders\BranchSeeder;
 
-test('guests receive all five static branches in the same order and shape as the web directory', function () {
+test('guests receive all five published branches in the same order and shape as the web directory', function () {
     $this->seed(BranchSeeder::class);
 
     $response = $this->get(route('api.v1.branches.index'));
@@ -37,18 +37,19 @@ test('guests receive all five static branches in the same order and shape as the
     expect($response->json('data'))->toBe($webResponse->inertiaProps('branches'));
 });
 
-test('unconfirmed branch fields remain null and hours come from configuration', function () {
+test('unconfirmed branch fields remain null and stored hours override configuration', function () {
     config(['battlefront.operating_hours' => '9:00 AM–5:00 PM']);
     $branch = Branch::factory()->create([
         'city' => 'Unconfirmed City', 'address' => null, 'contact_number' => null,
         'latitude' => null, 'longitude' => null,
+        'operating_hours' => '10:00 AM–4:00 PM',
     ]);
 
     $this->get(route('api.v1.branches.index'))->assertOk()->assertExactJson(['data' => [[
         'id' => $branch->id, 'name' => 'Battlefront Computer Trading',
         'city' => 'Unconfirmed City', 'address' => null, 'contact_number' => null,
         'latitude' => null, 'longitude' => null, 'email' => null,
-        'operating_hours' => '9:00 AM–5:00 PM', 'is_operational' => false, 'operational_notice' => null,
+        'operating_hours' => '10:00 AM–4:00 PM', 'is_operational' => false, 'operational_notice' => null,
     ]]]);
 });
 

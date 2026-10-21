@@ -6,6 +6,7 @@ const props = defineProps({
     imageUrl: { type: String, default: null },
     productName: { type: String, required: true },
     contain: { type: Boolean, default: true },
+    desktopCover: { type: Boolean, default: false },
 });
 
 const failedToLoad = ref(false);
@@ -31,7 +32,10 @@ watch(
             loading="lazy"
             decoding="async"
             class="size-full"
-            :class="contain ? 'object-contain' : 'object-cover'"
+            :class="[
+                contain ? 'object-contain' : 'object-cover',
+                { 'lg:object-cover': desktopCover },
+            ]"
             @error="failedToLoad = true"
         />
         <div
@@ -43,7 +47,9 @@ watch(
             >
                 <ImageOff class="size-6" aria-hidden="true" />
             </span>
-            <span class="text-xs font-medium wrap-anywhere sm:text-sm">Image unavailable</span>
+            <span class="text-xs font-medium wrap-anywhere sm:text-sm"
+                >Image unavailable</span
+            >
         </div>
         <span
             v-if="hasImage && isDemoImage"

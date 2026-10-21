@@ -56,7 +56,9 @@ defineProps({
             </div>
 
             <div class="grid gap-2">
-                <div class="flex flex-wrap items-center justify-between gap-x-3">
+                <div
+                    class="flex flex-wrap items-center justify-between gap-x-3"
+                >
                     <Label for="password">Password</Label>
                     <TextLink
                         v-if="canResetPassword"
@@ -79,7 +81,10 @@ defineProps({
             </div>
 
             <div class="flex items-center justify-between">
-                <Label for="remember" class="flex min-h-11 items-center space-x-3 md:min-h-0">
+                <Label
+                    for="remember"
+                    class="flex min-h-11 items-center space-x-3 md:min-h-0"
+                >
                     <Checkbox id="remember" name="remember" :tabindex="3" />
                     <span>Remember me</span>
                 </Label>

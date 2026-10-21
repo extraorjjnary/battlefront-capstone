@@ -24,7 +24,8 @@ class ResolveStoreContext
     public function execute(string $message): array
     {
         $branches = Branch::query()
-            ->select(['id', 'name', 'address', 'city', 'contact_number'])
+            ->published()
+            ->select(['id', 'name', 'address', 'city', 'contact_number', 'email', 'operating_hours'])
             ->orderBy('city')
             ->orderBy('id')
             ->get();
@@ -45,7 +46,7 @@ class ResolveStoreContext
                     'address' => $branch->address,
                     'contact_number' => $branch->contact_number,
                     'email' => $branch->email,
-                    'operating_hours' => $branch->operating_hours,
+                    'operating_hours' => $branch->operating_hours ?? '',
                     'is_operational' => $branch->is_operational,
                 ])
                 ->all()),

@@ -122,3 +122,78 @@ test('branch maps without coordinates show unavailable content without importing
     assert.match(await map.html(), /branch map is not currently available/);
     assert.doesNotMatch(await map.html(), /data-slot="skeleton"/);
 });
+
+test('branch map pins use only complete valid coordinates and escape managed text', async (t) => {
+    const originalDocument = globalThis.document;
+    const nodes = [];
+    globalThis.document = {
+        createElement: () => {
+            const node = { append() {} };
+            nodes.push(node);
+            return node;
+        },
+    };
+    t.after(() => {
+        if (originalDocument === undefined) delete globalThis.document;
+        else globalThis.document = originalDocument;
+    });
+    const pins = [];
+    const layer = {
+        addTo() {
+            return this;
+        },
+        bindTooltip() {
+            return this;
+        },
+        bindPopup() {
+            return this;
+        },
+    };
+    const map = mapHarness(
+        async () => ({
+            default: {
+                map: () => ({ fitBounds() {} }),
+                tileLayer: () => layer,
+                circleMarker: (coordinates) => {
+                    pins.push(coordinates);
+                    return layer;
+                },
+            },
+        }),
+        [
+            {
+                city: '<script>Untrusted city</script>',
+                address: '<img src=x onerror=alert(1)>',
+                latitude: '10.1234567',
+                longitude: '123.7654321',
+            },
+            { city: 'Zero', latitude: 0, longitude: 0 },
+            { city: 'No pin', latitude: null, longitude: null },
+            { city: 'Partial', latitude: 10, longitude: null },
+            { city: 'Blank', latitude: '', longitude: '' },
+            { city: 'Whitespace', latitude: ' ', longitude: ' ' },
+            { city: 'Missing' },
+            { city: 'Outside range', latitude: 91, longitude: 123 },
+            { city: 'Invalid', latitude: 'north', longitude: 123 },
+        ],
+    );
+
+    await map.mount();
+
+    assert.deepEqual(pins, [
+        [10.1234567, 123.7654321],
+        [0, 0],
+    ]);
+    assert.ok(
+        nodes.some(
+            (node) => node.textContent === '<script>Untrusted city</script>',
+        ),
+    );
+    assert.ok(
+        nodes.some(
+            (node) => node.textContent === '<img src=x onerror=alert(1)>',
+        ),
+    );
+    assert.ok(nodes.every((node) => !('innerHTML' in node)));
+    assert.match(await map.html(), /2 mapped/);
+});

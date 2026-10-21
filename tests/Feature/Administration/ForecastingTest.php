@@ -647,10 +647,10 @@ test('saved forecasts remain readable after their product is soft deleted', func
     $this->actingAs(User::factory()->administrator()->create())
         ->get(route('administration.forecasting.index'))
         ->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->where('forecasts.total', 1)
-            ->where('forecasts.data.0.product.id', $product->id)
-            ->where('forecasts.data.0.product.is_deleted', true)
-            ->where('forecasts.data.0.forecast_quantity', '17.00'));
+        ->where('forecasts.total', 1)
+        ->where('forecasts.data.0.product.id', $product->id)
+        ->where('forecasts.data.0.product.is_deleted', true)
+        ->where('forecasts.data.0.forecast_quantity', '17.00'));
 });
 
 test('calculation failures preserve saved demand and report a safe error', function (string $failure) {

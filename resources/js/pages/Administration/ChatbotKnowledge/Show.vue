@@ -1,6 +1,7 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Form, Head, Link } from '@inertiajs/vue3';
-import { ArrowLeft, MessageSquareText, Pencil, RotateCcw } from '@lucide/vue';
+import { ArrowLeft, Pencil, RotateCcw } from '@lucide/vue';
 import ChatbotKnowledgeActivationController from '@/actions/App/Http/Controllers/Administration/ChatbotKnowledgeActivationController';
 import ChatbotKnowledgeController from '@/actions/App/Http/Controllers/Administration/ChatbotKnowledgeController';
 import InputError from '@/components/InputError.vue';
@@ -30,61 +31,33 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Chatbot FAQ record" />
-
     <main
-        class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 p-6 lg:p-10"
+        class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
     >
-        <section class="border-border bg-card relative overflow-hidden border">
-            <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
-            <div
-                class="flex flex-col gap-5 p-6 sm:flex-row sm:items-start sm:justify-between"
-            >
-                <div class="flex min-w-0 items-start gap-4">
-                    <span
-                        class="bg-secondary text-primary flex size-11 shrink-0 items-center justify-center rounded-md"
-                    >
-                        <MessageSquareText class="size-5" />
-                    </span>
-                    <div class="min-w-0">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <p
-                                class="text-primary text-xs font-semibold tracking-widest uppercase"
-                            >
-                                Chatbot FAQ record
-                            </p>
-                            <Badge
-                                :variant="
-                                    knowledge.is_active
-                                        ? 'secondary'
-                                        : 'outline'
-                                "
-                            >
-                                {{
-                                    knowledge.is_active ? 'Active' : 'Inactive'
-                                }}
-                            </Badge>
-                        </div>
-                        <h1
-                            class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
-                        >
-                            {{ knowledge.question_pattern }}
-                        </h1>
-                        <p v-if="!knowledge.eligible_for_faq" class="text-muted-foreground mt-2 text-sm">Needs review: {{ knowledge.eligibility_reason }}</p>
-                        <p class="text-muted-foreground mt-2 text-sm">
-                            {{ knowledge.category_label }}
-                        </p>
-                    </div>
-                </div>
-
+        <Head title="Chatbot FAQ record" />
+        <PageHeader :title="knowledge.question_pattern">
+            <template #metadata>
+                <Badge :variant="knowledge.is_active ? 'secondary' : 'outline'">
+                    {{ knowledge.is_active ? 'Active' : 'Inactive' }}
+                </Badge>
+                <span>{{ knowledge.category_label }}</span>
+                <p
+                    v-if="!knowledge.eligible_for_faq"
+                    class="text-destructive w-full"
+                >
+                    Needs review:
+                    {{ knowledge.eligibility_reason }}
+                </p>
+            </template>
+            <template #actions>
                 <Button variant="outline" size="sm" as-child>
                     <Link :href="ChatbotKnowledgeController.index()">
                         <ArrowLeft />
                         Back to FAQs
                     </Link>
                 </Button>
-            </div>
-        </section>
+            </template>
+        </PageHeader>
 
         <section aria-labelledby="response-heading">
             <div class="mb-4 flex flex-wrap items-end justify-between gap-3">
@@ -131,7 +104,9 @@ defineOptions({
                         <Button
                             variant="outline"
                             size="sm"
-                            :disabled="processing || !knowledge.eligible_for_faq"
+                            :disabled="
+                                processing || !knowledge.eligible_for_faq
+                            "
                         >
                             <Spinner v-if="processing" />
                             <RotateCcw v-else />
@@ -141,7 +116,7 @@ defineOptions({
                 </div>
             </div>
 
-            <div class="border-border bg-card border p-6">
+            <div class="surface-panel border-border bg-card border p-6">
                 <p class="text-sm leading-7 whitespace-pre-wrap">
                     {{ knowledge.response_template }}
                 </p>

@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Branch;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 class BranchSeeder extends Seeder
 {
@@ -60,10 +61,25 @@ class BranchSeeder extends Seeder
         ];
 
         foreach ($branches as $branch) {
-            Branch::query()->updateOrCreate(
-                ['city' => $branch['city']],
-                $branch,
-            );
+            $seedKey = Str::slug($branch['city']);
+
+            if (Branch::query()->where('seed_key', $seedKey)->exists()) {
+                continue;
+            }
+
+            $record = Branch::query()->where('city', $branch['city'])->first();
+
+            if ($record === null) {
+                $record = new Branch([
+                    ...$branch,
+                    'email' => config('battlefront.branch_emails.'.$branch['city']),
+                    'operating_hours' => config('battlefront.operating_hours'),
+                    'is_published' => true,
+                ]);
+            }
+
+            $record->seed_key = $seedKey;
+            $record->save();
         }
     }
 }

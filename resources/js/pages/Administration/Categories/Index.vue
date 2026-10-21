@@ -42,10 +42,8 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Categories" />
-
     <main
-        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
+        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
     >
         <section class="border-border bg-card relative overflow-hidden border">
             <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
@@ -117,7 +115,7 @@ defineOptions({
 
             <div
                 v-if="categories.data.length === 0"
-                class="border-border bg-card flex min-h-52 items-center justify-center border p-6 text-center"
+                class="surface-panel border-border bg-card flex min-h-52 items-center justify-center border p-6 text-center"
             >
                 <div>
                     <FolderTree class="text-muted-foreground mx-auto size-9" />
@@ -136,7 +134,7 @@ defineOptions({
 
             <div
                 v-else
-                class="border-border bg-card divide-border divide-y border"
+                class="surface-panel border-border bg-card divide-border divide-y border"
             >
                 <article
                     v-for="category in categories.data"

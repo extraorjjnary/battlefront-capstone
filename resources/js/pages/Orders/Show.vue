@@ -1,9 +1,8 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import {
     ArrowRight,
-    BadgeCheck,
-    CalendarDays,
     CircleAlert,
     CreditCard,
     PackageCheck,
@@ -96,106 +95,47 @@ function submitReplacementProof() {
         <Head :title="`Order ${order.reference}`" />
 
         <main
-            class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
+            class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
         >
-            <section
-                class="border-border bg-card relative overflow-hidden border p-6 sm:p-8"
-                aria-labelledby="confirmation-heading"
-            >
-                <div
-                    class="bg-primary absolute inset-y-0 left-0 w-1"
-                    aria-hidden="true"
-                />
-                <div
-                    class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between"
+            <div class="space-y-3">
+                <PageHeader
+                    :title="`Order ${order.reference}`"
+                    heading-id="confirmation-heading"
                 >
-                    <div class="flex items-start gap-4">
+                    <template #metadata>
                         <span
-                            class="bg-secondary text-primary flex size-12 shrink-0 items-center justify-center rounded-md"
+                            v-if="isConfirmation"
+                            class="text-foreground font-medium"
                         >
-                            <BadgeCheck class="size-6" aria-hidden="true" />
+                            Thank you for your order. Order confirmed.
                         </span>
-                        <div>
-                            <p
-                                class="text-primary text-xs font-semibold tracking-widest uppercase"
-                            >
-                                {{
-                                    isConfirmation
-                                        ? 'Order confirmed'
-                                        : 'Customer order'
-                                }}
-                            </p>
-                            <h1
-                                id="confirmation-heading"
-                                class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
-                            >
-                                {{
-                                    isConfirmation
-                                        ? 'Thank you for your order'
-                                        : `Order ${order.reference}`
-                                }}
-                            </h1>
-                            <p
-                                class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6"
-                            >
-                                <template v-if="isConfirmation">
-                                    Battlefront received your order. Keep the
-                                    reference below when asking about its
-                                    progress.
-                                </template>
-                                <template v-else>
-                                    Review the latest order and payment status
-                                    recorded by Battlefront.
-                                </template>
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="sm:text-right">
-                        <p
-                            class="text-muted-foreground text-xs font-semibold tracking-wide uppercase"
-                        >
-                            Order reference
-                        </p>
-                        <p class="mt-1 text-2xl font-bold tabular-nums">
-                            {{ order.reference }}
-                        </p>
                         <Badge
                             variant="outline"
-                            class="mt-2"
                             :class="orderStatusBadgeClass(order.status.value)"
                         >
                             {{ order.status.label }}
                         </Badge>
-                    </div>
-                </div>
-
-                <div
-                    class="border-border mt-6 flex flex-wrap items-center justify-between gap-3 border-t pt-4"
-                >
-                    <p
-                        class="text-muted-foreground flex items-center gap-2 text-sm"
-                    >
-                        <CalendarDays class="size-4" aria-hidden="true" />
-                        Submitted {{ formatOrderDate(order.created_at) }}
-                    </p>
-                    <Button
-                        v-if="order.can_cancel"
-                        type="button"
-                        variant="destructive-outline"
-                        size="sm"
-                        :disabled="cancellationForm.processing"
-                        @click="requestCancellation"
-                    >
-                        <Spinner v-if="cancellationForm.processing" />
-                        Cancel order
-                    </Button>
-                </div>
-                <InputError
-                    class="mt-3"
-                    :message="cancellationForm.errors.status"
-                />
-            </section>
+                        <span
+                            >Submitted
+                            {{ formatOrderDate(order.created_at) }}</span
+                        >
+                    </template>
+                    <template #actions>
+                        <Button
+                            v-if="order.can_cancel"
+                            type="button"
+                            variant="destructive-outline"
+                            size="sm"
+                            :disabled="cancellationForm.processing"
+                            @click="requestCancellation"
+                        >
+                            <Spinner v-if="cancellationForm.processing" />
+                            Cancel order
+                        </Button>
+                    </template>
+                </PageHeader>
+                <InputError :message="cancellationForm.errors.status" />
+            </div>
 
             <Dialog v-model:open="cancellationOpen">
                 <DialogContent>
@@ -259,7 +199,7 @@ function submitReplacementProof() {
                     </div>
 
                     <div
-                        class="border-border bg-card divide-border divide-y border"
+                        class="surface-panel border-border bg-card divide-border divide-y border"
                     >
                         <article
                             v-for="item in order.items"
@@ -281,7 +221,7 @@ function submitReplacementProof() {
                                 <div class="min-w-0">
                                     <p
                                         v-if="item.product.brand"
-                                        class="text-primary text-xs font-semibold tracking-wide uppercase"
+                                        class="text-primary-ink text-xs font-semibold tracking-wide uppercase"
                                     >
                                         {{ item.product.brand }}
                                     </p>
@@ -315,12 +255,12 @@ function submitReplacementProof() {
 
                 <aside class="grid gap-6 xl:sticky xl:top-6">
                     <section
-                        class="border-border bg-card border p-6"
+                        class="surface-panel border-border bg-card border p-6"
                         aria-labelledby="order-total-heading"
                     >
                         <div class="flex items-center gap-3">
                             <ReceiptText
-                                class="text-primary size-5"
+                                class="text-primary-ink size-5"
                                 aria-hidden="true"
                             />
                             <h2 id="order-total-heading" class="font-bold">
@@ -369,55 +309,66 @@ function submitReplacementProof() {
                                     Delivery fee not configured ·
                                     {{ order.delivery_quote.destination }}
                                 </p>
-                                <p class="text-muted-foreground text-xs leading-5">
+                                <p
+                                    class="text-muted-foreground text-xs leading-5"
+                                >
                                     {{ order.delivery_quote.notice }}
                                 </p>
-                                <p class="text-muted-foreground text-xs leading-5">
+                                <p
+                                    class="text-muted-foreground text-xs leading-5"
+                                >
                                     {{ order.delivery_quote.assumption_label }}
                                 </p>
                             </template>
                             <template v-else>
-                            <p class="font-semibold">
-                                {{ order.delivery_quote.carrier.toUpperCase() }}
-                                · {{ order.delivery_quote.destination }}
-                            </p>
-                            <p>
-                                {{ order.delivery_quote.packing_expectation }}
-                            </p>
-                            <p>
-                                Estimated preparation and transit:
-                                {{ order.delivery_quote.eta_min_days
-                                }}<template
-                                    v-if="
-                                        order.delivery_quote.eta_min_days !==
-                                        order.delivery_quote.eta_max_days
-                                    "
-                                    >–{{
-                                        order.delivery_quote.eta_max_days
-                                    }}</template
+                                <p class="font-semibold">
+                                    {{
+                                        order.delivery_quote.carrier.toUpperCase()
+                                    }}
+                                    · {{ order.delivery_quote.destination }}
+                                </p>
+                                <p>
+                                    {{
+                                        order.delivery_quote.packing_expectation
+                                    }}
+                                </p>
+                                <p>
+                                    Estimated preparation and transit:
+                                    {{ order.delivery_quote.eta_min_days
+                                    }}<template
+                                        v-if="
+                                            order.delivery_quote
+                                                .eta_min_days !==
+                                            order.delivery_quote.eta_max_days
+                                        "
+                                        >–{{
+                                            order.delivery_quote.eta_max_days
+                                        }}</template
+                                    >
+                                    calendar days.
+                                </p>
+                                <p
+                                    class="text-muted-foreground text-xs leading-5"
                                 >
-                                calendar days.
-                            </p>
-                            <p class="text-muted-foreground text-xs leading-5">
-                                {{ order.delivery_quote.notice }}
-                            </p>
-                            <p
-                                v-if="order.delivery_quote.is_demo"
-                                class="text-muted-foreground text-xs leading-5"
-                            >
-                                {{ order.delivery_quote.assumption_label }}
-                            </p>
+                                    {{ order.delivery_quote.notice }}
+                                </p>
+                                <p
+                                    v-if="order.delivery_quote.is_demo"
+                                    class="text-muted-foreground text-xs leading-5"
+                                >
+                                    {{ order.delivery_quote.assumption_label }}
+                                </p>
                             </template>
                         </div>
                     </section>
 
                     <section
-                        class="border-border bg-card border p-6"
+                        class="surface-panel border-border bg-card border p-6"
                         aria-labelledby="submitted-details-heading"
                     >
                         <div class="flex items-center gap-3">
                             <PackageCheck
-                                class="text-primary size-5"
+                                class="text-primary-ink size-5"
                                 aria-hidden="true"
                             />
                             <h2
@@ -612,7 +563,7 @@ function submitReplacementProof() {
 
                                 <Button
                                     type="submit"
-                                    class="w-full bg-red-700 text-white hover:bg-red-800 focus-visible:ring-red-600/40 dark:bg-red-700 dark:hover:bg-red-600"
+                                    class="bg-destructive-action text-destructive-action-foreground hover:bg-destructive-action/90 focus-visible:ring-destructive w-full"
                                     :disabled="
                                         replacementProofForm.processing ||
                                         !replacementProofForm.payment_proof
