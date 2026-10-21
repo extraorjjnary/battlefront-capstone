@@ -45,8 +45,7 @@ class ProductCatalogController extends Controller
             );
         }
 
-        $products = fn (): LengthAwarePaginator => $this->productCatalogRepository->paginate($filters)
-            ->through(fn (Product $product): array => $this->catalogProductPresenter->present($product));
+        $products = fn (): LengthAwarePaginator => $this->paginateProducts($filters);
 
         $recommendationViewData = null;
         $resolveRecommendations = function () use (&$recommendationViewData, $hasDiscoveryFilters, $request, $buildRecommendationViewData): array {
@@ -129,5 +128,21 @@ class ProductCatalogController extends Controller
                 guestProfile: $guestProfile instanceof GuestRecommendationProfile ? $guestProfile : null,
             ),
         ]);
+    }
+
+    /**
+     * @param  array{q: string|null, category_id: int|null, brand: string|null, tag_id: int|null, category_ids?: list<int>, min_price?: string, max_price?: string, sort?: string}  $filters
+     * @return LengthAwarePaginator<int, covariant array{
+     *     id: int, name: string, description: string|null, brand: string|null,
+     *     price: string, discount_price: string|null, image_url: string|null,
+     *     is_featured: bool, shipping_profile: string,
+     *     category: array{id: int, name: string}, tags: list<array{id: int, name: string}>,
+     *     inventory: array{quantity: int|null, status: string}
+     * }>
+     */
+    private function paginateProducts(array $filters): LengthAwarePaginator
+    {
+        return $this->productCatalogRepository->paginate($filters)
+            ->through(fn (Product $product): array => $this->catalogProductPresenter->present($product));
     }
 }

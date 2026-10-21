@@ -4,6 +4,7 @@ namespace App\Http\Requests\Administration;
 
 use App\Actions\Chatbot\ValidateChatbotFaq;
 use App\Enums\ChatbotCategory;
+use App\Models\ChatbotKnowledge;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
@@ -37,6 +38,7 @@ class UpdateChatbotKnowledgeActivationRequest extends FormRequest
             if ($validator->errors()->isNotEmpty() || ! $this->boolean('is_active')) {
                 return;
             }
+            /** @var ChatbotKnowledge $record */
             $record = $this->route('chatbotKnowledge');
             $error = $record->category !== ChatbotCategory::Faq
                 ? 'Edit this legacy record into an eligible FAQ before reactivating it.'
