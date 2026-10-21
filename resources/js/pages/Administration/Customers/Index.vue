@@ -37,9 +37,9 @@ defineOptions({
     >
         <Head title="Customers" />
         <PageHeader
-                title="Customers"
-                description="Account details are read-only."
-            />
+            title="Customers"
+            description="Account details are read-only."
+        />
 
         <section aria-labelledby="customer-list-heading">
             <div class="mb-4">

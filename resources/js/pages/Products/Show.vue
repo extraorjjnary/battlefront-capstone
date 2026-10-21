@@ -30,7 +30,9 @@ const canUseCustomerCart = computed(
     () => page.props.auth?.can?.useCustomerCart === true,
 );
 const hasAvailableStock = computed(
-    () => Number.isInteger(props.product.inventory?.quantity) && props.product.inventory.quantity > 0,
+    () =>
+        Number.isInteger(props.product.inventory?.quantity) &&
+        props.product.inventory.quantity > 0,
 );
 const canReturnToCatalog = consumeCatalogVisit(props.product.id);
 let visibleSince = null;
@@ -195,7 +197,9 @@ function returnToCatalog() {
                     />
                 </div>
 
-                <div class="surface-card border-border bg-card flex min-w-0 flex-col border p-4 sm:p-6">
+                <div
+                    class="surface-card border-border bg-card flex min-w-0 flex-col border p-4 sm:p-6"
+                >
                     <div class="flex flex-wrap items-center gap-2">
                         <Badge variant="secondary">
                             {{ product.category.name }}
@@ -222,7 +226,6 @@ function returnToCatalog() {
                     />
 
                     <div class="mt-4">
-
                         <StockAvailability :inventory="product.inventory" />
                         <p
                             v-if="

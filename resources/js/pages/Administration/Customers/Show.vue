@@ -39,7 +39,10 @@ defineOptions({
         class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
     >
         <Head :title="customer.name" />
-        <PageHeader :title="customer.name" description="Account details are read-only.">
+        <PageHeader
+            :title="customer.name"
+            description="Account details are read-only."
+        >
             <template #actions>
                 <Button variant="outline" size="sm" as-child>
                     <Link :href="CustomerController.index()">
@@ -58,12 +61,16 @@ defineOptions({
                 </h2>
             </div>
 
-            <div class="surface-panel border-border bg-card divide-border divide-y border">
+            <div
+                class="surface-panel border-border bg-card divide-border divide-y border"
+            >
                 <div class="flex items-center gap-3 p-5">
                     <UserInfo :user="customer" show-email />
                 </div>
 
-                <dl class="divide-border grid grid-cols-1 md:grid-cols-2 md:divide-x">
+                <dl
+                    class="divide-border grid grid-cols-1 md:grid-cols-2 md:divide-x"
+                >
                     <div class="border-border flex gap-3 p-5 max-md:border-b">
                         <Mail
                             class="text-muted-foreground mt-0.5 size-5 shrink-0"

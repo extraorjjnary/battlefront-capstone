@@ -102,15 +102,27 @@ function submitReplacementProof() {
             class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
         >
             <div class="space-y-3">
-                <PageHeader :title="`Order ${order.reference}`" heading-id="confirmation-heading">
+                <PageHeader
+                    :title="`Order ${order.reference}`"
+                    heading-id="confirmation-heading"
+                >
                     <template #metadata>
-                        <span v-if="isConfirmation" class="text-foreground font-medium">
+                        <span
+                            v-if="isConfirmation"
+                            class="text-foreground font-medium"
+                        >
                             Thank you for your order. Order confirmed.
                         </span>
-                        <Badge variant="outline" :class="orderStatusBadgeClass(order.status.value)">
+                        <Badge
+                            variant="outline"
+                            :class="orderStatusBadgeClass(order.status.value)"
+                        >
                             {{ order.status.label }}
                         </Badge>
-                        <span>Submitted {{ formatOrderDate(order.created_at) }}</span>
+                        <span
+                            >Submitted
+                            {{ formatOrderDate(order.created_at) }}</span
+                        >
                     </template>
                     <template #actions>
                         <Button
@@ -126,8 +138,8 @@ function submitReplacementProof() {
                         </Button>
                     </template>
                 </PageHeader>
-<InputError :message="cancellationForm.errors.status" />
-</div>
+                <InputError :message="cancellationForm.errors.status" />
+            </div>
 
             <Dialog v-model:open="cancellationOpen">
                 <DialogContent>
@@ -301,44 +313,55 @@ function submitReplacementProof() {
                                     Delivery fee not configured ·
                                     {{ order.delivery_quote.destination }}
                                 </p>
-                                <p class="text-muted-foreground text-xs leading-5">
+                                <p
+                                    class="text-muted-foreground text-xs leading-5"
+                                >
                                     {{ order.delivery_quote.notice }}
                                 </p>
-                                <p class="text-muted-foreground text-xs leading-5">
+                                <p
+                                    class="text-muted-foreground text-xs leading-5"
+                                >
                                     {{ order.delivery_quote.assumption_label }}
                                 </p>
                             </template>
                             <template v-else>
-                            <p class="font-semibold">
-                                {{ order.delivery_quote.carrier.toUpperCase() }}
-                                · {{ order.delivery_quote.destination }}
-                            </p>
-                            <p>
-                                {{ order.delivery_quote.packing_expectation }}
-                            </p>
-                            <p>
-                                Estimated preparation and transit:
-                                {{ order.delivery_quote.eta_min_days
-                                }}<template
-                                    v-if="
-                                        order.delivery_quote.eta_min_days !==
-                                        order.delivery_quote.eta_max_days
-                                    "
-                                    >–{{
-                                        order.delivery_quote.eta_max_days
-                                    }}</template
+                                <p class="font-semibold">
+                                    {{
+                                        order.delivery_quote.carrier.toUpperCase()
+                                    }}
+                                    · {{ order.delivery_quote.destination }}
+                                </p>
+                                <p>
+                                    {{
+                                        order.delivery_quote.packing_expectation
+                                    }}
+                                </p>
+                                <p>
+                                    Estimated preparation and transit:
+                                    {{ order.delivery_quote.eta_min_days
+                                    }}<template
+                                        v-if="
+                                            order.delivery_quote
+                                                .eta_min_days !==
+                                            order.delivery_quote.eta_max_days
+                                        "
+                                        >–{{
+                                            order.delivery_quote.eta_max_days
+                                        }}</template
+                                    >
+                                    calendar days.
+                                </p>
+                                <p
+                                    class="text-muted-foreground text-xs leading-5"
                                 >
-                                calendar days.
-                            </p>
-                            <p class="text-muted-foreground text-xs leading-5">
-                                {{ order.delivery_quote.notice }}
-                            </p>
-                            <p
-                                v-if="order.delivery_quote.is_demo"
-                                class="text-muted-foreground text-xs leading-5"
-                            >
-                                {{ order.delivery_quote.assumption_label }}
-                            </p>
+                                    {{ order.delivery_quote.notice }}
+                                </p>
+                                <p
+                                    v-if="order.delivery_quote.is_demo"
+                                    class="text-muted-foreground text-xs leading-5"
+                                >
+                                    {{ order.delivery_quote.assumption_label }}
+                                </p>
                             </template>
                         </div>
                     </section>
@@ -544,7 +567,7 @@ function submitReplacementProof() {
 
                                 <Button
                                     type="submit"
-                                    class="w-full bg-destructive-action text-destructive-action-foreground hover:bg-destructive-action/90 focus-visible:ring-destructive"
+                                    class="bg-destructive-action text-destructive-action-foreground hover:bg-destructive-action/90 focus-visible:ring-destructive w-full"
                                     :disabled="
                                         replacementProofForm.processing ||
                                         !replacementProofForm.payment_proof

@@ -47,7 +47,9 @@ watch(
             >
                 <ImageOff class="size-6" aria-hidden="true" />
             </span>
-            <span class="text-xs font-medium wrap-anywhere sm:text-sm">Image unavailable</span>
+            <span class="text-xs font-medium wrap-anywhere sm:text-sm"
+                >Image unavailable</span
+            >
         </div>
         <span
             v-if="hasImage && isDemoImage"

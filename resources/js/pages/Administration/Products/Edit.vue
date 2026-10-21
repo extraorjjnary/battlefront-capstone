@@ -30,11 +30,7 @@ defineOptions({
         <Head :title="`Edit ${product.name}`" />
         <PageHeader :title="`Edit ${product.name}`">
             <template #metadata>
-                <Badge
-                    :variant="
-                        product.is_active ? 'secondary' : 'outline'
-                        "
-                >
+                <Badge :variant="product.is_active ? 'secondary' : 'outline'">
                     {{ product.is_active ? 'Active' : 'Inactive' }}
                 </Badge>
             </template>

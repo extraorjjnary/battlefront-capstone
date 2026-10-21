@@ -167,8 +167,8 @@ function findNodes(node, predicate) {
     const children = Array.isArray(node.children)
         ? node.children
         : Object.values(node.children ?? {})
-            .filter((slot) => typeof slot === 'function')
-            .flatMap((slot) => slot());
+              .filter((slot) => typeof slot === 'function')
+              .flatMap((slot) => slot());
     return [
         ...(predicate(node) ? [node] : []),
         ...children.flatMap((child) => findNodes(child, predicate)),

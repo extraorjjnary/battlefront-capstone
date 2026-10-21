@@ -5,9 +5,7 @@ import { Bell, Check, ArrowRight } from '@lucide/vue';
 import { ref } from 'vue';
 import CatalogPagination from '@/components/CatalogPagination.vue';
 import { Button } from '@/components/ui/button';
-import {
-    useNotificationNavigation,
-} from '@/composables/useNotificationNavigation';
+import { useNotificationNavigation } from '@/composables/useNotificationNavigation';
 
 defineProps({ notifications: { type: Object, required: true } });
 const navigation = useNotificationNavigation();
@@ -47,9 +45,16 @@ function markRead(id = null) {
         <main
             class="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
         >
-            <PageHeader title="Notifications" :description="`${summary.unread_count} unread`">
+            <PageHeader
+                title="Notifications"
+                :description="`${summary.unread_count} unread`"
+            >
                 <template #actions>
-                    <Button variant="outline" :disabled="busy || !summary.unread_count" @click="markRead()">
+                    <Button
+                        variant="outline"
+                        :disabled="busy || !summary.unread_count"
+                        @click="markRead()"
+                    >
                         <Check class="size-4" aria-hidden="true" />
                         Mark all as read
                     </Button>
@@ -78,11 +83,14 @@ function markRead(id = null) {
                         }}
                     </p>
                 </div>
-                <div v-else class="surface-panel border-border bg-card divide-border divide-y border">
+                <div
+                    v-else
+                    class="surface-panel border-border bg-card divide-border divide-y border"
+                >
                     <article
                         v-for="notification in notifications.data"
                         :key="notification.id"
-                        class="bg-card border-l-2 p-5 first:rounded-t-panel last:rounded-b-panel"
+                        class="bg-card first:rounded-t-panel last:rounded-b-panel border-l-2 p-5"
                         :class="
                             notification.is_read
                                 ? 'border-l-transparent'

@@ -23,7 +23,9 @@
                     "name": "Regions",
                     "request": {
                         "method": "GET",
-                        "header": [{ "key": "Accept", "value": "application/json" }],
+                        "header": [
+                            { "key": "Accept", "value": "application/json" }
+                        ],
                         "url": "{{base_url}}/delivery-locations?level=regions"
                     }
                 },
@@ -31,7 +33,9 @@
                     "name": "Negros Island Region provinces",
                     "request": {
                         "method": "GET",
-                        "header": [{ "key": "Accept", "value": "application/json" }],
+                        "header": [
+                            { "key": "Accept", "value": "application/json" }
+                        ],
                         "url": "{{base_url}}/delivery-locations?level=provinces&parent_code=1800000000"
                     }
                 },
@@ -39,7 +43,9 @@
                     "name": "Negros Occidental cities and municipalities",
                     "request": {
                         "method": "GET",
-                        "header": [{ "key": "Accept", "value": "application/json" }],
+                        "header": [
+                            { "key": "Accept", "value": "application/json" }
+                        ],
                         "url": "{{base_url}}/delivery-locations?level=cities&parent_code=1804500000"
                     }
                 },
@@ -47,7 +53,9 @@
                     "name": "NCR independent cities and municipality",
                     "request": {
                         "method": "GET",
-                        "header": [{ "key": "Accept", "value": "application/json" }],
+                        "header": [
+                            { "key": "Accept", "value": "application/json" }
+                        ],
                         "url": "{{base_url}}/delivery-locations?level=cities&parent_code=1300000000"
                     }
                 },
@@ -55,7 +63,9 @@
                     "name": "Sagay barangays",
                     "request": {
                         "method": "GET",
-                        "header": [{ "key": "Accept", "value": "application/json" }],
+                        "header": [
+                            { "key": "Accept", "value": "application/json" }
+                        ],
                         "url": "{{base_url}}/delivery-locations?level=barangays&parent_code=1804523000"
                     }
                 },
@@ -63,7 +73,9 @@
                     "name": "Sagay selected-cart quote",
                     "request": {
                         "method": "GET",
-                        "header": [{ "key": "Accept", "value": "application/json" }],
+                        "header": [
+                            { "key": "Accept", "value": "application/json" }
+                        ],
                         "url": "{{base_url}}/checkout/delivery-quote?delivery_city_code=1804523000&cart_item_ids[]={{cart_item_id}}",
                         "description": "Returns available=true plus quote. Display server destination_label, payment_methods, fees and disclaimer. Do not submit prices or estimates. Placement recomputes the accepted quote."
                     }
@@ -72,7 +84,9 @@
                     "name": "Negros Occidental Bago city-code quote",
                     "request": {
                         "method": "GET",
-                        "header": [{ "key": "Accept", "value": "application/json" }],
+                        "header": [
+                            { "key": "Accept", "value": "application/json" }
+                        ],
                         "url": "{{base_url}}/checkout/delivery-quote?delivery_city_code=1804502000&cart_item_ids[]={{cart_item_id}}",
                         "description": "New configured Negros Occidental route. The server validates the full city/barangay hierarchy and returns the configured Battlefront demo estimate, payment methods, carrier and provisional relative ETA. Do not calculate or submit a client-side fee; shipment/order placement independently recomputes and snapshots the estimate."
                     }
@@ -81,7 +95,9 @@
                     "name": "Makati unpriced route quote",
                     "request": {
                         "method": "GET",
-                        "header": [{ "key": "Accept", "value": "application/json" }],
+                        "header": [
+                            { "key": "Accept", "value": "application/json" }
+                        ],
                         "url": "{{base_url}}/checkout/delivery-quote?delivery_city_code=1380300000&cart_item_ids[]={{cart_item_id}}",
                         "description": "Valid address without configured pricing: HTTP 200 quote response with pricing_configured=false, order_placement_allowed=true, payment_methods=[gcash,maya,cod], no ETA/carrier, and a 0.00 absent-rate placeholder. Orders can be placed for product subtotal only; this is not free shipping or a delivery quotation. No automatic Shipment is created. Delivery arrangements and any applicable charge must be confirmed separately; an administrator can then register a manual Shipment."
                     }
@@ -1540,12 +1556,8 @@
                         ],
                         "url": {
                             "raw": "{{base_url}}/orders",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "orders"
-                            ]
+                            "host": ["{{base_url}}"],
+                            "path": ["orders"]
                         },
                         "description": "Delivery-only COD. Send no payment_proof. Uses validated supported destination/address and existing configured demo delivery fees. Display subtotal, delivery fee and total COD payable upon delivery. Initial order/payment stay pending. Delivered alone does not complete or record a sale; the web administrator must manually confirm LBC collection afterward. No LBC booking, approval or live settlement is performed. Failed delivery/returns are outside this workflow. Only selected cart items and inventory are consumed.",
                         "body": {
@@ -1608,12 +1620,8 @@
                                 ],
                                 "url": {
                                     "raw": "{{base_url}}/orders",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "orders"
-                                    ]
+                                    "host": ["{{base_url}}"],
+                                    "path": ["orders"]
                                 },
                                 "description": "Delivery-only COD. Send no payment_proof. Uses validated supported destination/address and existing configured demo delivery fees. Display subtotal, delivery fee and total COD payable upon delivery. Initial order/payment stay pending. Delivered alone does not complete or record a sale; the web administrator must manually confirm LBC collection afterward. No LBC booking, approval or live settlement is performed. Failed delivery/returns are outside this workflow. Only selected cart items and inventory are consumed.",
                                 "body": {

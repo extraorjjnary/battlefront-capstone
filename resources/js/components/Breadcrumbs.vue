@@ -19,10 +19,15 @@ defineProps({
             <template v-for="(item, index) in breadcrumbs" :key="index">
                 <BreadcrumbItem
                     class="min-w-0"
-                    :class="index < breadcrumbs.length - 1 && 'hidden sm:inline-flex'"
+                    :class="
+                        index < breadcrumbs.length - 1 &&
+                        'hidden sm:inline-flex'
+                    "
                 >
                     <template v-if="index === breadcrumbs.length - 1">
-                        <BreadcrumbPage class="truncate">{{ item.title }}</BreadcrumbPage>
+                        <BreadcrumbPage class="truncate">{{
+                            item.title
+                        }}</BreadcrumbPage>
                     </template>
                     <template v-else>
                         <BreadcrumbLink as-child>
@@ -30,7 +35,10 @@ defineProps({
                         </BreadcrumbLink>
                     </template>
                 </BreadcrumbItem>
-                <BreadcrumbSeparator v-if="index !== breadcrumbs.length - 1" class="hidden shrink-0 sm:block" />
+                <BreadcrumbSeparator
+                    v-if="index !== breadcrumbs.length - 1"
+                    class="hidden shrink-0 sm:block"
+                />
             </template>
         </BreadcrumbList>
     </Breadcrumb>

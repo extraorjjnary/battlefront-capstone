@@ -177,11 +177,10 @@ defineOptions({
 
         <CatalogNavigation />
 
-        <section
-            class="space-y-3"
-            aria-labelledby="product-query-heading"
-        >
-            <h2 id="product-query-heading" class="sr-only">Search and filters</h2>
+        <section class="space-y-3" aria-labelledby="product-query-heading">
+            <h2 id="product-query-heading" class="sr-only">
+                Search and filters
+            </h2>
 
             <div
                 class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
@@ -201,13 +200,14 @@ defineOptions({
                             autocomplete="off"
                         />
                     </div>
-                    <span class="sr-only" role="status">{{ isSearching ? "Updating results..." : "" }}</span>
+                    <span class="sr-only" role="status">{{
+                        isSearching ? 'Updating results...' : ''
+                    }}</span>
                 </div>
                 <Button
                     v-if="hasSearchInput"
                     type="button"
                     variant="outline"
-
                     @click="clearSearch"
                 >
                     <X />
@@ -215,9 +215,7 @@ defineOptions({
                 </Button>
             </div>
 
-            <div
-                class="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
-            >
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <div class="grid gap-2">
                     <Label for="admin-product-category">Category</Label>
                     <Select v-model="categoryId">
@@ -371,7 +369,9 @@ defineOptions({
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
                             <h3 class="font-semibold">{{ product.name }}</h3>
-                            <Badge variant="outline">{{ product.shipping_handling.label }}</Badge>
+                            <Badge variant="outline">{{
+                                product.shipping_handling.label
+                            }}</Badge>
                             <Badge
                                 :variant="
                                     product.is_active ? 'secondary' : 'outline'
@@ -397,9 +397,7 @@ defineOptions({
                         </p>
                         <p class="text-muted-foreground mt-2 text-xs">
                             {{
-                                formatPrice(
-                                    product.shipping_handling.surcharge,
-                                )
+                                formatPrice(product.shipping_handling.surcharge)
                             }}
                             additional surcharge per delivery order ·
                             {{ product.shipping_handling.preparation_days }}

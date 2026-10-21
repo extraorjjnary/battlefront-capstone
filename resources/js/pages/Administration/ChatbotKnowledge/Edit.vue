@@ -33,11 +33,7 @@ defineOptions({
         <Head title="Edit chatbot FAQ" />
         <PageHeader title="Edit chatbot FAQ">
             <template #metadata>
-                <Badge
-                    :variant="
-                        knowledge.is_active ? 'secondary' : 'outline'
-                        "
-                >
+                <Badge :variant="knowledge.is_active ? 'secondary' : 'outline'">
                     {{ knowledge.is_active ? 'Active' : 'Inactive' }}
                 </Badge>
             </template>

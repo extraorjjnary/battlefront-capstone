@@ -27,9 +27,9 @@ defineOptions({
     >
         <Head title="Add chatbot FAQ" />
         <PageHeader
-                title="Add chatbot FAQ"
-                description="Check the question before saving."
-            />
+            title="Add chatbot FAQ"
+            description="Check the question before saving."
+        />
 
         <section class="surface-panel border-border bg-card border p-6 sm:p-8">
             <ChatbotKnowledgeForm

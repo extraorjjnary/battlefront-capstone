@@ -228,9 +228,9 @@ const chartOptions = computed(() => ({
     <div class="flex flex-1 flex-col gap-6 p-4 lg:p-6">
         <Head title="Forecasting" />
         <PageHeader
-                title="Forecasting"
-                description="Estimate quarterly demand for stock planning."
-            />
+            title="Forecasting"
+            description="Estimate quarterly demand for stock planning."
+        />
 
         <div class="grid gap-6 xl:grid-cols-2">
             <section
@@ -418,7 +418,8 @@ const chartOptions = computed(() => ({
                     </Button>
                 </form>
                 <p class="text-muted-foreground mt-4 text-xs">
-                    Generating again replaces this product?s saved forecast for the same method and quarter.
+                    Generating again replaces this product?s saved forecast for
+                    the same method and quarter.
                 </p>
             </section>
         </div>
@@ -529,7 +530,12 @@ const chartOptions = computed(() => ({
                     >
                         View monthly history
                     </summary>
-                    <div class="mt-3 overflow-x-auto" tabindex="0" role="region" aria-label="Monthly demand history table">
+                    <div
+                        class="mt-3 overflow-x-auto"
+                        tabindex="0"
+                        role="region"
+                        aria-label="Monthly demand history table"
+                    >
                         <table class="w-full text-left text-sm">
                             <caption class="sr-only">
                                 Completed monthly sales used for this generation
@@ -595,7 +601,13 @@ const chartOptions = computed(() => ({
                     >
                 </div>
             </div>
-            <div v-if="forecasts.data.length" class="mt-5 overflow-x-auto" tabindex="0" role="region" aria-label="Saved forecasts table">
+            <div
+                v-if="forecasts.data.length"
+                class="mt-5 overflow-x-auto"
+                tabindex="0"
+                role="region"
+                aria-label="Saved forecasts table"
+            >
                 <table class="w-full min-w-3xl text-left text-sm">
                     <caption class="sr-only">
                         Persisted product demand forecasts

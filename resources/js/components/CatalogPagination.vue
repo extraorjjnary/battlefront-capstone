@@ -31,7 +31,9 @@ defineProps({
             Previous
         </Button>
 
-        <p class="text-muted-foreground order-first w-full text-center text-sm sm:order-none sm:w-auto">
+        <p
+            class="text-muted-foreground order-first w-full text-center text-sm sm:order-none sm:w-auto"
+        >
             Page {{ currentPage }} of {{ lastPage }}
         </p>
 

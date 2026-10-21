@@ -169,7 +169,9 @@ function loadComponent(
     }
     if (path !== '../catalog/ProductCard.vue') {
         modules['@/components/catalog/ProductCard.vue'] = {
-            default: loadComponent('../catalog/ProductCard.vue', { authenticated }),
+            default: loadComponent('../catalog/ProductCard.vue', {
+                authenticated,
+            }),
         };
     }
     const { descriptor } = parse(
@@ -213,10 +215,15 @@ function catalogProps(overrides = {}) {
         recommendations: [
             {
                 product: { id: 99, name: 'Behavioral suggestion' },
-                reasons: [{
-                    code: overrides.is_personalized === false ? 'featured_fallback' : 'matched_recent_searches',
-                    value: 'Recommendation reason',
-                }],
+                reasons: [
+                    {
+                        code:
+                            overrides.is_personalized === false
+                                ? 'featured_fallback'
+                                : 'matched_recent_searches',
+                        value: 'Recommendation reason',
+                    },
+                ],
             },
         ],
         is_personalized: true,
@@ -280,7 +287,9 @@ test('catalog renders recommendations above all products and outside ordinary re
     assert.ok(
         html.indexOf('Recommended for you') < html.indexOf('All products'),
     );
-    assert.ok(html.indexOf('Search products') < html.indexOf('Recommended for you'));
+    assert.ok(
+        html.indexOf('Search products') < html.indexOf('Recommended for you'),
+    );
     assert.ok(
         html.indexOf('Behavioral suggestion') <
             html.indexOf('data-catalog-results'),
@@ -293,14 +302,22 @@ test('catalog renders recommendations above all products and outside ordinary re
 
 test('mobile filter disclosure preserves selections and individual clearing keeps search and sorting', async (t) => {
     const visits = [];
-    const props = Vue.reactive(catalogProps({
-        filters: { q: 'graphics', category_id: 3, brand: 'Atlas', tag_id: 7, sort: 'price_asc' },
-        filter_options: {
-            categories: [{ id: 3, name: 'Graphics cards' }],
-            brands: ['Atlas'],
-            tags: [{ id: 7, name: 'Gaming' }],
-        },
-    }));
+    const props = Vue.reactive(
+        catalogProps({
+            filters: {
+                q: 'graphics',
+                category_id: 3,
+                brand: 'Atlas',
+                tag_id: 7,
+                sort: 'price_asc',
+            },
+            filter_options: {
+                categories: [{ id: 3, name: 'Graphics cards' }],
+                brands: ['Atlas'],
+                tags: [{ id: 7, name: 'Gaming' }],
+            },
+        }),
+    );
     const component = loadComponent('../../pages/Products/Index.vue', {
         inlineTemplate: false,
         router: { visit: (...args) => visits.push(args) },
@@ -310,7 +327,10 @@ test('mobile filter disclosure preserves selections and individual clearing keep
     const page = scope.run(() => component.setup(props, { expose() {} }));
 
     assert.equal(page.mobileFiltersOpen.value, false);
-    assert.deepEqual(page.activeFilters.value.map((filter) => filter.label), ['Graphics cards', 'Atlas', 'Gaming']);
+    assert.deepEqual(
+        page.activeFilters.value.map((filter) => filter.label),
+        ['Graphics cards', 'Atlas', 'Gaming'],
+    );
     page.mobileFiltersOpen.value = true;
     page.mobileFiltersOpen.value = false;
     await Vue.nextTick();
@@ -321,7 +341,10 @@ test('mobile filter disclosure preserves selections and individual clearing keep
     await Vue.nextTick();
     const url = new URL(visits[0][0].url, 'https://battlefront.test');
     assert.deepEqual(Object.fromEntries(url.searchParams), {
-        q: 'graphics', category_id: '3', tag_id: '7', sort: 'price_asc',
+        q: 'graphics',
+        category_id: '3',
+        tag_id: '7',
+        sort: 'price_asc',
     });
     assert.deepEqual(visits[0][1].reset, ['products']);
     assert.equal(page.activeFilters.value.length, 2);
@@ -634,10 +657,7 @@ test('profile settings explain disabled discovery sections and remaining context
             productViewRecommendationsEnabled: true,
         }),
     );
-    assert.match(
-        html,
-        /hides dashboard and catalog recommendations/,
-    );
+    assert.match(html, /hides dashboard and catalog recommendations/);
     assert.match(
         html,
         /Popular picks can still appear on product pages and in your cart/,
@@ -648,62 +668,125 @@ test('profile settings explain disabled discovery sections and remaining context
     );
 });
 
-
 test('featured products retain main grid badges and navigation without a standalone showcase', async () => {
     const props = catalogProps();
-    props.products.data[0] = { ...props.products.data[0], id: 77, name: 'Featured hardware', is_featured: true };
-    const html = await renderToString(Vue.h(loadComponent('../../pages/Products/Index.vue'), props));
+    props.products.data[0] = {
+        ...props.products.data[0],
+        id: 77,
+        name: 'Featured hardware',
+        is_featured: true,
+    };
+    const html = await renderToString(
+        Vue.h(loadComponent('../../pages/Products/Index.vue'), props),
+    );
     assert.match(html, /<h1 id="catalog-heading"/);
-    assert.doesNotMatch(html, /featured-products-heading|Featured Products|Selected by Battlefront, with current stock available/);
-    assert.ok(html.indexOf('Recommended for you') < html.indexOf('All products'));
+    assert.doesNotMatch(
+        html,
+        /featured-products-heading|Featured Products|Selected by Battlefront, with current stock available/,
+    );
+    assert.ok(
+        html.indexOf('Recommended for you') < html.indexOf('All products'),
+    );
     assert.equal(html.split('href="/products/77"').length - 1, 1);
     const results = html.split('data-catalog-results')[1];
     assert.match(results, />\s*Featured\s*</);
     assert.match(results, /Featured hardware/);
     assert.match(results, /grid-cols-2/);
     assert.match(html, /Sort by/);
-    for (const label of ['Featured First', 'Price: Low to High', 'Price: High to Low']) assert.ok(html.includes(label));
+    for (const label of [
+        'Featured First',
+        'Price: Low to High',
+        'Price: High to Low',
+    ])
+        assert.ok(html.includes(label));
 });
 
 test('featured products remain visible in recommendations even when also present in the main grid', async () => {
     const props = catalogProps();
-    props.products.data[0] = { ...props.products.data[0], id: 99, name: 'Recommended featured hardware', is_featured: true };
+    props.products.data[0] = {
+        ...props.products.data[0],
+        id: 99,
+        name: 'Recommended featured hardware',
+        is_featured: true,
+    };
     props.recommendations[0].product = props.products.data[0];
-    const html = await renderToString(Vue.h(loadComponent('../../pages/Products/Index.vue'), props));
+    const html = await renderToString(
+        Vue.h(loadComponent('../../pages/Products/Index.vue'), props),
+    );
     assert.doesNotMatch(html, /featured-products-heading/);
     assert.match(html, /data-placement="catalog"/);
-    assert.match(html.split('data-placement="catalog"')[1].split('All products')[0], /Recommended featured hardware/);
-    assert.match(html.split('data-catalog-results')[1], /Recommended featured hardware/);
+    assert.match(
+        html.split('data-placement="catalog"')[1].split('All products')[0],
+        /Recommended featured hardware/,
+    );
+    assert.match(
+        html.split('data-catalog-results')[1],
+        /Recommended featured hardware/,
+    );
 });
 
-for (const [filter, value] of Object.entries({ q: 'Atlas', category_id: 7, brand: 'Atlas', tag_id: 8 })) {
-    test('featured badges remain on main grid matches during ' + filter + ' filtering', async () => {
-        const props = catalogProps();
-        props.products.data[0].is_featured = true;
-        props.filters[filter] = value;
-        const html = await renderToString(Vue.h(loadComponent('../../pages/Products/Index.vue'), props));
-        assert.doesNotMatch(html, /featured-products-heading|data-placement="catalog"/);
-        assert.match(html.split('data-catalog-results')[1], />\s*Featured\s*</);
-    });
+for (const [filter, value] of Object.entries({
+    q: 'Atlas',
+    category_id: 7,
+    brand: 'Atlas',
+    tag_id: 8,
+})) {
+    test(
+        'featured badges remain on main grid matches during ' +
+            filter +
+            ' filtering',
+        async () => {
+            const props = catalogProps();
+            props.products.data[0].is_featured = true;
+            props.filters[filter] = value;
+            const html = await renderToString(
+                Vue.h(loadComponent('../../pages/Products/Index.vue'), props),
+            );
+            assert.doesNotMatch(
+                html,
+                /featured-products-heading|data-placement="catalog"/,
+            );
+            assert.match(
+                html.split('data-catalog-results')[1],
+                />\s*Featured\s*</,
+            );
+        },
+    );
 }
 
 test('disabled recommendations leave featured main grid cards and sorting visible', async () => {
     const props = catalogProps({ recommendations: [], is_personalized: false });
     props.products.data[0].is_featured = true;
-    const html = await renderToString(Vue.h(loadComponent('../../pages/Products/Index.vue'), props));
-    assert.doesNotMatch(html, /featured-products-heading|data-placement="catalog"/);
+    const html = await renderToString(
+        Vue.h(loadComponent('../../pages/Products/Index.vue'), props),
+    );
+    assert.doesNotMatch(
+        html,
+        /featured-products-heading|data-placement="catalog"/,
+    );
     assert.match(html.split('data-catalog-results')[1], />\s*Featured\s*</);
     assert.match(html, /Sort by/);
 });
 
 test('catalog retains all recommendations in server order and uses server heading metadata', async () => {
-    const props = catalogProps({ is_personalized: false, has_featured_fallback: true });
+    const props = catalogProps({
+        is_personalized: false,
+        has_featured_fallback: true,
+    });
     props.recommendations[0].product.is_featured = true;
-    props.recommendations.push({ product: { id: 88, name: 'Popular hardware' }, reasons: [{ code: 'popular_with_customers' }] });
-    const html = await renderToString(Vue.h(loadComponent('../../pages/Products/Index.vue'), props));
+    props.recommendations.push({
+        product: { id: 88, name: 'Popular hardware' },
+        reasons: [{ code: 'popular_with_customers' }],
+    });
+    const html = await renderToString(
+        Vue.h(loadComponent('../../pages/Products/Index.vue'), props),
+    );
     assert.match(html, /Popular and featured products/);
     assert.doesNotMatch(html, /Recommended for you|featured-products-heading/);
-    assert.ok(html.indexOf('Behavioral suggestion') < html.indexOf('Popular hardware'));
+    assert.ok(
+        html.indexOf('Behavioral suggestion') <
+            html.indexOf('Popular hardware'),
+    );
     assert.equal(props.recommendations.length, 2);
 });
 
@@ -711,12 +794,26 @@ test('sort changes preserve query selections cancel pending search and reset acc
     t.mock.timers.enable({ apis: ['setTimeout'] });
     const requests = [];
     const cancellations = [];
-    const props = Vue.reactive(catalogProps({ filters: { q: 'Part', category_id: 7, brand: 'Atlas', tag_id: 8, sort: 'featured' } }));
+    const props = Vue.reactive(
+        catalogProps({
+            filters: {
+                q: 'Part',
+                category_id: 7,
+                brand: 'Atlas',
+                tag_id: 8,
+                sort: 'featured',
+            },
+        }),
+    );
     const scope = Vue.effectScope();
     t.after(() => scope.stop());
     const component = loadComponent('../../pages/Products/Index.vue', {
-        inlineTemplate: false, realSearch: true,
-        router: { visit: (route, options) => requests.push({ route, options }), cancelAll: (options) => cancellations.push(options) },
+        inlineTemplate: false,
+        realSearch: true,
+        router: {
+            visit: (route, options) => requests.push({ route, options }),
+            cancelAll: (options) => cancellations.push(options),
+        },
     });
     const state = scope.run(() => component.setup(props, { expose() {} }));
     state.search.value = 'Latest Part';
@@ -725,7 +822,8 @@ test('sort changes preserve query selections cancel pending search and reset acc
     await Vue.nextTick();
     t.mock.timers.tick(400);
     assert.equal(requests.length, 1);
-    const query = new URL(requests[0].route.url, 'http://example.test').searchParams;
+    const query = new URL(requests[0].route.url, 'http://example.test')
+        .searchParams;
     assert.equal(query.get('q'), 'Latest Part');
     assert.equal(query.get('category_id'), '7');
     assert.equal(query.get('brand'), 'Atlas');
@@ -742,8 +840,19 @@ test('sort changes preserve query selections cancel pending search and reset acc
     await Vue.nextTick();
     state.clearFilters();
     await Vue.nextTick();
-    assert.equal(new URL(requests[1].route.url, 'http://example.test').searchParams.get('sort'), 'price_asc');
-    props.filters = { q: 'Latest Part', category_id: null, brand: null, tag_id: null, sort: 'price_asc' };
+    assert.equal(
+        new URL(requests[1].route.url, 'http://example.test').searchParams.get(
+            'sort',
+        ),
+        'price_asc',
+    );
+    props.filters = {
+        q: 'Latest Part',
+        category_id: null,
+        brand: null,
+        tag_id: null,
+        sort: 'price_asc',
+    };
     await Vue.nextTick();
     state.clearSearch();
     await Vue.nextTick();
@@ -753,16 +862,33 @@ test('sort changes preserve query selections cancel pending search and reset acc
 test('restored server filters synchronize every control without redundant visits', async (t) => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
     const requests = [];
-    const props = Vue.reactive(catalogProps({ filters: { q: 'Latest', category_id: null, brand: null, tag_id: null, sort: 'price_desc' } }));
+    const props = Vue.reactive(
+        catalogProps({
+            filters: {
+                q: 'Latest',
+                category_id: null,
+                brand: null,
+                tag_id: null,
+                sort: 'price_desc',
+            },
+        }),
+    );
     const scope = Vue.effectScope();
     t.after(() => scope.stop());
     const component = loadComponent('../../pages/Products/Index.vue', {
-        inlineTemplate: false, realSearch: true,
+        inlineTemplate: false,
+        realSearch: true,
         router: { visit: (...args) => requests.push(args) },
     });
     const state = scope.run(() => component.setup(props, { expose() {} }));
     assert.equal(state.sort.value, 'price_desc');
-    props.filters = { q: 'Previous', category_id: 7, brand: 'Atlas', tag_id: 8, sort: 'price_asc' };
+    props.filters = {
+        q: 'Previous',
+        category_id: 7,
+        brand: 'Atlas',
+        tag_id: 8,
+        sort: 'price_asc',
+    };
     await Vue.nextTick();
     t.mock.timers.tick(400);
     assert.equal(state.sort.value, 'price_asc');
@@ -771,7 +897,13 @@ test('restored server filters synchronize every control without redundant visits
     assert.equal(state.brand.value, 'Atlas');
     assert.equal(state.tagId.value, '8');
     assert.equal(requests.length, 0);
-    props.filters = { q: null, category_id: null, brand: null, tag_id: null, sort: 'featured' };
+    props.filters = {
+        q: null,
+        category_id: null,
+        brand: null,
+        tag_id: null,
+        sort: 'featured',
+    };
     await Vue.nextTick();
     state.sort.value = 'price_desc';
     await Vue.nextTick();

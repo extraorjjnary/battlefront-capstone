@@ -18,13 +18,19 @@ const props = defineProps({
 
 const enteredQuantity = ref(1);
 const hasAvailableStock = computed(
-    () => Number.isInteger(props.availableQuantity) && props.availableQuantity > 0,
+    () =>
+        Number.isInteger(props.availableQuantity) &&
+        props.availableQuantity > 0,
 );
 const exceedsStock = computed(
-    () => hasAvailableStock.value && enteredQuantity.value > props.availableQuantity,
+    () =>
+        hasAvailableStock.value &&
+        enteredQuantity.value > props.availableQuantity,
 );
 const isAtMaximum = computed(
-    () => hasAvailableStock.value && enteredQuantity.value === props.availableQuantity,
+    () =>
+        hasAvailableStock.value &&
+        enteredQuantity.value === props.availableQuantity,
 );
 
 function trackEnteredQuantity(event) {
@@ -45,8 +51,18 @@ function trackEnteredQuantity(event) {
 
         <div class="grid gap-2">
             <Label :for="`add-cart-quantity-${productId}`">Quantity</Label>
-            <p :id="`add-cart-stock-${productId}`" class="text-muted-foreground text-xs" aria-live="polite">
-                {{ hasAvailableStock ? `${availableQuantity} available` : availableQuantity === 0 ? 'Out of stock' : 'Stock unavailable' }}
+            <p
+                :id="`add-cart-stock-${productId}`"
+                class="text-muted-foreground text-xs"
+                aria-live="polite"
+            >
+                {{
+                    hasAvailableStock
+                        ? `${availableQuantity} available`
+                        : availableQuantity === 0
+                          ? 'Out of stock'
+                          : 'Stock unavailable'
+                }}
             </p>
             <Input
                 :id="`add-cart-quantity-${productId}`"
@@ -59,9 +75,7 @@ function trackEnteredQuantity(event) {
                 inputmode="numeric"
                 :default-value="1"
                 :aria-invalid="Boolean(errors.quantity)"
-                :aria-describedby="
-                    `add-cart-stock-${productId}${isAtMaximum || exceedsStock ? ` add-cart-quantity-limit-${productId}` : ''}`
-                "
+                :aria-describedby="`add-cart-stock-${productId}${isAtMaximum || exceedsStock ? ` add-cart-quantity-limit-${productId}` : ''}`"
                 required
                 @input="trackEnteredQuantity"
             />
@@ -88,10 +102,15 @@ function trackEnteredQuantity(event) {
                 :id="`add-cart-quantity-limit-${productId}`"
                 class="text-muted-foreground text-xs"
             >
-                {{ exceedsStock ? `Only ${availableQuantity} available. Reduce the quantity to continue.` : 'Maximum available quantity reached.' }}
+                {{
+                    exceedsStock
+                        ? `Only ${availableQuantity} available. Reduce the quantity to continue.`
+                        : 'Maximum available quantity reached.'
+                }}
             </p>
             <p class="text-muted-foreground text-xs">
-                Adding to your cart does not reserve stock. Availability is checked again at checkout.
+                Adding to your cart does not reserve stock. Availability is
+                checked again at checkout.
             </p>
         </div>
 

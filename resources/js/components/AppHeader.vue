@@ -157,7 +157,7 @@ const activeItemStyles = 'bg-accent text-accent-foreground';
                                         :alt="auth.user.name"
                                     />
                                     <AvatarFallback
-                                        class="rounded-lg bg-muted font-semibold text-foreground"
+                                        class="bg-muted text-foreground rounded-lg font-semibold"
                                     >
                                         {{ getInitials(auth.user?.name) }}
                                     </AvatarFallback>
@@ -177,7 +177,7 @@ const activeItemStyles = 'bg-accent text-accent-foreground';
             class="border-sidebar-border/70 flex w-full border-b"
         >
             <div
-                class="mx-auto flex h-12 w-full items-center justify-start px-4 text-muted-foreground md:max-w-7xl"
+                class="text-muted-foreground mx-auto flex h-12 w-full items-center justify-start px-4 md:max-w-7xl"
             >
                 <Breadcrumbs :breadcrumbs="breadcrumbs" />
             </div>

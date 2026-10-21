@@ -42,7 +42,10 @@ function trackingProps(overrides = {}) {
     return {
         shipment: {
             carrier: 'lbc',
-            arrangement: { value: 'quoted_lbc', label: 'Battlefront-arranged LBC delivery' },
+            arrangement: {
+                value: 'quoted_lbc',
+                label: 'Battlefront-arranged LBC delivery',
+            },
             status: {
                 value: 'awaiting_preparation',
                 label: 'Awaiting preparation',

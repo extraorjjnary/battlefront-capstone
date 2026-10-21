@@ -174,7 +174,10 @@ test(
                         ? 'rgb(9, 11, 16)'
                         : 'rgb(250, 247, 244)',
                 );
-                assert.equal(result.cardPadding, result.width < 640 ? '12px' : '16px');
+                assert.equal(
+                    result.cardPadding,
+                    result.width < 640 ? '12px' : '16px',
+                );
                 assert.ok(
                     result.surfaces.length >= 3,
                     'Shared cards, placeholders and panels render',

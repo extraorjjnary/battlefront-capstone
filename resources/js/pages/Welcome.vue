@@ -1,5 +1,5 @@
 <script setup>
-import { Head, Link } from "@inertiajs/vue3";
+import { Head, Link } from '@inertiajs/vue3';
 import {
     ArrowRight,
     ArrowUpRight,
@@ -9,30 +9,30 @@ import {
     Phone,
     Search,
     SlidersHorizontal,
-} from "@lucide/vue";
-import AppLogo from "@/components/AppLogo.vue";
-import StorefrontHeader from "@/components/StorefrontHeader.vue";
-import { Button } from "@/components/ui/button";
-import { dashboard, register } from "@/routes";
-import { index as branchIndex } from "@/routes/branches";
-import { index as productIndex } from "@/routes/products";
+} from '@lucide/vue';
+import AppLogo from '@/components/AppLogo.vue';
+import StorefrontHeader from '@/components/StorefrontHeader.vue';
+import { Button } from '@/components/ui/button';
+import { dashboard, register } from '@/routes';
+import { index as branchIndex } from '@/routes/branches';
+import { index as productIndex } from '@/routes/products';
 
 const customerHighlights = [
     {
-        title: "Find the right hardware",
-        description: "Filter computer hardware by category, brand, and price.",
+        title: 'Find the right hardware',
+        description: 'Filter computer hardware by category, brand, and price.',
         icon: Search,
     },
     {
-        title: "Choose with confidence",
+        title: 'Choose with confidence',
         description:
-            "Discover product suggestions, with personalization controls in your profile.",
+            'Discover product suggestions, with personalization controls in your profile.',
         icon: SlidersHorizontal,
     },
     {
-        title: "Keep track of your order",
+        title: 'Keep track of your order',
         description:
-            "Manage purchases and follow order progress from your account.",
+            'Manage purchases and follow order progress from your account.',
         icon: PackageCheck,
     },
 ];
@@ -60,7 +60,7 @@ const customerHighlights = [
                 >
                     <div>
                         <p
-                            class="mb-4 text-xs font-semibold tracking-[0.14em] text-primary-ink uppercase sm:mb-5"
+                            class="text-primary-ink mb-4 text-xs font-semibold tracking-[0.14em] uppercase sm:mb-5"
                         >
                             EXPLORE. CHOOSE. UPGRADE.
                         </p>
@@ -123,7 +123,7 @@ const customerHighlights = [
                             loading="eager"
                             fetchpriority="high"
                             decoding="async"
-                            class="mx-auto block h-auto w-[85%] max-w-xs object-contain mask-[linear-gradient(to_right,#000_92%,transparent_100%)] sm:max-w-[26rem] lg:mr-0 lg:w-full lg:max-w-xl"
+                            class="mx-auto block h-auto w-[85%] max-w-xs mask-[linear-gradient(to_right,#000_92%,transparent_100%)] object-contain sm:max-w-[26rem] lg:mr-0 lg:w-full lg:max-w-xl"
                         />
                     </picture>
                 </div>
@@ -148,7 +148,7 @@ const customerHighlights = [
                     >
                         <component
                             :is="highlight.icon"
-                            class="mt-0.5 size-5 shrink-0 text-primary-ink"
+                            class="text-primary-ink mt-0.5 size-5 shrink-0"
                             aria-hidden="true"
                         />
                         <div>
@@ -200,13 +200,13 @@ const customerHighlights = [
                     >
                         <Link
                             :href="productIndex()"
-                            class="inline-flex min-h-11 items-center rounded-sm py-2 hover:text-primary-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+                            class="hover:text-primary-ink focus-visible:outline-ring inline-flex min-h-11 items-center rounded-sm py-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4"
                         >
                             Shop Products
                         </Link>
                         <Link
                             :href="branchIndex()"
-                            class="inline-flex min-h-11 items-center rounded-sm py-2 hover:text-primary-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+                            class="hover:text-primary-ink focus-visible:outline-ring inline-flex min-h-11 items-center rounded-sm py-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4"
                         >
                             Our Stores
                         </Link>
@@ -231,7 +231,7 @@ const customerHighlights = [
                     >
                         <a
                             href="mailto:battlefrontcomputertrading@gmail.com"
-                            class="inline-flex min-h-11 items-center gap-2 rounded-sm py-2 hover:text-primary-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+                            class="hover:text-primary-ink focus-visible:outline-ring inline-flex min-h-11 items-center gap-2 rounded-sm py-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4"
                         >
                             <Mail class="size-4 shrink-0" aria-hidden="true" />
                             <span class="min-w-0 break-all"
@@ -240,7 +240,7 @@ const customerHighlights = [
                         </a>
                         <a
                             href="tel:09386476046"
-                            class="inline-flex min-h-11 items-center gap-2 rounded-sm py-2 hover:text-primary-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+                            class="hover:text-primary-ink focus-visible:outline-ring inline-flex min-h-11 items-center gap-2 rounded-sm py-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4"
                         >
                             <Phone class="size-4 shrink-0" aria-hidden="true" />
                             0938 647 6046
@@ -262,7 +262,7 @@ const customerHighlights = [
                             href="https://www.facebook.com/BattlefrontComputer"
                             target="_blank"
                             rel="noopener noreferrer"
-                            class="inline-flex min-h-11 items-center gap-1 rounded-sm py-2 hover:text-primary-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+                            class="hover:text-primary-ink focus-visible:outline-ring inline-flex min-h-11 items-center gap-1 rounded-sm py-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4"
                         >
                             Facebook
                             <ArrowUpRight class="size-4" aria-hidden="true" />
@@ -271,7 +271,7 @@ const customerHighlights = [
                             href="https://www.tiktok.com/@ralphpgonzaga"
                             target="_blank"
                             rel="noopener noreferrer"
-                            class="inline-flex min-h-11 items-center gap-1 rounded-sm py-2 hover:text-primary-ink hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+                            class="hover:text-primary-ink focus-visible:outline-ring inline-flex min-h-11 items-center gap-1 rounded-sm py-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-4"
                         >
                             TikTok
                             <ArrowUpRight class="size-4" aria-hidden="true" />

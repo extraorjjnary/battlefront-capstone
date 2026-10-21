@@ -27,9 +27,9 @@ defineOptions({
     >
         <Head title="Add product" />
         <PageHeader
-                title="Add product"
-                description="Manage stock separately in Inventory."
-            />
+            title="Add product"
+            description="Manage stock separately in Inventory."
+        />
 
         <section class="surface-panel border-border bg-card border p-6 sm:p-8">
             <ProductForm

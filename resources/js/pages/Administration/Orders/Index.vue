@@ -208,37 +208,34 @@ defineOptions({
         <Head title="Orders" />
         <PageHeader title="Orders" />
 
-<nav
-                aria-label="Order views"
-                class="border-border flex gap-1 overflow-x-auto border-t px-5"
-            >
-                <Link
-                    v-for="tab in tabs"
-                    :key="tab.value"
-                    :href="tabRoute(tab.value)"
-                    preserve-scroll
-                    :aria-current="
-                        filters.status === tab.value ? 'page' : undefined
-                    "
-                    class="text-muted-foreground hover:text-foreground relative inline-flex min-h-12 shrink-0 items-center gap-2 px-3 text-sm font-medium transition-colors"
-                    :class="{
-                        'text-foreground after:bg-primary after:absolute after:right-3 after:bottom-0 after:left-3 after:h-0.5':
-                            filters.status === tab.value,
-                    }"
-                >
-                    {{ tab.label }}
-                    <span
-                        class="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs tabular-nums"
-                    >
-                        {{ tab.count }}
-                    </span>
-                </Link>
-            </nav>
-
-        <section
-            class="space-y-3"
-            aria-labelledby="order-query-heading"
+        <nav
+            aria-label="Order views"
+            class="border-border flex gap-1 overflow-x-auto border-t px-5"
         >
+            <Link
+                v-for="tab in tabs"
+                :key="tab.value"
+                :href="tabRoute(tab.value)"
+                preserve-scroll
+                :aria-current="
+                    filters.status === tab.value ? 'page' : undefined
+                "
+                class="text-muted-foreground hover:text-foreground relative inline-flex min-h-12 shrink-0 items-center gap-2 px-3 text-sm font-medium transition-colors"
+                :class="{
+                    'text-foreground after:bg-primary after:absolute after:right-3 after:bottom-0 after:left-3 after:h-0.5':
+                        filters.status === tab.value,
+                }"
+            >
+                {{ tab.label }}
+                <span
+                    class="bg-muted text-muted-foreground rounded-full px-2 py-0.5 text-xs tabular-nums"
+                >
+                    {{ tab.count }}
+                </span>
+            </Link>
+        </nav>
+
+        <section class="space-y-3" aria-labelledby="order-query-heading">
             <h2 id="order-query-heading" class="sr-only">Search and filters</h2>
 
             <div
@@ -259,13 +256,14 @@ defineOptions({
                             autocomplete="off"
                         />
                     </div>
-                    <span class="sr-only" role="status">{{ isSearching ? "Updating results..." : "" }}</span>
+                    <span class="sr-only" role="status">{{
+                        isSearching ? 'Updating results...' : ''
+                    }}</span>
                 </div>
                 <Button
                     v-if="hasSearchInput"
                     type="button"
                     variant="outline"
-
                     @click="clearSearch"
                 >
                     <X />
@@ -273,9 +271,7 @@ defineOptions({
                 </Button>
             </div>
 
-            <div
-                class="grid gap-3 md:grid-cols-3"
-            >
+            <div class="grid gap-3 md:grid-cols-3">
                 <div class="grid gap-2">
                     <Label for="admin-order-payment-status">
                         Payment status

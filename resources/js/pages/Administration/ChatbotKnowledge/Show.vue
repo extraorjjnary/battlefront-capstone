@@ -37,19 +37,14 @@ defineOptions({
         <Head title="Chatbot FAQ record" />
         <PageHeader :title="knowledge.question_pattern">
             <template #metadata>
-                <Badge
-                    :variant="
-                        knowledge.is_active
-                        ? 'secondary'
-                        : 'outline'
-                        "
-                >
-                    {{
-                                knowledge.is_active ? 'Active' : 'Inactive'
-                            }}
+                <Badge :variant="knowledge.is_active ? 'secondary' : 'outline'">
+                    {{ knowledge.is_active ? 'Active' : 'Inactive' }}
                 </Badge>
                 <span>{{ knowledge.category_label }}</span>
-                <p v-if="!knowledge.eligible_for_faq" class="text-destructive w-full">
+                <p
+                    v-if="!knowledge.eligible_for_faq"
+                    class="text-destructive w-full"
+                >
                     Needs review:
                     {{ knowledge.eligibility_reason }}
                 </p>
@@ -109,7 +104,9 @@ defineOptions({
                         <Button
                             variant="outline"
                             size="sm"
-                            :disabled="processing || !knowledge.eligible_for_faq"
+                            :disabled="
+                                processing || !knowledge.eligible_for_faq
+                            "
                         >
                             <Spinner v-if="processing" />
                             <RotateCcw v-else />

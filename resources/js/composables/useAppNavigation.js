@@ -49,7 +49,9 @@ export function useAppNavigation() {
             },
             {
                 title: 'Branches',
-                href: isAdministrator.value ? administrationBranchIndex() : branchIndex(),
+                href: isAdministrator.value
+                    ? administrationBranchIndex()
+                    : branchIndex(),
                 icon: MapPin,
             },
         ];

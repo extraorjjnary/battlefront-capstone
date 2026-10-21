@@ -34,7 +34,6 @@ const phoneUrl = (phoneNumber) => `tel:${phoneNumber.replaceAll(' ', '')}`;
             <section aria-labelledby="branch-list-heading">
                 <div class="mb-6 flex items-end justify-between gap-6">
                     <div>
-
                         <h2
                             id="branch-list-heading"
                             class="text-xl font-semibold tracking-tight"
@@ -175,7 +174,12 @@ const phoneUrl = (phoneNumber) => `tel:${phoneNumber.replaceAll(' ', '')}`;
                                 </div>
                             </div>
                         </dl>
-                        <p v-if="branch.operational_notice" class="text-muted-foreground mt-4 text-sm leading-6">{{ branch.operational_notice }}</p>
+                        <p
+                            v-if="branch.operational_notice"
+                            class="text-muted-foreground mt-4 text-sm leading-6"
+                        >
+                            {{ branch.operational_notice }}
+                        </p>
                     </article>
                 </div>
 

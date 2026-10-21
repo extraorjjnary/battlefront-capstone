@@ -9,9 +9,7 @@ const tabs = [
 </script>
 
 <template>
-    <div
-        class="inline-flex max-w-full flex-wrap gap-1 rounded-lg bg-muted p-1"
-    >
+    <div class="bg-muted inline-flex max-w-full flex-wrap gap-1 rounded-lg p-1">
         <button
             v-for="{ value, Icon, label } in tabs"
             :key="value"
@@ -19,7 +17,7 @@ const tabs = [
             :aria-pressed="appearance === value"
             @click="updateAppearance(value)"
             :class="[
-                'flex min-h-11 items-center rounded-md px-3 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8 md:px-3.5',
+                'focus-visible:ring-ring flex min-h-11 items-center rounded-md px-3 py-1.5 transition-colors focus-visible:ring-2 focus-visible:outline-none md:min-h-8 md:px-3.5',
                 appearance === value
                     ? 'bg-card text-foreground shadow-xs'
                     : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',

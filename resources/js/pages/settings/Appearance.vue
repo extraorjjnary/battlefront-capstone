@@ -18,10 +18,7 @@ defineOptions({
 <template>
     <div class="space-y-6">
         <Head title="Appearance settings" />
-        <Heading
-            variant="small"
-            title="Appearance"
-        />
+        <Heading variant="small" title="Appearance" />
         <AppearanceTabs />
     </div>
 </template>

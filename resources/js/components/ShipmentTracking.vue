@@ -94,8 +94,7 @@ function formatCivilDate(value) {
                     </dd>
                     <dd class="text-muted-foreground mt-1 text-xs leading-5">
                         No delivery rate was configured or added to the order.
-                        This manual arrangement does not change its saved
-                        total.
+                        This manual arrangement does not change its saved total.
                     </dd>
                 </div>
                 <div>
@@ -153,13 +152,9 @@ function formatCivilDate(value) {
                             v-if="shipment.eta.min_days !== null"
                             class="text-muted-foreground mt-1 text-xs"
                         >
-                            Calendar dates are recorded when preparation
-                            starts.
+                            Calendar dates are recorded when preparation starts.
                         </dd>
-                        <dd
-                            v-else
-                            class="text-muted-foreground mt-1 text-sm"
-                        >
+                        <dd v-else class="text-muted-foreground mt-1 text-sm">
                             No delivery estimate has been provided.
                         </dd>
                     </template>

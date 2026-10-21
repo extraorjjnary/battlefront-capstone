@@ -44,7 +44,7 @@ defineOptions({
             </template>
         </PageHeader>
 
-<CatalogNavigation />
+        <CatalogNavigation />
 
         <section aria-labelledby="category-list-heading">
             <div class="mb-4">

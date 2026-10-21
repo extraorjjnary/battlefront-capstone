@@ -4,7 +4,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 <template>
     <section class="space-y-4" aria-hidden="true">
-
         <h2 class="text-xl font-semibold tracking-tight">
             Suggestions for you
         </h2>

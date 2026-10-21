@@ -135,7 +135,7 @@ async function submitMessage() {
                 ref="launcher"
                 type="button"
                 size="lg"
-                class="pointer-events-auto size-12 min-h-12 rounded-full p-0 shadow-card sm:w-auto sm:px-5"
+                class="shadow-card pointer-events-auto size-12 min-h-12 rounded-full p-0 sm:w-auto sm:px-5"
                 aria-controls="battlefront-chat-panel"
                 aria-expanded="false"
                 @click="openPanel"
@@ -147,7 +147,7 @@ async function submitMessage() {
             <section
                 v-else
                 id="battlefront-chat-panel"
-                class="border-border bg-card text-card-foreground flex h-[min(36rem,calc(100dvh-2rem-env(safe-area-inset-bottom)))] w-full max-w-96 flex-col surface-panel overflow-hidden border"
+                class="border-border bg-card text-card-foreground surface-panel flex h-[min(36rem,calc(100dvh-2rem-env(safe-area-inset-bottom)))] w-full max-w-96 flex-col overflow-hidden border"
                 aria-label="Battlefront customer support assistant"
                 @keydown.esc="closePanel"
             >

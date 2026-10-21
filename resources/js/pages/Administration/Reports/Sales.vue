@@ -529,7 +529,11 @@ defineOptions({
         <Head title="Sales reports" />
         <PageHeader title="Sales reports" :description="rangeLabel">
             <template #actions>
-                <div class="flex flex-wrap gap-2" role="group" aria-label="Sales report print and export">
+                <div
+                    class="flex flex-wrap gap-2"
+                    role="group"
+                    aria-label="Sales report print and export"
+                >
                     <Button
                         v-for="action in exportActions"
                         :key="action.label"
@@ -548,18 +552,19 @@ defineOptions({
                         >
                             <component :is="action.icon" aria-hidden="true" />
                             {{ action.label }}
-                            <span v-if="action.print" class="sr-only">(opens in a new tab)</span>
+                            <span v-if="action.print" class="sr-only"
+                                >(opens in a new tab)</span
+                            >
                         </a>
                     </Button>
                 </div>
             </template>
         </PageHeader>
 
-        <section
-            class="space-y-3"
-            aria-labelledby="sales-filter-heading"
-        >
-            <h2 id="sales-filter-heading" class="text-sm font-semibold">Date range (inclusive)</h2>
+        <section class="space-y-3" aria-labelledby="sales-filter-heading">
+            <h2 id="sales-filter-heading" class="text-sm font-semibold">
+                Date range (inclusive)
+            </h2>
 
             <form
                 class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end"
@@ -868,7 +873,13 @@ defineOptions({
                 </p>
             </div>
 
-            <div v-else class="surface-panel border-border bg-card overflow-x-auto border" tabindex="0" role="region" aria-label="Product performance table">
+            <div
+                v-else
+                class="surface-panel border-border bg-card overflow-x-auto border"
+                tabindex="0"
+                role="region"
+                aria-label="Product performance table"
+            >
                 <table class="w-full min-w-3xl text-left text-sm">
                     <thead
                         class="bg-secondary/60 text-muted-foreground text-xs uppercase"
@@ -894,7 +905,7 @@ defineOptions({
                             <td class="px-5 py-4 font-medium">
                                 <button
                                     type="button"
-                                    class="hover:text-primary-ink focus-visible:ring-ring max-md:min-h-11 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                                    class="hover:text-primary-ink focus-visible:ring-ring text-left transition-colors focus-visible:ring-2 focus-visible:outline-none max-md:min-h-11"
                                     :aria-pressed="
                                         selectedProduct?.id === product.id
                                     "
@@ -950,7 +961,13 @@ defineOptions({
             >
                 <p class="font-medium">No category sales to report</p>
             </div>
-            <div v-else class="surface-panel border-border bg-card overflow-x-auto border" tabindex="0" role="region" aria-label="Category performance table">
+            <div
+                v-else
+                class="surface-panel border-border bg-card overflow-x-auto border"
+                tabindex="0"
+                role="region"
+                aria-label="Category performance table"
+            >
                 <table class="w-full min-w-2xl text-left text-sm">
                     <thead
                         class="bg-secondary/60 text-muted-foreground text-xs uppercase"
@@ -976,7 +993,7 @@ defineOptions({
                             <td class="px-5 py-4 font-medium">
                                 <button
                                     type="button"
-                                    class="hover:text-primary-ink focus-visible:ring-ring max-md:min-h-11 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                                    class="hover:text-primary-ink focus-visible:ring-ring text-left transition-colors focus-visible:ring-2 focus-visible:outline-none max-md:min-h-11"
                                     :aria-pressed="
                                         selectedCategory?.id === category.id
                                     "

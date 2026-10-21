@@ -117,7 +117,9 @@ defineOptions({
             </h2>
             <CollapsibleContent class="px-6 pb-6">
                 <p class="text-muted-foreground max-w-3xl text-sm leading-6">
-                    Test a question against routing and active FAQs. This preview excludes live product, store, and order data and does not generate a reply.
+                    Test a question against routing and active FAQs. This
+                    preview excludes live product, store, and order data and
+                    does not generate a reply.
                 </p>
                 <form class="mt-5 space-y-3" @submit.prevent="testQuestion">
                     <Label for="knowledge-preview-message"
@@ -166,9 +168,7 @@ defineOptions({
                         </p>
                         <p>{{ previewResult.explanation }}</p>
                         <template v-if="previewResult.matches.length">
-                            <h3 class="pt-2 font-semibold">
-                                Matched FAQs
-                            </h3>
+                            <h3 class="pt-2 font-semibold">Matched FAQs</h3>
                             <ol class="space-y-4">
                                 <li
                                     v-for="match in previewResult.matches"
@@ -239,9 +239,7 @@ defineOptions({
                     <MessageSquareText
                         class="text-muted-foreground mx-auto size-9"
                     />
-                    <p class="mt-3 font-medium">
-                        No chatbot FAQs available
-                    </p>
+                    <p class="mt-3 font-medium">No chatbot FAQs available</p>
                     <p class="text-muted-foreground mt-1 text-sm">
                         Add approved support guidance to begin managing FAQs.
                     </p>
@@ -269,9 +267,18 @@ defineOptions({
                             >
                                 {{ item.is_active ? 'Active' : 'Inactive' }}
                             </Badge>
-                            <Badge v-if="!item.eligible_for_faq" variant="outline">Needs review</Badge>
+                            <Badge
+                                v-if="!item.eligible_for_faq"
+                                variant="outline"
+                                >Needs review</Badge
+                            >
                         </div>
-                        <p v-if="!item.eligible_for_faq" class="text-muted-foreground mt-2 text-xs">{{ item.eligibility_reason }}</p>
+                        <p
+                            v-if="!item.eligible_for_faq"
+                            class="text-muted-foreground mt-2 text-xs"
+                        >
+                            {{ item.eligibility_reason }}
+                        </p>
                         <h3 class="mt-3 font-semibold">
                             {{ item.question_pattern }}
                         </h3>

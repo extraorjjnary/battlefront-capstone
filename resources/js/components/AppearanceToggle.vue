@@ -1,24 +1,24 @@
 <script setup>
-import { Moon, Sun } from "@lucide/vue";
-import { computed } from "vue";
-import { Button } from "@/components/ui/button";
+import { Moon, Sun } from '@lucide/vue';
+import { computed } from 'vue';
+import { Button } from '@/components/ui/button';
 import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { useAppearance } from "@/composables/useAppearance";
+} from '@/components/ui/tooltip';
+import { useAppearance } from '@/composables/useAppearance';
 
 const { resolvedAppearance, updateAppearance } = useAppearance();
 const label = computed(() =>
-    resolvedAppearance.value === "dark"
-        ? "Switch to light mode"
-        : "Switch to dark mode",
+    resolvedAppearance.value === 'dark'
+        ? 'Switch to light mode'
+        : 'Switch to dark mode',
 );
 
 function toggleAppearance() {
-    updateAppearance(resolvedAppearance.value === "dark" ? "light" : "dark");
+    updateAppearance(resolvedAppearance.value === 'dark' ? 'light' : 'dark');
 }
 </script>
 
@@ -31,17 +31,17 @@ function toggleAppearance() {
                     role="switch"
                     variant="ghost"
                     size="icon"
-                    class="appearance-toggle group h-9 w-12 rounded-full p-0 hover:bg-transparent focus-visible:ring-ring dark:hover:bg-transparent motion-reduce:transition-none cursor-pointer"
+                    class="appearance-toggle group focus-visible:ring-ring h-9 w-12 cursor-pointer rounded-full p-0 hover:bg-transparent motion-reduce:transition-none dark:hover:bg-transparent"
                     aria-label="Dark mode"
                     :aria-checked="resolvedAppearance === 'dark'"
                     @click="toggleAppearance"
                 >
                     <span
-                        class="relative h-6 w-10 rounded-full border border-input bg-muted transition-colors duration-200 group-hover:border-ring motion-reduce:transition-none"
+                        class="border-input bg-muted group-hover:border-ring relative h-6 w-10 rounded-full border transition-colors duration-200 motion-reduce:transition-none"
                         aria-hidden="true"
                     >
                         <span
-                            class="absolute top-1/2 left-0.5 flex size-4.5 -translate-y-1/2 items-center justify-center rounded-full bg-background text-foreground transition-transform duration-200 ease-in-out motion-reduce:transition-none"
+                            class="bg-background text-foreground absolute top-1/2 left-0.5 flex size-4.5 -translate-y-1/2 items-center justify-center rounded-full transition-transform duration-200 ease-in-out motion-reduce:transition-none"
                             :class="
                                 resolvedAppearance === 'dark'
                                     ? 'translate-x-4'

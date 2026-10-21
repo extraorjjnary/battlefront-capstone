@@ -148,7 +148,8 @@ defineOptions({
                         attention
                     </AlertTitle>
                     <AlertDescription>
-                        Update the marked quantities, remove unavailable items, or deselect them to buy other items.
+                        Update the marked quantities, remove unavailable items,
+                        or deselect them to buy other items.
                     </AlertDescription>
                 </Alert>
 
@@ -179,7 +180,9 @@ defineOptions({
                                 :model-value="selectAllState"
                                 @update:model-value="selectAll($event === true)"
                             />
-                            <Label for="select-all-cart-items" class="min-h-11 md:min-h-0"
+                            <Label
+                                for="select-all-cart-items"
+                                class="min-h-11 md:min-h-0"
                                 >Select all</Label
                             >
                             <span
@@ -253,7 +256,9 @@ defineOptions({
                         </dl>
 
                         <p class="text-muted-foreground mt-4 text-sm leading-6">
-                            Only selected items will be purchased. Delivery fees and stock are checked at checkout; cart items do not reserve stock.
+                            Only selected items will be purchased. Delivery fees
+                            and stock are checked at checkout; cart items do not
+                            reserve stock.
                         </p>
 
                         <p

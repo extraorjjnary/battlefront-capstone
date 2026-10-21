@@ -18,9 +18,9 @@ const props = defineProps({
 });
 
 const published = ref(props.branch?.is_published ?? false);
-const requiresDetail = (field) => published.value && (
-    !props.branch?.is_published || Boolean(props.branch?.[field])
-);
+const requiresDetail = (field) =>
+    published.value &&
+    (!props.branch?.is_published || Boolean(props.branch?.[field]));
 </script>
 
 <template>
@@ -29,8 +29,12 @@ const requiresDetail = (field) => published.value && (
             <div class="grid gap-2">
                 <Label for="name">Branch name</Label>
                 <Input
-                    id="name" name="name" :default-value="branch?.name"
-                    maxlength="255" required autofocus
+                    id="name"
+                    name="name"
+                    :default-value="branch?.name"
+                    maxlength="255"
+                    required
+                    autofocus
                     :aria-invalid="Boolean(errors.name)"
                 />
                 <InputError :message="errors.name" />
@@ -38,8 +42,12 @@ const requiresDetail = (field) => published.value && (
             <div class="grid gap-2">
                 <Label for="city">City / location</Label>
                 <Input
-                    id="city" name="city" :default-value="branch?.city"
-                    maxlength="255" required :readonly="branch?.is_operational"
+                    id="city"
+                    name="city"
+                    :default-value="branch?.city"
+                    maxlength="255"
+                    required
+                    :readonly="branch?.is_operational"
                     :aria-invalid="Boolean(errors.city)"
                 />
                 <InputError :message="errors.city" />
@@ -49,8 +57,12 @@ const requiresDetail = (field) => published.value && (
         <div class="grid gap-2">
             <Label for="address">Complete address</Label>
             <Textarea
-                id="address" name="address" :default-value="branch?.address"
-                rows="3" maxlength="255" :required="requiresDetail('address')"
+                id="address"
+                name="address"
+                :default-value="branch?.address"
+                rows="3"
+                maxlength="255"
+                :required="requiresDetail('address')"
                 :aria-invalid="Boolean(errors.address)"
             />
             <InputError :message="errors.address" />
@@ -60,8 +72,11 @@ const requiresDetail = (field) => published.value && (
             <div class="grid gap-2">
                 <Label for="contact-number">Contact number</Label>
                 <Input
-                    id="contact-number" name="contact_number" type="tel"
-                    :default-value="branch?.contact_number" maxlength="20"
+                    id="contact-number"
+                    name="contact_number"
+                    type="tel"
+                    :default-value="branch?.contact_number"
+                    maxlength="20"
                     :aria-invalid="Boolean(errors.contact_number)"
                 />
                 <InputError :message="errors.contact_number" />
@@ -69,8 +84,11 @@ const requiresDetail = (field) => published.value && (
             <div class="grid gap-2">
                 <Label for="email">Email</Label>
                 <Input
-                    id="email" name="email" type="email"
-                    :default-value="branch?.email" maxlength="255"
+                    id="email"
+                    name="email"
+                    type="email"
+                    :default-value="branch?.email"
+                    maxlength="255"
                     :aria-invalid="Boolean(errors.email)"
                 />
                 <InputError :message="errors.email" />
@@ -80,25 +98,43 @@ const requiresDetail = (field) => published.value && (
         <div class="grid gap-2">
             <Label for="operating-hours">Operating hours</Label>
             <Input
-                id="operating-hours" name="operating_hours"
-                :default-value="branch?.operating_hours" maxlength="255"
+                id="operating-hours"
+                name="operating_hours"
+                :default-value="branch?.operating_hours"
+                maxlength="255"
                 :required="requiresDetail('operating_hours')"
                 :aria-invalid="Boolean(errors.operating_hours)"
             />
-            <p class="text-muted-foreground text-xs">Include days when hours vary. Address and hours are required before publishing.</p>
+            <p class="text-muted-foreground text-xs">
+                Include days when hours vary. Address and hours are required
+                before publishing.
+            </p>
             <InputError :message="errors.operating_hours" />
         </div>
 
         <fieldset class="border-border space-y-4 border-t pt-5">
-            <legend class="font-medium">Map coordinates <span class="text-muted-foreground font-normal">(optional)</span></legend>
-            <p id="coordinate-help" class="text-muted-foreground text-sm">Enter only verified coordinates. Leave both blank if unconfirmed; the branch will still be listed.</p>
+            <legend class="font-medium">
+                Map coordinates
+                <span class="text-muted-foreground font-normal"
+                    >(optional)</span
+                >
+            </legend>
+            <p id="coordinate-help" class="text-muted-foreground text-sm">
+                Enter only verified coordinates. Leave both blank if
+                unconfirmed; the branch will still be listed.
+            </p>
             <div class="grid gap-5 sm:grid-cols-2">
                 <div class="grid gap-2">
                     <Label for="latitude">Latitude</Label>
                     <Input
-                        id="latitude" name="latitude" type="number"
-                        step="0.0000001" min="-90" max="90"
-                        :default-value="branch?.latitude" aria-describedby="coordinate-help"
+                        id="latitude"
+                        name="latitude"
+                        type="number"
+                        step="0.0000001"
+                        min="-90"
+                        max="90"
+                        :default-value="branch?.latitude"
+                        aria-describedby="coordinate-help"
                         :aria-invalid="Boolean(errors.latitude)"
                     />
                     <InputError :message="errors.latitude" />
@@ -106,9 +142,14 @@ const requiresDetail = (field) => published.value && (
                 <div class="grid gap-2">
                     <Label for="longitude">Longitude</Label>
                     <Input
-                        id="longitude" name="longitude" type="number"
-                        step="0.0000001" min="-180" max="180"
-                        :default-value="branch?.longitude" aria-describedby="coordinate-help"
+                        id="longitude"
+                        name="longitude"
+                        type="number"
+                        step="0.0000001"
+                        min="-180"
+                        max="180"
+                        :default-value="branch?.longitude"
+                        aria-describedby="coordinate-help"
                         :aria-invalid="Boolean(errors.longitude)"
                     />
                     <InputError :message="errors.longitude" />
@@ -117,19 +158,36 @@ const requiresDetail = (field) => published.value && (
         </fieldset>
 
         <div class="border-border space-y-2 border-t pt-5">
-            <input type="hidden" name="is_published" :value="published ? '1' : '0'" />
+            <input
+                type="hidden"
+                name="is_published"
+                :value="published ? '1' : '0'"
+            />
             <div class="flex items-center gap-3">
                 <Checkbox
-                    id="is-published" v-model="published" :disabled="branch?.is_operational"
-                    :aria-invalid="Boolean(errors.is_published)" aria-describedby="publication-help"
+                    id="is-published"
+                    v-model="published"
+                    :disabled="branch?.is_operational"
+                    :aria-invalid="Boolean(errors.is_published)"
+                    aria-describedby="publication-help"
                 />
                 <Label for="is-published">Published</Label>
             </div>
             <p id="publication-help" class="text-muted-foreground text-sm">
-                {{ branch?.is_operational ? 'Sagay City stays published as the operational store.' : 'Publish after verifying these details. Unpublished branches are visible only to administrators.' }}
+                {{
+                    branch?.is_operational
+                        ? 'Sagay City stays published as the operational store.'
+                        : 'Publish after verifying these details. Unpublished branches are visible only to administrators.'
+                }}
             </p>
             <InputError :message="errors.is_published" />
-            <p v-if="!branch?.is_operational" class="text-muted-foreground text-xs">This record provides store information only. Operations remain at Sagay City.</p>
+            <p
+                v-if="!branch?.is_operational"
+                class="text-muted-foreground text-xs"
+            >
+                This record provides store information only. Operations remain
+                at Sagay City.
+            </p>
         </div>
 
         <div class="flex flex-wrap items-center gap-3">

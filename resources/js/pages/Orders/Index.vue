@@ -57,9 +57,7 @@ defineOptions({
                         {{ orders.total }}
                         {{ orders.total === 1 ? 'order' : 'orders' }}
                     </p>
-                    <h2 id="orders-heading" class="sr-only">
-                        Your orders
-                    </h2>
+                    <h2 id="orders-heading" class="sr-only">Your orders</h2>
                 </div>
 
                 <div

@@ -48,22 +48,22 @@ Use Warm Battlefront Light as the default. The main page background is warm off-
 
 These values match `:root` and `.dark` in `resources/css/app.css`. Reuse the semantic tokens instead of scattering hex values through components.
 
-| Semantic token | Light (default) | Dark (optional) | Role |
-| --- | --- | --- | --- |
-| `--background` | `#FAF7F4` | `#090B10` | Main page and application background |
-| `--card`, `--popover`, `--sidebar-background` | `#FFFFFF` | `#111318` | Cards, dialogs, menus, and navigation surfaces |
-| `--secondary`, `--accent` | `#F2EDE8` | `#1B1E24` | Secondary and selected surfaces |
-| `--muted` | `#F0EBE6` | `#1B1E24` | Muted surface areas |
-| `--warm-accent` | `#EBD6CC` | `#2C2220` | Subtle warm accents |
-| `--foreground` | `#242120` | `#F8FAFC` | Headings, body copy, and labels |
-| `--muted-foreground` | `#6B625E` | `#9CA3AF` | Supporting text and metadata |
-| `--primary` | `#B91C1C` | `#B91C1C` | Solid primary actions |
-| `--primary-foreground` | `#FFFFFF` | `#F8FAFC` | Text on primary actions |
-| `--primary-ink` | `#B91C1C` | `#F87171` | Emphasized text, links, and icons |
-| `--brand-highlight` | `#EF1B1B` | `#EF1B1B` | Selective brand highlights |
-| `--border` | `#E2DAD4` | `#2A2E36` | Subtle dividers |
-| `--input` | `#94867D` | `#687282` | Visible input boundaries |
-| `--ring` | `#B91C1C` | `#EF1B1B` | Keyboard focus indicators |
+| Semantic token                                | Light (default) | Dark (optional) | Role                                           |
+| --------------------------------------------- | --------------- | --------------- | ---------------------------------------------- |
+| `--background`                                | `#FAF7F4`       | `#090B10`       | Main page and application background           |
+| `--card`, `--popover`, `--sidebar-background` | `#FFFFFF`       | `#111318`       | Cards, dialogs, menus, and navigation surfaces |
+| `--secondary`, `--accent`                     | `#F2EDE8`       | `#1B1E24`       | Secondary and selected surfaces                |
+| `--muted`                                     | `#F0EBE6`       | `#1B1E24`       | Muted surface areas                            |
+| `--warm-accent`                               | `#EBD6CC`       | `#2C2220`       | Subtle warm accents                            |
+| `--foreground`                                | `#242120`       | `#F8FAFC`       | Headings, body copy, and labels                |
+| `--muted-foreground`                          | `#6B625E`       | `#9CA3AF`       | Supporting text and metadata                   |
+| `--primary`                                   | `#B91C1C`       | `#B91C1C`       | Solid primary actions                          |
+| `--primary-foreground`                        | `#FFFFFF`       | `#F8FAFC`       | Text on primary actions                        |
+| `--primary-ink`                               | `#B91C1C`       | `#F87171`       | Emphasized text, links, and icons              |
+| `--brand-highlight`                           | `#EF1B1B`       | `#EF1B1B`       | Selective brand highlights                     |
+| `--border`                                    | `#E2DAD4`       | `#2A2E36`       | Subtle dividers                                |
+| `--input`                                     | `#94867D`       | `#687282`       | Visible input boundaries                       |
+| `--ring`                                      | `#B91C1C`       | `#EF1B1B`       | Keyboard focus indicators                      |
 
 ### Appearance Behavior
 

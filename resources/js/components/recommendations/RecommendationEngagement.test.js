@@ -22,11 +22,18 @@ const modules = new Proxy(
         vue: Vue,
         '@/components/PageHeader.vue': pageHeaderModule,
         '@/composables/useChartTheme': {
-            useChartTheme: () => Vue.ref({
-                primary: 'red', secondary: 'gray', highlight: 'red',
-                fill: 'pink', muted: 'gray', text: 'black',
-                foreground: 'black', border: 'gray', surface: 'white',
-            }),
+            useChartTheme: () =>
+                Vue.ref({
+                    primary: 'red',
+                    secondary: 'gray',
+                    highlight: 'red',
+                    fill: 'pink',
+                    muted: 'gray',
+                    text: 'black',
+                    foreground: 'black',
+                    border: 'gray',
+                    surface: 'white',
+                }),
         },
         'reka-ui': Reka,
         '@/lib/currency': { formatCurrency },

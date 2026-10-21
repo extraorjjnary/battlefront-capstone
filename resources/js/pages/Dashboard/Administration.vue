@@ -109,7 +109,11 @@ defineOptions({
                                 v-for="stat in 5"
                                 :key="stat"
                                 class="border-border border-b sm:border-r xl:border-b-0"
-                                :class="stat === 5 ? 'sm:col-span-2 xl:col-span-1' : ''"
+                                :class="
+                                    stat === 5
+                                        ? 'sm:col-span-2 xl:col-span-1'
+                                        : ''
+                                "
                             />
                         </div>
                     </template>
@@ -124,7 +128,9 @@ defineOptions({
                             </dt>
                             <dd class="mt-2 text-2xl font-bold tabular-nums">
                                 {{
-                                    formatCurrency(dashboard.kpis.recorded_revenue)
+                                    formatCurrency(
+                                        dashboard.kpis.recorded_revenue,
+                                    )
                                 }}
                             </dd>
                             <p class="text-muted-foreground mt-1 text-xs">
@@ -202,7 +208,9 @@ defineOptions({
                 aria-labelledby="needs-attention-heading"
             >
                 <div class="min-w-0">
-                    <div class="mb-4 flex flex-wrap items-end justify-between gap-4">
+                    <div
+                        class="mb-4 flex flex-wrap items-end justify-between gap-4"
+                    >
                         <div>
                             <p class="text-muted-foreground text-sm">
                                 Operational queue
@@ -232,7 +240,11 @@ defineOptions({
                                 aria-hidden="true"
                                 class="surface-panel border-border bg-card divide-border divide-y border"
                             >
-                                <div v-for="queue in 3" :key="queue" class="p-5">
+                                <div
+                                    v-for="queue in 3"
+                                    :key="queue"
+                                    class="p-5"
+                                >
                                     <Skeleton class="h-5 w-40 max-w-full" />
                                     <ListSkeleton :rows="1" class="mt-4" />
                                 </div>
@@ -240,7 +252,9 @@ defineOptions({
                         </template>
                         <div class="surface-panel border-border bg-card border">
                             <div class="border-border border-b p-5">
-                                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                <div
+                                    class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+                                >
                                     <div class="flex gap-3">
                                         <span
                                             class="bg-secondary text-primary-ink flex size-10 shrink-0 items-center justify-center rounded-md"
@@ -290,8 +304,8 @@ defineOptions({
                                 </div>
                                 <div v-else class="mt-5 grid gap-1">
                                     <Link
-                                        v-for="order in dashboard.needs_attention
-                                            .payment_orders"
+                                        v-for="order in dashboard
+                                            .needs_attention.payment_orders"
                                         :key="order.id"
                                         :href="OrderController.show(order.id)"
                                         class="hover:bg-accent focus-visible:ring-ring grid gap-2 px-3 py-3 transition-colors focus-visible:ring-2 focus-visible:outline-none sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
@@ -305,7 +319,9 @@ defineOptions({
                                                 class="text-muted-foreground mt-1 text-xs"
                                             >
                                                 {{ order.payment_method }} ·
-                                                {{ formatDate(order.created_at) }}
+                                                {{
+                                                    formatDate(order.created_at)
+                                                }}
                                             </p>
                                         </div>
                                         <p class="font-semibold tabular-nums">
@@ -318,7 +334,9 @@ defineOptions({
                             <div
                                 class="border-destructive/40 bg-destructive/5 border-b p-5"
                             >
-                                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                <div
+                                    class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+                                >
                                     <div class="flex gap-3">
                                         <span
                                             class="bg-destructive/10 text-destructive flex size-10 shrink-0 items-center justify-center rounded-md"
@@ -341,7 +359,8 @@ defineOptions({
                                                     dashboard.kpis
                                                         .out_of_stock_products
                                                 }}
-                                                products have no units available.
+                                                products have no units
+                                                available.
                                             </p>
                                         </div>
                                     </div>
@@ -371,12 +390,15 @@ defineOptions({
                                 </p>
                                 <div v-else class="mt-5 divide-y">
                                     <div
-                                        v-for="product in dashboard.needs_attention
+                                        v-for="product in dashboard
+                                            .needs_attention
                                             .out_of_stock_products"
                                         :key="product.id"
                                         class="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
                                     >
-                                        <p class="min-w-0 truncate font-semibold">
+                                        <p
+                                            class="min-w-0 truncate font-semibold"
+                                        >
                                             {{ product.name }}
                                         </p>
                                         <span
@@ -389,7 +411,9 @@ defineOptions({
                             </div>
 
                             <div class="p-5">
-                                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                                <div
+                                    class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
+                                >
                                     <div class="flex gap-3">
                                         <span
                                             class="bg-secondary text-primary-ink flex size-10 shrink-0 items-center justify-center rounded-md"
@@ -415,7 +439,9 @@ defineOptions({
                                         <Link
                                             :href="
                                                 InventoryController.index({
-                                                    query: { stock: 'low_stock' },
+                                                    query: {
+                                                        stock: 'low_stock',
+                                                    },
                                                 })
                                             "
                                         >
@@ -427,8 +453,8 @@ defineOptions({
 
                                 <div
                                     v-if="
-                                        dashboard.needs_attention.low_stock_products
-                                            .length === 0
+                                        dashboard.needs_attention
+                                            .low_stock_products.length === 0
                                     "
                                     class="text-muted-foreground mt-5 flex items-center gap-2 border-t pt-4 text-sm"
                                 >
@@ -440,8 +466,8 @@ defineOptions({
                                 </div>
                                 <div v-else class="mt-5 divide-y">
                                     <div
-                                        v-for="product in dashboard.needs_attention
-                                            .low_stock_products"
+                                        v-for="product in dashboard
+                                            .needs_attention.low_stock_products"
                                         :key="product.id"
                                         class="flex items-center justify-between gap-4 py-3 first:pt-0 last:pb-0"
                                     >
@@ -508,15 +534,21 @@ defineOptions({
                         </template>
                         <div class="surface-panel border-border bg-card border">
                             <div
-                                v-if="props.dashboard.recent_orders.length === 0"
+                                v-if="
+                                    props.dashboard.recent_orders.length === 0
+                                "
                                 class="text-muted-foreground flex min-h-64 flex-col items-center justify-center gap-3 p-8 text-center text-sm"
                             >
-                                <ReceiptText class="size-7" aria-hidden="true" />
+                                <ReceiptText
+                                    class="size-7"
+                                    aria-hidden="true"
+                                />
                                 No orders have been placed yet.
                             </div>
                             <div v-else class="divide-border divide-y">
                                 <Link
-                                    v-for="order in props.dashboard.recent_orders"
+                                    v-for="order in props.dashboard
+                                        .recent_orders"
                                     :key="order.id"
                                     :href="OrderController.show(order.id)"
                                     class="hover:bg-accent focus-visible:ring-ring block p-4 transition-colors focus-visible:ring-2 focus-visible:outline-none"
@@ -525,7 +557,9 @@ defineOptions({
                                         class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
                                     >
                                         <div class="min-w-0">
-                                            <p class="font-semibold tabular-nums">
+                                            <p
+                                                class="font-semibold tabular-nums"
+                                            >
                                                 {{ order.reference }}
                                             </p>
                                             <p

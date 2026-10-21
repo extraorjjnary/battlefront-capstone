@@ -1,1 +1,2888 @@
-{"schema_version":2,"version":"2026-03-31.v2","region_code":"1200000000","barangays":[{"code":"1204705001","name":"Abaga","city_code":"1204705000"},{"code":"1206317001","name":"Acmonan","city_code":"1206317000"},{"code":"1206316024","name":"Aflek","city_code":"1206316000"},{"code":"1206316017","name":"Afus","city_code":"1206316000"},{"code":"1204709002","name":"Agriculture","city_code":"1204709000"},{"code":"1206509001","name":"Akol","city_code":"1206509000"},{"code":"1206503001","name":"Ala","city_code":"1206503000"},{"code":"1206314001","name":"Albagan","city_code":"1206314000"},{"code":"1204713001","name":"Alegria","city_code":"1204713000"},{"code":"1208001001","name":"Alegria","city_code":"1208001000"},{"code":"1204706001","name":"Alibayon","city_code":"1204706000"},{"code":"1208007001","name":"Alkikan","city_code":"1208007000"},{"code":"1204718001","name":"Allab","city_code":"1204718000"},{"code":"1204706048","name":"Amabel","city_code":"1204706000"},{"code":"1204704001","name":"Amas","city_code":"1204704000"},{"code":"1204704002","name":"Amazion","city_code":"1204704000"},{"code":"1206318001","name":"Ambalgan","city_code":"1206318000"},{"code":"1208007002","name":"Ampon","city_code":"1208007000"},{"code":"1208004001","name":"Amsipit","city_code":"1208004000"},{"code":"1204718002","name":"Anapolon","city_code":"1204718000"},{"code":"1204711001","name":"Anick","city_code":"1204711000"},{"code":"1204709003","name":"Anonang","city_code":"1204709000"},{"code":"1206507001","name":"Antong","city_code":"1206507000"},{"code":"1230800029","name":"Apopong","city_code":"1230800000"},{"code":"1204708003","name":"Arakan","city_code":"1204708000"},{"code":"1204703001","name":"Aringay","city_code":"1204703000"},{"code":"1204709004","name":"Arizona","city_code":"1204709000"},{"code":"1204702001","name":"Aroman","city_code":"1204702000"},{"code":"1206306001","name":"Assumption","city_code":"1206306000"},{"code":"1208007003","name":"Atlae","city_code":"1208007000"},{"code":"1206506027","name":"Aurelio F. Freires","city_code":"1206506000"},{"code":"1206306002","name":"Avanceña","city_code":"1206306000"},{"code":"1204715012","name":"B. Cadungon","city_code":"1204715000"},{"code":"1208007006","name":"B'Laan","city_code":"1208007000"},{"code":"1206319001","name":"Bacdulong","city_code":"1206319000"},{"code":"1204714027","name":"Bacong","city_code":"1204714000"},{"code":"1204718003","name":"Badiangon","city_code":"1204718000"},{"code":"1206509002","name":"Badiangon","city_code":"1206509000"},{"code":"1208003001","name":"Badtasan","city_code":"1208003000"},{"code":"1208001002","name":"Bagacay","city_code":"1208001000"},{"code":"1204717001","name":"Bagolibas","city_code":"1204717000"},{"code":"1204710001","name":"Bagontapay","city_code":"1204710000"},{"code":"1204705003","name":"Baguer","city_code":"1204705000"},{"code":"1204709005","name":"Bagumba","city_code":"1204709000"},{"code":"1204706005","name":"Bagumbayan","city_code":"1204706000"},{"code":"1204714001","name":"Bagumbayan","city_code":"1204714000"},{"code":"1206510001","name":"Bagumbayan","city_code":"1206510000"},{"code":"1206501001","name":"Bai Sarifinang","city_code":"1206501000"},{"code":"1204704003","name":"Balabag","city_code":"1204704000"},{"code":"1204712003","name":"Balabak","city_code":"1204712000"},{"code":"1204712004","name":"Balatican","city_code":"1204712000"},{"code":"1208004002","name":"Bales","city_code":"1208004000"},{"code":"1204706049","name":"Balete","city_code":"1204706000"},{"code":"1206509003","name":"Baliango","city_code":"1206509000"},{"code":"1204709006","name":"Baliki","city_code":"1204709000"},{"code":"1204704004","name":"Balindog","city_code":"1204704000"},{"code":"1208002001","name":"Baliton","city_code":"1208002000"},{"code":"1204711004","name":"Balogo","city_code":"1204711000"},{"code":"1230800003","name":"Baluan","city_code":"1230800000"},{"code":"1208001003","name":"Baluntay","city_code":"1208001000"},{"code":"1206509042","name":"Balwan","city_code":"1206509000"},{"code":"1206504003","name":"Bambad","city_code":"1206504000"},{"code":"1206509036","name":"Bambanen","city_code":"1206509000"},{"code":"1208007004","name":"Banahaw","city_code":"1208007000"},{"code":"1206512001","name":"Banali","city_code":"1206512000"},{"code":"1208007005","name":"Banate","city_code":"1208007000"},{"code":"1204714002","name":"Banayal","city_code":"1204714000"},{"code":"1204708004","name":"Bangbang","city_code":"1204708000"},{"code":"1204703002","name":"Bangilan","city_code":"1204703000"},{"code":"1204706006","name":"Bangkal","city_code":"1204706000"},{"code":"1204716001","name":"Banisilan Poblacion","city_code":"1204716000"},{"code":"1204703003","name":"Bannawag","city_code":"1204703000"},{"code":"1206510003","name":"Bannawag","city_code":"1206510000"},{"code":"1204706007","name":"Bantac","city_code":"1204706000"},{"code":"1206502002","name":"Bantangan","city_code":"1206502000"},{"code":"1206505001","name":"Bantogon","city_code":"1206505000"},{"code":"1204711006","name":"Banucagon","city_code":"1204711000"},{"code":"1204701001","name":"Bao","city_code":"1204701000"},{"code":"1206509004","name":"Baranayan","city_code":"1206509000"},{"code":"1204709035","name":"Barangay Poblacion 1","city_code":"1204709000"},{"code":"1204709036","name":"Barangay Poblacion 2","city_code":"1204709000"},{"code":"1204709037","name":"Barangay Poblacion 3","city_code":"1204709000"},{"code":"1204709038","name":"Barangay Poblacion 4","city_code":"1204709000"},{"code":"1204709039","name":"Barangay Poblacion 5","city_code":"1204709000"},{"code":"1204709040","name":"Barangay Poblacion 6","city_code":"1204709000"},{"code":"1204709041","name":"Barangay Poblacion 7","city_code":"1204709000"},{"code":"1204709042","name":"Barangay Poblacion 8","city_code":"1204709000"},{"code":"1204701002","name":"Barangiran","city_code":"1204701000"},{"code":"1206511001","name":"Baras","city_code":"1206511000"},{"code":"1204705004","name":"Barongis","city_code":"1204705000"},{"code":"1206509005","name":"Barongis","city_code":"1206509000"},{"code":"1206506001","name":"Barurao","city_code":"1206506000"},{"code":"1206506026","name":"Barurao II","city_code":"1206506000"},{"code":"1206316001","name":"Basag","city_code":"1206316000"},{"code":"1206512002","name":"Basag","city_code":"1206512000"},{"code":"1204706008","name":"Basak","city_code":"1204706000"},{"code":"1206506003","name":"Basak","city_code":"1206506000"},{"code":"1204714003","name":"Batang","city_code":"1204714000"},{"code":"1206509006","name":"Batang-baglas","city_code":"1206509000"},{"code":"1204707001","name":"Batasan","city_code":"1204707000"},{"code":"1208005001","name":"Bati-an","city_code":"1208005000"},{"code":"1204705005","name":"Batiocan","city_code":"1204705000"},{"code":"1204707002","name":"Bato","city_code":"1204707000"},{"code":"1204708005","name":"Bato","city_code":"1204708000"},{"code":"1204713002","name":"Bato-bato","city_code":"1204713000"},{"code":"1230800032","name":"Batomelong","city_code":"1230800000"},{"code":"1208002002","name":"Batotuling","city_code":"1208002000"},{"code":"1208002003","name":"Batulaki","city_code":"1208002000"},{"code":"1206507002","name":"Bayasong","city_code":"1206507000"},{"code":"1206510004","name":"Bayawa","city_code":"1206510000"},{"code":"1206311022","name":"Benigno Aquino, Jr.","city_code":"1206311000"},{"code":"1206302002","name":"Benitez","city_code":"1206302000"},{"code":"1204704005","name":"Benoligan","city_code":"1204704000"},{"code":"1204702003","name":"Bentangan","city_code":"1204702000"},{"code":"1206312001","name":"Bentung","city_code":"1206312000"},{"code":"1204704006","name":"Berada","city_code":"1204704000"},{"code":"1204710002","name":"Bialong","city_code":"1204710000"},{"code":"1204707003","name":"Biangan","city_code":"1204707000"},{"code":"1208002004","name":"Big Margus","city_code":"1208002000"},{"code":"1204706009","name":"Binay","city_code":"1204706000"},{"code":"1204718004","name":"Binoongan","city_code":"1204718000"},{"code":"1204709007","name":"Bitoka","city_code":"1204709000"},{"code":"1204714004","name":"Bituan","city_code":"1204714000"},{"code":"1206501002","name":"Biwang","city_code":"1206501000"},{"code":"1206507003","name":"Blingkong","city_code":"1206507000"},{"code":"1206506029","name":"Bolebok","city_code":"1206506000"},{"code":"1206317002","name":"Bololmala","city_code":"1206317000"},{"code":"1204706010","name":"Bongolanon","city_code":"1204706000"},{"code":"1204714005","name":"Bual","city_code":"1204714000"},{"code":"1206504005","name":"Bual","city_code":"1206504000"},{"code":"1204709008","name":"Bual Norte","city_code":"1204709000"},{"code":"1204709009","name":"Bual Sur","city_code":"1204709000"},{"code":"1204710003","name":"Buayan","city_code":"1204710000"},{"code":"1230800004","name":"Buayan","city_code":"1230800000"},{"code":"1204707004","name":"Buena Vida","city_code":"1204707000"},{"code":"1206511002","name":"Buenaflor","city_code":"1206511000"},{"code":"1206512003","name":"Buenaflores","city_code":"1206512000"},{"code":"1206313002","name":"Buenavista","city_code":"1206313000"},{"code":"1206512004","name":"Bugso","city_code":"1206512000"},{"code":"1204707005","name":"Buhay","city_code":"1204707000"},{"code":"1206315001","name":"Bukay Pait","city_code":"1206315000"},{"code":"1206512005","name":"Buklod","city_code":"1206512000"},{"code":"1230800005","name":"Bula","city_code":"1230800000"},{"code":"1204707006","name":"Bulakanon","city_code":"1204707000"},{"code":"1204709052","name":"Bulanan Upper","city_code":"1204709000"},{"code":"1204712011","name":"Bulod","city_code":"1204712000"},{"code":"1204711008","name":"Buluan","city_code":"1204711000"},{"code":"1204711007","name":"Bulucaon","city_code":"1204711000"},{"code":"1206506004","name":"Bululawan","city_code":"1206506000"},{"code":"1206317003","name":"Bunao","city_code":"1206317000"},{"code":"1204714012","name":"Bunawan","city_code":"1204714000"},{"code":"1208002005","name":"Burias","city_code":"1208002000"},{"code":"1204716002","name":"Busaon","city_code":"1204716000"},{"code":"1206501003","name":"Busok","city_code":"1206501000"},{"code":"1206314008","name":"Buto","city_code":"1206314000"},{"code":"1206509007","name":"Butril","city_code":"1206509000"},{"code":"1206510014","name":"C. Mangilala","city_code":"1206510000"},{"code":"1204713031","name":"Cabangbangan","city_code":"1204713000"},{"code":"1204705006","name":"Cabaruyan","city_code":"1204705000"},{"code":"1204707007","name":"Cabilao","city_code":"1204707000"},{"code":"1208002006","name":"Cablalan","city_code":"1208002000"},{"code":"1204705007","name":"Cabpangi","city_code":"1204705000"},{"code":"1204711041","name":"Cabpangi","city_code":"1204711000"},{"code":"1206302003","name":"Cabudian","city_code":"1206302000"},{"code":"1206302004","name":"Cabuling","city_code":"1206302000"},{"code":"1206315002","name":"Cabuling","city_code":"1206315000"},{"code":"1206306003","name":"Cacub","city_code":"1206306000"},{"code":"1204702005","name":"Cadiis","city_code":"1204702000"},{"code":"1206505004","name":"Cadiz","city_code":"1206505000"},{"code":"1208002007","name":"Calabanit","city_code":"1208002000"},{"code":"1204712013","name":"Calawag","city_code":"1204712000"},{"code":"1206511003","name":"Calean","city_code":"1206511000"},{"code":"1206306004","name":"Caloocan","city_code":"1206306000"},{"code":"1208002008","name":"Calpidong","city_code":"1208002000"},{"code":"1230800033","name":"Calumpang","city_code":"1230800000"},{"code":"1204710004","name":"Calunasan","city_code":"1204710000"},{"code":"1204701003","name":"Camansi","city_code":"1204701000"},{"code":"1204713009","name":"Camasi","city_code":"1204713000"},{"code":"1204715001","name":"Camutan","city_code":"1204715000"},{"code":"1204715002","name":"Canaan","city_code":"1204715000"},{"code":"1206313008","name":"Canahay","city_code":"1206313000"},{"code":"1206312024","name":"Cannery Site","city_code":"1206312000"},{"code":"1204716003","name":"Capayangan","city_code":"1204716000"},{"code":"1204711010","name":"Capayuran","city_code":"1204711000"},{"code":"1206506005","name":"Capilan","city_code":"1206506000"},{"code":"1206508001","name":"Caridad","city_code":"1206508000"},{"code":"1206511004","name":"Carmen","city_code":"1206511000"},{"code":"1206306005","name":"Carpenter Hill","city_code":"1206306000"},{"code":"1204716004","name":"Carugmanan","city_code":"1204716000"},{"code":"1204717002","name":"Cawilihan","city_code":"1204717000"},{"code":"1206317004","name":"Cebuano","city_code":"1206317000"},{"code":"1204709010","name":"Central Bulanan","city_code":"1204709000"},{"code":"1204709012","name":"Central Glad","city_code":"1204709000"},{"code":"1204709017","name":"Central Katingawan","city_code":"1204709000"},{"code":"1204708006","name":"Central Malamote","city_code":"1204708000"},{"code":"1204711011","name":"Central Panatan","city_code":"1204711000"},{"code":"1206313003","name":"Centrala","city_code":"1206313000"},{"code":"1206506006","name":"Christiannuevo","city_code":"1206506000"},{"code":"1206501012","name":"Chua","city_code":"1206501000"},{"code":"1206302005","name":"Cinco","city_code":"1206302000"},{"code":"1230800034","name":"City Heights","city_code":"1230800000"},{"code":"1206509033","name":"Colobe","city_code":"1206509000"},{"code":"1208004003","name":"Colon","city_code":"1208004000"},{"code":"1206313004","name":"Colongulo","city_code":"1206313000"},{"code":"1204707008","name":"Concepcion","city_code":"1204707000"},{"code":"1206306006","name":"Concepcion","city_code":"1206306000"},{"code":"1230800006","name":"Conel","city_code":"1230800000"},{"code":"1208002009","name":"Congan","city_code":"1208002000"},{"code":"1208002010","name":"Cross","city_code":"1208002000"},{"code":"1206312002","name":"Crossing Palkan","city_code":"1206312000"},{"code":"1206317005","name":"Crossing Rubber","city_code":"1206317000"},{"code":"1204703005","name":"Cuyapon","city_code":"1204703000"},{"code":"1206511005","name":"D'Ledesma","city_code":"1206511000"},{"code":"1206504007","name":"D'Lotilla","city_code":"1206504000"},{"code":"1208006001","name":"Daan Suyan","city_code":"1208006000"},{"code":"1230800007","name":"Dadiangas East","city_code":"1230800000"},{"code":"1230800035","name":"Dadiangas North","city_code":"1230800000"},{"code":"1230800036","name":"Dadiangas South","city_code":"1230800000"},{"code":"1230800037","name":"Dadiangas West","city_code":"1230800000"},{"code":"1204701004","name":"Dado","city_code":"1204701000"},{"code":"1204710006","name":"Dagong","city_code":"1204710000"},{"code":"1206501004","name":"Daguma","city_code":"1206501000"},{"code":"1204703006","name":"Dagupan","city_code":"1204703000"},{"code":"1204707009","name":"Dagupan","city_code":"1204707000"},{"code":"1204714006","name":"Daig","city_code":"1204714000"},{"code":"1206313005","name":"Dajay","city_code":"1206313000"},{"code":"1206503003","name":"Daladap","city_code":"1206503000"},{"code":"1204708007","name":"Dalapitan","city_code":"1204708000"},{"code":"1208004004","name":"Daliao","city_code":"1208004000"},{"code":"1204712015","name":"Dalingaoen","city_code":"1204712000"},{"code":"1204710005","name":"Dalipe","city_code":"1204710000"},{"code":"1204718005","name":"Dallag","city_code":"1204718000"},{"code":"1206501013","name":"Daluga","city_code":"1206501000"},{"code":"1204712016","name":"Damalasak","city_code":"1204712000"},{"code":"1204714007","name":"Damawato","city_code":"1204714000"},{"code":"1206314012","name":"Danlag","city_code":"1206314000"},{"code":"1206504009","name":"Dansuli","city_code":"1206504000"},{"code":"1206502009","name":"Datablao","city_code":"1206502000"},{"code":"1208001004","name":"Datal Anggas","city_code":"1208001000"},{"code":"1208007007","name":"Datal Batong","city_code":"1208007000"},{"code":"1208007008","name":"Datal Bila","city_code":"1208007000"},{"code":"1206316025","name":"Datal Bob","city_code":"1206316000"},{"code":"1208007009","name":"Datal Tampal","city_code":"1208007000"},{"code":"1208002011","name":"Datalbukay","city_code":"1208002000"},{"code":"1204715013","name":"Datu Agod","city_code":"1204715000"},{"code":"1204706014","name":"Datu Celo","city_code":"1204706000"},{"code":"1208003002","name":"Datu Dani","city_code":"1208003000"},{"code":"1204713032","name":"Datu Indang","city_code":"1204713000"},{"code":"1206505018","name":"Datu Ito Andong","city_code":"1206505000"},{"code":"1206506007","name":"Datu Karon","city_code":"1206506000"},{"code":"1204718006","name":"Datu Ladayon","city_code":"1204718000"},{"code":"1206509044","name":"Datu Maguiales","city_code":"1206509000"},{"code":"1204718007","name":"Datu Matangkil","city_code":"1204718000"},{"code":"1204713033","name":"Datu Sandongan","city_code":"1204713000"},{"code":"1206505019","name":"Datu Wasay","city_code":"1206505000"},{"code":"1204713003","name":"Del Carmen","city_code":"1204713000"},{"code":"1204706015","name":"Del Pilar","city_code":"1204706000"},{"code":"1204705010","name":"Demapaco","city_code":"1204705000"},{"code":"1206319002","name":"Denlag","city_code":"1206319000"},{"code":"1206302006","name":"Derilon","city_code":"1206302000"},{"code":"1206316026","name":"Desawo","city_code":"1206316000"},{"code":"1206508002","name":"Didtaras","city_code":"1206508000"},{"code":"1206316027","name":"Dlanag","city_code":"1206316000"},{"code":"1204706016","name":"Doles","city_code":"1204706000"},{"code":"1204715003","name":"Dolores","city_code":"1204715000"},{"code":"1208001005","name":"Domolok","city_code":"1208001000"},{"code":"1206509009","name":"Domolol","city_code":"1206509000"},{"code":"1204706050","name":"Don Panaca","city_code":"1204706000"},{"code":"1204718008","name":"Doroluman","city_code":"1204718000"},{"code":"1204717003","name":"Dualing","city_code":"1204717000"},{"code":"1206313006","name":"Duengas","city_code":"1206313000"},{"code":"1206503005","name":"Dukay","city_code":"1206503000"},{"code":"1206315003","name":"Dumadalig","city_code":"1206315000"},{"code":"1206311002","name":"Dumaguil","city_code":"1206311000"},{"code":"1206505006","name":"Dumangas Nuevo","city_code":"1206505000"},{"code":"1204710007","name":"Dungo-an","city_code":"1204710000"},{"code":"1204714008","name":"Dungos","city_code":"1204714000"},{"code":"1208002012","name":"E. Alegado","city_code":"1208002000"},{"code":"1206502010","name":"Eday","city_code":"1206502000"},{"code":"1206316002","name":"Edwards","city_code":"1206316000"},{"code":"1206302007","name":"El Nonok","city_code":"1206302000"},{"code":"1206502011","name":"Elbebe","city_code":"1206502000"},{"code":"1206511008","name":"Enrique J.C. Montilla","city_code":"1206511000"},{"code":"1206306007","name":"Esperanza","city_code":"1206306000"},{"code":"1206311003","name":"Esperanza","city_code":"1206311000"},{"code":"1204708008","name":"Estado","city_code":"1204708000"},{"code":"1206510005","name":"Estrella","city_code":"1206510000"},{"code":"1204713005","name":"F. Cajelo","city_code":"1204713000"},{"code":"1204714026","name":"F. Cajelo","city_code":"1204714000"},{"code":"1230800038","name":"Fatima","city_code":"1230800000"},{"code":"1204714028","name":"Galidan","city_code":"1204714000"},{"code":"1204718009","name":"Gambodes","city_code":"1204718000"},{"code":"1204718010","name":"Ganatan","city_code":"1204718000"},{"code":"1206508004","name":"Gansing","city_code":"1206508000"},{"code":"1206512006","name":"Gapok","city_code":"1206512000"},{"code":"1204707010","name":"Garsika","city_code":"1204707000"},{"code":"1208003003","name":"Gasi","city_code":"1208003000"},{"code":"1204716005","name":"Gastay","city_code":"1204716000"},{"code":"1204710008","name":"Gaunan","city_code":"1204710000"},{"code":"1204704007","name":"Gayola","city_code":"1204704000"},{"code":"1204702007","name":"General Luna","city_code":"1204702000"},{"code":"1206306008","name":"General Paulino Santos","city_code":"1206306000"},{"code":"1204714029","name":"Genoveva Baynosa","city_code":"1204714000"},{"code":"1204704008","name":"Ginatilan","city_code":"1204704000"},{"code":"1204712020","name":"Ginatilan","city_code":"1204712000"},{"code":"1206312003","name":"Glamang","city_code":"1206312000"},{"code":"1208002013","name":"Glan Padidu","city_code":"1208002000"},{"code":"1204705011","name":"Grebona","city_code":"1204705000"},{"code":"1204718011","name":"Greenfield","city_code":"1204718000"},{"code":"1204713030","name":"Greenhill","city_code":"1204713000"},{"code":"1204707011","name":"Guangan","city_code":"1204707000"},{"code":"1204706021","name":"Gubatan","city_code":"1204706000"},{"code":"1206503007","name":"Guiamalia","city_code":"1206503000"},{"code":"1204701005","name":"Guiling","city_code":"1204701000"},{"code":"1206318002","name":"Guinsang-an","city_code":"1206318000"},{"code":"1204705013","name":"Gumaga","city_code":"1204705000"},{"code":"1208002014","name":"Gumasa","city_code":"1208002000"},{"code":"1206319003","name":"Halilan","city_code":"1206319000"},{"code":"1206319004","name":"Hanoon","city_code":"1206319000"},{"code":"1206505007","name":"Hinalaan","city_code":"1206505000"},{"code":"1204713006","name":"Idaoman","city_code":"1204713000"},{"code":"1208002015","name":"Ilaya","city_code":"1208002000"},{"code":"1204709013","name":"Ilbocean","city_code":"1204709000"},{"code":"1204706022","name":"Ilian","city_code":"1204706000"},{"code":"1204708009","name":"Ilian","city_code":"1204708000"},{"code":"1206503008","name":"Ilian","city_code":"1206503000"},{"code":"1204704009","name":"Ilomavis","city_code":"1204704000"},{"code":"1204713007","name":"Ilustre","city_code":"1204713000"},{"code":"1204706051","name":"Imamaling","city_code":"1204706000"},{"code":"1206504010","name":"Impao","city_code":"1206504000"},{"code":"1206302008","name":"Improgo Village","city_code":"1206302000"},{"code":"1204706023","name":"Inac","city_code":"1204706000"},{"code":"1204710009","name":"Inas","city_code":"1204710000"},{"code":"1204704010","name":"Indangan","city_code":"1204704000"},{"code":"1204707012","name":"Indangan","city_code":"1204707000"},{"code":"1204712023","name":"Inug-ug","city_code":"1204712000"},{"code":"1208007010","name":"J.P. Laurel","city_code":"1208007000"},{"code":"1204707013","name":"Jose Rizal","city_code":"1204707000"},{"code":"1206317017","name":"Juan-Loreto Tamayo","city_code":"1206317000"},{"code":"1204704011","name":"Junction","city_code":"1204704000"},{"code":"1204718012","name":"Kabalantian","city_code":"1204718000"},{"code":"1208004005","name":"Kabatiol","city_code":"1208004000"},{"code":"1208004006","name":"Kablacan","city_code":"1208004000"},{"code":"1206317006","name":"Kablon","city_code":"1206317000"},{"code":"1204708010","name":"Kabulacan","city_code":"1204708000"},{"code":"1206508005","name":"Kabulakan","city_code":"1206508000"},{"code":"1206501014","name":"Kabulanan","city_code":"1206501000"},{"code":"1206509010","name":"Kabuling","city_code":"1206509000"},{"code":"1206512007","name":"Kadi","city_code":"1206512000"},{"code":"1204712025","name":"Kalacacan","city_code":"1204712000"},{"code":"1204704012","name":"Kalaisan","city_code":"1204704000"},{"code":"1206506008","name":"Kalamongog","city_code":"1206506000"},{"code":"1206510007","name":"Kalanawe I","city_code":"1206510000"},{"code":"1206510008","name":"Kalanawe II","city_code":"1206510000"},{"code":"1206511007","name":"Kalandagan","city_code":"1206511000"},{"code":"1208005002","name":"Kalaneg","city_code":"1208005000"},{"code":"1208005003","name":"Kalaong","city_code":"1208005000"},{"code":"1204704013","name":"Kalasuyan","city_code":"1204704000"},{"code":"1206504011","name":"Kalawag I","city_code":"1206504000"},{"code":"1206504012","name":"Kalawag II","city_code":"1206504000"},{"code":"1206504013","name":"Kalawag III","city_code":"1206504000"},{"code":"1204716006","name":"Kalawaig","city_code":"1204716000"},{"code":"1206509011","name":"Kalibuhan","city_code":"1206509000"},{"code":"1206317007","name":"Kalkam","city_code":"1206317000"},{"code":"1208002016","name":"Kaltuad","city_code":"1208002000"},{"code":"1204706024","name":"Kamada","city_code":"1204706000"},{"code":"1208004007","name":"Kamanga","city_code":"1208004000"},{"code":"1204713008","name":"Kamarahan","city_code":"1204713000"},{"code":"1208004008","name":"Kanalo","city_code":"1208004000"},{"code":"1206503011","name":"Kangkong","city_code":"1206503000"},{"code":"1204714009","name":"Kanibong","city_code":"1204714000"},{"code":"1206509013","name":"Kanipaan","city_code":"1206509000"},{"code":"1206501015","name":"Kanulay","city_code":"1206501000"},{"code":"1206512008","name":"Kapatagan","city_code":"1206512000"},{"code":"1208002017","name":"Kapatan","city_code":"1208002000"},{"code":"1208003004","name":"Kapate","city_code":"1208003000"},{"code":"1206501005","name":"Kapaya","city_code":"1206501000"},{"code":"1204705014","name":"Kapayawi","city_code":"1204705000"},{"code":"1206508006","name":"Kapingkong","city_code":"1206508000"},{"code":"1204717005","name":"Katalicanan","city_code":"1204717000"},{"code":"1204702008","name":"Katanayanan","city_code":"1204702000"},{"code":"1230800009","name":"Katangawan","city_code":"1230800000"},{"code":"1206510009","name":"Katico","city_code":"1206510000"},{"code":"1204703007","name":"Katidtuan","city_code":"1204703000"},{"code":"1204712026","name":"Katilacan","city_code":"1204712000"},{"code":"1204704014","name":"Katipunan","city_code":"1204704000"},{"code":"1204710010","name":"Katipunan","city_code":"1204710000"},{"code":"1204718013","name":"Katipunan","city_code":"1204718000"},{"code":"1206318003","name":"Katipunan","city_code":"1206318000"},{"code":"1204707014","name":"Katipunan II","city_code":"1204707000"},{"code":"1206508007","name":"Katitisan","city_code":"1206508000"},{"code":"1208003005","name":"Katubao","city_code":"1208003000"},{"code":"1204706026","name":"Kauswagan","city_code":"1204706000"},{"code":"1208001006","name":"Kawas","city_code":"1208001000"},{"code":"1208007011","name":"Kawayan","city_code":"1208007000"},{"code":"1204707015","name":"Kawayanon","city_code":"1204707000"},{"code":"1204703008","name":"Kayaga","city_code":"1204703000"},{"code":"1208003006","name":"Kayupo","city_code":"1208003000"},{"code":"1206316004","name":"Kematu","city_code":"1206316000"},{"code":"1206504016","name":"Kenram","city_code":"1206504000"},{"code":"1206506009","name":"Keytodac","city_code":"1206506000"},{"code":"1206512009","name":"Kiadsam","city_code":"1206512000"},{"code":"1208005004","name":"Kiambing","city_code":"1208005000"},{"code":"1204716007","name":"Kiaring","city_code":"1204716000"},{"code":"1208005005","name":"Kiayap","city_code":"1208005000"},{"code":"1208007012","name":"Kibala","city_code":"1208007000"},{"code":"1204702011","name":"Kibenes","city_code":"1204702000"},{"code":"1204708012","name":"Kibia","city_code":"1204708000"},{"code":"1206311006","name":"Kibid","city_code":"1206311000"},{"code":"1208007013","name":"Kiblat","city_code":"1208007000"},{"code":"1204708013","name":"Kibudoc","city_code":"1204708000"},{"code":"1204702012","name":"Kibugtongan","city_code":"1204702000"},{"code":"1204708014","name":"Kidama","city_code":"1204708000"},{"code":"1206509015","name":"Kidayan","city_code":"1206509000"},{"code":"1208006002","name":"Kihan","city_code":"1208006000"},{"code":"1204708015","name":"Kilada","city_code":"1204708000"},{"code":"1204703009","name":"Kilagasan","city_code":"1204703000"},{"code":"1204702013","name":"Kilala","city_code":"1204702000"},{"code":"1204705015","name":"Kiloyao","city_code":"1204705000"},{"code":"1204702014","name":"Kimadzil","city_code":"1204702000"},{"code":"1204709018","name":"Kimagango","city_code":"1204709000"},{"code":"1204711015","name":"Kimarayang","city_code":"1204711000"},{"code":"1204713034","name":"Kimaruhing","city_code":"1204713000"},{"code":"1208007014","name":"Kinabalan","city_code":"1208007000"},{"code":"1208006003","name":"Kinam","city_code":"1208006000"},{"code":"1204706052","name":"Kinarum","city_code":"1204706000"},{"code":"1204718014","name":"Kinawayan","city_code":"1204718000"},{"code":"1206501006","name":"Kinayao","city_code":"1206501000"},{"code":"1206312004","name":"Kinilis","city_code":"1206312000"},{"code":"1206506010","name":"Kinodalan","city_code":"1206506000"},{"code":"1206314002","name":"Kipalbig","city_code":"1206314000"},{"code":"1206509016","name":"Kiponget","city_code":"1206509000"},{"code":"1204706027","name":"Kisandal","city_code":"1204706000"},{"code":"1204707016","name":"Kisante","city_code":"1204707000"},{"code":"1206509014","name":"Kisek","city_code":"1206509000"},{"code":"1204713011","name":"Kisupaan","city_code":"1204713000"},{"code":"1204701006","name":"Kitacubong","city_code":"1204701000"},{"code":"1204705017","name":"Kitubod","city_code":"1204705000"},{"code":"1204709057","name":"Kiwanan","city_code":"1204709000"},{"code":"1204715004","name":"Kiyaab","city_code":"1204715000"},{"code":"1206312005","name":"Klinan 6","city_code":"1206312000"},{"code":"1208003007","name":"Kling","city_code":"1208003000"},{"code":"1206319005","name":"Klubi","city_code":"1206319000"},{"code":"1204712028","name":"Kolambog","city_code":"1204712000"},{"code":"1206504019","name":"Kolambog","city_code":"1206504000"},{"code":"1206312006","name":"Koronadal Proper","city_code":"1206312000"},{"code":"1206509018","name":"Kraan","city_code":"1206509000"},{"code":"1206504018","name":"Kudanding","city_code":"1206504000"},{"code":"1206512010","name":"Kuden","city_code":"1206512000"},{"code":"1206512011","name":"Kulaman","city_code":"1206512000"},{"code":"1204718015","name":"Kulaman Valley","city_code":"1204718000"},{"code":"1206509017","name":"Kulong-kulong","city_code":"1206509000"},{"code":"1206302009","name":"Kusan","city_code":"1206302000"},{"code":"1204713012","name":"La Esperanza","city_code":"1204713000"},{"code":"1204714010","name":"La Esperanza","city_code":"1204714000"},{"code":"1204710011","name":"La Fortuna","city_code":"1204710000"},{"code":"1204710012","name":"La Suerte","city_code":"1204710000"},{"code":"1230800012","name":"Labangal","city_code":"1230800000"},{"code":"1204713013","name":"Labu-o","city_code":"1204713000"},{"code":"1206316005","name":"Laconon","city_code":"1206316000"},{"code":"1208001013","name":"Ladol","city_code":"1208001000"},{"code":"1204712029","name":"Ladtingan","city_code":"1204712000"},{"code":"1206504020","name":"Lagandang","city_code":"1206504000"},{"code":"1206508008","name":"Lagao","city_code":"1206508000"},{"code":"1230800011","name":"Lagao","city_code":"1230800000"},{"code":"1208002018","name":"Lago","city_code":"1208002000"},{"code":"1206512012","name":"Lagubang","city_code":"1206512000"},{"code":"1206504021","name":"Laguilayan","city_code":"1206504000"},{"code":"1208002019","name":"Laguimit","city_code":"1208002000"},{"code":"1206503033","name":"Laguinding","city_code":"1206503000"},{"code":"1204709021","name":"Lagumbingan","city_code":"1204709000"},{"code":"1208003008","name":"Lagundi","city_code":"1208003000"},{"code":"1206319006","name":"Lake Lahit","city_code":"1206319000"},{"code":"1206302010","name":"Lam-Apos","city_code":"1206302000"},{"code":"1206312007","name":"Lam-Caliaf","city_code":"1206312000"},{"code":"1204713014","name":"Lamalama","city_code":"1204713000"},{"code":"1206302011","name":"Lamba","city_code":"1206302000"},{"code":"1206316014","name":"Lambangan","city_code":"1206316000"},{"code":"1206314003","name":"Lambayong","city_code":"1206314000"},{"code":"1206302012","name":"Lambingi","city_code":"1206302000"},{"code":"1206313014","name":"Lambontong","city_code":"1206313000"},{"code":"1206316018","name":"Lambuling","city_code":"1206316000"},{"code":"1206319007","name":"Lamcade","city_code":"1206319000"},{"code":"1206319008","name":"Lamdalag","city_code":"1206319000"},{"code":"1206319009","name":"Lamfugon","city_code":"1206319000"},{"code":"1206316019","name":"Lamhako","city_code":"1206316000"},{"code":"1206313017","name":"Lamian","city_code":"1206313000"},{"code":"1206319010","name":"Lamlahak","city_code":"1206319000"},{"code":"1204714011","name":"Lampagang","city_code":"1204714000"},{"code":"1206302013","name":"Lampari","city_code":"1206302000"},{"code":"1204708017","name":"Lampayan","city_code":"1204708000"},{"code":"1206314009","name":"Lampitak","city_code":"1206314000"},{"code":"1206316008","name":"Lamsalome","city_code":"1206316000"},{"code":"1206313018","name":"Lamsugod","city_code":"1206313000"},{"code":"1204704015","name":"Lanao","city_code":"1204704000"},{"code":"1204718016","name":"Lanao Kuran","city_code":"1204718000"},{"code":"1206511023","name":"Lancheta","city_code":"1206511000"},{"code":"1206312008","name":"Landan","city_code":"1206312000"},{"code":"1206509020","name":"Langali","city_code":"1206509000"},{"code":"1204712031","name":"Langayen","city_code":"1204712000"},{"code":"1206512013","name":"Langgal","city_code":"1206512000"},{"code":"1204710013","name":"Langkong","city_code":"1204710000"},{"code":"1204702017","name":"Lanoon","city_code":"1204702000"},{"code":"1206312023","name":"Lapu","city_code":"1206312000"},{"code":"1206311007","name":"Lapuz","city_code":"1206311000"},{"code":"1206502032","name":"Lasak","city_code":"1206502000"},{"code":"1204708018","name":"Latagan","city_code":"1204708000"},{"code":"1204717006","name":"Lawili","city_code":"1204717000"},{"code":"1208003009","name":"Lebe","city_code":"1208003000"},{"code":"1204707017","name":"Leboce","city_code":"1204707000"},{"code":"1206316028","name":"Lemsnolon","city_code":"1206316000"},{"code":"1204710014","name":"Lepaga","city_code":"1204710000"},{"code":"1206315004","name":"Libas","city_code":"1206315000"},{"code":"1204707018","name":"Libertad","city_code":"1204707000"},{"code":"1204718017","name":"Libertad","city_code":"1204718000"},{"code":"1206313019","name":"Libertad","city_code":"1206313000"},{"code":"1206502015","name":"Libertad","city_code":"1206502000"},{"code":"1206311008","name":"Liberty","city_code":"1206311000"},{"code":"1206314004","name":"Liberty","city_code":"1206314000"},{"code":"1208006004","name":"Libi","city_code":"1208006000"},{"code":"1204710015","name":"Liboo","city_code":"1204710000"},{"code":"1206509021","name":"Libua","city_code":"1206509000"},{"code":"1206509043","name":"Ligao","city_code":"1206509000"},{"code":"1230800015","name":"Ligaya","city_code":"1230800000"},{"code":"1204710016","name":"Lika","city_code":"1204710000"},{"code":"1204702019","name":"Liliongan","city_code":"1204702000"},{"code":"1206508009","name":"Lilit","city_code":"1206508000"},{"code":"1206512014","name":"Limuhay","city_code":"1206512000"},{"code":"1206505011","name":"Limulan","city_code":"1206505000"},{"code":"1206317009","name":"Linan","city_code":"1206317000"},{"code":"1204704016","name":"Linangcob","city_code":"1204704000"},{"code":"1204708019","name":"Linao","city_code":"1204708000"},{"code":"1206313020","name":"Little Baguio","city_code":"1206313000"},{"code":"1206302014","name":"Liwanay","city_code":"1206302000"},{"code":"1204713016","name":"Lomonay","city_code":"1204713000"},{"code":"1204709022","name":"Lomopog","city_code":"1204709000"},{"code":"1206502016","name":"Lomoyon","city_code":"1206502000"},{"code":"1208003010","name":"Lomuyon","city_code":"1208003000"},{"code":"1206311009","name":"Lopez Jaena","city_code":"1206311000"},{"code":"1206509038","name":"Lopoken","city_code":"1206509000"},{"code":"1204701015","name":"Lower Dado","city_code":"1204701000"},{"code":"1204709023","name":"Lower Glad","city_code":"1204709000"},{"code":"1204709024","name":"Lower Katingawan","city_code":"1204709000"},{"code":"1206319011","name":"Lower Maculan","city_code":"1206319000"},{"code":"1208007015","name":"Lower Mainit","city_code":"1208007000"},{"code":"1204708020","name":"Lower Malamote","city_code":"1204708000"},{"code":"1204717007","name":"Lower Mingading","city_code":"1204717000"},{"code":"1204717008","name":"Luanan","city_code":"1204717000"},{"code":"1204707019","name":"Luayon","city_code":"1204707000"},{"code":"1206319012","name":"Luhib","city_code":"1206319000"},{"code":"1204715005","name":"Luhong","city_code":"1204715000"},{"code":"1208003011","name":"Luma","city_code":"1208003000"},{"code":"1206312009","name":"Lumakil","city_code":"1206312000"},{"code":"1208004009","name":"Lumasal","city_code":"1208004000"},{"code":"1208004010","name":"Lumatil","city_code":"1208004000"},{"code":"1206509022","name":"Lumitan","city_code":"1206509000"},{"code":"1208006005","name":"Lun Masla","city_code":"1208006000"},{"code":"1208006006","name":"Lun Padidu","city_code":"1208006000"},{"code":"1204707020","name":"Luna Norte","city_code":"1204707000"},{"code":"1204707021","name":"Luna Sur","city_code":"1204707000"},{"code":"1206317010","name":"Lunen","city_code":"1206317000"},{"code":"1208007016","name":"Lutay","city_code":"1208007000"},{"code":"1206507004","name":"Lutayan Proper","city_code":"1206507000"},{"code":"1204704017","name":"Luvimin","city_code":"1204704000"},{"code":"1204710017","name":"Luz Village","city_code":"1204710000"},{"code":"1206316016","name":"Maan","city_code":"1206316000"},{"code":"1208005006","name":"Mabay","city_code":"1208005000"},{"code":"1206306009","name":"Mabini","city_code":"1206306000"},{"code":"1204713035","name":"Mabuhay","city_code":"1204713000"},{"code":"1230800016","name":"Mabuhay","city_code":"1230800000"},{"code":"1204701007","name":"Macabasa","city_code":"1204701000"},{"code":"1204702021","name":"Macabenban","city_code":"1204702000"},{"code":"1204704018","name":"Macabolig","city_code":"1204704000"},{"code":"1204709025","name":"Macasendeg","city_code":"1204709000"},{"code":"1206508010","name":"Madanding","city_code":"1206508000"},{"code":"1204710018","name":"Magallon","city_code":"1204710000"},{"code":"1206509023","name":"Maganao","city_code":"1206509000"},{"code":"1204703010","name":"Magatos","city_code":"1204703000"},{"code":"1204714013","name":"Magbok","city_code":"1204714000"},{"code":"1204706029","name":"Magcaalam","city_code":"1204706000"},{"code":"1206315005","name":"Magon","city_code":"1206315000"},{"code":"1204704041","name":"Magsaysay","city_code":"1204704000"},{"code":"1204715006","name":"Magsaysay","city_code":"1204715000"},{"code":"1206306010","name":"Magsaysay","city_code":"1206306000"},{"code":"1206312016","name":"Magsaysay","city_code":"1206312000"},{"code":"1206503034","name":"Magsaysay","city_code":"1206503000"},{"code":"1206509024","name":"Maguid","city_code":"1206509000"},{"code":"1208005007","name":"Maguling","city_code":"1208005000"},{"code":"1204706030","name":"Mahongcog","city_code":"1204706000"},{"code":"1206315006","name":"Maibo","city_code":"1206315000"},{"code":"1206507005","name":"Maindang","city_code":"1206507000"},{"code":"1204718018","name":"Makalangot","city_code":"1204718000"},{"code":"1206502017","name":"Makat","city_code":"1206502000"},{"code":"1208007017","name":"Malabod","city_code":"1208007000"},{"code":"1204707022","name":"Malabuan","city_code":"1204707000"},{"code":"1204711019","name":"Malagakit","city_code":"1204711000"},{"code":"1204716008","name":"Malagap","city_code":"1204716000"},{"code":"1208005008","name":"Malalag","city_code":"1208005000"},{"code":"1208007018","name":"Malalag Cogon","city_code":"1208007000"},{"code":"1204703011","name":"Malamote","city_code":"1204703000"},{"code":"1204709026","name":"Malamote","city_code":"1204709000"},{"code":"1208007019","name":"Malandag","city_code":"1208007000"},{"code":"1204703012","name":"Malanduague","city_code":"1204703000"},{"code":"1204715007","name":"Malangag","city_code":"1204715000"},{"code":"1204702022","name":"Malapag","city_code":"1204702000"},{"code":"1204717009","name":"Malapang","city_code":"1204717000"},{"code":"1204707023","name":"Malasila","city_code":"1204707000"},{"code":"1204715008","name":"Malatad","city_code":"1204715000"},{"code":"1206509025","name":"Malatuneng","city_code":"1206509000"},{"code":"1206302015","name":"Malaya","city_code":"1206302000"},{"code":"1204710019","name":"Malayan","city_code":"1204710000"},{"code":"1208004011","name":"Malbang","city_code":"1208004000"},{"code":"1206512015","name":"Malegdeg","city_code":"1206512000"},{"code":"1204705019","name":"Malengen","city_code":"1204705000"},{"code":"1204718019","name":"Malibatuan","city_code":"1204718000"},{"code":"1208003012","name":"Maligang","city_code":"1208003000"},{"code":"1206502019","name":"Maligaya","city_code":"1206502000"},{"code":"1206508011","name":"Maligaya","city_code":"1206508000"},{"code":"1206312011","name":"Maligo","city_code":"1206312000"},{"code":"1204704020","name":"Malinan","city_code":"1204704000"},{"code":"1204716009","name":"Malinao","city_code":"1204716000"},{"code":"1206510012","name":"Malingon","city_code":"1206510000"},{"code":"1204715009","name":"Malire","city_code":"1204715000"},{"code":"1206509026","name":"Malisbong","city_code":"1206509000"},{"code":"1204701008","name":"Malitubog","city_code":"1204701000"},{"code":"1206314005","name":"Maltana","city_code":"1206314000"},{"code":"1204711020","name":"Maluao","city_code":"1204711000"},{"code":"1206316029","name":"Malugong","city_code":"1206316000"},{"code":"1204707024","name":"Malungon","city_code":"1204707000"},{"code":"1208007020","name":"Malungon Gamay","city_code":"1208007000"},{"code":"1206507006","name":"Mamali","city_code":"1206507000"},{"code":"1206508012","name":"Mamali","city_code":"1206508000"},{"code":"1206306011","name":"Mambucal","city_code":"1206306000"},{"code":"1206510013","name":"Mangalen","city_code":"1206510000"},{"code":"1206315007","name":"Mangilala","city_code":"1206315000"},{"code":"1204702025","name":"Manili","city_code":"1204702000"},{"code":"1206507007","name":"Manili","city_code":"1206507000"},{"code":"1204706053","name":"Manobisa","city_code":"1204706000"},{"code":"1204706033","name":"Manobo","city_code":"1204706000"},{"code":"1204704021","name":"Manongol","city_code":"1204704000"},{"code":"1204708025","name":"Manubuan","city_code":"1204708000"},{"code":"1206318004","name":"Manuel Roxas","city_code":"1206318000"},{"code":"1204708026","name":"Manupal","city_code":"1204708000"},{"code":"1206504022","name":"Mapantig","city_code":"1206504000"},{"code":"1204701009","name":"Mapurok","city_code":"1204701000"},{"code":"1204704022","name":"Marbel","city_code":"1204704000"},{"code":"1204708027","name":"Marbel","city_code":"1204708000"},{"code":"1206503016","name":"Margues","city_code":"1206503000"},{"code":"1204718020","name":"Maria Caridad","city_code":"1204718000"},{"code":"1208001007","name":"Maribulan","city_code":"1208001000"},{"code":"1206501008","name":"Masiag","city_code":"1206501000"},{"code":"1206311011","name":"Matapol","city_code":"1206311000"},{"code":"1204704023","name":"Mateo","city_code":"1204704000"},{"code":"1206508013","name":"Matiompong","city_code":"1206508000"},{"code":"1204714014","name":"Maybula","city_code":"1204714000"},{"code":"1206502021","name":"Mayo","city_code":"1206502000"},{"code":"1206509040","name":"Medol","city_code":"1206509000"},{"code":"1204718021","name":"Meocan","city_code":"1204718000"},{"code":"1204704024","name":"Meochao","city_code":"1204704000"},{"code":"1206317011","name":"Miasong","city_code":"1206317000"},{"code":"1204711023","name":"Midpapan I","city_code":"1204711000"},{"code":"1204711040","name":"Midpapan II","city_code":"1204711000"},{"code":"1206508014","name":"Midtapok","city_code":"1206508000"},{"code":"1206512016","name":"Midtungok","city_code":"1206512000"},{"code":"1204716010","name":"Miguel Macasarte","city_code":"1204716000"},{"code":"1204709028","name":"Milaya","city_code":"1204709000"},{"code":"1206509027","name":"Milbuk","city_code":"1206509000"},{"code":"1206509039","name":"Mina","city_code":"1206509000"},{"code":"1204708028","name":"Minamaing","city_code":"1204708000"},{"code":"1204714015","name":"Minapan","city_code":"1204714000"},{"code":"1208005009","name":"Mindupok","city_code":"1208005000"},{"code":"1204701016","name":"Mirasol","city_code":"1204701000"},{"code":"1206509028","name":"Molon","city_code":"1206509000"},{"code":"1206313023","name":"Moloy","city_code":"1206313000"},{"code":"1206316030","name":"Mongocayo","city_code":"1206316000"},{"code":"1204705023","name":"Montay","city_code":"1204705000"},{"code":"1206501016","name":"Monteverde","city_code":"1206501000"},{"code":"1206306012","name":"Morales","city_code":"1206306000"},{"code":"1204704025","name":"Mua-an","city_code":"1204704000"},{"code":"1208002020","name":"Mudan","city_code":"1208002000"},{"code":"1204711024","name":"Mulok","city_code":"1204711000"},{"code":"1204714030","name":"Nabundasan","city_code":"1204714000"},{"code":"1206313024","name":"Naci","city_code":"1206313000"},{"code":"1208007021","name":"Nagpan","city_code":"1208007000"},{"code":"1204718022","name":"Naje","city_code":"1204718000"},{"code":"1206505020","name":"Nalilidan","city_code":"1206505000"},{"code":"1204709031","name":"Nalin","city_code":"1204709000"},{"code":"1208003013","name":"Nalus","city_code":"1208003000"},{"code":"1206509029","name":"Namat Masla","city_code":"1206509000"},{"code":"1206306013","name":"Namnama","city_code":"1206306000"},{"code":"1204718023","name":"Napalico","city_code":"1204718000"},{"code":"1206509030","name":"Napnapon","city_code":"1206509000"},{"code":"1206512017","name":"Nati","city_code":"1206512000"},{"code":"1206502022","name":"Natividad","city_code":"1206502000"},{"code":"1204708029","name":"Natutungan","city_code":"1204708000"},{"code":"1206319013","name":"Ned","city_code":"1206319000"},{"code":"1204709032","name":"Nes","city_code":"1204709000"},{"code":"1204708041","name":"New Abra","city_code":"1204708000"},{"code":"1208002021","name":"New Aklan","city_code":"1208002000"},{"code":"1204708001","name":"New Alimodian","city_code":"1204708000"},{"code":"1204710020","name":"New Antique","city_code":"1204710000"},{"code":"1204707025","name":"New Baguio","city_code":"1204707000"},{"code":"1204710021","name":"New Barbaza","city_code":"1204710000"},{"code":"1204704026","name":"New Bohol","city_code":"1204704000"},{"code":"1204708030","name":"New Bugasong","city_code":"1204708000"},{"code":"1204707026","name":"New Bulatukan","city_code":"1204707000"},{"code":"1206506012","name":"New Calinog","city_code":"1206506000"},{"code":"1208001014","name":"New Canaan","city_code":"1208001000"},{"code":"1204714016","name":"New Caridad","city_code":"1204714000"},{"code":"1204707027","name":"New Cebu","city_code":"1204707000"},{"code":"1204713022","name":"New Cebu","city_code":"1204713000"},{"code":"1206508015","name":"New Cebu","city_code":"1206508000"},{"code":"1204710024","name":"New Consolacion","city_code":"1204710000"},{"code":"1204711025","name":"New Culasi","city_code":"1204711000"},{"code":"1204714017","name":"New Culasi","city_code":"1204714000"},{"code":"1206315012","name":"New Cuyapo","city_code":"1206315000"},{"code":"1206316011","name":"New Dumangas","city_code":"1206316000"},{"code":"1204710025","name":"New Esperanza","city_code":"1204710000"},{"code":"1204711026","name":"New Igbaras","city_code":"1204711000"},{"code":"1206315008","name":"New Iloilo","city_code":"1206315000"},{"code":"1206511010","name":"New Isabela","city_code":"1206511000"},{"code":"1204707038","name":"New Israel","city_code":"1204707000"},{"code":"1204710026","name":"New Janiuay","city_code":"1204710000"},{"code":"1204710022","name":"New Kalibo","city_code":"1204710000"},{"code":"1208005010","name":"New La Union","city_code":"1208005000"},{"code":"1206511011","name":"New Lagao","city_code":"1206511000"},{"code":"1206315009","name":"New Lambunao","city_code":"1206315000"},{"code":"1204710027","name":"New Lawa-an","city_code":"1204710000"},{"code":"1204717010","name":"New Leon","city_code":"1204717000"},{"code":"1204711027","name":"New Panay","city_code":"1204711000"},{"code":"1204714018","name":"New Panay","city_code":"1204714000"},{"code":"1204717011","name":"New Panay","city_code":"1204717000"},{"code":"1206503018","name":"New Panay","city_code":"1206503000"},{"code":"1204708031","name":"New Pandan","city_code":"1204708000"},{"code":"1206306014","name":"New Pangasinan","city_code":"1206306000"},{"code":"1206504024","name":"New Pangasinan","city_code":"1206504000"},{"code":"1206511012","name":"New Passi","city_code":"1206511000"},{"code":"1204715010","name":"New Pontevedra","city_code":"1204715000"},{"code":"1204710028","name":"New Rizal","city_code":"1204710000"},{"code":"1204705024","name":"Nica-an","city_code":"1204705000"},{"code":"1204706037","name":"Noa","city_code":"1204706000"},{"code":"1208004012","name":"Nomoh","city_code":"1208004000"},{"code":"1204711021","name":"North Manuangan","city_code":"1204711000"},{"code":"1204704027","name":"Nuangan","city_code":"1204704000"},{"code":"1204710029","name":"Nueva Vida","city_code":"1204710000"},{"code":"1206506013","name":"Nuling","city_code":"1206506000"},{"code":"1206503020","name":"Numo","city_code":"1206503000"},{"code":"1206505013","name":"Obial","city_code":"1206505000"},{"code":"1204707028","name":"Old Bulatukan","city_code":"1204707000"},{"code":"1208005011","name":"Old Poblacion","city_code":"1208005000"},{"code":"1230800039","name":"Olympog","city_code":"1230800000"},{"code":"1204704028","name":"Onica","city_code":"1204704000"},{"code":"1204703014","name":"Osias","city_code":"1204703000"},{"code":"1204706038","name":"Owas","city_code":"1204706000"},{"code":"1204703015","name":"Paatan Lower","city_code":"1204703000"},{"code":"1204703016","name":"Paatan Upper","city_code":"1204703000"},{"code":"1204701010","name":"Pacao","city_code":"1204701000"},{"code":"1204704029","name":"Paco","city_code":"1204704000"},{"code":"1204710030","name":"Pag-asa","city_code":"1204710000"},{"code":"1206505022","name":"Pag-asa","city_code":"1206505000"},{"code":"1208001008","name":"Pag-asa","city_code":"1208001000"},{"code":"1206312025","name":"Pagalungan","city_code":"1206312000"},{"code":"1204717012","name":"Pagangan","city_code":"1204717000"},{"code":"1204712046","name":"Paidu Pulangi","city_code":"1204712000"},{"code":"1206503035","name":"Paitan","city_code":"1206503000"},{"code":"1204717013","name":"Palacat","city_code":"1204717000"},{"code":"1204702028","name":"Palanggalan","city_code":"1204702000"},{"code":"1204705025","name":"Palao","city_code":"1204705000"},{"code":"1206507011","name":"Palavilla","city_code":"1206507000"},{"code":"1206317012","name":"Palian","city_code":"1206317000"},{"code":"1206312013","name":"Palkan","city_code":"1206312000"},{"code":"1204710037","name":"Palma-Perez","city_code":"1204710000"},{"code":"1206314010","name":"Palo","city_code":"1206314000"},{"code":"1204709043","name":"Palongoguen","city_code":"1204709000"},{"code":"1206508016","name":"Palumbi","city_code":"1206508000"},{"code":"1206503021","name":"Pamantingan","city_code":"1206503000"},{"code":"1208007022","name":"Panamin","city_code":"1208007000"},{"code":"1208004013","name":"Pananag","city_code":"1208004000"},{"code":"1206318005","name":"Panay","city_code":"1206318000"},{"code":"1204706039","name":"Pangao-an","city_code":"1204706000"},{"code":"1208005012","name":"Pangi","city_code":"1208005000"},{"code":"1208002022","name":"Pangyan","city_code":"1208002000"},{"code":"1206506014","name":"Pansud","city_code":"1206506000"},{"code":"1204716011","name":"Pantar","city_code":"1204716000"},{"code":"1204716012","name":"Paradise","city_code":"1204716000"},{"code":"1204714019","name":"Paraiso","city_code":"1204714000"},{"code":"1206306015","name":"Paraiso","city_code":"1206306000"},{"code":"1208001009","name":"Paraiso","city_code":"1208001000"},{"code":"1206505014","name":"Paril","city_code":"1206505000"},{"code":"1204701011","name":"Paruayan","city_code":"1204701000"},{"code":"1206506015","name":"Pasandalan","city_code":"1206506000"},{"code":"1204704030","name":"Patadon","city_code":"1204704000"},{"code":"1204708033","name":"Patadon West","city_code":"1204708000"},{"code":"1208006007","name":"Patag","city_code":"1208006000"},{"code":"1204709034","name":"Patindeguen","city_code":"1204709000"},{"code":"1204711030","name":"Payong-payong","city_code":"1204711000"},{"code":"1206510015","name":"Pedtubo","city_code":"1206510000"},{"code":"1204717014","name":"Pentil","city_code":"1204717000"},{"code":"1204704031","name":"Perez","city_code":"1204704000"},{"code":"1206508017","name":"Pidtiguian","city_code":"1206508000"},{"code":"1204701012","name":"Pigcawaran","city_code":"1204701000"},{"code":"1206508018","name":"Pimbalayan","city_code":"1206508000"},{"code":"1204708042","name":"Pinamaton","city_code":"1204708000"},{"code":"1204716013","name":"Pinamulaan","city_code":"1204716000"},{"code":"1206508019","name":"Pinguiaman","city_code":"1206508000"},{"code":"1208005013","name":"Pinol","city_code":"1208005000"},{"code":"1204703018","name":"Pisan","city_code":"1204703000"},{"code":"1204702032","name":"Poblacion","city_code":"1204702000"},{"code":"1204703019","name":"Poblacion","city_code":"1204703000"},{"code":"1204704032","name":"Poblacion","city_code":"1204704000"},{"code":"1204705029","name":"Poblacion","city_code":"1204705000"},{"code":"1204706040","name":"Poblacion","city_code":"1204706000"},{"code":"1204707029","name":"Poblacion","city_code":"1204707000"},{"code":"1204708034","name":"Poblacion","city_code":"1204708000"},{"code":"1204710031","name":"Poblacion","city_code":"1204710000"},{"code":"1204712050","name":"Poblacion","city_code":"1204712000"},{"code":"1204713024","name":"Poblacion","city_code":"1204713000"},{"code":"1204714020","name":"Poblacion","city_code":"1204714000"},{"code":"1204715011","name":"Poblacion","city_code":"1204715000"},{"code":"1206311013","name":"Poblacion","city_code":"1206311000"},{"code":"1206312014","name":"Poblacion","city_code":"1206312000"},{"code":"1206314006","name":"Poblacion","city_code":"1206314000"},{"code":"1206315010","name":"Poblacion","city_code":"1206315000"},{"code":"1206316020","name":"Poblacion","city_code":"1206316000"},{"code":"1206317013","name":"Poblacion","city_code":"1206317000"},{"code":"1206318006","name":"Poblacion","city_code":"1206318000"},{"code":"1206319014","name":"Poblacion","city_code":"1206319000"},{"code":"1206501009","name":"Poblacion","city_code":"1206501000"},{"code":"1206502023","name":"Poblacion","city_code":"1206502000"},{"code":"1206503022","name":"Poblacion","city_code":"1206503000"},{"code":"1206505015","name":"Poblacion","city_code":"1206505000"},{"code":"1206506016","name":"Poblacion","city_code":"1206506000"},{"code":"1206508020","name":"Poblacion","city_code":"1206508000"},{"code":"1206509031","name":"Poblacion","city_code":"1206509000"},{"code":"1206510016","name":"Poblacion","city_code":"1206510000"},{"code":"1206511013","name":"Poblacion","city_code":"1206511000"},{"code":"1208001010","name":"Poblacion","city_code":"1208001000"},{"code":"1208002023","name":"Poblacion","city_code":"1208002000"},{"code":"1208003014","name":"Poblacion","city_code":"1208003000"},{"code":"1208004014","name":"Poblacion","city_code":"1208004000"},{"code":"1208006008","name":"Poblacion","city_code":"1208006000"},{"code":"1208007023","name":"Poblacion","city_code":"1208007000"},{"code":"1204710038","name":"Poblacion B","city_code":"1204710000"},{"code":"1204711031","name":"Poblacion I","city_code":"1204711000"},{"code":"1204711032","name":"Poblacion II","city_code":"1204711000"},{"code":"1204716014","name":"Poblacion II","city_code":"1204716000"},{"code":"1204711033","name":"Poblacion III","city_code":"1204711000"},{"code":"1206506028","name":"Poblacion III","city_code":"1206506000"},{"code":"1204701013","name":"Polayagan","city_code":"1204701000"},{"code":"1206312015","name":"Polo","city_code":"1206312000"},{"code":"1206502024","name":"Polomolok","city_code":"1206502000"},{"code":"1206317014","name":"Polonuling","city_code":"1206317000"},{"code":"1206506017","name":"Poloy-poloy","city_code":"1206506000"},{"code":"1204714021","name":"Popoyon","city_code":"1204714000"},{"code":"1204711034","name":"Presbitero","city_code":"1204711000"},{"code":"1206314011","name":"Pula-bato","city_code":"1206314000"},{"code":"1204710032","name":"Pulang-lupa","city_code":"1204710000"},{"code":"1204712051","name":"Punol","city_code":"1204712000"},{"code":"1206302016","name":"Punong Grande","city_code":"1206302000"},{"code":"1206506018","name":"Purikay","city_code":"1206506000"},{"code":"1206311014","name":"Puti","city_code":"1206311000"},{"code":"1204716015","name":"Puting-bato","city_code":"1204716000"},{"code":"1206506019","name":"Ragandang","city_code":"1206506000"},{"code":"1206511014","name":"Rajah Nuda","city_code":"1206511000"},{"code":"1206302017","name":"Rang-ay","city_code":"1206302000"},{"code":"1204709044","name":"Rangaban","city_code":"1204709000"},{"code":"1204701014","name":"Rangayen","city_code":"1204701000"},{"code":"1204702034","name":"Ranzo","city_code":"1204702000"},{"code":"1204701017","name":"Raradangan","city_code":"1204701000"},{"code":"1204711035","name":"Renibon","city_code":"1204711000"},{"code":"1206302018","name":"Reyes","city_code":"1206302000"},{"code":"1208002024","name":"Rio Del Pilar","city_code":"1208002000"},{"code":"1206302019","name":"Rizal","city_code":"1206302000"},{"code":"1206302020","name":"Rizal Poblacion","city_code":"1206302000"},{"code":"1204707030","name":"Rodero","city_code":"1204707000"},{"code":"1206510018","name":"Romualdez","city_code":"1206510000"},{"code":"1206306020","name":"Rotonda","city_code":"1206306000"},{"code":"1206312017","name":"Rubber","city_code":"1206312000"},{"code":"1206505021","name":"Sabanal","city_code":"1206505000"},{"code":"1204709045","name":"Sadaan","city_code":"1204709000"},{"code":"1206508021","name":"Sadsalan","city_code":"1206508000"},{"code":"1206503023","name":"Sagasa","city_code":"1206503000"},{"code":"1204713026","name":"Sagcungan","city_code":"1204713000"},{"code":"1204707031","name":"Saguing","city_code":"1204707000"},{"code":"1206318010","name":"Sajaneba","city_code":"1206318000"},{"code":"1206503024","name":"Salabaca","city_code":"1206503000"},{"code":"1206316031","name":"Salacafe","city_code":"1206316000"},{"code":"1208003015","name":"Salakit","city_code":"1208003000"},{"code":"1206506020","name":"Salaman","city_code":"1206506000"},{"code":"1206506021","name":"Salangsang","city_code":"1206506000"},{"code":"1204703020","name":"Salapungan","city_code":"1204703000"},{"code":"1204718024","name":"Salasang","city_code":"1204718000"},{"code":"1204713027","name":"Salat","city_code":"1204713000"},{"code":"1206503036","name":"Saliao","city_code":"1206503000"},{"code":"1204706042","name":"Sallab","city_code":"1204706000"},{"code":"1206503037","name":"Salumping","city_code":"1206503000"},{"code":"1204709046","name":"Salunayan","city_code":"1204709000"},{"code":"1204708035","name":"Salvacion","city_code":"1204708000"},{"code":"1206504026","name":"Sampao","city_code":"1206504000"},{"code":"1206507008","name":"Sampao","city_code":"1206507000"},{"code":"1206511015","name":"San Antonio","city_code":"1206511000"},{"code":"1206511016","name":"San Emmanuel","city_code":"1206511000"},{"code":"1206315011","name":"San Felipe","city_code":"1206315000"},{"code":"1204704033","name":"San Isidro","city_code":"1204704000"},{"code":"1204709048","name":"San Isidro","city_code":"1204709000"},{"code":"1206306021","name":"San Isidro","city_code":"1206306000"},{"code":"1206314013","name":"San Isidro","city_code":"1206314000"},{"code":"1206318007","name":"San Isidro","city_code":"1206318000"},{"code":"1230800023","name":"San Isidro","city_code":"1230800000"},{"code":"1206302021","name":"San Jose","city_code":"1206302000"},{"code":"1206306022","name":"San Jose","city_code":"1206306000"},{"code":"1206311016","name":"San Jose","city_code":"1206311000"},{"code":"1206510020","name":"San Jose","city_code":"1206510000"},{"code":"1208002025","name":"San Jose","city_code":"1208002000"},{"code":"1230800024","name":"San Jose","city_code":"1230800000"},{"code":"1208007024","name":"San Juan","city_code":"1208007000"},{"code":"1204717015","name":"San Mateo","city_code":"1204717000"},{"code":"1204718025","name":"San Miguel","city_code":"1204718000"},{"code":"1206311017","name":"San Miguel","city_code":"1206311000"},{"code":"1208007025","name":"San Miguel","city_code":"1208007000"},{"code":"1206511019","name":"San Pablo","city_code":"1206511000"},{"code":"1204709058","name":"San Pedro","city_code":"1204709000"},{"code":"1206510026","name":"San Pedro","city_code":"1206510000"},{"code":"1206511022","name":"San Rafael","city_code":"1206511000"},{"code":"1204704034","name":"San Roque","city_code":"1204704000"},{"code":"1206306023","name":"San Roque","city_code":"1206306000"},{"code":"1206509032","name":"San Roque","city_code":"1206509000"},{"code":"1208007026","name":"San Roque","city_code":"1208007000"},{"code":"1204707032","name":"San Vicente","city_code":"1204707000"},{"code":"1206302022","name":"San Vicente","city_code":"1206302000"},{"code":"1206318008","name":"San Vicente","city_code":"1206318000"},{"code":"1208002026","name":"San Vicente","city_code":"1208002000"},{"code":"1204710033","name":"Sangat","city_code":"1204710000"},{"code":"1206505016","name":"Sangay","city_code":"1206505000"},{"code":"1204709049","name":"Santa Cruz","city_code":"1204709000"},{"code":"1204717016","name":"Santa Cruz","city_code":"1204717000"},{"code":"1206306024","name":"Santa Cruz","city_code":"1206306000"},{"code":"1206314014","name":"Santa Cruz","city_code":"1206314000"},{"code":"1204707033","name":"Santa Felomina","city_code":"1204707000"},{"code":"1204708036","name":"Santa Maria","city_code":"1204708000"},{"code":"1206505017","name":"Santa Maria","city_code":"1206505000"},{"code":"1204704035","name":"Santo Niño","city_code":"1204704000"},{"code":"1204707034","name":"Santo Niño","city_code":"1204707000"},{"code":"1204718026","name":"Santo Niño","city_code":"1204718000"},{"code":"1206306025","name":"Santo Niño","city_code":"1206306000"},{"code":"1206501017","name":"Santo Niño","city_code":"1206501000"},{"code":"1208006009","name":"Sapu Masla","city_code":"1208006000"},{"code":"1208006010","name":"Sapu Padidu","city_code":"1208006000"},{"code":"1206306026","name":"Sarabia","city_code":"1206306000"},{"code":"1204708037","name":"Sarayan","city_code":"1204708000"},{"code":"1204713028","name":"Sarayan","city_code":"1204713000"},{"code":"1206508022","name":"Seneben","city_code":"1206508000"},{"code":"1208004015","name":"Seven Hills","city_code":"1208004000"},{"code":"1206512018","name":"Sewod","city_code":"1206512000"},{"code":"1204704036","name":"Sibawan","city_code":"1204704000"},{"code":"1204714022","name":"Sibsib","city_code":"1204714000"},{"code":"1206508023","name":"Sigayan","city_code":"1206508000"},{"code":"1230800030","name":"Siguel","city_code":"1230800000"},{"code":"1204704037","name":"Sikitan","city_code":"1204704000"},{"code":"1204712055","name":"Silik","city_code":"1204712000"},{"code":"1206319015","name":"Siluton","city_code":"1206319000"},{"code":"1206312018","name":"Silway 7","city_code":"1206312000"},{"code":"1206312019","name":"Silway 8","city_code":"1206312000"},{"code":"1206317015","name":"Simbo","city_code":"1206317000"},{"code":"1206311020","name":"Simsiman","city_code":"1206311000"},{"code":"1206510021","name":"Sinakulay","city_code":"1206510000"},{"code":"1204705032","name":"Sinapangan","city_code":"1204705000"},{"code":"1206502027","name":"Sinapulan","city_code":"1206502000"},{"code":"1230800026","name":"Sinawal","city_code":"1230800000"},{"code":"1204705033","name":"Sinawingan","city_code":"1204705000"},{"code":"1204704038","name":"Singao","city_code":"1204704000"},{"code":"1204707035","name":"Sinkatulan","city_code":"1204707000"},{"code":"1206316012","name":"Sinolon","city_code":"1206316000"},{"code":"1206507009","name":"Sisiman","city_code":"1206507000"},{"code":"1206501020","name":"Sison","city_code":"1206501000"},{"code":"1208005014","name":"Sison","city_code":"1208005000"},{"code":"1208002027","name":"Small Margus","city_code":"1208002000"},{"code":"1204716016","name":"Solama","city_code":"1204716000"},{"code":"1204711037","name":"South Manuangan","city_code":"1204711000"},{"code":"1206501010","name":"South Sepaka","city_code":"1206501000"},{"code":"1208001011","name":"Spring","city_code":"1208001000"},{"code":"1206510022","name":"Suben","city_code":"1206510000"},{"code":"1206502028","name":"Sucob","city_code":"1206502000"},{"code":"1204704039","name":"Sudapin","city_code":"1204704000"},{"code":"1208002028","name":"Sufatubo","city_code":"1208002000"},{"code":"1208003016","name":"Suli","city_code":"1208003000"},{"code":"1206312020","name":"Sulit","city_code":"1206312000"},{"code":"1204718027","name":"Sumalili","city_code":"1204718000"},{"code":"1206312021","name":"Sumbakil","city_code":"1206312000"},{"code":"1204704040","name":"Sumbao","city_code":"1204704000"},{"code":"1206501018","name":"Sumilil","city_code":"1206501000"},{"code":"1206316032","name":"T'bolok","city_code":"1206316000"},{"code":"1208003017","name":"Tablao","city_code":"1208003000"},{"code":"1206314007","name":"Tablu","city_code":"1206314000"},{"code":"1204708038","name":"Taculen","city_code":"1204708000"},{"code":"1204702035","name":"Tacupan","city_code":"1204702000"},{"code":"1206512019","name":"Tacupis","city_code":"1206512000"},{"code":"1204706043","name":"Tagbac","city_code":"1204706000"},{"code":"1206506022","name":"Taguisa","city_code":"1206506000"},{"code":"1204708039","name":"Taguranao","city_code":"1204708000"},{"code":"1204712056","name":"Takipan","city_code":"1204712000"},{"code":"1206319017","name":"Takunel","city_code":"1206319000"},{"code":"1206313028","name":"Talahik","city_code":"1206313000"},{"code":"1206316021","name":"Talcon","city_code":"1206316000"},{"code":"1206319016","name":"Talisay","city_code":"1206319000"},{"code":"1204712057","name":"Talitay","city_code":"1204712000"},{"code":"1206316022","name":"Talufo","city_code":"1206316000"},{"code":"1204707036","name":"Taluntalunan","city_code":"1204707000"},{"code":"1208007027","name":"Talus","city_code":"1208007000"},{"code":"1208002029","name":"Taluya","city_code":"1208002000"},{"code":"1208003018","name":"Tamadang","city_code":"1208003000"},{"code":"1204714023","name":"Tambac","city_code":"1204714000"},{"code":"1204702036","name":"Tambad","city_code":"1204702000"},{"code":"1206508024","name":"Tambak","city_code":"1206508000"},{"code":"1208007028","name":"Tamban","city_code":"1208007000"},{"code":"1208003019","name":"Tambilil","city_code":"1208003000"},{"code":"1230800027","name":"Tambler","city_code":"1230800000"},{"code":"1206507010","name":"Tamnag","city_code":"1206507000"},{"code":"1204708040","name":"Tamped","city_code":"1204708000"},{"code":"1208002030","name":"Tango","city_code":"1208002000"},{"code":"1208002031","name":"Tapon","city_code":"1208002000"},{"code":"1206319019","name":"Tasiman","city_code":"1206319000"},{"code":"1204710034","name":"Tawantawan","city_code":"1204710000"},{"code":"1206504028","name":"Tayugo","city_code":"1206504000"},{"code":"1206502030","name":"Telafas","city_code":"1206502000"},{"code":"1204706044","name":"Temporan","city_code":"1204706000"},{"code":"1206318009","name":"Teresita","city_code":"1206318000"},{"code":"1204716017","name":"Thailand","city_code":"1204716000"},{"code":"1204710035","name":"Tibao","city_code":"1204710000"},{"code":"1206506023","name":"Tibpuan","city_code":"1206506000"},{"code":"1206509034","name":"Tibuhol","city_code":"1206509000"},{"code":"1208005015","name":"Ticulab","city_code":"1208005000"},{"code":"1204711038","name":"Tigbawan","city_code":"1204711000"},{"code":"1206511021","name":"Tina","city_code":"1206511000"},{"code":"1230800028","name":"Tinagacan","city_code":"1230800000"},{"code":"1206311021","name":"Tinago","city_code":"1206311000"},{"code":"1206512020","name":"Tinalon","city_code":"1206512000"},{"code":"1206510023","name":"Tinaungan","city_code":"1206510000"},{"code":"1204716018","name":"Tinimbacan","city_code":"1204716000"},{"code":"1206315013","name":"Tinongcop","city_code":"1206315000"},{"code":"1208004016","name":"Tinoto","city_code":"1208004000"},{"code":"1206508025","name":"Tinumigues","city_code":"1206508000"},{"code":"1204712060","name":"Tinutulan","city_code":"1204712000"},{"code":"1206501019","name":"Titulok","city_code":"1206501000"},{"code":"1208001012","name":"Tokawal","city_code":"1208001000"},{"code":"1204717018","name":"Tomado","city_code":"1204717000"},{"code":"1204702037","name":"Tonganon","city_code":"1204702000"},{"code":"1206506024","name":"Tran","city_code":"1206506000"},{"code":"1204713029","name":"Tuael","city_code":"1204713000"},{"code":"1206510025","name":"Tual","city_code":"1206510000"},{"code":"1208005016","name":"Tuanadatu","city_code":"1208005000"},{"code":"1206317016","name":"Tubeng","city_code":"1206317000"},{"code":"1206313030","name":"Tubiala","city_code":"1206313000"},{"code":"1204711039","name":"Tubon","city_code":"1204711000"},{"code":"1204714024","name":"Tuburan","city_code":"1204714000"},{"code":"1206316023","name":"Tudok","city_code":"1206316000"},{"code":"1206501011","name":"Tuka","city_code":"1206501000"},{"code":"1204718028","name":"Tumanding","city_code":"1204718000"},{"code":"1204716019","name":"Tumbao-Camalig","city_code":"1204716000"},{"code":"1206508027","name":"Tumiao","city_code":"1206508000"},{"code":"1208006011","name":"Tuyan","city_code":"1208006000"},{"code":"1206508028","name":"Udtong","city_code":"1206508000"},{"code":"1204702020","name":"Ugalingan","city_code":"1204702000"},{"code":"1204710036","name":"Ugpay","city_code":"1204710000"},{"code":"1204705034","name":"Ulamian","city_code":"1204705000"},{"code":"1208005017","name":"Upo","city_code":"1208005000"},{"code":"1204711002","name":"Upper Baguer","city_code":"1204711000"},{"code":"1208007029","name":"Upper Biangan","city_code":"1208007000"},{"code":"1204709053","name":"Upper Glad I","city_code":"1204709000"},{"code":"1204709054","name":"Upper Glad II","city_code":"1204709000"},{"code":"1206511020","name":"Upper Katungal","city_code":"1206511000"},{"code":"1206312022","name":"Upper Klinan","city_code":"1206312000"},{"code":"1204709055","name":"Upper Labas","city_code":"1204709000"},{"code":"1230800031","name":"Upper Labay","city_code":"1230800000"},{"code":"1208007030","name":"Upper Lumabat","city_code":"1208007000"},{"code":"1206319018","name":"Upper Maculan","city_code":"1206319000"},{"code":"1208007031","name":"Upper Mainit","city_code":"1208007000"},{"code":"1204717019","name":"Upper Mingading","city_code":"1204717000"},{"code":"1206313031","name":"Upper Sepaka","city_code":"1206313000"},{"code":"1208006012","name":"Upper Suyan","city_code":"1208006000"},{"code":"1206313032","name":"Veterans","city_code":"1206313000"},{"code":"1204707037","name":"Villaflores","city_code":"1204707000"},{"code":"1206506025","name":"Villamonte","city_code":"1206506000"},{"code":"1206503032","name":"Villamor","city_code":"1206503000"},{"code":"1204709056","name":"Villarica","city_code":"1204709000"},{"code":"1206511006","name":"Virginia Griño","city_code":"1206511000"},{"code":"1204716020","name":"Wadya","city_code":"1204716000"},{"code":"1206509035","name":"Wal","city_code":"1206509000"},{"code":"1208005018","name":"Wali","city_code":"1208005000"},{"code":"1206509041","name":"Wasag","city_code":"1206509000"},{"code":"1206302024","name":"Yangco Poblacion","city_code":"1206302000"},{"code":"1208005019","name":"Zion","city_code":"1208005000"},{"code":"1206306016","name":"Zone I","city_code":"1206306000"},{"code":"1206306017","name":"Zone II","city_code":"1206306000"},{"code":"1206306018","name":"Zone III","city_code":"1206306000"},{"code":"1206306019","name":"Zone IV","city_code":"1206306000"},{"code":"1206306027","name":"Zulueta","city_code":"1206306000"}]}
+{
+    "schema_version": 2,
+    "version": "2026-03-31.v2",
+    "region_code": "1200000000",
+    "barangays": [
+        { "code": "1204705001", "name": "Abaga", "city_code": "1204705000" },
+        { "code": "1206317001", "name": "Acmonan", "city_code": "1206317000" },
+        { "code": "1206316024", "name": "Aflek", "city_code": "1206316000" },
+        { "code": "1206316017", "name": "Afus", "city_code": "1206316000" },
+        {
+            "code": "1204709002",
+            "name": "Agriculture",
+            "city_code": "1204709000"
+        },
+        { "code": "1206509001", "name": "Akol", "city_code": "1206509000" },
+        { "code": "1206503001", "name": "Ala", "city_code": "1206503000" },
+        { "code": "1206314001", "name": "Albagan", "city_code": "1206314000" },
+        { "code": "1204713001", "name": "Alegria", "city_code": "1204713000" },
+        { "code": "1208001001", "name": "Alegria", "city_code": "1208001000" },
+        { "code": "1204706001", "name": "Alibayon", "city_code": "1204706000" },
+        { "code": "1208007001", "name": "Alkikan", "city_code": "1208007000" },
+        { "code": "1204718001", "name": "Allab", "city_code": "1204718000" },
+        { "code": "1204706048", "name": "Amabel", "city_code": "1204706000" },
+        { "code": "1204704001", "name": "Amas", "city_code": "1204704000" },
+        { "code": "1204704002", "name": "Amazion", "city_code": "1204704000" },
+        { "code": "1206318001", "name": "Ambalgan", "city_code": "1206318000" },
+        { "code": "1208007002", "name": "Ampon", "city_code": "1208007000" },
+        { "code": "1208004001", "name": "Amsipit", "city_code": "1208004000" },
+        { "code": "1204718002", "name": "Anapolon", "city_code": "1204718000" },
+        { "code": "1204711001", "name": "Anick", "city_code": "1204711000" },
+        { "code": "1204709003", "name": "Anonang", "city_code": "1204709000" },
+        { "code": "1206507001", "name": "Antong", "city_code": "1206507000" },
+        { "code": "1230800029", "name": "Apopong", "city_code": "1230800000" },
+        { "code": "1204708003", "name": "Arakan", "city_code": "1204708000" },
+        { "code": "1204703001", "name": "Aringay", "city_code": "1204703000" },
+        { "code": "1204709004", "name": "Arizona", "city_code": "1204709000" },
+        { "code": "1204702001", "name": "Aroman", "city_code": "1204702000" },
+        {
+            "code": "1206306001",
+            "name": "Assumption",
+            "city_code": "1206306000"
+        },
+        { "code": "1208007003", "name": "Atlae", "city_code": "1208007000" },
+        {
+            "code": "1206506027",
+            "name": "Aurelio F. Freires",
+            "city_code": "1206506000"
+        },
+        { "code": "1206306002", "name": "Avanceña", "city_code": "1206306000" },
+        {
+            "code": "1204715012",
+            "name": "B. Cadungon",
+            "city_code": "1204715000"
+        },
+        { "code": "1208007006", "name": "B'Laan", "city_code": "1208007000" },
+        {
+            "code": "1206319001",
+            "name": "Bacdulong",
+            "city_code": "1206319000"
+        },
+        { "code": "1204714027", "name": "Bacong", "city_code": "1204714000" },
+        {
+            "code": "1204718003",
+            "name": "Badiangon",
+            "city_code": "1204718000"
+        },
+        {
+            "code": "1206509002",
+            "name": "Badiangon",
+            "city_code": "1206509000"
+        },
+        { "code": "1208003001", "name": "Badtasan", "city_code": "1208003000" },
+        { "code": "1208001002", "name": "Bagacay", "city_code": "1208001000" },
+        {
+            "code": "1204717001",
+            "name": "Bagolibas",
+            "city_code": "1204717000"
+        },
+        {
+            "code": "1204710001",
+            "name": "Bagontapay",
+            "city_code": "1204710000"
+        },
+        { "code": "1204705003", "name": "Baguer", "city_code": "1204705000" },
+        { "code": "1204709005", "name": "Bagumba", "city_code": "1204709000" },
+        {
+            "code": "1204706005",
+            "name": "Bagumbayan",
+            "city_code": "1204706000"
+        },
+        {
+            "code": "1204714001",
+            "name": "Bagumbayan",
+            "city_code": "1204714000"
+        },
+        {
+            "code": "1206510001",
+            "name": "Bagumbayan",
+            "city_code": "1206510000"
+        },
+        {
+            "code": "1206501001",
+            "name": "Bai Sarifinang",
+            "city_code": "1206501000"
+        },
+        { "code": "1204704003", "name": "Balabag", "city_code": "1204704000" },
+        { "code": "1204712003", "name": "Balabak", "city_code": "1204712000" },
+        {
+            "code": "1204712004",
+            "name": "Balatican",
+            "city_code": "1204712000"
+        },
+        { "code": "1208004002", "name": "Bales", "city_code": "1208004000" },
+        { "code": "1204706049", "name": "Balete", "city_code": "1204706000" },
+        { "code": "1206509003", "name": "Baliango", "city_code": "1206509000" },
+        { "code": "1204709006", "name": "Baliki", "city_code": "1204709000" },
+        { "code": "1204704004", "name": "Balindog", "city_code": "1204704000" },
+        { "code": "1208002001", "name": "Baliton", "city_code": "1208002000" },
+        { "code": "1204711004", "name": "Balogo", "city_code": "1204711000" },
+        { "code": "1230800003", "name": "Baluan", "city_code": "1230800000" },
+        { "code": "1208001003", "name": "Baluntay", "city_code": "1208001000" },
+        { "code": "1206509042", "name": "Balwan", "city_code": "1206509000" },
+        { "code": "1206504003", "name": "Bambad", "city_code": "1206504000" },
+        { "code": "1206509036", "name": "Bambanen", "city_code": "1206509000" },
+        { "code": "1208007004", "name": "Banahaw", "city_code": "1208007000" },
+        { "code": "1206512001", "name": "Banali", "city_code": "1206512000" },
+        { "code": "1208007005", "name": "Banate", "city_code": "1208007000" },
+        { "code": "1204714002", "name": "Banayal", "city_code": "1204714000" },
+        { "code": "1204708004", "name": "Bangbang", "city_code": "1204708000" },
+        { "code": "1204703002", "name": "Bangilan", "city_code": "1204703000" },
+        { "code": "1204706006", "name": "Bangkal", "city_code": "1204706000" },
+        {
+            "code": "1204716001",
+            "name": "Banisilan Poblacion",
+            "city_code": "1204716000"
+        },
+        { "code": "1204703003", "name": "Bannawag", "city_code": "1204703000" },
+        { "code": "1206510003", "name": "Bannawag", "city_code": "1206510000" },
+        { "code": "1204706007", "name": "Bantac", "city_code": "1204706000" },
+        {
+            "code": "1206502002",
+            "name": "Bantangan",
+            "city_code": "1206502000"
+        },
+        { "code": "1206505001", "name": "Bantogon", "city_code": "1206505000" },
+        {
+            "code": "1204711006",
+            "name": "Banucagon",
+            "city_code": "1204711000"
+        },
+        { "code": "1204701001", "name": "Bao", "city_code": "1204701000" },
+        {
+            "code": "1206509004",
+            "name": "Baranayan",
+            "city_code": "1206509000"
+        },
+        {
+            "code": "1204709035",
+            "name": "Barangay Poblacion 1",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1204709036",
+            "name": "Barangay Poblacion 2",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1204709037",
+            "name": "Barangay Poblacion 3",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1204709038",
+            "name": "Barangay Poblacion 4",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1204709039",
+            "name": "Barangay Poblacion 5",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1204709040",
+            "name": "Barangay Poblacion 6",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1204709041",
+            "name": "Barangay Poblacion 7",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1204709042",
+            "name": "Barangay Poblacion 8",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1204701002",
+            "name": "Barangiran",
+            "city_code": "1204701000"
+        },
+        { "code": "1206511001", "name": "Baras", "city_code": "1206511000" },
+        { "code": "1204705004", "name": "Barongis", "city_code": "1204705000" },
+        { "code": "1206509005", "name": "Barongis", "city_code": "1206509000" },
+        { "code": "1206506001", "name": "Barurao", "city_code": "1206506000" },
+        {
+            "code": "1206506026",
+            "name": "Barurao II",
+            "city_code": "1206506000"
+        },
+        { "code": "1206316001", "name": "Basag", "city_code": "1206316000" },
+        { "code": "1206512002", "name": "Basag", "city_code": "1206512000" },
+        { "code": "1204706008", "name": "Basak", "city_code": "1204706000" },
+        { "code": "1206506003", "name": "Basak", "city_code": "1206506000" },
+        { "code": "1204714003", "name": "Batang", "city_code": "1204714000" },
+        {
+            "code": "1206509006",
+            "name": "Batang-baglas",
+            "city_code": "1206509000"
+        },
+        { "code": "1204707001", "name": "Batasan", "city_code": "1204707000" },
+        { "code": "1208005001", "name": "Bati-an", "city_code": "1208005000" },
+        { "code": "1204705005", "name": "Batiocan", "city_code": "1204705000" },
+        { "code": "1204707002", "name": "Bato", "city_code": "1204707000" },
+        { "code": "1204708005", "name": "Bato", "city_code": "1204708000" },
+        {
+            "code": "1204713002",
+            "name": "Bato-bato",
+            "city_code": "1204713000"
+        },
+        {
+            "code": "1230800032",
+            "name": "Batomelong",
+            "city_code": "1230800000"
+        },
+        {
+            "code": "1208002002",
+            "name": "Batotuling",
+            "city_code": "1208002000"
+        },
+        { "code": "1208002003", "name": "Batulaki", "city_code": "1208002000" },
+        { "code": "1206507002", "name": "Bayasong", "city_code": "1206507000" },
+        { "code": "1206510004", "name": "Bayawa", "city_code": "1206510000" },
+        {
+            "code": "1206311022",
+            "name": "Benigno Aquino, Jr.",
+            "city_code": "1206311000"
+        },
+        { "code": "1206302002", "name": "Benitez", "city_code": "1206302000" },
+        {
+            "code": "1204704005",
+            "name": "Benoligan",
+            "city_code": "1204704000"
+        },
+        {
+            "code": "1204702003",
+            "name": "Bentangan",
+            "city_code": "1204702000"
+        },
+        { "code": "1206312001", "name": "Bentung", "city_code": "1206312000" },
+        { "code": "1204704006", "name": "Berada", "city_code": "1204704000" },
+        { "code": "1204710002", "name": "Bialong", "city_code": "1204710000" },
+        { "code": "1204707003", "name": "Biangan", "city_code": "1204707000" },
+        {
+            "code": "1208002004",
+            "name": "Big Margus",
+            "city_code": "1208002000"
+        },
+        { "code": "1204706009", "name": "Binay", "city_code": "1204706000" },
+        {
+            "code": "1204718004",
+            "name": "Binoongan",
+            "city_code": "1204718000"
+        },
+        { "code": "1204709007", "name": "Bitoka", "city_code": "1204709000" },
+        { "code": "1204714004", "name": "Bituan", "city_code": "1204714000" },
+        { "code": "1206501002", "name": "Biwang", "city_code": "1206501000" },
+        {
+            "code": "1206507003",
+            "name": "Blingkong",
+            "city_code": "1206507000"
+        },
+        { "code": "1206506029", "name": "Bolebok", "city_code": "1206506000" },
+        {
+            "code": "1206317002",
+            "name": "Bololmala",
+            "city_code": "1206317000"
+        },
+        {
+            "code": "1204706010",
+            "name": "Bongolanon",
+            "city_code": "1204706000"
+        },
+        { "code": "1204714005", "name": "Bual", "city_code": "1204714000" },
+        { "code": "1206504005", "name": "Bual", "city_code": "1206504000" },
+        {
+            "code": "1204709008",
+            "name": "Bual Norte",
+            "city_code": "1204709000"
+        },
+        { "code": "1204709009", "name": "Bual Sur", "city_code": "1204709000" },
+        { "code": "1204710003", "name": "Buayan", "city_code": "1204710000" },
+        { "code": "1230800004", "name": "Buayan", "city_code": "1230800000" },
+        {
+            "code": "1204707004",
+            "name": "Buena Vida",
+            "city_code": "1204707000"
+        },
+        {
+            "code": "1206511002",
+            "name": "Buenaflor",
+            "city_code": "1206511000"
+        },
+        {
+            "code": "1206512003",
+            "name": "Buenaflores",
+            "city_code": "1206512000"
+        },
+        {
+            "code": "1206313002",
+            "name": "Buenavista",
+            "city_code": "1206313000"
+        },
+        { "code": "1206512004", "name": "Bugso", "city_code": "1206512000" },
+        { "code": "1204707005", "name": "Buhay", "city_code": "1204707000" },
+        {
+            "code": "1206315001",
+            "name": "Bukay Pait",
+            "city_code": "1206315000"
+        },
+        { "code": "1206512005", "name": "Buklod", "city_code": "1206512000" },
+        { "code": "1230800005", "name": "Bula", "city_code": "1230800000" },
+        {
+            "code": "1204707006",
+            "name": "Bulakanon",
+            "city_code": "1204707000"
+        },
+        {
+            "code": "1204709052",
+            "name": "Bulanan Upper",
+            "city_code": "1204709000"
+        },
+        { "code": "1204712011", "name": "Bulod", "city_code": "1204712000" },
+        { "code": "1204711008", "name": "Buluan", "city_code": "1204711000" },
+        { "code": "1204711007", "name": "Bulucaon", "city_code": "1204711000" },
+        {
+            "code": "1206506004",
+            "name": "Bululawan",
+            "city_code": "1206506000"
+        },
+        { "code": "1206317003", "name": "Bunao", "city_code": "1206317000" },
+        { "code": "1204714012", "name": "Bunawan", "city_code": "1204714000" },
+        { "code": "1208002005", "name": "Burias", "city_code": "1208002000" },
+        { "code": "1204716002", "name": "Busaon", "city_code": "1204716000" },
+        { "code": "1206501003", "name": "Busok", "city_code": "1206501000" },
+        { "code": "1206314008", "name": "Buto", "city_code": "1206314000" },
+        { "code": "1206509007", "name": "Butril", "city_code": "1206509000" },
+        {
+            "code": "1206510014",
+            "name": "C. Mangilala",
+            "city_code": "1206510000"
+        },
+        {
+            "code": "1204713031",
+            "name": "Cabangbangan",
+            "city_code": "1204713000"
+        },
+        {
+            "code": "1204705006",
+            "name": "Cabaruyan",
+            "city_code": "1204705000"
+        },
+        { "code": "1204707007", "name": "Cabilao", "city_code": "1204707000" },
+        { "code": "1208002006", "name": "Cablalan", "city_code": "1208002000" },
+        { "code": "1204705007", "name": "Cabpangi", "city_code": "1204705000" },
+        { "code": "1204711041", "name": "Cabpangi", "city_code": "1204711000" },
+        { "code": "1206302003", "name": "Cabudian", "city_code": "1206302000" },
+        { "code": "1206302004", "name": "Cabuling", "city_code": "1206302000" },
+        { "code": "1206315002", "name": "Cabuling", "city_code": "1206315000" },
+        { "code": "1206306003", "name": "Cacub", "city_code": "1206306000" },
+        { "code": "1204702005", "name": "Cadiis", "city_code": "1204702000" },
+        { "code": "1206505004", "name": "Cadiz", "city_code": "1206505000" },
+        {
+            "code": "1208002007",
+            "name": "Calabanit",
+            "city_code": "1208002000"
+        },
+        { "code": "1204712013", "name": "Calawag", "city_code": "1204712000" },
+        { "code": "1206511003", "name": "Calean", "city_code": "1206511000" },
+        { "code": "1206306004", "name": "Caloocan", "city_code": "1206306000" },
+        {
+            "code": "1208002008",
+            "name": "Calpidong",
+            "city_code": "1208002000"
+        },
+        {
+            "code": "1230800033",
+            "name": "Calumpang",
+            "city_code": "1230800000"
+        },
+        {
+            "code": "1204710004",
+            "name": "Calunasan",
+            "city_code": "1204710000"
+        },
+        { "code": "1204701003", "name": "Camansi", "city_code": "1204701000" },
+        { "code": "1204713009", "name": "Camasi", "city_code": "1204713000" },
+        { "code": "1204715001", "name": "Camutan", "city_code": "1204715000" },
+        { "code": "1204715002", "name": "Canaan", "city_code": "1204715000" },
+        { "code": "1206313008", "name": "Canahay", "city_code": "1206313000" },
+        {
+            "code": "1206312024",
+            "name": "Cannery Site",
+            "city_code": "1206312000"
+        },
+        {
+            "code": "1204716003",
+            "name": "Capayangan",
+            "city_code": "1204716000"
+        },
+        {
+            "code": "1204711010",
+            "name": "Capayuran",
+            "city_code": "1204711000"
+        },
+        { "code": "1206506005", "name": "Capilan", "city_code": "1206506000" },
+        { "code": "1206508001", "name": "Caridad", "city_code": "1206508000" },
+        { "code": "1206511004", "name": "Carmen", "city_code": "1206511000" },
+        {
+            "code": "1206306005",
+            "name": "Carpenter Hill",
+            "city_code": "1206306000"
+        },
+        {
+            "code": "1204716004",
+            "name": "Carugmanan",
+            "city_code": "1204716000"
+        },
+        {
+            "code": "1204717002",
+            "name": "Cawilihan",
+            "city_code": "1204717000"
+        },
+        { "code": "1206317004", "name": "Cebuano", "city_code": "1206317000" },
+        {
+            "code": "1204709010",
+            "name": "Central Bulanan",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1204709012",
+            "name": "Central Glad",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1204709017",
+            "name": "Central Katingawan",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1204708006",
+            "name": "Central Malamote",
+            "city_code": "1204708000"
+        },
+        {
+            "code": "1204711011",
+            "name": "Central Panatan",
+            "city_code": "1204711000"
+        },
+        { "code": "1206313003", "name": "Centrala", "city_code": "1206313000" },
+        {
+            "code": "1206506006",
+            "name": "Christiannuevo",
+            "city_code": "1206506000"
+        },
+        { "code": "1206501012", "name": "Chua", "city_code": "1206501000" },
+        { "code": "1206302005", "name": "Cinco", "city_code": "1206302000" },
+        {
+            "code": "1230800034",
+            "name": "City Heights",
+            "city_code": "1230800000"
+        },
+        { "code": "1206509033", "name": "Colobe", "city_code": "1206509000" },
+        { "code": "1208004003", "name": "Colon", "city_code": "1208004000" },
+        {
+            "code": "1206313004",
+            "name": "Colongulo",
+            "city_code": "1206313000"
+        },
+        {
+            "code": "1204707008",
+            "name": "Concepcion",
+            "city_code": "1204707000"
+        },
+        {
+            "code": "1206306006",
+            "name": "Concepcion",
+            "city_code": "1206306000"
+        },
+        { "code": "1230800006", "name": "Conel", "city_code": "1230800000" },
+        { "code": "1208002009", "name": "Congan", "city_code": "1208002000" },
+        { "code": "1208002010", "name": "Cross", "city_code": "1208002000" },
+        {
+            "code": "1206312002",
+            "name": "Crossing Palkan",
+            "city_code": "1206312000"
+        },
+        {
+            "code": "1206317005",
+            "name": "Crossing Rubber",
+            "city_code": "1206317000"
+        },
+        { "code": "1204703005", "name": "Cuyapon", "city_code": "1204703000" },
+        {
+            "code": "1206511005",
+            "name": "D'Ledesma",
+            "city_code": "1206511000"
+        },
+        {
+            "code": "1206504007",
+            "name": "D'Lotilla",
+            "city_code": "1206504000"
+        },
+        {
+            "code": "1208006001",
+            "name": "Daan Suyan",
+            "city_code": "1208006000"
+        },
+        {
+            "code": "1230800007",
+            "name": "Dadiangas East",
+            "city_code": "1230800000"
+        },
+        {
+            "code": "1230800035",
+            "name": "Dadiangas North",
+            "city_code": "1230800000"
+        },
+        {
+            "code": "1230800036",
+            "name": "Dadiangas South",
+            "city_code": "1230800000"
+        },
+        {
+            "code": "1230800037",
+            "name": "Dadiangas West",
+            "city_code": "1230800000"
+        },
+        { "code": "1204701004", "name": "Dado", "city_code": "1204701000" },
+        { "code": "1204710006", "name": "Dagong", "city_code": "1204710000" },
+        { "code": "1206501004", "name": "Daguma", "city_code": "1206501000" },
+        { "code": "1204703006", "name": "Dagupan", "city_code": "1204703000" },
+        { "code": "1204707009", "name": "Dagupan", "city_code": "1204707000" },
+        { "code": "1204714006", "name": "Daig", "city_code": "1204714000" },
+        { "code": "1206313005", "name": "Dajay", "city_code": "1206313000" },
+        { "code": "1206503003", "name": "Daladap", "city_code": "1206503000" },
+        {
+            "code": "1204708007",
+            "name": "Dalapitan",
+            "city_code": "1204708000"
+        },
+        { "code": "1208004004", "name": "Daliao", "city_code": "1208004000" },
+        {
+            "code": "1204712015",
+            "name": "Dalingaoen",
+            "city_code": "1204712000"
+        },
+        { "code": "1204710005", "name": "Dalipe", "city_code": "1204710000" },
+        { "code": "1204718005", "name": "Dallag", "city_code": "1204718000" },
+        { "code": "1206501013", "name": "Daluga", "city_code": "1206501000" },
+        {
+            "code": "1204712016",
+            "name": "Damalasak",
+            "city_code": "1204712000"
+        },
+        { "code": "1204714007", "name": "Damawato", "city_code": "1204714000" },
+        { "code": "1206314012", "name": "Danlag", "city_code": "1206314000" },
+        { "code": "1206504009", "name": "Dansuli", "city_code": "1206504000" },
+        { "code": "1206502009", "name": "Datablao", "city_code": "1206502000" },
+        {
+            "code": "1208001004",
+            "name": "Datal Anggas",
+            "city_code": "1208001000"
+        },
+        {
+            "code": "1208007007",
+            "name": "Datal Batong",
+            "city_code": "1208007000"
+        },
+        {
+            "code": "1208007008",
+            "name": "Datal Bila",
+            "city_code": "1208007000"
+        },
+        {
+            "code": "1206316025",
+            "name": "Datal Bob",
+            "city_code": "1206316000"
+        },
+        {
+            "code": "1208007009",
+            "name": "Datal Tampal",
+            "city_code": "1208007000"
+        },
+        {
+            "code": "1208002011",
+            "name": "Datalbukay",
+            "city_code": "1208002000"
+        },
+        {
+            "code": "1204715013",
+            "name": "Datu Agod",
+            "city_code": "1204715000"
+        },
+        {
+            "code": "1204706014",
+            "name": "Datu Celo",
+            "city_code": "1204706000"
+        },
+        {
+            "code": "1208003002",
+            "name": "Datu Dani",
+            "city_code": "1208003000"
+        },
+        {
+            "code": "1204713032",
+            "name": "Datu Indang",
+            "city_code": "1204713000"
+        },
+        {
+            "code": "1206505018",
+            "name": "Datu Ito Andong",
+            "city_code": "1206505000"
+        },
+        {
+            "code": "1206506007",
+            "name": "Datu Karon",
+            "city_code": "1206506000"
+        },
+        {
+            "code": "1204718006",
+            "name": "Datu Ladayon",
+            "city_code": "1204718000"
+        },
+        {
+            "code": "1206509044",
+            "name": "Datu Maguiales",
+            "city_code": "1206509000"
+        },
+        {
+            "code": "1204718007",
+            "name": "Datu Matangkil",
+            "city_code": "1204718000"
+        },
+        {
+            "code": "1204713033",
+            "name": "Datu Sandongan",
+            "city_code": "1204713000"
+        },
+        {
+            "code": "1206505019",
+            "name": "Datu Wasay",
+            "city_code": "1206505000"
+        },
+        {
+            "code": "1204713003",
+            "name": "Del Carmen",
+            "city_code": "1204713000"
+        },
+        {
+            "code": "1204706015",
+            "name": "Del Pilar",
+            "city_code": "1204706000"
+        },
+        { "code": "1204705010", "name": "Demapaco", "city_code": "1204705000" },
+        { "code": "1206319002", "name": "Denlag", "city_code": "1206319000" },
+        { "code": "1206302006", "name": "Derilon", "city_code": "1206302000" },
+        { "code": "1206316026", "name": "Desawo", "city_code": "1206316000" },
+        { "code": "1206508002", "name": "Didtaras", "city_code": "1206508000" },
+        { "code": "1206316027", "name": "Dlanag", "city_code": "1206316000" },
+        { "code": "1204706016", "name": "Doles", "city_code": "1204706000" },
+        { "code": "1204715003", "name": "Dolores", "city_code": "1204715000" },
+        { "code": "1208001005", "name": "Domolok", "city_code": "1208001000" },
+        { "code": "1206509009", "name": "Domolol", "city_code": "1206509000" },
+        {
+            "code": "1204706050",
+            "name": "Don Panaca",
+            "city_code": "1204706000"
+        },
+        {
+            "code": "1204718008",
+            "name": "Doroluman",
+            "city_code": "1204718000"
+        },
+        { "code": "1204717003", "name": "Dualing", "city_code": "1204717000" },
+        { "code": "1206313006", "name": "Duengas", "city_code": "1206313000" },
+        { "code": "1206503005", "name": "Dukay", "city_code": "1206503000" },
+        {
+            "code": "1206315003",
+            "name": "Dumadalig",
+            "city_code": "1206315000"
+        },
+        { "code": "1206311002", "name": "Dumaguil", "city_code": "1206311000" },
+        {
+            "code": "1206505006",
+            "name": "Dumangas Nuevo",
+            "city_code": "1206505000"
+        },
+        { "code": "1204710007", "name": "Dungo-an", "city_code": "1204710000" },
+        { "code": "1204714008", "name": "Dungos", "city_code": "1204714000" },
+        {
+            "code": "1208002012",
+            "name": "E. Alegado",
+            "city_code": "1208002000"
+        },
+        { "code": "1206502010", "name": "Eday", "city_code": "1206502000" },
+        { "code": "1206316002", "name": "Edwards", "city_code": "1206316000" },
+        { "code": "1206302007", "name": "El Nonok", "city_code": "1206302000" },
+        { "code": "1206502011", "name": "Elbebe", "city_code": "1206502000" },
+        {
+            "code": "1206511008",
+            "name": "Enrique J.C. Montilla",
+            "city_code": "1206511000"
+        },
+        {
+            "code": "1206306007",
+            "name": "Esperanza",
+            "city_code": "1206306000"
+        },
+        {
+            "code": "1206311003",
+            "name": "Esperanza",
+            "city_code": "1206311000"
+        },
+        { "code": "1204708008", "name": "Estado", "city_code": "1204708000" },
+        { "code": "1206510005", "name": "Estrella", "city_code": "1206510000" },
+        {
+            "code": "1204713005",
+            "name": "F. Cajelo",
+            "city_code": "1204713000"
+        },
+        {
+            "code": "1204714026",
+            "name": "F. Cajelo",
+            "city_code": "1204714000"
+        },
+        { "code": "1230800038", "name": "Fatima", "city_code": "1230800000" },
+        { "code": "1204714028", "name": "Galidan", "city_code": "1204714000" },
+        { "code": "1204718009", "name": "Gambodes", "city_code": "1204718000" },
+        { "code": "1204718010", "name": "Ganatan", "city_code": "1204718000" },
+        { "code": "1206508004", "name": "Gansing", "city_code": "1206508000" },
+        { "code": "1206512006", "name": "Gapok", "city_code": "1206512000" },
+        { "code": "1204707010", "name": "Garsika", "city_code": "1204707000" },
+        { "code": "1208003003", "name": "Gasi", "city_code": "1208003000" },
+        { "code": "1204716005", "name": "Gastay", "city_code": "1204716000" },
+        { "code": "1204710008", "name": "Gaunan", "city_code": "1204710000" },
+        { "code": "1204704007", "name": "Gayola", "city_code": "1204704000" },
+        {
+            "code": "1204702007",
+            "name": "General Luna",
+            "city_code": "1204702000"
+        },
+        {
+            "code": "1206306008",
+            "name": "General Paulino Santos",
+            "city_code": "1206306000"
+        },
+        {
+            "code": "1204714029",
+            "name": "Genoveva Baynosa",
+            "city_code": "1204714000"
+        },
+        {
+            "code": "1204704008",
+            "name": "Ginatilan",
+            "city_code": "1204704000"
+        },
+        {
+            "code": "1204712020",
+            "name": "Ginatilan",
+            "city_code": "1204712000"
+        },
+        { "code": "1206312003", "name": "Glamang", "city_code": "1206312000" },
+        {
+            "code": "1208002013",
+            "name": "Glan Padidu",
+            "city_code": "1208002000"
+        },
+        { "code": "1204705011", "name": "Grebona", "city_code": "1204705000" },
+        {
+            "code": "1204718011",
+            "name": "Greenfield",
+            "city_code": "1204718000"
+        },
+        {
+            "code": "1204713030",
+            "name": "Greenhill",
+            "city_code": "1204713000"
+        },
+        { "code": "1204707011", "name": "Guangan", "city_code": "1204707000" },
+        { "code": "1204706021", "name": "Gubatan", "city_code": "1204706000" },
+        {
+            "code": "1206503007",
+            "name": "Guiamalia",
+            "city_code": "1206503000"
+        },
+        { "code": "1204701005", "name": "Guiling", "city_code": "1204701000" },
+        {
+            "code": "1206318002",
+            "name": "Guinsang-an",
+            "city_code": "1206318000"
+        },
+        { "code": "1204705013", "name": "Gumaga", "city_code": "1204705000" },
+        { "code": "1208002014", "name": "Gumasa", "city_code": "1208002000" },
+        { "code": "1206319003", "name": "Halilan", "city_code": "1206319000" },
+        { "code": "1206319004", "name": "Hanoon", "city_code": "1206319000" },
+        { "code": "1206505007", "name": "Hinalaan", "city_code": "1206505000" },
+        { "code": "1204713006", "name": "Idaoman", "city_code": "1204713000" },
+        { "code": "1208002015", "name": "Ilaya", "city_code": "1208002000" },
+        { "code": "1204709013", "name": "Ilbocean", "city_code": "1204709000" },
+        { "code": "1204706022", "name": "Ilian", "city_code": "1204706000" },
+        { "code": "1204708009", "name": "Ilian", "city_code": "1204708000" },
+        { "code": "1206503008", "name": "Ilian", "city_code": "1206503000" },
+        { "code": "1204704009", "name": "Ilomavis", "city_code": "1204704000" },
+        { "code": "1204713007", "name": "Ilustre", "city_code": "1204713000" },
+        {
+            "code": "1204706051",
+            "name": "Imamaling",
+            "city_code": "1204706000"
+        },
+        { "code": "1206504010", "name": "Impao", "city_code": "1206504000" },
+        {
+            "code": "1206302008",
+            "name": "Improgo Village",
+            "city_code": "1206302000"
+        },
+        { "code": "1204706023", "name": "Inac", "city_code": "1204706000" },
+        { "code": "1204710009", "name": "Inas", "city_code": "1204710000" },
+        { "code": "1204704010", "name": "Indangan", "city_code": "1204704000" },
+        { "code": "1204707012", "name": "Indangan", "city_code": "1204707000" },
+        { "code": "1204712023", "name": "Inug-ug", "city_code": "1204712000" },
+        {
+            "code": "1208007010",
+            "name": "J.P. Laurel",
+            "city_code": "1208007000"
+        },
+        {
+            "code": "1204707013",
+            "name": "Jose Rizal",
+            "city_code": "1204707000"
+        },
+        {
+            "code": "1206317017",
+            "name": "Juan-Loreto Tamayo",
+            "city_code": "1206317000"
+        },
+        { "code": "1204704011", "name": "Junction", "city_code": "1204704000" },
+        {
+            "code": "1204718012",
+            "name": "Kabalantian",
+            "city_code": "1204718000"
+        },
+        { "code": "1208004005", "name": "Kabatiol", "city_code": "1208004000" },
+        { "code": "1208004006", "name": "Kablacan", "city_code": "1208004000" },
+        { "code": "1206317006", "name": "Kablon", "city_code": "1206317000" },
+        {
+            "code": "1204708010",
+            "name": "Kabulacan",
+            "city_code": "1204708000"
+        },
+        {
+            "code": "1206508005",
+            "name": "Kabulakan",
+            "city_code": "1206508000"
+        },
+        {
+            "code": "1206501014",
+            "name": "Kabulanan",
+            "city_code": "1206501000"
+        },
+        { "code": "1206509010", "name": "Kabuling", "city_code": "1206509000" },
+        { "code": "1206512007", "name": "Kadi", "city_code": "1206512000" },
+        {
+            "code": "1204712025",
+            "name": "Kalacacan",
+            "city_code": "1204712000"
+        },
+        { "code": "1204704012", "name": "Kalaisan", "city_code": "1204704000" },
+        {
+            "code": "1206506008",
+            "name": "Kalamongog",
+            "city_code": "1206506000"
+        },
+        {
+            "code": "1206510007",
+            "name": "Kalanawe I",
+            "city_code": "1206510000"
+        },
+        {
+            "code": "1206510008",
+            "name": "Kalanawe II",
+            "city_code": "1206510000"
+        },
+        {
+            "code": "1206511007",
+            "name": "Kalandagan",
+            "city_code": "1206511000"
+        },
+        { "code": "1208005002", "name": "Kalaneg", "city_code": "1208005000" },
+        { "code": "1208005003", "name": "Kalaong", "city_code": "1208005000" },
+        {
+            "code": "1204704013",
+            "name": "Kalasuyan",
+            "city_code": "1204704000"
+        },
+        {
+            "code": "1206504011",
+            "name": "Kalawag I",
+            "city_code": "1206504000"
+        },
+        {
+            "code": "1206504012",
+            "name": "Kalawag II",
+            "city_code": "1206504000"
+        },
+        {
+            "code": "1206504013",
+            "name": "Kalawag III",
+            "city_code": "1206504000"
+        },
+        { "code": "1204716006", "name": "Kalawaig", "city_code": "1204716000" },
+        {
+            "code": "1206509011",
+            "name": "Kalibuhan",
+            "city_code": "1206509000"
+        },
+        { "code": "1206317007", "name": "Kalkam", "city_code": "1206317000" },
+        { "code": "1208002016", "name": "Kaltuad", "city_code": "1208002000" },
+        { "code": "1204706024", "name": "Kamada", "city_code": "1204706000" },
+        { "code": "1208004007", "name": "Kamanga", "city_code": "1208004000" },
+        {
+            "code": "1204713008",
+            "name": "Kamarahan",
+            "city_code": "1204713000"
+        },
+        { "code": "1208004008", "name": "Kanalo", "city_code": "1208004000" },
+        { "code": "1206503011", "name": "Kangkong", "city_code": "1206503000" },
+        { "code": "1204714009", "name": "Kanibong", "city_code": "1204714000" },
+        { "code": "1206509013", "name": "Kanipaan", "city_code": "1206509000" },
+        { "code": "1206501015", "name": "Kanulay", "city_code": "1206501000" },
+        {
+            "code": "1206512008",
+            "name": "Kapatagan",
+            "city_code": "1206512000"
+        },
+        { "code": "1208002017", "name": "Kapatan", "city_code": "1208002000" },
+        { "code": "1208003004", "name": "Kapate", "city_code": "1208003000" },
+        { "code": "1206501005", "name": "Kapaya", "city_code": "1206501000" },
+        { "code": "1204705014", "name": "Kapayawi", "city_code": "1204705000" },
+        {
+            "code": "1206508006",
+            "name": "Kapingkong",
+            "city_code": "1206508000"
+        },
+        {
+            "code": "1204717005",
+            "name": "Katalicanan",
+            "city_code": "1204717000"
+        },
+        {
+            "code": "1204702008",
+            "name": "Katanayanan",
+            "city_code": "1204702000"
+        },
+        {
+            "code": "1230800009",
+            "name": "Katangawan",
+            "city_code": "1230800000"
+        },
+        { "code": "1206510009", "name": "Katico", "city_code": "1206510000" },
+        {
+            "code": "1204703007",
+            "name": "Katidtuan",
+            "city_code": "1204703000"
+        },
+        {
+            "code": "1204712026",
+            "name": "Katilacan",
+            "city_code": "1204712000"
+        },
+        {
+            "code": "1204704014",
+            "name": "Katipunan",
+            "city_code": "1204704000"
+        },
+        {
+            "code": "1204710010",
+            "name": "Katipunan",
+            "city_code": "1204710000"
+        },
+        {
+            "code": "1204718013",
+            "name": "Katipunan",
+            "city_code": "1204718000"
+        },
+        {
+            "code": "1206318003",
+            "name": "Katipunan",
+            "city_code": "1206318000"
+        },
+        {
+            "code": "1204707014",
+            "name": "Katipunan II",
+            "city_code": "1204707000"
+        },
+        {
+            "code": "1206508007",
+            "name": "Katitisan",
+            "city_code": "1206508000"
+        },
+        { "code": "1208003005", "name": "Katubao", "city_code": "1208003000" },
+        {
+            "code": "1204706026",
+            "name": "Kauswagan",
+            "city_code": "1204706000"
+        },
+        { "code": "1208001006", "name": "Kawas", "city_code": "1208001000" },
+        { "code": "1208007011", "name": "Kawayan", "city_code": "1208007000" },
+        {
+            "code": "1204707015",
+            "name": "Kawayanon",
+            "city_code": "1204707000"
+        },
+        { "code": "1204703008", "name": "Kayaga", "city_code": "1204703000" },
+        { "code": "1208003006", "name": "Kayupo", "city_code": "1208003000" },
+        { "code": "1206316004", "name": "Kematu", "city_code": "1206316000" },
+        { "code": "1206504016", "name": "Kenram", "city_code": "1206504000" },
+        { "code": "1206506009", "name": "Keytodac", "city_code": "1206506000" },
+        { "code": "1206512009", "name": "Kiadsam", "city_code": "1206512000" },
+        { "code": "1208005004", "name": "Kiambing", "city_code": "1208005000" },
+        { "code": "1204716007", "name": "Kiaring", "city_code": "1204716000" },
+        { "code": "1208005005", "name": "Kiayap", "city_code": "1208005000" },
+        { "code": "1208007012", "name": "Kibala", "city_code": "1208007000" },
+        { "code": "1204702011", "name": "Kibenes", "city_code": "1204702000" },
+        { "code": "1204708012", "name": "Kibia", "city_code": "1204708000" },
+        { "code": "1206311006", "name": "Kibid", "city_code": "1206311000" },
+        { "code": "1208007013", "name": "Kiblat", "city_code": "1208007000" },
+        { "code": "1204708013", "name": "Kibudoc", "city_code": "1204708000" },
+        {
+            "code": "1204702012",
+            "name": "Kibugtongan",
+            "city_code": "1204702000"
+        },
+        { "code": "1204708014", "name": "Kidama", "city_code": "1204708000" },
+        { "code": "1206509015", "name": "Kidayan", "city_code": "1206509000" },
+        { "code": "1208006002", "name": "Kihan", "city_code": "1208006000" },
+        { "code": "1204708015", "name": "Kilada", "city_code": "1204708000" },
+        {
+            "code": "1204703009",
+            "name": "Kilagasan",
+            "city_code": "1204703000"
+        },
+        { "code": "1204702013", "name": "Kilala", "city_code": "1204702000" },
+        { "code": "1204705015", "name": "Kiloyao", "city_code": "1204705000" },
+        { "code": "1204702014", "name": "Kimadzil", "city_code": "1204702000" },
+        {
+            "code": "1204709018",
+            "name": "Kimagango",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1204711015",
+            "name": "Kimarayang",
+            "city_code": "1204711000"
+        },
+        {
+            "code": "1204713034",
+            "name": "Kimaruhing",
+            "city_code": "1204713000"
+        },
+        {
+            "code": "1208007014",
+            "name": "Kinabalan",
+            "city_code": "1208007000"
+        },
+        { "code": "1208006003", "name": "Kinam", "city_code": "1208006000" },
+        { "code": "1204706052", "name": "Kinarum", "city_code": "1204706000" },
+        {
+            "code": "1204718014",
+            "name": "Kinawayan",
+            "city_code": "1204718000"
+        },
+        { "code": "1206501006", "name": "Kinayao", "city_code": "1206501000" },
+        { "code": "1206312004", "name": "Kinilis", "city_code": "1206312000" },
+        {
+            "code": "1206506010",
+            "name": "Kinodalan",
+            "city_code": "1206506000"
+        },
+        { "code": "1206314002", "name": "Kipalbig", "city_code": "1206314000" },
+        { "code": "1206509016", "name": "Kiponget", "city_code": "1206509000" },
+        { "code": "1204706027", "name": "Kisandal", "city_code": "1204706000" },
+        { "code": "1204707016", "name": "Kisante", "city_code": "1204707000" },
+        { "code": "1206509014", "name": "Kisek", "city_code": "1206509000" },
+        { "code": "1204713011", "name": "Kisupaan", "city_code": "1204713000" },
+        {
+            "code": "1204701006",
+            "name": "Kitacubong",
+            "city_code": "1204701000"
+        },
+        { "code": "1204705017", "name": "Kitubod", "city_code": "1204705000" },
+        { "code": "1204709057", "name": "Kiwanan", "city_code": "1204709000" },
+        { "code": "1204715004", "name": "Kiyaab", "city_code": "1204715000" },
+        { "code": "1206312005", "name": "Klinan 6", "city_code": "1206312000" },
+        { "code": "1208003007", "name": "Kling", "city_code": "1208003000" },
+        { "code": "1206319005", "name": "Klubi", "city_code": "1206319000" },
+        { "code": "1204712028", "name": "Kolambog", "city_code": "1204712000" },
+        { "code": "1206504019", "name": "Kolambog", "city_code": "1206504000" },
+        {
+            "code": "1206312006",
+            "name": "Koronadal Proper",
+            "city_code": "1206312000"
+        },
+        { "code": "1206509018", "name": "Kraan", "city_code": "1206509000" },
+        {
+            "code": "1206504018",
+            "name": "Kudanding",
+            "city_code": "1206504000"
+        },
+        { "code": "1206512010", "name": "Kuden", "city_code": "1206512000" },
+        { "code": "1206512011", "name": "Kulaman", "city_code": "1206512000" },
+        {
+            "code": "1204718015",
+            "name": "Kulaman Valley",
+            "city_code": "1204718000"
+        },
+        {
+            "code": "1206509017",
+            "name": "Kulong-kulong",
+            "city_code": "1206509000"
+        },
+        { "code": "1206302009", "name": "Kusan", "city_code": "1206302000" },
+        {
+            "code": "1204713012",
+            "name": "La Esperanza",
+            "city_code": "1204713000"
+        },
+        {
+            "code": "1204714010",
+            "name": "La Esperanza",
+            "city_code": "1204714000"
+        },
+        {
+            "code": "1204710011",
+            "name": "La Fortuna",
+            "city_code": "1204710000"
+        },
+        {
+            "code": "1204710012",
+            "name": "La Suerte",
+            "city_code": "1204710000"
+        },
+        { "code": "1230800012", "name": "Labangal", "city_code": "1230800000" },
+        { "code": "1204713013", "name": "Labu-o", "city_code": "1204713000" },
+        { "code": "1206316005", "name": "Laconon", "city_code": "1206316000" },
+        { "code": "1208001013", "name": "Ladol", "city_code": "1208001000" },
+        {
+            "code": "1204712029",
+            "name": "Ladtingan",
+            "city_code": "1204712000"
+        },
+        {
+            "code": "1206504020",
+            "name": "Lagandang",
+            "city_code": "1206504000"
+        },
+        { "code": "1206508008", "name": "Lagao", "city_code": "1206508000" },
+        { "code": "1230800011", "name": "Lagao", "city_code": "1230800000" },
+        { "code": "1208002018", "name": "Lago", "city_code": "1208002000" },
+        { "code": "1206512012", "name": "Lagubang", "city_code": "1206512000" },
+        {
+            "code": "1206504021",
+            "name": "Laguilayan",
+            "city_code": "1206504000"
+        },
+        { "code": "1208002019", "name": "Laguimit", "city_code": "1208002000" },
+        {
+            "code": "1206503033",
+            "name": "Laguinding",
+            "city_code": "1206503000"
+        },
+        {
+            "code": "1204709021",
+            "name": "Lagumbingan",
+            "city_code": "1204709000"
+        },
+        { "code": "1208003008", "name": "Lagundi", "city_code": "1208003000" },
+        {
+            "code": "1206319006",
+            "name": "Lake Lahit",
+            "city_code": "1206319000"
+        },
+        { "code": "1206302010", "name": "Lam-Apos", "city_code": "1206302000" },
+        {
+            "code": "1206312007",
+            "name": "Lam-Caliaf",
+            "city_code": "1206312000"
+        },
+        { "code": "1204713014", "name": "Lamalama", "city_code": "1204713000" },
+        { "code": "1206302011", "name": "Lamba", "city_code": "1206302000" },
+        {
+            "code": "1206316014",
+            "name": "Lambangan",
+            "city_code": "1206316000"
+        },
+        {
+            "code": "1206314003",
+            "name": "Lambayong",
+            "city_code": "1206314000"
+        },
+        { "code": "1206302012", "name": "Lambingi", "city_code": "1206302000" },
+        {
+            "code": "1206313014",
+            "name": "Lambontong",
+            "city_code": "1206313000"
+        },
+        {
+            "code": "1206316018",
+            "name": "Lambuling",
+            "city_code": "1206316000"
+        },
+        { "code": "1206319007", "name": "Lamcade", "city_code": "1206319000" },
+        { "code": "1206319008", "name": "Lamdalag", "city_code": "1206319000" },
+        { "code": "1206319009", "name": "Lamfugon", "city_code": "1206319000" },
+        { "code": "1206316019", "name": "Lamhako", "city_code": "1206316000" },
+        { "code": "1206313017", "name": "Lamian", "city_code": "1206313000" },
+        { "code": "1206319010", "name": "Lamlahak", "city_code": "1206319000" },
+        {
+            "code": "1204714011",
+            "name": "Lampagang",
+            "city_code": "1204714000"
+        },
+        { "code": "1206302013", "name": "Lampari", "city_code": "1206302000" },
+        { "code": "1204708017", "name": "Lampayan", "city_code": "1204708000" },
+        { "code": "1206314009", "name": "Lampitak", "city_code": "1206314000" },
+        {
+            "code": "1206316008",
+            "name": "Lamsalome",
+            "city_code": "1206316000"
+        },
+        { "code": "1206313018", "name": "Lamsugod", "city_code": "1206313000" },
+        { "code": "1204704015", "name": "Lanao", "city_code": "1204704000" },
+        {
+            "code": "1204718016",
+            "name": "Lanao Kuran",
+            "city_code": "1204718000"
+        },
+        { "code": "1206511023", "name": "Lancheta", "city_code": "1206511000" },
+        { "code": "1206312008", "name": "Landan", "city_code": "1206312000" },
+        { "code": "1206509020", "name": "Langali", "city_code": "1206509000" },
+        { "code": "1204712031", "name": "Langayen", "city_code": "1204712000" },
+        { "code": "1206512013", "name": "Langgal", "city_code": "1206512000" },
+        { "code": "1204710013", "name": "Langkong", "city_code": "1204710000" },
+        { "code": "1204702017", "name": "Lanoon", "city_code": "1204702000" },
+        { "code": "1206312023", "name": "Lapu", "city_code": "1206312000" },
+        { "code": "1206311007", "name": "Lapuz", "city_code": "1206311000" },
+        { "code": "1206502032", "name": "Lasak", "city_code": "1206502000" },
+        { "code": "1204708018", "name": "Latagan", "city_code": "1204708000" },
+        { "code": "1204717006", "name": "Lawili", "city_code": "1204717000" },
+        { "code": "1208003009", "name": "Lebe", "city_code": "1208003000" },
+        { "code": "1204707017", "name": "Leboce", "city_code": "1204707000" },
+        {
+            "code": "1206316028",
+            "name": "Lemsnolon",
+            "city_code": "1206316000"
+        },
+        { "code": "1204710014", "name": "Lepaga", "city_code": "1204710000" },
+        { "code": "1206315004", "name": "Libas", "city_code": "1206315000" },
+        { "code": "1204707018", "name": "Libertad", "city_code": "1204707000" },
+        { "code": "1204718017", "name": "Libertad", "city_code": "1204718000" },
+        { "code": "1206313019", "name": "Libertad", "city_code": "1206313000" },
+        { "code": "1206502015", "name": "Libertad", "city_code": "1206502000" },
+        { "code": "1206311008", "name": "Liberty", "city_code": "1206311000" },
+        { "code": "1206314004", "name": "Liberty", "city_code": "1206314000" },
+        { "code": "1208006004", "name": "Libi", "city_code": "1208006000" },
+        { "code": "1204710015", "name": "Liboo", "city_code": "1204710000" },
+        { "code": "1206509021", "name": "Libua", "city_code": "1206509000" },
+        { "code": "1206509043", "name": "Ligao", "city_code": "1206509000" },
+        { "code": "1230800015", "name": "Ligaya", "city_code": "1230800000" },
+        { "code": "1204710016", "name": "Lika", "city_code": "1204710000" },
+        {
+            "code": "1204702019",
+            "name": "Liliongan",
+            "city_code": "1204702000"
+        },
+        { "code": "1206508009", "name": "Lilit", "city_code": "1206508000" },
+        { "code": "1206512014", "name": "Limuhay", "city_code": "1206512000" },
+        { "code": "1206505011", "name": "Limulan", "city_code": "1206505000" },
+        { "code": "1206317009", "name": "Linan", "city_code": "1206317000" },
+        {
+            "code": "1204704016",
+            "name": "Linangcob",
+            "city_code": "1204704000"
+        },
+        { "code": "1204708019", "name": "Linao", "city_code": "1204708000" },
+        {
+            "code": "1206313020",
+            "name": "Little Baguio",
+            "city_code": "1206313000"
+        },
+        { "code": "1206302014", "name": "Liwanay", "city_code": "1206302000" },
+        { "code": "1204713016", "name": "Lomonay", "city_code": "1204713000" },
+        { "code": "1204709022", "name": "Lomopog", "city_code": "1204709000" },
+        { "code": "1206502016", "name": "Lomoyon", "city_code": "1206502000" },
+        { "code": "1208003010", "name": "Lomuyon", "city_code": "1208003000" },
+        {
+            "code": "1206311009",
+            "name": "Lopez Jaena",
+            "city_code": "1206311000"
+        },
+        { "code": "1206509038", "name": "Lopoken", "city_code": "1206509000" },
+        {
+            "code": "1204701015",
+            "name": "Lower Dado",
+            "city_code": "1204701000"
+        },
+        {
+            "code": "1204709023",
+            "name": "Lower Glad",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1204709024",
+            "name": "Lower Katingawan",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1206319011",
+            "name": "Lower Maculan",
+            "city_code": "1206319000"
+        },
+        {
+            "code": "1208007015",
+            "name": "Lower Mainit",
+            "city_code": "1208007000"
+        },
+        {
+            "code": "1204708020",
+            "name": "Lower Malamote",
+            "city_code": "1204708000"
+        },
+        {
+            "code": "1204717007",
+            "name": "Lower Mingading",
+            "city_code": "1204717000"
+        },
+        { "code": "1204717008", "name": "Luanan", "city_code": "1204717000" },
+        { "code": "1204707019", "name": "Luayon", "city_code": "1204707000" },
+        { "code": "1206319012", "name": "Luhib", "city_code": "1206319000" },
+        { "code": "1204715005", "name": "Luhong", "city_code": "1204715000" },
+        { "code": "1208003011", "name": "Luma", "city_code": "1208003000" },
+        { "code": "1206312009", "name": "Lumakil", "city_code": "1206312000" },
+        { "code": "1208004009", "name": "Lumasal", "city_code": "1208004000" },
+        { "code": "1208004010", "name": "Lumatil", "city_code": "1208004000" },
+        { "code": "1206509022", "name": "Lumitan", "city_code": "1206509000" },
+        {
+            "code": "1208006005",
+            "name": "Lun Masla",
+            "city_code": "1208006000"
+        },
+        {
+            "code": "1208006006",
+            "name": "Lun Padidu",
+            "city_code": "1208006000"
+        },
+        {
+            "code": "1204707020",
+            "name": "Luna Norte",
+            "city_code": "1204707000"
+        },
+        { "code": "1204707021", "name": "Luna Sur", "city_code": "1204707000" },
+        { "code": "1206317010", "name": "Lunen", "city_code": "1206317000" },
+        { "code": "1208007016", "name": "Lutay", "city_code": "1208007000" },
+        {
+            "code": "1206507004",
+            "name": "Lutayan Proper",
+            "city_code": "1206507000"
+        },
+        { "code": "1204704017", "name": "Luvimin", "city_code": "1204704000" },
+        {
+            "code": "1204710017",
+            "name": "Luz Village",
+            "city_code": "1204710000"
+        },
+        { "code": "1206316016", "name": "Maan", "city_code": "1206316000" },
+        { "code": "1208005006", "name": "Mabay", "city_code": "1208005000" },
+        { "code": "1206306009", "name": "Mabini", "city_code": "1206306000" },
+        { "code": "1204713035", "name": "Mabuhay", "city_code": "1204713000" },
+        { "code": "1230800016", "name": "Mabuhay", "city_code": "1230800000" },
+        { "code": "1204701007", "name": "Macabasa", "city_code": "1204701000" },
+        {
+            "code": "1204702021",
+            "name": "Macabenban",
+            "city_code": "1204702000"
+        },
+        {
+            "code": "1204704018",
+            "name": "Macabolig",
+            "city_code": "1204704000"
+        },
+        {
+            "code": "1204709025",
+            "name": "Macasendeg",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1206508010",
+            "name": "Madanding",
+            "city_code": "1206508000"
+        },
+        { "code": "1204710018", "name": "Magallon", "city_code": "1204710000" },
+        { "code": "1206509023", "name": "Maganao", "city_code": "1206509000" },
+        { "code": "1204703010", "name": "Magatos", "city_code": "1204703000" },
+        { "code": "1204714013", "name": "Magbok", "city_code": "1204714000" },
+        {
+            "code": "1204706029",
+            "name": "Magcaalam",
+            "city_code": "1204706000"
+        },
+        { "code": "1206315005", "name": "Magon", "city_code": "1206315000" },
+        {
+            "code": "1204704041",
+            "name": "Magsaysay",
+            "city_code": "1204704000"
+        },
+        {
+            "code": "1204715006",
+            "name": "Magsaysay",
+            "city_code": "1204715000"
+        },
+        {
+            "code": "1206306010",
+            "name": "Magsaysay",
+            "city_code": "1206306000"
+        },
+        {
+            "code": "1206312016",
+            "name": "Magsaysay",
+            "city_code": "1206312000"
+        },
+        {
+            "code": "1206503034",
+            "name": "Magsaysay",
+            "city_code": "1206503000"
+        },
+        { "code": "1206509024", "name": "Maguid", "city_code": "1206509000" },
+        { "code": "1208005007", "name": "Maguling", "city_code": "1208005000" },
+        {
+            "code": "1204706030",
+            "name": "Mahongcog",
+            "city_code": "1204706000"
+        },
+        { "code": "1206315006", "name": "Maibo", "city_code": "1206315000" },
+        { "code": "1206507005", "name": "Maindang", "city_code": "1206507000" },
+        {
+            "code": "1204718018",
+            "name": "Makalangot",
+            "city_code": "1204718000"
+        },
+        { "code": "1206502017", "name": "Makat", "city_code": "1206502000" },
+        { "code": "1208007017", "name": "Malabod", "city_code": "1208007000" },
+        { "code": "1204707022", "name": "Malabuan", "city_code": "1204707000" },
+        {
+            "code": "1204711019",
+            "name": "Malagakit",
+            "city_code": "1204711000"
+        },
+        { "code": "1204716008", "name": "Malagap", "city_code": "1204716000" },
+        { "code": "1208005008", "name": "Malalag", "city_code": "1208005000" },
+        {
+            "code": "1208007018",
+            "name": "Malalag Cogon",
+            "city_code": "1208007000"
+        },
+        { "code": "1204703011", "name": "Malamote", "city_code": "1204703000" },
+        { "code": "1204709026", "name": "Malamote", "city_code": "1204709000" },
+        { "code": "1208007019", "name": "Malandag", "city_code": "1208007000" },
+        {
+            "code": "1204703012",
+            "name": "Malanduague",
+            "city_code": "1204703000"
+        },
+        { "code": "1204715007", "name": "Malangag", "city_code": "1204715000" },
+        { "code": "1204702022", "name": "Malapag", "city_code": "1204702000" },
+        { "code": "1204717009", "name": "Malapang", "city_code": "1204717000" },
+        { "code": "1204707023", "name": "Malasila", "city_code": "1204707000" },
+        { "code": "1204715008", "name": "Malatad", "city_code": "1204715000" },
+        {
+            "code": "1206509025",
+            "name": "Malatuneng",
+            "city_code": "1206509000"
+        },
+        { "code": "1206302015", "name": "Malaya", "city_code": "1206302000" },
+        { "code": "1204710019", "name": "Malayan", "city_code": "1204710000" },
+        { "code": "1208004011", "name": "Malbang", "city_code": "1208004000" },
+        { "code": "1206512015", "name": "Malegdeg", "city_code": "1206512000" },
+        { "code": "1204705019", "name": "Malengen", "city_code": "1204705000" },
+        {
+            "code": "1204718019",
+            "name": "Malibatuan",
+            "city_code": "1204718000"
+        },
+        { "code": "1208003012", "name": "Maligang", "city_code": "1208003000" },
+        { "code": "1206502019", "name": "Maligaya", "city_code": "1206502000" },
+        { "code": "1206508011", "name": "Maligaya", "city_code": "1206508000" },
+        { "code": "1206312011", "name": "Maligo", "city_code": "1206312000" },
+        { "code": "1204704020", "name": "Malinan", "city_code": "1204704000" },
+        { "code": "1204716009", "name": "Malinao", "city_code": "1204716000" },
+        { "code": "1206510012", "name": "Malingon", "city_code": "1206510000" },
+        { "code": "1204715009", "name": "Malire", "city_code": "1204715000" },
+        {
+            "code": "1206509026",
+            "name": "Malisbong",
+            "city_code": "1206509000"
+        },
+        {
+            "code": "1204701008",
+            "name": "Malitubog",
+            "city_code": "1204701000"
+        },
+        { "code": "1206314005", "name": "Maltana", "city_code": "1206314000" },
+        { "code": "1204711020", "name": "Maluao", "city_code": "1204711000" },
+        { "code": "1206316029", "name": "Malugong", "city_code": "1206316000" },
+        { "code": "1204707024", "name": "Malungon", "city_code": "1204707000" },
+        {
+            "code": "1208007020",
+            "name": "Malungon Gamay",
+            "city_code": "1208007000"
+        },
+        { "code": "1206507006", "name": "Mamali", "city_code": "1206507000" },
+        { "code": "1206508012", "name": "Mamali", "city_code": "1206508000" },
+        { "code": "1206306011", "name": "Mambucal", "city_code": "1206306000" },
+        { "code": "1206510013", "name": "Mangalen", "city_code": "1206510000" },
+        {
+            "code": "1206315007",
+            "name": "Mangilala",
+            "city_code": "1206315000"
+        },
+        { "code": "1204702025", "name": "Manili", "city_code": "1204702000" },
+        { "code": "1206507007", "name": "Manili", "city_code": "1206507000" },
+        { "code": "1204706053", "name": "Manobisa", "city_code": "1204706000" },
+        { "code": "1204706033", "name": "Manobo", "city_code": "1204706000" },
+        { "code": "1204704021", "name": "Manongol", "city_code": "1204704000" },
+        { "code": "1204708025", "name": "Manubuan", "city_code": "1204708000" },
+        {
+            "code": "1206318004",
+            "name": "Manuel Roxas",
+            "city_code": "1206318000"
+        },
+        { "code": "1204708026", "name": "Manupal", "city_code": "1204708000" },
+        { "code": "1206504022", "name": "Mapantig", "city_code": "1206504000" },
+        { "code": "1204701009", "name": "Mapurok", "city_code": "1204701000" },
+        { "code": "1204704022", "name": "Marbel", "city_code": "1204704000" },
+        { "code": "1204708027", "name": "Marbel", "city_code": "1204708000" },
+        { "code": "1206503016", "name": "Margues", "city_code": "1206503000" },
+        {
+            "code": "1204718020",
+            "name": "Maria Caridad",
+            "city_code": "1204718000"
+        },
+        {
+            "code": "1208001007",
+            "name": "Maribulan",
+            "city_code": "1208001000"
+        },
+        { "code": "1206501008", "name": "Masiag", "city_code": "1206501000" },
+        { "code": "1206311011", "name": "Matapol", "city_code": "1206311000" },
+        { "code": "1204704023", "name": "Mateo", "city_code": "1204704000" },
+        {
+            "code": "1206508013",
+            "name": "Matiompong",
+            "city_code": "1206508000"
+        },
+        { "code": "1204714014", "name": "Maybula", "city_code": "1204714000" },
+        { "code": "1206502021", "name": "Mayo", "city_code": "1206502000" },
+        { "code": "1206509040", "name": "Medol", "city_code": "1206509000" },
+        { "code": "1204718021", "name": "Meocan", "city_code": "1204718000" },
+        { "code": "1204704024", "name": "Meochao", "city_code": "1204704000" },
+        { "code": "1206317011", "name": "Miasong", "city_code": "1206317000" },
+        {
+            "code": "1204711023",
+            "name": "Midpapan I",
+            "city_code": "1204711000"
+        },
+        {
+            "code": "1204711040",
+            "name": "Midpapan II",
+            "city_code": "1204711000"
+        },
+        { "code": "1206508014", "name": "Midtapok", "city_code": "1206508000" },
+        {
+            "code": "1206512016",
+            "name": "Midtungok",
+            "city_code": "1206512000"
+        },
+        {
+            "code": "1204716010",
+            "name": "Miguel Macasarte",
+            "city_code": "1204716000"
+        },
+        { "code": "1204709028", "name": "Milaya", "city_code": "1204709000" },
+        { "code": "1206509027", "name": "Milbuk", "city_code": "1206509000" },
+        { "code": "1206509039", "name": "Mina", "city_code": "1206509000" },
+        {
+            "code": "1204708028",
+            "name": "Minamaing",
+            "city_code": "1204708000"
+        },
+        { "code": "1204714015", "name": "Minapan", "city_code": "1204714000" },
+        { "code": "1208005009", "name": "Mindupok", "city_code": "1208005000" },
+        { "code": "1204701016", "name": "Mirasol", "city_code": "1204701000" },
+        { "code": "1206509028", "name": "Molon", "city_code": "1206509000" },
+        { "code": "1206313023", "name": "Moloy", "city_code": "1206313000" },
+        {
+            "code": "1206316030",
+            "name": "Mongocayo",
+            "city_code": "1206316000"
+        },
+        { "code": "1204705023", "name": "Montay", "city_code": "1204705000" },
+        {
+            "code": "1206501016",
+            "name": "Monteverde",
+            "city_code": "1206501000"
+        },
+        { "code": "1206306012", "name": "Morales", "city_code": "1206306000" },
+        { "code": "1204704025", "name": "Mua-an", "city_code": "1204704000" },
+        { "code": "1208002020", "name": "Mudan", "city_code": "1208002000" },
+        { "code": "1204711024", "name": "Mulok", "city_code": "1204711000" },
+        {
+            "code": "1204714030",
+            "name": "Nabundasan",
+            "city_code": "1204714000"
+        },
+        { "code": "1206313024", "name": "Naci", "city_code": "1206313000" },
+        { "code": "1208007021", "name": "Nagpan", "city_code": "1208007000" },
+        { "code": "1204718022", "name": "Naje", "city_code": "1204718000" },
+        {
+            "code": "1206505020",
+            "name": "Nalilidan",
+            "city_code": "1206505000"
+        },
+        { "code": "1204709031", "name": "Nalin", "city_code": "1204709000" },
+        { "code": "1208003013", "name": "Nalus", "city_code": "1208003000" },
+        {
+            "code": "1206509029",
+            "name": "Namat Masla",
+            "city_code": "1206509000"
+        },
+        { "code": "1206306013", "name": "Namnama", "city_code": "1206306000" },
+        { "code": "1204718023", "name": "Napalico", "city_code": "1204718000" },
+        { "code": "1206509030", "name": "Napnapon", "city_code": "1206509000" },
+        { "code": "1206512017", "name": "Nati", "city_code": "1206512000" },
+        {
+            "code": "1206502022",
+            "name": "Natividad",
+            "city_code": "1206502000"
+        },
+        {
+            "code": "1204708029",
+            "name": "Natutungan",
+            "city_code": "1204708000"
+        },
+        { "code": "1206319013", "name": "Ned", "city_code": "1206319000" },
+        { "code": "1204709032", "name": "Nes", "city_code": "1204709000" },
+        { "code": "1204708041", "name": "New Abra", "city_code": "1204708000" },
+        {
+            "code": "1208002021",
+            "name": "New Aklan",
+            "city_code": "1208002000"
+        },
+        {
+            "code": "1204708001",
+            "name": "New Alimodian",
+            "city_code": "1204708000"
+        },
+        {
+            "code": "1204710020",
+            "name": "New Antique",
+            "city_code": "1204710000"
+        },
+        {
+            "code": "1204707025",
+            "name": "New Baguio",
+            "city_code": "1204707000"
+        },
+        {
+            "code": "1204710021",
+            "name": "New Barbaza",
+            "city_code": "1204710000"
+        },
+        {
+            "code": "1204704026",
+            "name": "New Bohol",
+            "city_code": "1204704000"
+        },
+        {
+            "code": "1204708030",
+            "name": "New Bugasong",
+            "city_code": "1204708000"
+        },
+        {
+            "code": "1204707026",
+            "name": "New Bulatukan",
+            "city_code": "1204707000"
+        },
+        {
+            "code": "1206506012",
+            "name": "New Calinog",
+            "city_code": "1206506000"
+        },
+        {
+            "code": "1208001014",
+            "name": "New Canaan",
+            "city_code": "1208001000"
+        },
+        {
+            "code": "1204714016",
+            "name": "New Caridad",
+            "city_code": "1204714000"
+        },
+        { "code": "1204707027", "name": "New Cebu", "city_code": "1204707000" },
+        { "code": "1204713022", "name": "New Cebu", "city_code": "1204713000" },
+        { "code": "1206508015", "name": "New Cebu", "city_code": "1206508000" },
+        {
+            "code": "1204710024",
+            "name": "New Consolacion",
+            "city_code": "1204710000"
+        },
+        {
+            "code": "1204711025",
+            "name": "New Culasi",
+            "city_code": "1204711000"
+        },
+        {
+            "code": "1204714017",
+            "name": "New Culasi",
+            "city_code": "1204714000"
+        },
+        {
+            "code": "1206315012",
+            "name": "New Cuyapo",
+            "city_code": "1206315000"
+        },
+        {
+            "code": "1206316011",
+            "name": "New Dumangas",
+            "city_code": "1206316000"
+        },
+        {
+            "code": "1204710025",
+            "name": "New Esperanza",
+            "city_code": "1204710000"
+        },
+        {
+            "code": "1204711026",
+            "name": "New Igbaras",
+            "city_code": "1204711000"
+        },
+        {
+            "code": "1206315008",
+            "name": "New Iloilo",
+            "city_code": "1206315000"
+        },
+        {
+            "code": "1206511010",
+            "name": "New Isabela",
+            "city_code": "1206511000"
+        },
+        {
+            "code": "1204707038",
+            "name": "New Israel",
+            "city_code": "1204707000"
+        },
+        {
+            "code": "1204710026",
+            "name": "New Janiuay",
+            "city_code": "1204710000"
+        },
+        {
+            "code": "1204710022",
+            "name": "New Kalibo",
+            "city_code": "1204710000"
+        },
+        {
+            "code": "1208005010",
+            "name": "New La Union",
+            "city_code": "1208005000"
+        },
+        {
+            "code": "1206511011",
+            "name": "New Lagao",
+            "city_code": "1206511000"
+        },
+        {
+            "code": "1206315009",
+            "name": "New Lambunao",
+            "city_code": "1206315000"
+        },
+        {
+            "code": "1204710027",
+            "name": "New Lawa-an",
+            "city_code": "1204710000"
+        },
+        { "code": "1204717010", "name": "New Leon", "city_code": "1204717000" },
+        {
+            "code": "1204711027",
+            "name": "New Panay",
+            "city_code": "1204711000"
+        },
+        {
+            "code": "1204714018",
+            "name": "New Panay",
+            "city_code": "1204714000"
+        },
+        {
+            "code": "1204717011",
+            "name": "New Panay",
+            "city_code": "1204717000"
+        },
+        {
+            "code": "1206503018",
+            "name": "New Panay",
+            "city_code": "1206503000"
+        },
+        {
+            "code": "1204708031",
+            "name": "New Pandan",
+            "city_code": "1204708000"
+        },
+        {
+            "code": "1206306014",
+            "name": "New Pangasinan",
+            "city_code": "1206306000"
+        },
+        {
+            "code": "1206504024",
+            "name": "New Pangasinan",
+            "city_code": "1206504000"
+        },
+        {
+            "code": "1206511012",
+            "name": "New Passi",
+            "city_code": "1206511000"
+        },
+        {
+            "code": "1204715010",
+            "name": "New Pontevedra",
+            "city_code": "1204715000"
+        },
+        {
+            "code": "1204710028",
+            "name": "New Rizal",
+            "city_code": "1204710000"
+        },
+        { "code": "1204705024", "name": "Nica-an", "city_code": "1204705000" },
+        { "code": "1204706037", "name": "Noa", "city_code": "1204706000" },
+        { "code": "1208004012", "name": "Nomoh", "city_code": "1208004000" },
+        {
+            "code": "1204711021",
+            "name": "North Manuangan",
+            "city_code": "1204711000"
+        },
+        { "code": "1204704027", "name": "Nuangan", "city_code": "1204704000" },
+        {
+            "code": "1204710029",
+            "name": "Nueva Vida",
+            "city_code": "1204710000"
+        },
+        { "code": "1206506013", "name": "Nuling", "city_code": "1206506000" },
+        { "code": "1206503020", "name": "Numo", "city_code": "1206503000" },
+        { "code": "1206505013", "name": "Obial", "city_code": "1206505000" },
+        {
+            "code": "1204707028",
+            "name": "Old Bulatukan",
+            "city_code": "1204707000"
+        },
+        {
+            "code": "1208005011",
+            "name": "Old Poblacion",
+            "city_code": "1208005000"
+        },
+        { "code": "1230800039", "name": "Olympog", "city_code": "1230800000" },
+        { "code": "1204704028", "name": "Onica", "city_code": "1204704000" },
+        { "code": "1204703014", "name": "Osias", "city_code": "1204703000" },
+        { "code": "1204706038", "name": "Owas", "city_code": "1204706000" },
+        {
+            "code": "1204703015",
+            "name": "Paatan Lower",
+            "city_code": "1204703000"
+        },
+        {
+            "code": "1204703016",
+            "name": "Paatan Upper",
+            "city_code": "1204703000"
+        },
+        { "code": "1204701010", "name": "Pacao", "city_code": "1204701000" },
+        { "code": "1204704029", "name": "Paco", "city_code": "1204704000" },
+        { "code": "1204710030", "name": "Pag-asa", "city_code": "1204710000" },
+        { "code": "1206505022", "name": "Pag-asa", "city_code": "1206505000" },
+        { "code": "1208001008", "name": "Pag-asa", "city_code": "1208001000" },
+        {
+            "code": "1206312025",
+            "name": "Pagalungan",
+            "city_code": "1206312000"
+        },
+        { "code": "1204717012", "name": "Pagangan", "city_code": "1204717000" },
+        {
+            "code": "1204712046",
+            "name": "Paidu Pulangi",
+            "city_code": "1204712000"
+        },
+        { "code": "1206503035", "name": "Paitan", "city_code": "1206503000" },
+        { "code": "1204717013", "name": "Palacat", "city_code": "1204717000" },
+        {
+            "code": "1204702028",
+            "name": "Palanggalan",
+            "city_code": "1204702000"
+        },
+        { "code": "1204705025", "name": "Palao", "city_code": "1204705000" },
+        {
+            "code": "1206507011",
+            "name": "Palavilla",
+            "city_code": "1206507000"
+        },
+        { "code": "1206317012", "name": "Palian", "city_code": "1206317000" },
+        { "code": "1206312013", "name": "Palkan", "city_code": "1206312000" },
+        {
+            "code": "1204710037",
+            "name": "Palma-Perez",
+            "city_code": "1204710000"
+        },
+        { "code": "1206314010", "name": "Palo", "city_code": "1206314000" },
+        {
+            "code": "1204709043",
+            "name": "Palongoguen",
+            "city_code": "1204709000"
+        },
+        { "code": "1206508016", "name": "Palumbi", "city_code": "1206508000" },
+        {
+            "code": "1206503021",
+            "name": "Pamantingan",
+            "city_code": "1206503000"
+        },
+        { "code": "1208007022", "name": "Panamin", "city_code": "1208007000" },
+        { "code": "1208004013", "name": "Pananag", "city_code": "1208004000" },
+        { "code": "1206318005", "name": "Panay", "city_code": "1206318000" },
+        {
+            "code": "1204706039",
+            "name": "Pangao-an",
+            "city_code": "1204706000"
+        },
+        { "code": "1208005012", "name": "Pangi", "city_code": "1208005000" },
+        { "code": "1208002022", "name": "Pangyan", "city_code": "1208002000" },
+        { "code": "1206506014", "name": "Pansud", "city_code": "1206506000" },
+        { "code": "1204716011", "name": "Pantar", "city_code": "1204716000" },
+        { "code": "1204716012", "name": "Paradise", "city_code": "1204716000" },
+        { "code": "1204714019", "name": "Paraiso", "city_code": "1204714000" },
+        { "code": "1206306015", "name": "Paraiso", "city_code": "1206306000" },
+        { "code": "1208001009", "name": "Paraiso", "city_code": "1208001000" },
+        { "code": "1206505014", "name": "Paril", "city_code": "1206505000" },
+        { "code": "1204701011", "name": "Paruayan", "city_code": "1204701000" },
+        {
+            "code": "1206506015",
+            "name": "Pasandalan",
+            "city_code": "1206506000"
+        },
+        { "code": "1204704030", "name": "Patadon", "city_code": "1204704000" },
+        {
+            "code": "1204708033",
+            "name": "Patadon West",
+            "city_code": "1204708000"
+        },
+        { "code": "1208006007", "name": "Patag", "city_code": "1208006000" },
+        {
+            "code": "1204709034",
+            "name": "Patindeguen",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1204711030",
+            "name": "Payong-payong",
+            "city_code": "1204711000"
+        },
+        { "code": "1206510015", "name": "Pedtubo", "city_code": "1206510000" },
+        { "code": "1204717014", "name": "Pentil", "city_code": "1204717000" },
+        { "code": "1204704031", "name": "Perez", "city_code": "1204704000" },
+        {
+            "code": "1206508017",
+            "name": "Pidtiguian",
+            "city_code": "1206508000"
+        },
+        {
+            "code": "1204701012",
+            "name": "Pigcawaran",
+            "city_code": "1204701000"
+        },
+        {
+            "code": "1206508018",
+            "name": "Pimbalayan",
+            "city_code": "1206508000"
+        },
+        {
+            "code": "1204708042",
+            "name": "Pinamaton",
+            "city_code": "1204708000"
+        },
+        {
+            "code": "1204716013",
+            "name": "Pinamulaan",
+            "city_code": "1204716000"
+        },
+        {
+            "code": "1206508019",
+            "name": "Pinguiaman",
+            "city_code": "1206508000"
+        },
+        { "code": "1208005013", "name": "Pinol", "city_code": "1208005000" },
+        { "code": "1204703018", "name": "Pisan", "city_code": "1204703000" },
+        {
+            "code": "1204702032",
+            "name": "Poblacion",
+            "city_code": "1204702000"
+        },
+        {
+            "code": "1204703019",
+            "name": "Poblacion",
+            "city_code": "1204703000"
+        },
+        {
+            "code": "1204704032",
+            "name": "Poblacion",
+            "city_code": "1204704000"
+        },
+        {
+            "code": "1204705029",
+            "name": "Poblacion",
+            "city_code": "1204705000"
+        },
+        {
+            "code": "1204706040",
+            "name": "Poblacion",
+            "city_code": "1204706000"
+        },
+        {
+            "code": "1204707029",
+            "name": "Poblacion",
+            "city_code": "1204707000"
+        },
+        {
+            "code": "1204708034",
+            "name": "Poblacion",
+            "city_code": "1204708000"
+        },
+        {
+            "code": "1204710031",
+            "name": "Poblacion",
+            "city_code": "1204710000"
+        },
+        {
+            "code": "1204712050",
+            "name": "Poblacion",
+            "city_code": "1204712000"
+        },
+        {
+            "code": "1204713024",
+            "name": "Poblacion",
+            "city_code": "1204713000"
+        },
+        {
+            "code": "1204714020",
+            "name": "Poblacion",
+            "city_code": "1204714000"
+        },
+        {
+            "code": "1204715011",
+            "name": "Poblacion",
+            "city_code": "1204715000"
+        },
+        {
+            "code": "1206311013",
+            "name": "Poblacion",
+            "city_code": "1206311000"
+        },
+        {
+            "code": "1206312014",
+            "name": "Poblacion",
+            "city_code": "1206312000"
+        },
+        {
+            "code": "1206314006",
+            "name": "Poblacion",
+            "city_code": "1206314000"
+        },
+        {
+            "code": "1206315010",
+            "name": "Poblacion",
+            "city_code": "1206315000"
+        },
+        {
+            "code": "1206316020",
+            "name": "Poblacion",
+            "city_code": "1206316000"
+        },
+        {
+            "code": "1206317013",
+            "name": "Poblacion",
+            "city_code": "1206317000"
+        },
+        {
+            "code": "1206318006",
+            "name": "Poblacion",
+            "city_code": "1206318000"
+        },
+        {
+            "code": "1206319014",
+            "name": "Poblacion",
+            "city_code": "1206319000"
+        },
+        {
+            "code": "1206501009",
+            "name": "Poblacion",
+            "city_code": "1206501000"
+        },
+        {
+            "code": "1206502023",
+            "name": "Poblacion",
+            "city_code": "1206502000"
+        },
+        {
+            "code": "1206503022",
+            "name": "Poblacion",
+            "city_code": "1206503000"
+        },
+        {
+            "code": "1206505015",
+            "name": "Poblacion",
+            "city_code": "1206505000"
+        },
+        {
+            "code": "1206506016",
+            "name": "Poblacion",
+            "city_code": "1206506000"
+        },
+        {
+            "code": "1206508020",
+            "name": "Poblacion",
+            "city_code": "1206508000"
+        },
+        {
+            "code": "1206509031",
+            "name": "Poblacion",
+            "city_code": "1206509000"
+        },
+        {
+            "code": "1206510016",
+            "name": "Poblacion",
+            "city_code": "1206510000"
+        },
+        {
+            "code": "1206511013",
+            "name": "Poblacion",
+            "city_code": "1206511000"
+        },
+        {
+            "code": "1208001010",
+            "name": "Poblacion",
+            "city_code": "1208001000"
+        },
+        {
+            "code": "1208002023",
+            "name": "Poblacion",
+            "city_code": "1208002000"
+        },
+        {
+            "code": "1208003014",
+            "name": "Poblacion",
+            "city_code": "1208003000"
+        },
+        {
+            "code": "1208004014",
+            "name": "Poblacion",
+            "city_code": "1208004000"
+        },
+        {
+            "code": "1208006008",
+            "name": "Poblacion",
+            "city_code": "1208006000"
+        },
+        {
+            "code": "1208007023",
+            "name": "Poblacion",
+            "city_code": "1208007000"
+        },
+        {
+            "code": "1204710038",
+            "name": "Poblacion B",
+            "city_code": "1204710000"
+        },
+        {
+            "code": "1204711031",
+            "name": "Poblacion I",
+            "city_code": "1204711000"
+        },
+        {
+            "code": "1204711032",
+            "name": "Poblacion II",
+            "city_code": "1204711000"
+        },
+        {
+            "code": "1204716014",
+            "name": "Poblacion II",
+            "city_code": "1204716000"
+        },
+        {
+            "code": "1204711033",
+            "name": "Poblacion III",
+            "city_code": "1204711000"
+        },
+        {
+            "code": "1206506028",
+            "name": "Poblacion III",
+            "city_code": "1206506000"
+        },
+        {
+            "code": "1204701013",
+            "name": "Polayagan",
+            "city_code": "1204701000"
+        },
+        { "code": "1206312015", "name": "Polo", "city_code": "1206312000" },
+        {
+            "code": "1206502024",
+            "name": "Polomolok",
+            "city_code": "1206502000"
+        },
+        {
+            "code": "1206317014",
+            "name": "Polonuling",
+            "city_code": "1206317000"
+        },
+        {
+            "code": "1206506017",
+            "name": "Poloy-poloy",
+            "city_code": "1206506000"
+        },
+        { "code": "1204714021", "name": "Popoyon", "city_code": "1204714000" },
+        {
+            "code": "1204711034",
+            "name": "Presbitero",
+            "city_code": "1204711000"
+        },
+        {
+            "code": "1206314011",
+            "name": "Pula-bato",
+            "city_code": "1206314000"
+        },
+        {
+            "code": "1204710032",
+            "name": "Pulang-lupa",
+            "city_code": "1204710000"
+        },
+        { "code": "1204712051", "name": "Punol", "city_code": "1204712000" },
+        {
+            "code": "1206302016",
+            "name": "Punong Grande",
+            "city_code": "1206302000"
+        },
+        { "code": "1206506018", "name": "Purikay", "city_code": "1206506000" },
+        { "code": "1206311014", "name": "Puti", "city_code": "1206311000" },
+        {
+            "code": "1204716015",
+            "name": "Puting-bato",
+            "city_code": "1204716000"
+        },
+        {
+            "code": "1206506019",
+            "name": "Ragandang",
+            "city_code": "1206506000"
+        },
+        {
+            "code": "1206511014",
+            "name": "Rajah Nuda",
+            "city_code": "1206511000"
+        },
+        { "code": "1206302017", "name": "Rang-ay", "city_code": "1206302000" },
+        { "code": "1204709044", "name": "Rangaban", "city_code": "1204709000" },
+        { "code": "1204701014", "name": "Rangayen", "city_code": "1204701000" },
+        { "code": "1204702034", "name": "Ranzo", "city_code": "1204702000" },
+        {
+            "code": "1204701017",
+            "name": "Raradangan",
+            "city_code": "1204701000"
+        },
+        { "code": "1204711035", "name": "Renibon", "city_code": "1204711000" },
+        { "code": "1206302018", "name": "Reyes", "city_code": "1206302000" },
+        {
+            "code": "1208002024",
+            "name": "Rio Del Pilar",
+            "city_code": "1208002000"
+        },
+        { "code": "1206302019", "name": "Rizal", "city_code": "1206302000" },
+        {
+            "code": "1206302020",
+            "name": "Rizal Poblacion",
+            "city_code": "1206302000"
+        },
+        { "code": "1204707030", "name": "Rodero", "city_code": "1204707000" },
+        {
+            "code": "1206510018",
+            "name": "Romualdez",
+            "city_code": "1206510000"
+        },
+        { "code": "1206306020", "name": "Rotonda", "city_code": "1206306000" },
+        { "code": "1206312017", "name": "Rubber", "city_code": "1206312000" },
+        { "code": "1206505021", "name": "Sabanal", "city_code": "1206505000" },
+        { "code": "1204709045", "name": "Sadaan", "city_code": "1204709000" },
+        { "code": "1206508021", "name": "Sadsalan", "city_code": "1206508000" },
+        { "code": "1206503023", "name": "Sagasa", "city_code": "1206503000" },
+        {
+            "code": "1204713026",
+            "name": "Sagcungan",
+            "city_code": "1204713000"
+        },
+        { "code": "1204707031", "name": "Saguing", "city_code": "1204707000" },
+        { "code": "1206318010", "name": "Sajaneba", "city_code": "1206318000" },
+        { "code": "1206503024", "name": "Salabaca", "city_code": "1206503000" },
+        { "code": "1206316031", "name": "Salacafe", "city_code": "1206316000" },
+        { "code": "1208003015", "name": "Salakit", "city_code": "1208003000" },
+        { "code": "1206506020", "name": "Salaman", "city_code": "1206506000" },
+        {
+            "code": "1206506021",
+            "name": "Salangsang",
+            "city_code": "1206506000"
+        },
+        {
+            "code": "1204703020",
+            "name": "Salapungan",
+            "city_code": "1204703000"
+        },
+        { "code": "1204718024", "name": "Salasang", "city_code": "1204718000" },
+        { "code": "1204713027", "name": "Salat", "city_code": "1204713000" },
+        { "code": "1206503036", "name": "Saliao", "city_code": "1206503000" },
+        { "code": "1204706042", "name": "Sallab", "city_code": "1204706000" },
+        {
+            "code": "1206503037",
+            "name": "Salumping",
+            "city_code": "1206503000"
+        },
+        {
+            "code": "1204709046",
+            "name": "Salunayan",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1204708035",
+            "name": "Salvacion",
+            "city_code": "1204708000"
+        },
+        { "code": "1206504026", "name": "Sampao", "city_code": "1206504000" },
+        { "code": "1206507008", "name": "Sampao", "city_code": "1206507000" },
+        {
+            "code": "1206511015",
+            "name": "San Antonio",
+            "city_code": "1206511000"
+        },
+        {
+            "code": "1206511016",
+            "name": "San Emmanuel",
+            "city_code": "1206511000"
+        },
+        {
+            "code": "1206315011",
+            "name": "San Felipe",
+            "city_code": "1206315000"
+        },
+        {
+            "code": "1204704033",
+            "name": "San Isidro",
+            "city_code": "1204704000"
+        },
+        {
+            "code": "1204709048",
+            "name": "San Isidro",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1206306021",
+            "name": "San Isidro",
+            "city_code": "1206306000"
+        },
+        {
+            "code": "1206314013",
+            "name": "San Isidro",
+            "city_code": "1206314000"
+        },
+        {
+            "code": "1206318007",
+            "name": "San Isidro",
+            "city_code": "1206318000"
+        },
+        {
+            "code": "1230800023",
+            "name": "San Isidro",
+            "city_code": "1230800000"
+        },
+        { "code": "1206302021", "name": "San Jose", "city_code": "1206302000" },
+        { "code": "1206306022", "name": "San Jose", "city_code": "1206306000" },
+        { "code": "1206311016", "name": "San Jose", "city_code": "1206311000" },
+        { "code": "1206510020", "name": "San Jose", "city_code": "1206510000" },
+        { "code": "1208002025", "name": "San Jose", "city_code": "1208002000" },
+        { "code": "1230800024", "name": "San Jose", "city_code": "1230800000" },
+        { "code": "1208007024", "name": "San Juan", "city_code": "1208007000" },
+        {
+            "code": "1204717015",
+            "name": "San Mateo",
+            "city_code": "1204717000"
+        },
+        {
+            "code": "1204718025",
+            "name": "San Miguel",
+            "city_code": "1204718000"
+        },
+        {
+            "code": "1206311017",
+            "name": "San Miguel",
+            "city_code": "1206311000"
+        },
+        {
+            "code": "1208007025",
+            "name": "San Miguel",
+            "city_code": "1208007000"
+        },
+        {
+            "code": "1206511019",
+            "name": "San Pablo",
+            "city_code": "1206511000"
+        },
+        {
+            "code": "1204709058",
+            "name": "San Pedro",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1206510026",
+            "name": "San Pedro",
+            "city_code": "1206510000"
+        },
+        {
+            "code": "1206511022",
+            "name": "San Rafael",
+            "city_code": "1206511000"
+        },
+        {
+            "code": "1204704034",
+            "name": "San Roque",
+            "city_code": "1204704000"
+        },
+        {
+            "code": "1206306023",
+            "name": "San Roque",
+            "city_code": "1206306000"
+        },
+        {
+            "code": "1206509032",
+            "name": "San Roque",
+            "city_code": "1206509000"
+        },
+        {
+            "code": "1208007026",
+            "name": "San Roque",
+            "city_code": "1208007000"
+        },
+        {
+            "code": "1204707032",
+            "name": "San Vicente",
+            "city_code": "1204707000"
+        },
+        {
+            "code": "1206302022",
+            "name": "San Vicente",
+            "city_code": "1206302000"
+        },
+        {
+            "code": "1206318008",
+            "name": "San Vicente",
+            "city_code": "1206318000"
+        },
+        {
+            "code": "1208002026",
+            "name": "San Vicente",
+            "city_code": "1208002000"
+        },
+        { "code": "1204710033", "name": "Sangat", "city_code": "1204710000" },
+        { "code": "1206505016", "name": "Sangay", "city_code": "1206505000" },
+        {
+            "code": "1204709049",
+            "name": "Santa Cruz",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1204717016",
+            "name": "Santa Cruz",
+            "city_code": "1204717000"
+        },
+        {
+            "code": "1206306024",
+            "name": "Santa Cruz",
+            "city_code": "1206306000"
+        },
+        {
+            "code": "1206314014",
+            "name": "Santa Cruz",
+            "city_code": "1206314000"
+        },
+        {
+            "code": "1204707033",
+            "name": "Santa Felomina",
+            "city_code": "1204707000"
+        },
+        {
+            "code": "1204708036",
+            "name": "Santa Maria",
+            "city_code": "1204708000"
+        },
+        {
+            "code": "1206505017",
+            "name": "Santa Maria",
+            "city_code": "1206505000"
+        },
+        {
+            "code": "1204704035",
+            "name": "Santo Niño",
+            "city_code": "1204704000"
+        },
+        {
+            "code": "1204707034",
+            "name": "Santo Niño",
+            "city_code": "1204707000"
+        },
+        {
+            "code": "1204718026",
+            "name": "Santo Niño",
+            "city_code": "1204718000"
+        },
+        {
+            "code": "1206306025",
+            "name": "Santo Niño",
+            "city_code": "1206306000"
+        },
+        {
+            "code": "1206501017",
+            "name": "Santo Niño",
+            "city_code": "1206501000"
+        },
+        {
+            "code": "1208006009",
+            "name": "Sapu Masla",
+            "city_code": "1208006000"
+        },
+        {
+            "code": "1208006010",
+            "name": "Sapu Padidu",
+            "city_code": "1208006000"
+        },
+        { "code": "1206306026", "name": "Sarabia", "city_code": "1206306000" },
+        { "code": "1204708037", "name": "Sarayan", "city_code": "1204708000" },
+        { "code": "1204713028", "name": "Sarayan", "city_code": "1204713000" },
+        { "code": "1206508022", "name": "Seneben", "city_code": "1206508000" },
+        {
+            "code": "1208004015",
+            "name": "Seven Hills",
+            "city_code": "1208004000"
+        },
+        { "code": "1206512018", "name": "Sewod", "city_code": "1206512000" },
+        { "code": "1204704036", "name": "Sibawan", "city_code": "1204704000" },
+        { "code": "1204714022", "name": "Sibsib", "city_code": "1204714000" },
+        { "code": "1206508023", "name": "Sigayan", "city_code": "1206508000" },
+        { "code": "1230800030", "name": "Siguel", "city_code": "1230800000" },
+        { "code": "1204704037", "name": "Sikitan", "city_code": "1204704000" },
+        { "code": "1204712055", "name": "Silik", "city_code": "1204712000" },
+        { "code": "1206319015", "name": "Siluton", "city_code": "1206319000" },
+        { "code": "1206312018", "name": "Silway 7", "city_code": "1206312000" },
+        { "code": "1206312019", "name": "Silway 8", "city_code": "1206312000" },
+        { "code": "1206317015", "name": "Simbo", "city_code": "1206317000" },
+        { "code": "1206311020", "name": "Simsiman", "city_code": "1206311000" },
+        {
+            "code": "1206510021",
+            "name": "Sinakulay",
+            "city_code": "1206510000"
+        },
+        {
+            "code": "1204705032",
+            "name": "Sinapangan",
+            "city_code": "1204705000"
+        },
+        {
+            "code": "1206502027",
+            "name": "Sinapulan",
+            "city_code": "1206502000"
+        },
+        { "code": "1230800026", "name": "Sinawal", "city_code": "1230800000" },
+        {
+            "code": "1204705033",
+            "name": "Sinawingan",
+            "city_code": "1204705000"
+        },
+        { "code": "1204704038", "name": "Singao", "city_code": "1204704000" },
+        {
+            "code": "1204707035",
+            "name": "Sinkatulan",
+            "city_code": "1204707000"
+        },
+        { "code": "1206316012", "name": "Sinolon", "city_code": "1206316000" },
+        { "code": "1206507009", "name": "Sisiman", "city_code": "1206507000" },
+        { "code": "1206501020", "name": "Sison", "city_code": "1206501000" },
+        { "code": "1208005014", "name": "Sison", "city_code": "1208005000" },
+        {
+            "code": "1208002027",
+            "name": "Small Margus",
+            "city_code": "1208002000"
+        },
+        { "code": "1204716016", "name": "Solama", "city_code": "1204716000" },
+        {
+            "code": "1204711037",
+            "name": "South Manuangan",
+            "city_code": "1204711000"
+        },
+        {
+            "code": "1206501010",
+            "name": "South Sepaka",
+            "city_code": "1206501000"
+        },
+        { "code": "1208001011", "name": "Spring", "city_code": "1208001000" },
+        { "code": "1206510022", "name": "Suben", "city_code": "1206510000" },
+        { "code": "1206502028", "name": "Sucob", "city_code": "1206502000" },
+        { "code": "1204704039", "name": "Sudapin", "city_code": "1204704000" },
+        { "code": "1208002028", "name": "Sufatubo", "city_code": "1208002000" },
+        { "code": "1208003016", "name": "Suli", "city_code": "1208003000" },
+        { "code": "1206312020", "name": "Sulit", "city_code": "1206312000" },
+        { "code": "1204718027", "name": "Sumalili", "city_code": "1204718000" },
+        { "code": "1206312021", "name": "Sumbakil", "city_code": "1206312000" },
+        { "code": "1204704040", "name": "Sumbao", "city_code": "1204704000" },
+        { "code": "1206501018", "name": "Sumilil", "city_code": "1206501000" },
+        { "code": "1206316032", "name": "T'bolok", "city_code": "1206316000" },
+        { "code": "1208003017", "name": "Tablao", "city_code": "1208003000" },
+        { "code": "1206314007", "name": "Tablu", "city_code": "1206314000" },
+        { "code": "1204708038", "name": "Taculen", "city_code": "1204708000" },
+        { "code": "1204702035", "name": "Tacupan", "city_code": "1204702000" },
+        { "code": "1206512019", "name": "Tacupis", "city_code": "1206512000" },
+        { "code": "1204706043", "name": "Tagbac", "city_code": "1204706000" },
+        { "code": "1206506022", "name": "Taguisa", "city_code": "1206506000" },
+        {
+            "code": "1204708039",
+            "name": "Taguranao",
+            "city_code": "1204708000"
+        },
+        { "code": "1204712056", "name": "Takipan", "city_code": "1204712000" },
+        { "code": "1206319017", "name": "Takunel", "city_code": "1206319000" },
+        { "code": "1206313028", "name": "Talahik", "city_code": "1206313000" },
+        { "code": "1206316021", "name": "Talcon", "city_code": "1206316000" },
+        { "code": "1206319016", "name": "Talisay", "city_code": "1206319000" },
+        { "code": "1204712057", "name": "Talitay", "city_code": "1204712000" },
+        { "code": "1206316022", "name": "Talufo", "city_code": "1206316000" },
+        {
+            "code": "1204707036",
+            "name": "Taluntalunan",
+            "city_code": "1204707000"
+        },
+        { "code": "1208007027", "name": "Talus", "city_code": "1208007000" },
+        { "code": "1208002029", "name": "Taluya", "city_code": "1208002000" },
+        { "code": "1208003018", "name": "Tamadang", "city_code": "1208003000" },
+        { "code": "1204714023", "name": "Tambac", "city_code": "1204714000" },
+        { "code": "1204702036", "name": "Tambad", "city_code": "1204702000" },
+        { "code": "1206508024", "name": "Tambak", "city_code": "1206508000" },
+        { "code": "1208007028", "name": "Tamban", "city_code": "1208007000" },
+        { "code": "1208003019", "name": "Tambilil", "city_code": "1208003000" },
+        { "code": "1230800027", "name": "Tambler", "city_code": "1230800000" },
+        { "code": "1206507010", "name": "Tamnag", "city_code": "1206507000" },
+        { "code": "1204708040", "name": "Tamped", "city_code": "1204708000" },
+        { "code": "1208002030", "name": "Tango", "city_code": "1208002000" },
+        { "code": "1208002031", "name": "Tapon", "city_code": "1208002000" },
+        { "code": "1206319019", "name": "Tasiman", "city_code": "1206319000" },
+        {
+            "code": "1204710034",
+            "name": "Tawantawan",
+            "city_code": "1204710000"
+        },
+        { "code": "1206504028", "name": "Tayugo", "city_code": "1206504000" },
+        { "code": "1206502030", "name": "Telafas", "city_code": "1206502000" },
+        { "code": "1204706044", "name": "Temporan", "city_code": "1204706000" },
+        { "code": "1206318009", "name": "Teresita", "city_code": "1206318000" },
+        { "code": "1204716017", "name": "Thailand", "city_code": "1204716000" },
+        { "code": "1204710035", "name": "Tibao", "city_code": "1204710000" },
+        { "code": "1206506023", "name": "Tibpuan", "city_code": "1206506000" },
+        { "code": "1206509034", "name": "Tibuhol", "city_code": "1206509000" },
+        { "code": "1208005015", "name": "Ticulab", "city_code": "1208005000" },
+        { "code": "1204711038", "name": "Tigbawan", "city_code": "1204711000" },
+        { "code": "1206511021", "name": "Tina", "city_code": "1206511000" },
+        {
+            "code": "1230800028",
+            "name": "Tinagacan",
+            "city_code": "1230800000"
+        },
+        { "code": "1206311021", "name": "Tinago", "city_code": "1206311000" },
+        { "code": "1206512020", "name": "Tinalon", "city_code": "1206512000" },
+        {
+            "code": "1206510023",
+            "name": "Tinaungan",
+            "city_code": "1206510000"
+        },
+        {
+            "code": "1204716018",
+            "name": "Tinimbacan",
+            "city_code": "1204716000"
+        },
+        {
+            "code": "1206315013",
+            "name": "Tinongcop",
+            "city_code": "1206315000"
+        },
+        { "code": "1208004016", "name": "Tinoto", "city_code": "1208004000" },
+        {
+            "code": "1206508025",
+            "name": "Tinumigues",
+            "city_code": "1206508000"
+        },
+        {
+            "code": "1204712060",
+            "name": "Tinutulan",
+            "city_code": "1204712000"
+        },
+        { "code": "1206501019", "name": "Titulok", "city_code": "1206501000" },
+        { "code": "1208001012", "name": "Tokawal", "city_code": "1208001000" },
+        { "code": "1204717018", "name": "Tomado", "city_code": "1204717000" },
+        { "code": "1204702037", "name": "Tonganon", "city_code": "1204702000" },
+        { "code": "1206506024", "name": "Tran", "city_code": "1206506000" },
+        { "code": "1204713029", "name": "Tuael", "city_code": "1204713000" },
+        { "code": "1206510025", "name": "Tual", "city_code": "1206510000" },
+        {
+            "code": "1208005016",
+            "name": "Tuanadatu",
+            "city_code": "1208005000"
+        },
+        { "code": "1206317016", "name": "Tubeng", "city_code": "1206317000" },
+        { "code": "1206313030", "name": "Tubiala", "city_code": "1206313000" },
+        { "code": "1204711039", "name": "Tubon", "city_code": "1204711000" },
+        { "code": "1204714024", "name": "Tuburan", "city_code": "1204714000" },
+        { "code": "1206316023", "name": "Tudok", "city_code": "1206316000" },
+        { "code": "1206501011", "name": "Tuka", "city_code": "1206501000" },
+        {
+            "code": "1204718028",
+            "name": "Tumanding",
+            "city_code": "1204718000"
+        },
+        {
+            "code": "1204716019",
+            "name": "Tumbao-Camalig",
+            "city_code": "1204716000"
+        },
+        { "code": "1206508027", "name": "Tumiao", "city_code": "1206508000" },
+        { "code": "1208006011", "name": "Tuyan", "city_code": "1208006000" },
+        { "code": "1206508028", "name": "Udtong", "city_code": "1206508000" },
+        {
+            "code": "1204702020",
+            "name": "Ugalingan",
+            "city_code": "1204702000"
+        },
+        { "code": "1204710036", "name": "Ugpay", "city_code": "1204710000" },
+        { "code": "1204705034", "name": "Ulamian", "city_code": "1204705000" },
+        { "code": "1208005017", "name": "Upo", "city_code": "1208005000" },
+        {
+            "code": "1204711002",
+            "name": "Upper Baguer",
+            "city_code": "1204711000"
+        },
+        {
+            "code": "1208007029",
+            "name": "Upper Biangan",
+            "city_code": "1208007000"
+        },
+        {
+            "code": "1204709053",
+            "name": "Upper Glad I",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1204709054",
+            "name": "Upper Glad II",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1206511020",
+            "name": "Upper Katungal",
+            "city_code": "1206511000"
+        },
+        {
+            "code": "1206312022",
+            "name": "Upper Klinan",
+            "city_code": "1206312000"
+        },
+        {
+            "code": "1204709055",
+            "name": "Upper Labas",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1230800031",
+            "name": "Upper Labay",
+            "city_code": "1230800000"
+        },
+        {
+            "code": "1208007030",
+            "name": "Upper Lumabat",
+            "city_code": "1208007000"
+        },
+        {
+            "code": "1206319018",
+            "name": "Upper Maculan",
+            "city_code": "1206319000"
+        },
+        {
+            "code": "1208007031",
+            "name": "Upper Mainit",
+            "city_code": "1208007000"
+        },
+        {
+            "code": "1204717019",
+            "name": "Upper Mingading",
+            "city_code": "1204717000"
+        },
+        {
+            "code": "1206313031",
+            "name": "Upper Sepaka",
+            "city_code": "1206313000"
+        },
+        {
+            "code": "1208006012",
+            "name": "Upper Suyan",
+            "city_code": "1208006000"
+        },
+        { "code": "1206313032", "name": "Veterans", "city_code": "1206313000" },
+        {
+            "code": "1204707037",
+            "name": "Villaflores",
+            "city_code": "1204707000"
+        },
+        {
+            "code": "1206506025",
+            "name": "Villamonte",
+            "city_code": "1206506000"
+        },
+        { "code": "1206503032", "name": "Villamor", "city_code": "1206503000" },
+        {
+            "code": "1204709056",
+            "name": "Villarica",
+            "city_code": "1204709000"
+        },
+        {
+            "code": "1206511006",
+            "name": "Virginia Griño",
+            "city_code": "1206511000"
+        },
+        { "code": "1204716020", "name": "Wadya", "city_code": "1204716000" },
+        { "code": "1206509035", "name": "Wal", "city_code": "1206509000" },
+        { "code": "1208005018", "name": "Wali", "city_code": "1208005000" },
+        { "code": "1206509041", "name": "Wasag", "city_code": "1206509000" },
+        {
+            "code": "1206302024",
+            "name": "Yangco Poblacion",
+            "city_code": "1206302000"
+        },
+        { "code": "1208005019", "name": "Zion", "city_code": "1208005000" },
+        { "code": "1206306016", "name": "Zone I", "city_code": "1206306000" },
+        { "code": "1206306017", "name": "Zone II", "city_code": "1206306000" },
+        { "code": "1206306018", "name": "Zone III", "city_code": "1206306000" },
+        { "code": "1206306019", "name": "Zone IV", "city_code": "1206306000" },
+        { "code": "1206306027", "name": "Zulueta", "city_code": "1206306000" }
+    ]
+}

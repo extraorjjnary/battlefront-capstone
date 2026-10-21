@@ -12,9 +12,7 @@ import ProductImage from '@/components/catalog/ProductImage.vue';
 import ProductPrice from '@/components/catalog/ProductPrice.vue';
 import StockAvailability from '@/components/catalog/StockAvailability.vue';
 import { Button } from '@/components/ui/button';
-import {
-    store as storeRecommendationInteraction,
-} from '@/routes/recommendations/interactions';
+import { store as storeRecommendationInteraction } from '@/routes/recommendations/interactions';
 import { show as productShow } from '@/routes/products';
 
 const props = defineProps({
@@ -278,14 +276,16 @@ onBeforeUnmount(() => {
     >
         <div class="flex flex-wrap items-end justify-between gap-4">
             <div class="max-w-2xl">
-
                 <h2
                     id="recommendation-section-heading"
                     class="text-xl font-semibold tracking-tight"
                 >
                     {{ title }}
                 </h2>
-                <p v-if="description" class="text-muted-foreground mt-1 text-sm leading-6">
+                <p
+                    v-if="description"
+                    class="text-muted-foreground mt-1 text-sm leading-6"
+                >
                     {{ description }}
                 </p>
             </div>

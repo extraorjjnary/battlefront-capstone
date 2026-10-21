@@ -523,14 +523,14 @@ The prefill contains `delivery_destination`, `delivery_barangay_code`, and `deli
 
 All requests use the existing customer bearer token. `GET /delivery-locations` returns `{data:{version:"2026-03-31.v2",locations:[...]}}`. Lazily load:
 
-| Query | Result |
-| --- | --- |
-| `level=regions` | 18 regions: code/name |
+| Query                                    | Result                                                   |
+| ---------------------------------------- | -------------------------------------------------------- |
+| `level=regions`                          | 18 regions: code/name                                    |
 | `level=provinces&parent_code=1800000000` | Provinces in Negros Island Region: code/name/region_code |
-| `level=cities&parent_code=1804500000` | Cities/municipalities belonging to Negros Occidental |
-| `level=cities&parent_code=1300000000` | NCR cities/municipalities with no province |
-| `level=city&parent_code=1804523000` | One city for saved-address hydration |
-| `level=barangays&parent_code=1804523000` | Sagay barangays: code/name/city_code |
+| `level=cities&parent_code=1804500000`    | Cities/municipalities belonging to Negros Occidental     |
+| `level=cities&parent_code=1300000000`    | NCR cities/municipalities with no province               |
+| `level=city&parent_code=1804523000`      | One city for saved-address hydration                     |
+| `level=barangays&parent_code=1804523000` | Sagay barangays: code/name/city_code                     |
 
 City records include code/name/region_code/nullable province_code/destination/type/city_class. Use null province for independent localities, including HUCs, NCR, Isabela and SGA; null does not itself imply HUC. Manila district metadata belongs to City of Manila. Keep every code as a string. Reset descendants after parent changes and discard stale responses. Invalid parents return 422 `errors.parent_code`. No external PSGC API is needed.
 
@@ -563,18 +563,18 @@ Order detail `delivery_quote` adds nullable `metadata` containing accepted geogr
 
 Required fields:
 
-| Field                | Rule                                                                                                                 |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| cart_item_ids        | Required nonempty list of distinct positive integer cart-item IDs owned by the customer                              |
-| recipient_name       | String <=255                                                                                                         |
-| contact_number       | String <=20; preserve formatting as text                                                                             |
-| fulfillment_method   | pickup or delivery                                                                                                   |
-| payment_method       | cash, card_at_store, gcash, maya, cod                                                                                |
-| delivery_address     | Legacy mobile delivery: string <=255, required when both structured fields are absent; prohibited when nonempty for pickup |
-| delivery_barangay_code | Structured delivery: required 10-digit string belonging to the selected destination; prohibited when nonempty for pickup |
-| delivery_address_details | Structured delivery: required nonblank string; composed address must fit 255 characters; prohibited when nonempty for pickup |
-| delivery_destination | Exactly one destination for delivery: an original canonical alias from `delivery_quotes` or the selected full city code for structured nationwide address fields; prohibited when nonempty for pickup |
-| payment_proof        | Required for gcash/maya; prohibited for cash/card_at_store/cod                                                       |
+| Field                    | Rule                                                                                                                                                                                                  |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| cart_item_ids            | Required nonempty list of distinct positive integer cart-item IDs owned by the customer                                                                                                               |
+| recipient_name           | String <=255                                                                                                                                                                                          |
+| contact_number           | String <=20; preserve formatting as text                                                                                                                                                              |
+| fulfillment_method       | pickup or delivery                                                                                                                                                                                    |
+| payment_method           | cash, card_at_store, gcash, maya, cod                                                                                                                                                                 |
+| delivery_address         | Legacy mobile delivery: string <=255, required when both structured fields are absent; prohibited when nonempty for pickup                                                                            |
+| delivery_barangay_code   | Structured delivery: required 10-digit string belonging to the selected destination; prohibited when nonempty for pickup                                                                              |
+| delivery_address_details | Structured delivery: required nonblank string; composed address must fit 255 characters; prohibited when nonempty for pickup                                                                          |
+| delivery_destination     | Exactly one destination for delivery: an original canonical alias from `delivery_quotes` or the selected full city code for structured nationwide address fields; prohibited when nonempty for pickup |
+| payment_proof            | Required for gcash/maya; prohibited for cash/card_at_store/cod                                                                                                                                        |
 
 Pickup accepts cash, card_at_store, gcash, and maya. Delivery accepts gcash, maya, and cod. COD is delivery-only and requires no uploaded proof or advance payment. Submit JSON for cash/card pickup:
 
@@ -960,7 +960,7 @@ The collection uses the [Postman v2.1 JSON format](https://schema.postman.com/) 
 | rejected_order_id                                         | Owned wallet order prepared with rejected payment in web administration                                                                              |
 | quantity, page, search                                    | Representative nonsecret defaults where useful; optional catalog filters initially disabled                                                          |
 | recipient_name, contact_number, delivery_address          | Locally supplied test checkout/profile values                                                                                                        |
-| delivery_destination                                      | Configured destination alias or full structured city code; defaults to Sagay City for disposable delivery tests                                     |
+| delivery_destination                                      | Configured destination alias or full structured city code; defaults to Sagay City for disposable delivery tests                                      |
 | chatbot_message, follow_up_message                        | Representative public questions provided                                                                                                             |
 | context_token, guest_context_token                        | Separate customer/guest continuation values captured by chatbot scripts                                                                              |
 | other_cart_item_id, other_order_id, other_order_reference | Another disposable customer's resources, for ownership checks                                                                                        |

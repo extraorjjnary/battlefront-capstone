@@ -98,19 +98,26 @@ function loadPage(path, inlineTemplate = false) {
             '@/components/InputError.vue': { default: inputError },
             '@/lib/currency': { formatCurrency },
             '@/lib/orderStatus': { orderStatusBadgeClass },
-            '@/actions/App/Http/Controllers/Administration/OrderStatusController': {
-                default: {
-                    update: (id) => ({
-                        url: `/administration/orders/${id}/status`,
-                        method: 'patch',
-                    }),
+            '@/actions/App/Http/Controllers/Administration/OrderStatusController':
+                {
+                    default: {
+                        update: (id) => ({
+                            url: `/administration/orders/${id}/status`,
+                            method: 'patch',
+                        }),
+                    },
                 },
-            },
             '@/routes/administration/orders/cod-collection': {
-                store: (id) => ({ url: `/administration/orders/${id}/cod-collection`, method: 'post' }),
+                store: (id) => ({
+                    url: `/administration/orders/${id}/cod-collection`,
+                    method: 'post',
+                }),
             },
             '@/routes/administration/orders/pickup-confirmation': {
-                store: (id) => ({ url: `/administration/orders/${id}/pickup-confirmation`, method: 'post' }),
+                store: (id) => ({
+                    url: `/administration/orders/${id}/pickup-confirmation`,
+                    method: 'post',
+                }),
             },
         },
         { get: (target, key) => target[key] ?? generic },
@@ -136,8 +143,11 @@ function orderProps(overrides = {}) {
             fulfillment: { value: 'pickup', label: 'Pickup' },
             payment: {
                 method: {
-                    value: 'cash', label: 'Cash (Pay at Pickup)', requires_proof: false,
-                    description: 'Pay cash when collecting your products at the store.',
+                    value: 'cash',
+                    label: 'Cash (Pay at Pickup)',
+                    requires_proof: false,
+                    description:
+                        'Pay cash when collecting your products at the store.',
                 },
                 status: { value: 'pending', label: 'Pending' },
                 pay_at_pickup: true,
@@ -329,7 +339,10 @@ test('admin detail flags unconfigured delivery logistics without offering LBC tr
     assert.match(html, /Product subtotal only/);
     assert.match(html, /Arrange delivery separately/);
     assert.match(html, /no delivery fee, LBC quote, booking, or estimate/);
-    assert.match(html, /Manual shipment setup does not change the saved total or add a fee/);
+    assert.match(
+        html,
+        /Manual shipment setup does not change the saved total or add a fee/,
+    );
     assert.doesNotMatch(html, /Shipment progress/);
 });
 
@@ -375,7 +388,11 @@ function codOrderProps(canConfirm = false) {
         fulfillment: { value: 'delivery', label: 'Delivery' },
         allowed_status_transitions: [],
         payment: {
-            method: { value: 'cod', label: 'Cash on Delivery (COD)', requires_proof: false },
+            method: {
+                value: 'cod',
+                label: 'Cash on Delivery (COD)',
+                requires_proof: false,
+            },
             status: { value: 'pending', label: 'COD — Awaiting Collection' },
             can_confirm_cod_collection: canConfirm,
         },
@@ -392,7 +409,9 @@ test('pending COD offers an enabled Processing option and submits without paymen
     ];
     const loaded = loadPage('../Administration/Orders/Show.vue', true);
     const html = await renderToString(Vue.h(loaded.component, props));
-    const processingOption = html.match(/<div\b[^>]*\bvalue="processing"[^>]*>/)?.[0];
+    const processingOption = html.match(
+        /<div\b[^>]*\bvalue="processing"[^>]*>/,
+    )?.[0];
     assert.ok(processingOption, 'Processing must be offered for eligible COD');
     assert.doesNotMatch(processingOption, /\bdisabled(?:=|\s|>)/);
     assert.doesNotMatch(html, /\bvalue="completed"/);
@@ -400,16 +419,26 @@ test('pending COD offers an enabled Processing option and submits without paymen
     const scope = Vue.effectScope();
     try {
         const admin = loadPage('../Administration/Orders/Show.vue');
-        const page = scope.run(() => admin.component.setup(props, { expose() {} }));
+        const page = scope.run(() =>
+            admin.component.setup(props, { expose() {} }),
+        );
         page.selectOrderStatus('processing');
         page.requestOrderStatusUpdate();
         assert.equal(page.orderStatusForm.status, 'processing');
         assert.equal(page.orderConfirmationOpen.value, false);
-        assert.deepEqual(admin.submissions.map(({ target }) => target), [{
-            url: '/administration/orders/7/status',
-            method: 'patch',
-        }]);
-        assert.equal(page.paymentStatusForm.manual_verification_confirmed, false);
+        assert.deepEqual(
+            admin.submissions.map(({ target }) => target),
+            [
+                {
+                    url: '/administration/orders/7/status',
+                    method: 'patch',
+                },
+            ],
+        );
+        assert.equal(
+            page.paymentStatusForm.manual_verification_confirmed,
+            false,
+        );
         assert.equal(props.order.payment.status.value, 'pending');
     } finally {
         scope.stop();
@@ -419,13 +448,19 @@ test('pending COD offers an enabled Processing option and submits without paymen
 test('unverified prepaid payments cannot select or submit server-excluded fulfillment transitions', async () => {
     for (const method of ['gcash', 'maya']) {
         for (const status of ['pending', 'rejected']) {
-            const props = { order: orderProps({
-                payment: {
-                    method: { value: method, label: method, requires_proof: true },
-                    status: { value: status, label: status },
-                    rejection_reasons: [],
-                },
-            }).order };
+            const props = {
+                order: orderProps({
+                    payment: {
+                        method: {
+                            value: method,
+                            label: method,
+                            requires_proof: true,
+                        },
+                        status: { value: status, label: status },
+                        rejection_reasons: [],
+                    },
+                }).order,
+            };
             const loaded = loadPage('../Administration/Orders/Show.vue', true);
             const html = await renderToString(Vue.h(loaded.component, props));
             assert.doesNotMatch(html, /\bvalue="(?:processing|completed)"/);
@@ -434,7 +469,9 @@ test('unverified prepaid payments cannot select or submit server-excluded fulfil
             const scope = Vue.effectScope();
             try {
                 const admin = loadPage('../Administration/Orders/Show.vue');
-                const page = scope.run(() => admin.component.setup(props, { expose() {} }));
+                const page = scope.run(() =>
+                    admin.component.setup(props, { expose() {} }),
+                );
                 for (const transition of ['processing', 'completed']) {
                     page.selectOrderStatus(transition);
                     page.requestOrderStatusUpdate();
@@ -452,7 +489,9 @@ test('processing COD cannot directly submit completion when the server excludes 
     const scope = Vue.effectScope();
     try {
         const loaded = loadPage('../Administration/Orders/Show.vue');
-        const page = scope.run(() => loaded.component.setup(codOrderProps(), { expose() {} }));
+        const page = scope.run(() =>
+            loaded.component.setup(codOrderProps(), { expose() {} }),
+        );
         page.selectOrderStatus('completed');
         page.requestOrderStatusUpdate();
         assert.equal(loaded.submissions.length, 0);
@@ -466,22 +505,39 @@ test('pickup offers unpaid Processing and shows combined confirmation only when 
     for (const method of ['cash', 'card_at_store']) {
         for (const eligible of [false, true]) {
             const props = orderProps({
-                status: { value: eligible ? 'processing' : 'pending', label: eligible ? 'Processing' : 'Pending' },
+                status: {
+                    value: eligible ? 'processing' : 'pending',
+                    label: eligible ? 'Processing' : 'Pending',
+                },
                 allowed_status_transitions: eligible
                     ? [{ value: 'cancelled', label: 'Cancelled' }]
-                    : [{ value: 'processing', label: 'Processing' }, { value: 'cancelled', label: 'Cancelled' }],
+                    : [
+                          { value: 'processing', label: 'Processing' },
+                          { value: 'cancelled', label: 'Cancelled' },
+                      ],
             });
             props.order.payment.can_confirm_pickup = eligible;
             props.order.payment.method.value = method;
-            props.order.payment.method.description = method === 'cash'
-                ? 'Pay cash at pickup.'
-                : 'Pay through a physical debit/credit card terminal. This is not an online payment gateway.';
+            props.order.payment.method.description =
+                method === 'cash'
+                    ? 'Pay cash at pickup.'
+                    : 'Pay through a physical debit/credit card terminal. This is not an online payment gateway.';
             const loaded = loadPage('../Administration/Orders/Show.vue', true);
-            const html = await renderToString(Vue.h(loaded.component, { order: props.order }));
-            assert.equal(html.includes('Confirm Payment &amp; Complete Pickup'), eligible);
-            assert.doesNotMatch(html, /Apply payment decision|Verify payment before moving|value="completed"/);
+            const html = await renderToString(
+                Vue.h(loaded.component, { order: props.order }),
+            );
+            assert.equal(
+                html.includes('Confirm Payment &amp; Complete Pickup'),
+                eligible,
+            );
+            assert.doesNotMatch(
+                html,
+                /Apply payment decision|Verify payment before moving|value="completed"/,
+            );
             if (!eligible) {
-                const option = html.match(/<div\b[^>]*\bvalue="processing"[^>]*>/)?.[0];
+                const option = html.match(
+                    /<div\b[^>]*\bvalue="processing"[^>]*>/,
+                )?.[0];
                 assert.ok(option);
                 assert.doesNotMatch(option, /\bdisabled(?:=|\s|>)/);
             }
@@ -497,11 +553,15 @@ test('pickup confirmation requires both checkboxes and prevents duplicate or sta
     const scope = Vue.effectScope();
     try {
         const loaded = loadPage('../Administration/Orders/Show.vue');
-        const props = Vue.reactive({ order: orderProps({
-            status: { value: 'processing', label: 'Processing' },
-        }).order });
+        const props = Vue.reactive({
+            order: orderProps({
+                status: { value: 'processing', label: 'Processing' },
+            }).order,
+        });
         props.order.payment.can_confirm_pickup = true;
-        const page = scope.run(() => loaded.component.setup(props, { expose() {} }));
+        const page = scope.run(() =>
+            loaded.component.setup(props, { expose() {} }),
+        );
         page.requestPickupConfirmation();
         assert.equal(page.pickupConfirmationOpen.value, true);
         page.submitPickupConfirmation();
@@ -512,14 +572,21 @@ test('pickup confirmation requires both checkboxes and prevents duplicate or sta
         page.pickupConfirmationForm.products_handed_over_confirmed = true;
         page.submitPickupConfirmation();
         assert.deepEqual(loaded.submissions[0].target, {
-            url: '/administration/orders/7/pickup-confirmation', method: 'post',
+            url: '/administration/orders/7/pickup-confirmation',
+            method: 'post',
         });
         page.submitPickupConfirmation();
         assert.equal(loaded.submissions.length, 1);
         loaded.submissions[0].options.onSuccess();
         assert.equal(page.pickupConfirmationOpen.value, false);
-        assert.equal(page.pickupConfirmationForm.payment_received_confirmed, false);
-        assert.equal(page.pickupConfirmationForm.products_handed_over_confirmed, false);
+        assert.equal(
+            page.pickupConfirmationForm.payment_received_confirmed,
+            false,
+        );
+        assert.equal(
+            page.pickupConfirmationForm.products_handed_over_confirmed,
+            false,
+        );
         props.order.payment.can_confirm_pickup = false;
         page.pickupConfirmationForm.processing = false;
         page.requestPickupConfirmation();
@@ -532,12 +599,26 @@ test('pickup confirmation requires both checkboxes and prevents duplicate or sta
 test('admin COD controls show collection confirmation only when eligible and hide ordinary payment decisions', async () => {
     for (const eligible of [false, true]) {
         const loaded = loadPage('../Administration/Orders/Show.vue', true);
-        const html = await renderToString(Vue.h(loaded.component, codOrderProps(eligible)));
+        const html = await renderToString(
+            Vue.h(loaded.component, codOrderProps(eligible)),
+        );
         assert.match(html, /COD — Awaiting Collection/);
-        assert.match(html, /Handle failed delivery, unpaid orders, and returns manually/);
-        assert.match(html, /Delivered does not verify payment or record a sale/);
-        assert.match(html, /No automatic cancellation, refund, return, or stock restoration/);
-        assert.doesNotMatch(html, /Apply payment decision|manually at the store|decision is final/);
+        assert.match(
+            html,
+            /Handle failed delivery, unpaid orders, and returns manually/,
+        );
+        assert.match(
+            html,
+            /Delivered does not verify payment or record a sale/,
+        );
+        assert.match(
+            html,
+            /No automatic cancellation, refund, return, or stock restoration/,
+        );
+        assert.doesNotMatch(
+            html,
+            /Apply payment decision|manually at the store|decision is final/,
+        );
         assert.equal(html.includes('Confirm COD Collection'), eligible);
     }
 });
@@ -547,7 +628,9 @@ test('COD confirmation requires an explicit checkbox and blocks duplicate submis
     try {
         const loaded = loadPage('../Administration/Orders/Show.vue');
         const props = Vue.reactive(codOrderProps(true));
-        const page = scope.run(() => loaded.component.setup(props, { expose() {} }));
+        const page = scope.run(() =>
+            loaded.component.setup(props, { expose() {} }),
+        );
         page.requestCodConfirmation();
         assert.equal(page.codConfirmationOpen.value, true);
         assert.equal(page.codCollectionForm.cod_collection_confirmed, false);
@@ -555,7 +638,10 @@ test('COD confirmation requires an explicit checkbox and blocks duplicate submis
         assert.equal(loaded.submissions.length, 0);
         page.codCollectionForm.cod_collection_confirmed = true;
         page.submitCodCollection();
-        assert.deepEqual(loaded.submissions[0].target, { url: '/administration/orders/7/cod-collection', method: 'post' });
+        assert.deepEqual(loaded.submissions[0].target, {
+            url: '/administration/orders/7/cod-collection',
+            method: 'post',
+        });
         page.submitCodCollection();
         assert.equal(loaded.submissions.length, 1);
         loaded.submissions[0].options.onSuccess();
@@ -576,11 +662,16 @@ test('COD delivery confirmation explains that delivery alone does not complete o
         const loaded = loadPage('../Administration/Orders/Show.vue', true);
         const props = codOrderProps();
         props.order.shipment = { status: { value: 'out_for_delivery' } };
-        props.order.shipment_actions = { next_status: { value: 'delivered', label: 'Delivered' } };
-        const render = scope.run(() => loaded.component.setup(props, { expose() {} }));
+        props.order.shipment_actions = {
+            next_status: { value: 'delivered', label: 'Delivered' },
+        };
+        const render = scope.run(() =>
+            loaded.component.setup(props, { expose() {} }),
+        );
         const root = render({}, []);
         function find(node) {
-            if (node?.props?.onClick?.name === 'requestShipmentUpdate') return node;
+            if (node?.props?.onClick?.name === 'requestShipmentUpdate')
+                return node;
             const children = Array.isArray(node?.children) ? node.children : [];
             return children.map(find).find(Boolean);
         }
@@ -588,7 +679,10 @@ test('COD delivery confirmation explains that delivery alone does not complete o
         const html = await renderToString(render({}, []));
         assert.match(html, /order remains Processing until COD collection/);
         assert.match(html, /No sale is recorded yet/);
-        assert.doesNotMatch(html, /This completes the order and records its sale/);
+        assert.doesNotMatch(
+            html,
+            /This completes the order and records its sale/,
+        );
     } finally {
         scope.stop();
     }

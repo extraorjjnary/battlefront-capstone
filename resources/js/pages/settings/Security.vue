@@ -25,10 +25,7 @@ defineOptions({
 <template>
     <div class="space-y-6">
         <Head title="Security settings" />
-        <Heading
-            variant="small"
-            title="Update password"
-        />
+        <Heading variant="small" title="Update password" />
 
         <Form
             v-bind="SecurityController.update.form()"

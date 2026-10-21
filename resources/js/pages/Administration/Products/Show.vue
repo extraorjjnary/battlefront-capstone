@@ -41,12 +41,12 @@ defineOptions({
     >
         <Head :title="product.name" />
         <Link
-                    :href="ProductController.index()"
-                    class="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 text-sm"
-                >
-                    <ArrowLeft class="size-4" />
-                    Back to products
-                </Link>
+            :href="ProductController.index()"
+            class="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 text-sm"
+        >
+            <ArrowLeft class="size-4" />
+            Back to products
+        </Link>
         <PageHeader :title="product.name" :description="product.product_code">
             <template #actions>
                 <Button as-child>

@@ -275,7 +275,9 @@ defineOptions({
                                 >
                                     Order reference
                                 </p>
-                                <h3 class="mt-1 text-2xl font-bold tabular-nums">
+                                <h3
+                                    class="mt-1 text-2xl font-bold tabular-nums"
+                                >
                                     {{ props.dashboard.latest_order.reference }}
                                 </h3>
                                 <p
@@ -287,7 +289,8 @@ defineOptions({
                                     />
                                     {{
                                         formatDate(
-                                            props.dashboard.latest_order.created_at,
+                                            props.dashboard.latest_order
+                                                .created_at,
                                         )
                                     }}
                                 </p>
@@ -302,7 +305,10 @@ defineOptions({
                                         )
                                     "
                                 >
-                                    {{ props.dashboard.latest_order.status.label }}
+                                    {{
+                                        props.dashboard.latest_order.status
+                                            .label
+                                    }}
                                 </Badge>
                                 <Badge
                                     variant="outline"
@@ -315,8 +321,8 @@ defineOptions({
                                 >
                                     Payment
                                     {{
-                                        props.dashboard.latest_order.payment.status
-                                            .label
+                                        props.dashboard.latest_order.payment
+                                            .status.label
                                     }}
                                 </Badge>
                             </div>
@@ -345,8 +351,8 @@ defineOptions({
                                     </dt>
                                     <dd class="mt-1 font-semibold">
                                         {{
-                                            props.dashboard.latest_order.fulfillment
-                                                .label
+                                            props.dashboard.latest_order
+                                                .fulfillment.label
                                         }}
                                     </dd>
                                 </div>
@@ -359,7 +365,8 @@ defineOptions({
                                 </dt>
                                 <dd class="mt-1 font-semibold">
                                     {{
-                                        props.dashboard.latest_order.payment.method
+                                        props.dashboard.latest_order.payment
+                                            .method
                                     }}
                                 </dd>
                             </div>
@@ -367,16 +374,19 @@ defineOptions({
                                 <dt
                                     class="text-muted-foreground text-xs font-medium"
                                 >
-                                    {{ props.dashboard.latest_order.item_count }}
                                     {{
-                                        props.dashboard.latest_order.item_count ===
-                                        1
+                                        props.dashboard.latest_order.item_count
+                                    }}
+                                    {{
+                                        props.dashboard.latest_order
+                                            .item_count === 1
                                             ? 'product'
                                             : 'products'
                                     }}
                                     ·
                                     {{
-                                        props.dashboard.latest_order.total_quantity
+                                        props.dashboard.latest_order
+                                            .total_quantity
                                     }}
                                     {{
                                         props.dashboard.latest_order
@@ -385,7 +395,9 @@ defineOptions({
                                             : 'units'
                                     }}
                                 </dt>
-                                <dd class="mt-1 text-2xl font-bold tabular-nums">
+                                <dd
+                                    class="mt-1 text-2xl font-bold tabular-nums"
+                                >
                                     {{
                                         formatCurrency(
                                             props.dashboard.latest_order.total,
@@ -404,12 +416,19 @@ defineOptions({
                             <span
                                 class="border-border bg-secondary text-muted-foreground mx-auto flex size-14 items-center justify-center border"
                             >
-                                <PackageOpen class="size-6" aria-hidden="true" />
+                                <PackageOpen
+                                    class="size-6"
+                                    aria-hidden="true"
+                                />
                             </span>
-                            <h3 class="mt-5 text-xl font-bold">No orders yet</h3>
-                            <p class="text-muted-foreground mt-2 text-sm leading-6">
-                                Your latest order and its fulfillment progress will
-                                appear here after checkout.
+                            <h3 class="mt-5 text-xl font-bold">
+                                No orders yet
+                            </h3>
+                            <p
+                                class="text-muted-foreground mt-2 text-sm leading-6"
+                            >
+                                Your latest order and its fulfillment progress
+                                will appear here after checkout.
                             </p>
                             <Button as-child class="mt-6">
                                 <Link :href="productIndex()">

@@ -27,11 +27,7 @@ defineOptions({
         <Head :title="`Edit ${category.name}`" />
         <PageHeader :title="`Edit ${category.name}`">
             <template #metadata>
-                <Badge
-                    :variant="
-                        category.is_active ? 'secondary' : 'outline'
-                        "
-                >
+                <Badge :variant="category.is_active ? 'secondary' : 'outline'">
                     {{ category.is_active ? 'Active' : 'Inactive' }}
                 </Badge>
             </template>
