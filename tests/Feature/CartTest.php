@@ -28,14 +28,14 @@ test('a customer cannot own more than one cart', function () {
     $customer = User::factory()->customer()->create();
     Cart::factory()->for($customer)->create();
 
-    expect(fn() => Cart::factory()->for($customer)->create())
+    expect(fn () => Cart::factory()->for($customer)->create())
         ->toThrow(QueryException::class);
 });
 
 test('an administrator cannot own a cart', function () {
     $administrator = User::factory()->administrator()->create();
 
-    expect(fn() => Cart::factory()->for($administrator)->create())
+    expect(fn () => Cart::factory()->for($administrator)->create())
         ->toThrow(DomainException::class, 'Carts may only belong to customers.');
     expect(Cart::query()->count())->toBe(0);
 });

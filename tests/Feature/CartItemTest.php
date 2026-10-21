@@ -30,7 +30,7 @@ test('a cart item persists through its reciprocal relationships', function () {
 test('a product appears only once in a cart', function () {
     $item = CartItem::factory()->create();
 
-    expect(fn() => CartItem::factory()
+    expect(fn () => CartItem::factory()
         ->for($item->cart)
         ->for($item->product)
         ->create())
@@ -38,7 +38,7 @@ test('a product appears only once in a cart', function () {
 });
 
 test('non-positive cart quantities are rejected when inserted', function (int $quantity) {
-    expect(fn() => CartItem::factory()->create(['quantity' => $quantity]))
+    expect(fn () => CartItem::factory()->create(['quantity' => $quantity]))
         ->toThrow(QueryException::class);
 })->with([
     'zero' => 0,
@@ -48,7 +48,7 @@ test('non-positive cart quantities are rejected when inserted', function (int $q
 test('non-positive cart quantities are rejected when updated', function (int $quantity) {
     $item = CartItem::factory()->create(['quantity' => 3]);
 
-    expect(fn() => $item->update(['quantity' => $quantity]))
+    expect(fn () => $item->update(['quantity' => $quantity]))
         ->toThrow(QueryException::class);
     expect($item->refresh()->quantity)->toBe(3);
 })->with([
@@ -59,7 +59,7 @@ test('non-positive cart quantities are rejected when updated', function (int $qu
 test('unavailable or customer-ineligible products are rejected', function (Product $product) {
     $cart = Cart::factory()->create();
 
-    expect(fn() => CartItem::factory()->for($cart)->for($product)->create())
+    expect(fn () => CartItem::factory()->for($cart)->for($product)->create())
         ->toThrow(DomainException::class, 'Cart items require an available customer-eligible product.');
     expect(CartItem::query()->count())->toBe(0);
 })->with([
@@ -77,7 +77,7 @@ test('unavailable or customer-ineligible products are rejected', function (Produ
 
         return $product;
     },
-    'missing inventory' => fn(): Product => Product::factory()->create(),
+    'missing inventory' => fn (): Product => Product::factory()->create(),
     'zero stock' => function (): Product {
         $product = Product::factory()->create();
         Inventory::factory()->for($product)->create(['quantity' => 0]);
@@ -104,7 +104,7 @@ test('an existing cart item cannot be changed to an ineligible product', functio
     $inactiveProduct = Product::factory()->inactive()->create();
     Inventory::factory()->for($inactiveProduct)->create(['quantity' => 10]);
 
-    expect(fn() => $item->update(['product_id' => $inactiveProduct->id]))
+    expect(fn () => $item->update(['product_id' => $inactiveProduct->id]))
         ->toThrow(DomainException::class, 'Cart items require an available customer-eligible product.');
     expect($item->refresh()->product->is($originalProduct))->toBeTrue();
 });
@@ -112,6 +112,6 @@ test('an existing cart item cannot be changed to an ineligible product', functio
 test('a product referenced by a cart item cannot be deleted', function () {
     $item = CartItem::factory()->create();
 
-    expect(fn() => $item->product->delete())
+    expect(fn () => $item->product->delete())
         ->toThrow(QueryException::class);
 });
