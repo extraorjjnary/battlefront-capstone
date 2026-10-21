@@ -45,7 +45,7 @@ class ProductCatalogController extends Controller
             );
         }
 
-        $products = fn () => $this->catalogProducts($filters);
+        $products = fn (): LengthAwarePaginator => $this->paginateProducts($filters);
 
         $recommendationViewData = null;
         $resolveRecommendations = function () use (&$recommendationViewData, $hasDiscoveryFilters, $request, $buildRecommendationViewData): array {
@@ -132,33 +132,17 @@ class ProductCatalogController extends Controller
 
     /**
      * @param  array{q: string|null, category_id: int|null, brand: string|null, tag_id: int|null, category_ids?: list<int>, min_price?: string, max_price?: string, sort?: string}  $filters
-     * @return LengthAwarePaginator<int, array<string, mixed>>
+     * @return LengthAwarePaginator<int, covariant array{
+     *     id: int, name: string, description: string|null, brand: string|null,
+     *     price: string, discount_price: string|null, image_url: string|null,
+     *     is_featured: bool, shipping_profile: string,
+     *     category: array{id: int, name: string}, tags: list<array{id: int, name: string}>,
+     *     inventory: array{quantity: int|null, status: string}
+     * }>
      */
-    private function catalogProducts(array $filters): LengthAwarePaginator
+    private function paginateProducts(array $filters): LengthAwarePaginator
     {
-        $products = $this->productCatalogRepository->paginate($filters);
-        $presentedProducts = $products->getCollection()
-            ->map(fn (Product $product): array => $this->catalogProductData($product));
-        $options = $products->getOptions();
-        $options['query'] = array_filter(
-            $filters,
-            fn (mixed $value): bool => $value !== null
-                && $value !== ''
-                && ! (is_array($value) && $value === []),
-        );
-
-        return new LengthAwarePaginator(
-            $presentedProducts,
-            $products->total(),
-            $products->perPage(),
-            $products->currentPage(),
-            $options,
-        );
-    }
-
-    /** @return array<string, mixed> */
-    private function catalogProductData(Product $product): array
-    {
-        return $this->catalogProductPresenter->present($product);
+        return $this->productCatalogRepository->paginate($filters)
+            ->through(fn (Product $product): array => $this->catalogProductPresenter->present($product));
     }
 }

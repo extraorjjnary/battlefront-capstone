@@ -3,7 +3,6 @@
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\User;
-use DomainException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Schema;
 
