@@ -15,7 +15,7 @@ test('inspection evidence stays private and is limited to five files per case', 
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->available()->create();
     $this->actingAs($staff)->post(route('administration.damage-reports.store'), [
-        'product_id' => $product->id, 'quantity' => 1, 'reason' => 'Damaged packaging found',
+        'product_id' => $product->id, 'quantity' => 1, 'reason_code' => 'handling_damage', 'reason' => 'Damaged packaging found',
     ])->assertSessionHasNoErrors();
     $damageId = DB::table('damage_reports')->where('product_id', $product->id)->value('id');
 

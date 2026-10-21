@@ -20,11 +20,20 @@ const props = defineProps({
     filters: Object,
 });
 const page = usePage();
+const damageProgress = (report) => {
+    if (report.status === 'pending') return 'Awaiting a separate administrator decision';
+    if (report.disposition === 'release') return 'Released back to sellable stock';
+    if (report.disposition === 'write_off') return 'Written off and removed from held stock';
+    if (report.disposition === 'supplier_return' && report.held_quantity > 0) return 'Held while supplier return is processed';
+    if (report.disposition === 'supplier_return') return 'Supplier follow-up complete; no stock held';
+
+    return report.status.replaceAll('_', ' ');
+};
 const { search, isSearching, clearSearch } = useDebouncedSearch({
     initialSearch: props.filters?.q,
     currentSearch: () => props.filters?.q,
     route: DamageReportController.index,
-    query: () => ({ case: props.selected_case ?? undefined }),
+    query: () => ({ case: props.selected_case ?? undefined, overdue: props.filters?.overdue ? 1 : undefined }),
 });
 watch(() => props.filters?.q, (query) => { search.value = query ?? ''; });
 defineOptions({
@@ -83,6 +92,16 @@ defineOptions({
                 /><InputError :message="errors.quantity" />
             </div>
             <div class="space-y-2 sm:col-span-2">
+                <Label for="damage-reason-code">Reason category</Label>
+                <select id="damage-reason-code" name="reason_code" required class="border-border bg-background w-full border p-2">
+                    <option value="">Select a reason</option>
+                    <option value="handling_damage">Warehouse handling</option>
+                    <option value="storage_damage">Storage</option>
+                    <option value="packing_damage">Packing</option>
+                    <option value="defect_discovered">Defect discovered</option>
+                    <option value="other">Other</option>
+                </select>
+                <InputError :message="errors.reason_code" />
                 <Label for="damage-reason">Reason</Label
                 ><Input
                     id="damage-reason"
@@ -97,6 +116,9 @@ defineOptions({
             >
         </Form>
         <section class="space-y-3" aria-label="Damage cases">
+            <Link :href="DamageReportController.index({ query: { case: selected_case ?? undefined, q: filters?.q ?? undefined, overdue: filters?.overdue ? undefined : 1 } })" class="text-primary text-sm underline">
+                {{ filters?.overdue ? 'Show all damage reports' : 'Show overdue inspections' }}
+            </Link>
             <SearchField
                 id="damage-search"
                 v-model="search"
@@ -133,9 +155,10 @@ defineOptions({
                     }}</span>
                 </div>
                 <p class="text-sm">
-                    Held in quarantine for this case:
-                    {{ report.held_quantity }} units
+                    Stock handling: {{ damageProgress(report) }} ·
+                    {{ report.held_quantity }} units held · {{ report.age_days }} days old
                 </p>
+                <p v-if="report.inspection_overdue" class="text-destructive text-sm font-semibold">Inspection follow-up overdue</p>
                 <p v-if="report.decision_reason" class="text-sm">
                     Decision reason: {{ report.decision_reason }}
                 </p>
@@ -196,7 +219,7 @@ defineOptions({
                         required
                         class="border-border bg-background border p-2"
                     >
-                        <option value="release">Release to sale</option>
+                        <option value="release">Return to sellable stock after inspection</option>
                         <option value="write_off">Write off</option>
                         <option value="supplier_return">
                             Return to supplier
@@ -222,6 +245,10 @@ defineOptions({
                         maxlength="2000"
                         placeholder="Decision reason"
                     />
+                    <label class="flex items-center gap-2 text-sm sm:col-span-3">
+                        <input name="inspection_confirmed" type="checkbox" value="1" />
+                        I inspected the units and confirmed they are safe to sell
+                    </label>
                     <Button type="submit" :disabled="processing"
                         >Record decision</Button
                     >
@@ -230,7 +257,9 @@ defineOptions({
                             errors.decision ||
                             errors.disposition ||
                             errors.supplier_id ||
-                            errors.reason
+                            errors.reason ||
+                            errors.inspection_confirmed ||
+                            errors.evidence
                         "
                     />
                 </Form>

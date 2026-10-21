@@ -438,6 +438,7 @@ function salesProps() {
             outstanding_at_cutoff: '0.00',
             outstanding_refunds: { data: [], last_page: 1 },
             payments: { data: [], last_page: 1 },
+            reversals: { data: [], last_page: 1 },
         },
         sale_transactions: { data: [], last_page: 1 },
         filters: { from: '2026-09-01', to: '2026-09-30', period: 'day' },

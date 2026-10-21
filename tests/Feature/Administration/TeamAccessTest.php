@@ -106,3 +106,17 @@ test('inactive administrator sessions are rejected', function () {
     $inactiveResponse = $this->actingAs($owner->fresh())->get(route('administration.orders.index'));
     expect($inactiveResponse->status())->toBe(403);
 });
+
+test('administrators without report access land on a page their role can open', function () {
+    $roleId = DB::table('administration_roles')->where('code', 'manager')->value('id');
+    $administrator = User::factory()->administrator()->create(['administration_role_id' => $roleId]);
+    DB::table('administration_role_permissions')->where('administration_role_id', $roleId)->delete();
+    $permissionId = DB::table('administration_permissions')->where('code', 'inventory.view')->value('id');
+    DB::table('administration_role_permissions')->insert([
+        'administration_role_id' => $roleId,
+        'administration_permission_id' => $permissionId,
+    ]);
+
+    $this->actingAs($administrator)->get(route('dashboard'))
+        ->assertRedirect(route('administration.inventory.index'));
+});

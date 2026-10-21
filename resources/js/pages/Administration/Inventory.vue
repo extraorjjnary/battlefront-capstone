@@ -518,6 +518,18 @@ defineOptions({
                         </div>
 
                         <div class="grid gap-2 sm:col-span-3">
+                            <Label :for="`reason-code-${product.inventory.id}`">Reason category</Label>
+                            <select :id="`reason-code-${product.inventory.id}`" name="reason_code" required class="border-border bg-background w-full border p-2">
+                                <option value="">Select a reason</option>
+                                <option value="damage">Damage</option>
+                                <option value="theft_loss">Theft or loss</option>
+                                <option value="found_stock">Found stock</option>
+                                <option value="count_error">Count correction</option>
+                                <option value="receiving_error">Receiving error</option>
+                                <option value="unit_of_measure_error">Unit-of-measure error</option>
+                                <option value="other">Other</option>
+                            </select>
+                            <InputError :message="errors.reason_code" />
                             <Label :for="`reason-${product.inventory.id}`"
                                 >Reason for stock request</Label
                             >
@@ -638,6 +650,14 @@ defineOptions({
                         </div>
 
                         <div class="grid gap-2 sm:col-span-3">
+                            <Label :for="`opening-reason-code-${product.id}`">Reason category</Label>
+                            <select :id="`opening-reason-code-${product.id}`" name="reason_code" required class="border-border bg-background w-full border p-2">
+                                <option value="">Select a reason</option>
+                                <option value="receiving_error">Initial receipt</option>
+                                <option value="found_stock">Found stock</option>
+                                <option value="other">Other</option>
+                            </select>
+                            <InputError :message="errors.reason_code" />
                             <Label :for="`opening-reason-${product.id}`"
                                 >Reason for opening stock</Label
                             >

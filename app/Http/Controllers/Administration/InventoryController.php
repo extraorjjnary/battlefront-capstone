@@ -12,6 +12,7 @@ use App\Repositories\Inventory\InventoryRepository;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -86,6 +87,7 @@ class InventoryController extends Controller
             $request->integer('quantity'),
             $request->string('reason')->toString(),
             $request->integer('reorder_level'),
+            reasonCode: $request->string('reason_code')->toString(),
         );
 
         Inertia::flash('toast', [
@@ -113,11 +115,38 @@ class InventoryController extends Controller
             $request->user(),
             $request->integer('quantity'),
             $request->string('reason')->toString(),
+            reasonCode: $request->string('reason_code')->toString(),
         );
 
         Inertia::flash('toast', [
             'type' => 'success',
             'message' => __('Stock change submitted for approval.'),
+        ]);
+
+        return back();
+    }
+
+    public function count(Request $request, Inventory $inventory, RequestInventoryAdjustment $adjustment): RedirectResponse
+    {
+        $validated = $request->validate([
+            'quantity' => ['required', 'integer', 'min:0', 'max:4294967295'],
+            'observed_quantity' => ['required', 'integer', 'min:0', 'max:4294967295'],
+            'reason' => ['required', 'string', 'min:5', 'max:2000'],
+            'reason_code' => ['required', Rule::in(['damage', 'theft_loss', 'found_stock', 'count_error', 'receiving_error', 'unit_of_measure_error', 'other'])],
+        ]);
+
+        $adjustment->execute(
+            $inventory->product,
+            $request->user(),
+            (int) $validated['quantity'],
+            'Physical sellable stock count: '.$validated['reason'],
+            expectedQuantity: (int) $validated['observed_quantity'],
+            reasonCode: $validated['reason_code'],
+        );
+
+        Inertia::flash('toast', [
+            'type' => 'success',
+            'message' => __('Physical count submitted for approval.'),
         ]);
 
         return back();

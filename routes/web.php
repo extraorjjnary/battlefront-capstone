@@ -190,6 +190,8 @@ Route::middleware(['auth', 'can:access-administration'])
         Route::patch('inventory/{inventory}', [InventoryController::class, 'update'])
             ->middleware('can:inventory.request')
             ->name('inventory.update');
+        Route::post('inventory/{inventory}/physical-count', [InventoryController::class, 'count'])
+            ->middleware('can:inventory.request')->name('inventory.count');
         Route::get('inventory-adjustments', [InventoryAdjustmentController::class, 'index'])
             ->middleware('can:inventory.view')
             ->name('inventory-adjustments.index');

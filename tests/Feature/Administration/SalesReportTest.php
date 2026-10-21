@@ -84,24 +84,37 @@ test('sales report separates sale dates from refund payment dates and calculates
     ]);
     $refundId = DB::table('customer_refunds')->insertGetId([
         'customer_return_id' => $returnId, 'approved_by' => $owner->id,
-        'approved_amount' => '50.00', 'paid_amount' => '30.00',
+        'approved_amount' => '50.00', 'paid_amount' => '20.00',
         'created_at' => '2026-09-06 10:00:00', 'updated_at' => '2026-10-02 10:00:00',
     ]);
-    foreach ([['20.00', '2026-09-20 10:00:00'], ['10.00', '2026-10-02 10:00:00']] as [$amount, $date]) {
-        DB::table('customer_refund_payments')->insert([
+    foreach ([
+        ['20.00', '2026-09-20 10:00:00', 'voided'],
+        ['10.00', '2026-09-28 10:00:00', 'verified'],
+        ['10.00', '2026-10-02 10:00:00', null],
+    ] as [$amount, $date, $decision]) {
+        $paymentId = DB::table('customer_refund_payments')->insertGetId([
             'customer_refund_id' => $refundId, 'recorded_by' => $owner->id,
             'amount' => $amount, 'payment_method' => 'cash', 'external_reference' => $date,
             'paid_at' => $date,
         ]);
+        if ($decision !== null) {
+            DB::table('customer_refund_payment_reviews')->insert([
+                'customer_refund_payment_id' => $paymentId, 'reviewed_by' => $owner->id,
+                'decision' => $decision, 'reason' => $decision === 'voided' ? 'Disputed duplicate record' : 'Checked against cash book',
+                'created_at' => $decision === 'voided' ? '2026-09-25 10:00:00' : '2026-09-29 10:00:00',
+            ]);
+        }
     }
 
     $this->actingAs($owner)->get(route('administration.reports.sales', ['from' => '2026-09-01', 'to' => '2026-09-30']))
         ->assertInertia(fn (Assert $page) => $page
             ->where('refund_measures.gross_item_sales', '100.00')
-            ->where('refund_measures.refund_payments', '20.00')
-            ->where('refund_measures.gross_less_refunds', '80.00')
-            ->where('refund_measures.outstanding_at_cutoff', '30.00')
+            ->where('refund_measures.refund_payments', '10.00')
+            ->where('refund_measures.gross_less_refunds', '90.00')
+            ->where('refund_measures.outstanding_at_cutoff', '40.00')
             ->where('refund_measures.payments.total', 1)
+            ->where('refund_measures.reversals.total', 1)
+            ->where('refund_measures.reversals.data.0.amount', 20)
             ->where('refund_measures.outstanding_refunds.total', 1)
             ->where('sale_transactions.total', 1));
 

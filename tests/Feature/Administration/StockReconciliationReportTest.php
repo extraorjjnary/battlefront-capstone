@@ -33,8 +33,35 @@ test('stock reconciliation identifies movement and quarantine gaps without chang
     $inventory->save();
     $this->actingAs($owner)->get(route('administration.reports.stock-reconciliation', ['product_id' => $product->id]))
         ->assertInertia(fn (Assert $page) => $page->where('inventories.data.0.status', 'discrepancy')
-            ->where('inventories.data.0.case_expected', 0));
+            ->where('inventories.data.0.case_expected', 0)
+            ->where('inventories.data.0.findings.0', 'Current held stock differs from the last movement balance.')
+            ->where('inventories.data.0.findings.1', 'Held stock differs from the quantity assigned to open cases.'));
     expect($inventory->fresh()->quarantined_quantity)->toBe(2);
+});
+
+test('stock reconciliation explains invalid movement arithmetic and broken movement continuity', function () {
+    $owner = User::factory()->administrator()->create();
+    $product = Product::factory()->available()->create();
+    $inventory = $product->inventory;
+
+    DB::table('inventory_movements')->insert([
+        'product_id' => $product->id, 'actor_id' => $owner->id,
+        'kind' => 'approved_adjustment', 'reference_type' => 'inventory_adjustment_request', 'reference_id' => 1,
+        'sellable_before' => $inventory->quantity - 2, 'sellable_delta' => 1, 'sellable_after' => $inventory->quantity,
+        'quarantined_before' => 0, 'quarantined_delta' => 0, 'quarantined_after' => 0, 'created_at' => now()->subMinute(),
+    ]);
+    DB::table('inventory_movements')->insert([
+        'product_id' => $product->id, 'actor_id' => $owner->id,
+        'kind' => 'approved_adjustment', 'reference_type' => 'inventory_adjustment_request', 'reference_id' => 2,
+        'sellable_before' => $inventory->quantity + 1, 'sellable_delta' => -1, 'sellable_after' => $inventory->quantity,
+        'quarantined_before' => 0, 'quarantined_delta' => 0, 'quarantined_after' => 0, 'created_at' => now(),
+    ]);
+
+    $this->actingAs($owner)->get(route('administration.reports.stock-reconciliation', ['product_id' => $product->id]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('inventories.data.0.status', 'discrepancy')
+            ->where('inventories.data.0.findings.0', 'A movement does not balance its before, change, and after quantities.')
+            ->where('inventories.data.0.findings.1', 'Movement records do not join to the previous recorded balance.'));
 });
 
 test('customers cannot inspect stock movement history', function () {

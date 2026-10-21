@@ -27,8 +27,13 @@ class AdministrationWorkQueue
         if ($actor->can('inventory.view') && $actor->can('returns.approve')) {
             $queries[] = $this->entries('damage_reports as work', 'damage', 'pending')
                 ->where('work.requester_id', '<>', $actor->id);
-            $queries[] = $this->entries('supplier_returns as work', 'supplier_return', ['pending', 'dispatched', 'rejected_follow_up'])
+            $queries[] = $this->entries('supplier_returns as work', 'supplier_return', 'pending')
                 ->where('work.requester_id', '<>', $actor->id);
+            $queries[] = $this->entries('supplier_returns as work', 'supplier_return', 'dispatched');
+            $queries[] = $this->entries('supplier_returns as work', 'supplier_return', 'rejected_follow_up')
+                ->where('work.requester_id', '<>', $actor->id)
+                ->where(fn (Builder $query): Builder => $query->whereNull('work.reviewer_id')
+                    ->orWhere('work.reviewer_id', '<>', $actor->id));
         }
         if ($actor->can('inventory.view') && $actor->can('returns.dispatch')) {
             $queries[] = $this->entries('supplier_returns as work', 'supplier_return', 'approved');
@@ -64,7 +69,7 @@ class AdministrationWorkQueue
                 ->whereNotExists(fn (Builder $query) => $query->selectRaw('1')->from('customer_refund_payment_reviews as reviews')
                     ->whereColumn('reviews.customer_refund_payment_id', 'work.id')
                     ->whereRaw('reviews.id = (select max(latest.id) from customer_refund_payment_reviews as latest where latest.customer_refund_payment_id = work.id)')
-                    ->where('reviews.decision', 'verified'));
+                    ->whereIn('reviews.decision', ['verified', 'voided']));
         }
         if ($actor->can('orders.view') && $actor->can('returns.approve')) {
             $queries[] = $this->entries('customer_returns as work', 'customer_return', 'pending')

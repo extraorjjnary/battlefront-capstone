@@ -297,6 +297,7 @@ test('administrators can initialize missing inventory', function () {
         ->post(route('administration.products.inventory.store', $product), [
             'quantity' => 12,
             'reorder_level' => 4,
+            'reason_code' => 'receiving_error',
             'reason' => 'Initial physical stock count',
             'product_id' => $otherProduct->id,
         ]);
@@ -353,6 +354,7 @@ test('initializing inventory twice preserves the existing stock values', functio
         ->post(route('administration.products.inventory.store', $inventory->product), [
             'quantity' => 20,
             'reorder_level' => 6,
+            'reason_code' => 'receiving_error',
             'reason' => 'Attempt duplicate initialization',
         ]);
 
@@ -419,6 +421,7 @@ test('administrators can update inventory stock values', function () {
         ->patch(route('administration.inventory.update', $inventory), [
             'quantity' => 24,
             'reorder_level' => 3,
+            'reason_code' => 'count_error',
             'reason' => 'Physical inventory count correction',
             'product_id' => Product::factory()->create()->id,
         ]);

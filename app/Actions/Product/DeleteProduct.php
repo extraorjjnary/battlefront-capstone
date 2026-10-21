@@ -57,17 +57,25 @@ class DeleteProduct
             return true;
         }
 
+        if (DB::table('supplier_returns as returns')->where('returns.product_id', $product->id)
+            ->where('returns.status', 'closed')
+            ->whereNotExists(fn ($query) => $query->selectRaw('1')->from('supplier_return_resolutions as resolutions')
+                ->whereColumn('resolutions.supplier_return_id', 'returns.id'))->exists()) {
+            return true;
+        }
+
         $returnItems = DB::table('customer_return_items as items')
             ->join('order_items', 'order_items.id', '=', 'items.order_item_id')
             ->where('order_items.product_id', $product->id)
             ->join('customer_returns as returns', 'returns.id', '=', 'items.customer_return_id');
 
-        return $returnItems->whereIn('returns.status', ['pending', 'accepted', 'rejected_pending_handover'])->exists()
+        return $returnItems->whereIn('returns.status', ['pending', 'rejected_pending_handover'])->exists()
             || DB::table('customer_refunds as refunds')
                 ->join('customer_returns as returns', 'returns.id', '=', 'refunds.customer_return_id')
                 ->join('customer_return_items as items', 'items.customer_return_id', '=', 'returns.id')
                 ->join('order_items', 'order_items.id', '=', 'items.order_item_id')
                 ->where('order_items.product_id', $product->id)
-                ->whereColumn('refunds.paid_amount', '<', 'refunds.approved_amount')->exists();
+                ->whereRaw('refunds.approved_amount > (select COALESCE(SUM(payments.amount), 0) from customer_refund_payments as payments where payments.customer_refund_id = refunds.id and exists (select 1 from customer_refund_payment_reviews as reviews where reviews.customer_refund_payment_id = payments.id and reviews.decision = ? and reviews.id = (select MAX(latest.id) from customer_refund_payment_reviews as latest where latest.customer_refund_payment_id = payments.id)))', ['verified'])
+                ->exists();
     }
 }

@@ -52,6 +52,11 @@ class StaffPerformanceController extends Controller
             ->join('sales', 'sales.order_id', '=', 'returns.order_id')
             ->when($refundStart, fn ($query) => $query->where('payments.paid_at', '>=', $refundStart))
             ->when($refundEnd, fn ($query) => $query->where('payments.paid_at', '<', $refundEnd))
+            ->whereExists(fn ($reviews) => $reviews->selectRaw('1')
+                ->from('customer_refund_payment_reviews as verified_reviews')
+                ->whereColumn('verified_reviews.customer_refund_payment_id', 'payments.id')
+                ->where('verified_reviews.decision', 'verified')
+                ->when($refundEnd, fn ($query) => $query->where('verified_reviews.created_at', '<', $refundEnd)))
             ->select('sales.handler_id')
             ->selectRaw('SUM(payments.amount) as amount')
             ->groupBy('sales.handler_id')
@@ -82,7 +87,8 @@ class StaffPerformanceController extends Controller
                 'name' => $sale->name,
                 'orders_count' => (int) $sale->orders_count,
                 'gross_sales' => (string) $sale->gross_sales,
-                'refunds_paid' => (string) ($refunds[$sale->id] ?? '0.00'),
+                'refunds_paid' => bcadd((string) ($refunds[$sale->id] ?? '0.00'), '0.00', 2),
+                'net_sales' => bcsub((string) $sale->gross_sales, (string) ($refunds[$sale->id] ?? '0.00'), 2),
             ]),
             'unattributed_count' => $canViewAll ? DB::table('sales')->whereNull('handler_id')
                 ->when($from, fn ($query) => $query->whereDate('sale_date', '>=', $from))

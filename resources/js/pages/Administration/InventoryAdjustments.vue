@@ -51,8 +51,9 @@ defineOptions({
             <div class="flex flex-wrap justify-between gap-3">
                 <div>
                     <h2 class="font-semibold">{{ entry.product_name }}</h2>
-                    <p class="text-muted-foreground text-sm">{{ entry.requester_name }} requested {{ entry.observed_quantity }} → {{ entry.target_quantity }} units</p>
+                    <p class="text-muted-foreground text-sm">{{ entry.reason.startsWith('Physical sellable stock count:') ? 'Physical count submitted by' : 'Stock change requested by' }} {{ entry.requester_name }} · system quantity {{ entry.observed_quantity }} → requested quantity {{ entry.target_quantity }}</p>
                     <p class="mt-2 text-sm">{{ entry.reason }}</p>
+                    <p v-if="entry.reason_code" class="text-muted-foreground text-sm">Reason category: {{ entry.reason_code.replaceAll('_', ' ') }}</p>
                     <p v-if="entry.replaces_request_id" class="text-muted-foreground text-sm">Replaces request #{{ entry.replaces_request_id }}</p>
                     <p v-if="entry.replacement_id" class="text-muted-foreground text-sm">Replaced by request #{{ entry.replacement_id }}</p>
                     <p v-if="entry.decision_reason" class="text-muted-foreground text-sm">Decision: {{ entry.decision_reason }}</p>
@@ -76,9 +77,10 @@ defineOptions({
             <Form v-if="page.props.auth.can?.requestInventory && entry.status === 'withdrawn' && !entry.replacement_id && entry.requester_id === page.props.auth.user.id" v-bind="InventoryAdjustmentController.replace.form(entry.id)" v-slot="{ errors, processing }" class="grid gap-2 sm:grid-cols-2">
                 <label class="text-sm">Replacement quantity<Input name="quantity" type="number" min="0" required :default-value="entry.target_quantity" /></label>
                 <label v-if="entry.initial_reorder_level !== null" class="text-sm">Initial reorder level<Input name="reorder_level" type="number" min="0" :default-value="entry.initial_reorder_level" /></label>
+                <select name="reason_code" required class="border-border bg-background border p-2"><option value="">Select a reason</option><option value="damage">Damage</option><option value="theft_loss">Theft or loss</option><option value="found_stock">Found stock</option><option value="count_error">Count correction</option><option value="receiving_error">Receiving error</option><option value="unit_of_measure_error">Unit-of-measure error</option><option value="other">Other</option></select>
                 <label class="text-sm sm:col-span-2">New request reason<Input name="reason" required minlength="5" maxlength="2000" /></label>
                 <Button type="submit" :disabled="processing">Submit replacement</Button>
-                <InputError :message="errors.quantity || errors.reason || errors.replacement" />
+                <InputError :message="errors.quantity || errors.reason || errors.reason_code || errors.replacement" />
             </Form>
         </article>
         <div v-if="requests.last_page > 1" class="flex justify-between text-sm">

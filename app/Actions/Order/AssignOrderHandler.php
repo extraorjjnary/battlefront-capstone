@@ -30,17 +30,23 @@ class AssignOrderHandler
                 throw ValidationException::withMessages(['handler' => 'Choose an active administrator who can process orders.']);
             }
 
-            $before = $locked->assigned_handler_id;
-            $locked->assigned_handler_id = $handler->id;
-            $locked->save();
-            DB::table('audit_logs')->insert([
-                'actor_id' => $actor->id,
-                'action' => 'order.handler.assigned',
-                'subject_type' => 'order',
-                'subject_id' => $locked->id,
-                'changes' => json_encode(['before' => $before, 'after' => $handlerId], JSON_THROW_ON_ERROR),
-                'created_at' => now(),
-            ]);
+            $this->assignLocked($locked, $actor, $handler);
         }, attempts: 3);
+    }
+
+    private function assignLocked(Order $order, User $actor, User $handler): void
+    {
+        $before = $order->assigned_handler_id;
+        $order->assigned_handler_id = $handler->id;
+        $order->save();
+
+        DB::table('audit_logs')->insert([
+            'actor_id' => $actor->id,
+            'action' => 'order.handler.assigned',
+            'subject_type' => 'order',
+            'subject_id' => $order->id,
+            'changes' => json_encode(['before' => $before, 'after' => $handler->id], JSON_THROW_ON_ERROR),
+            'created_at' => now(),
+        ]);
     }
 }

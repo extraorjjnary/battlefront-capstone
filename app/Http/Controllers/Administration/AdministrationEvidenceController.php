@@ -34,6 +34,15 @@ class AdministrationEvidenceController extends Controller
             abort(404);
         }
 
-        return Storage::disk('local')->download($record->path, $record->original_name);
+        $disk = Storage::disk('local');
+        if (in_array($record->mime_type, ['image/jpeg', 'image/png', 'image/webp'], true)) {
+            return $disk->response($record->path, $record->original_name, [
+                'Content-Type' => $record->mime_type,
+                'Cache-Control' => 'private, no-store',
+                'X-Content-Type-Options' => 'nosniff',
+            ]);
+        }
+
+        return $disk->download($record->path, $record->original_name);
     }
 }

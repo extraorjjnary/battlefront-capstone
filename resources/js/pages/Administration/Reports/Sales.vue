@@ -1200,11 +1200,9 @@ defineOptions({
                 Sales and refunds by event date
             </h2>
             <p class="text-muted-foreground mt-1 text-sm">
-                Sales use sale dates; recorded refund payments use payment
-                dates. The difference is a period measure, not profit.
-                Outstanding balance includes approvals through
-                {{ refund_measures.cutoff }} and payments recorded through that
-                date.
+                Sales use sale dates; refund payments count after an
+                independent review verifies them. Outstanding balance includes
+                verified payments through {{ refund_measures.cutoff }}.
             </p>
             <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <div
@@ -1214,7 +1212,7 @@ defineOptions({
                             value: refund_measures.gross_item_sales,
                         },
                         {
-                            label: 'Recorded refund payments',
+                            label: 'Verified refund payments',
                             value: refund_measures.refund_payments,
                         },
                         {
@@ -1297,8 +1295,8 @@ defineOptions({
             </nav>
             <h3 class="mt-6 font-semibold">Refund payment source records</h3>
             <p class="text-muted-foreground mt-1 text-xs">
-                Staff-recorded transactions; payment review is shown in the
-                return case.
+                Only independently verified payment records appear here.
+                Disputed and voided records remain in their return case history.
             </p>
             <div class="mt-3 space-y-2">
                 <div
@@ -1351,6 +1349,33 @@ defineOptions({
                     >Next</Link
                 >
             </nav>
+            <h3 class="mt-6 font-semibold">Voided refund payment records</h3>
+            <div class="mt-3 space-y-2">
+                <div
+                    v-for="reversal in refund_measures.reversals.data"
+                    :key="reversal.id"
+                    class="border-border flex flex-wrap items-center justify-between gap-2 border p-3 text-sm"
+                >
+                    <div>
+                        <strong>Payment #{{ reversal.customer_refund_payment_id }}</strong>
+                        · −{{ formatCurrency(reversal.amount) }} ·
+                        {{ reversal.created_at }} · {{ reversal.reason }}
+                    </div>
+                    <Link
+                        v-if="page.props.auth.can?.viewOrders"
+                        :href="CustomerReturnController.index({ query: { case: reversal.customer_return_id } })"
+                        class="text-primary underline"
+                        >Return #{{ reversal.customer_return_id }}</Link
+                    >
+                    <span v-else>Return #{{ reversal.customer_return_id }}</span>
+                </div>
+                <p
+                    v-if="refund_measures.reversals.data.length === 0"
+                    class="text-muted-foreground text-sm"
+                >
+                    No voided payment records in this period.
+                </p>
+            </div>
             <h3 class="mt-6 font-semibold">Outstanding approvals at cutoff</h3>
             <div class="mt-3 space-y-2">
                 <div

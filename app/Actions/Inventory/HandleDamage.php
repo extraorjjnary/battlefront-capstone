@@ -11,9 +11,9 @@ use Illuminate\Validation\ValidationException;
 
 class HandleDamage
 {
-    public function report(Product $product, User $reporter, int $quantity, string $reason): int
+    public function report(Product $product, User $reporter, int $quantity, string $reason, string $reasonCode): int
     {
-        return DB::transaction(function () use ($product, $reporter, $quantity, $reason): int {
+        return DB::transaction(function () use ($product, $reporter, $quantity, $reason, $reasonCode): int {
             $inventory = Inventory::query()->where('product_id', $product->id)->lockForUpdate()->firstOrFail();
             if ($inventory->quantity < $quantity) {
                 throw ValidationException::withMessages(['quantity' => 'Not enough sellable stock remains to quarantine.']);
@@ -30,6 +30,7 @@ class HandleDamage
                 'quantity' => $quantity,
                 'status' => 'pending',
                 'reason' => $reason,
+                'reason_code' => $reasonCode,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -40,9 +41,9 @@ class HandleDamage
         }, attempts: 3);
     }
 
-    public function decide(int $damageId, User $reviewer, string $disposition, string $reason, ?int $supplierId = null): void
+    public function decide(int $damageId, User $reviewer, string $disposition, string $reason, ?int $supplierId = null, bool $inspectionConfirmed = false): void
     {
-        DB::transaction(function () use ($damageId, $reviewer, $disposition, $reason, $supplierId): void {
+        DB::transaction(function () use ($damageId, $reviewer, $disposition, $reason, $supplierId, $inspectionConfirmed): void {
             $report = DB::table('damage_reports')->where('id', $damageId)->lockForUpdate()->first();
             if ($report === null) {
                 abort(404);
@@ -61,9 +62,15 @@ class HandleDamage
             if ($inventory->quarantined_quantity < $report->quantity) {
                 throw ValidationException::withMessages(['decision' => 'The quarantined quantity is no longer available.']);
             }
+            if ($disposition === 'write_off' && ! DB::table('administration_evidence')->where('subject_type', 'damage_report')->where('subject_id', $damageId)->exists()) {
+                throw ValidationException::withMessages(['evidence' => 'Attach evidence before writing off damaged stock.']);
+            }
             $beforeSellable = $inventory->quantity;
             $beforeHeld = $inventory->quarantined_quantity;
             if ($disposition === 'release') {
+                if (! $inspectionConfirmed) {
+                    throw ValidationException::withMessages(['inspection_confirmed' => 'Confirm inspection before releasing stock for sale.']);
+                }
                 $inventory->quantity += $report->quantity;
                 $inventory->quarantined_quantity = max(0, (int) ($inventory->quarantined_quantity - $report->quantity));
                 $inventory->save();
@@ -84,6 +91,7 @@ class HandleDamage
                     'quantity' => $report->quantity,
                     'status' => 'pending',
                     'reason' => $report->reason,
+                    'reason_code' => $report->reason_code,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);

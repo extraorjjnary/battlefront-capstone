@@ -177,3 +177,39 @@ test('work queue links return reviews and refund reconciliation to the correct p
         ->assertInertia(fn (Assert $page) => $page->where('selected_case', $acceptedReturnId)
             ->where('selected_payment', $paymentId));
 });
+
+test('refund reconciliation queue excludes verified and voided payments', function () {
+    $owner = User::factory()->administrator()->create();
+    $staff = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
+    $order = Order::factory()->create(['status' => 'completed']);
+    $returnId = DB::table('customer_returns')->insertGetId([
+        'order_id' => $order->id, 'requester_id' => $staff->id, 'status' => 'accepted', 'reason' => 'Approved return',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $refundId = DB::table('customer_refunds')->insertGetId([
+        'customer_return_id' => $returnId, 'approved_by' => $owner->id,
+        'approved_amount' => '100.00', 'paid_amount' => '60.00', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    foreach ([null, 'verified', 'voided'] as $decision) {
+        $paymentId = DB::table('customer_refund_payments')->insertGetId([
+            'customer_refund_id' => $refundId, 'recorded_by' => $staff->id, 'amount' => '20.00',
+            'payment_method' => 'cash', 'external_reference' => 'QUEUE-'.($decision ?? 'pending'), 'paid_at' => now(),
+        ]);
+        if ($decision !== null) {
+            DB::table('customer_refund_payment_reviews')->insert([
+                'customer_refund_payment_id' => $paymentId, 'reviewed_by' => $owner->id,
+                'decision' => $decision, 'reason' => 'Reviewed', 'created_at' => now(),
+            ]);
+        }
+    }
+
+    $this->actingAs($owner)->get(route('administration.work-queue.index', ['kind' => 'refund_reconciliation']))
+        ->assertInertia(fn (Assert $page) => $page->where('entries.total', 1)
+            ->where('entries.data.0.kind', 'refund_reconciliation')
+            ->where('entries.data.0.href', route('administration.customer-returns.index', [
+                'case' => $returnId,
+                'payment_id' => DB::table('customer_refund_payments')->where('external_reference', 'QUEUE-pending')->value('id'),
+            ]).'#refund-payment-'.DB::table('customer_refund_payments')->where('external_reference', 'QUEUE-pending')->value('id')));
+});

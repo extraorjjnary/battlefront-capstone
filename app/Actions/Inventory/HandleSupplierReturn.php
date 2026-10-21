@@ -10,9 +10,9 @@ use Illuminate\Validation\ValidationException;
 
 class HandleSupplierReturn
 {
-    public function request(User $requester, int $supplierId, int $productId, int $quantity, string $reason): int
+    public function request(User $requester, int $supplierId, int $productId, int $quantity, string $reason, string $reasonCode): int
     {
-        return DB::transaction(function () use ($requester, $supplierId, $productId, $quantity, $reason): int {
+        return DB::transaction(function () use ($requester, $supplierId, $productId, $quantity, $reason, $reasonCode): int {
             if (! DB::table('suppliers')->where('id', $supplierId)->where('is_active', true)->exists()) {
                 throw ValidationException::withMessages(['supplier_id' => 'Select an active supplier.']);
             }
@@ -33,6 +33,7 @@ class HandleSupplierReturn
                 'quantity' => $quantity,
                 'status' => 'pending',
                 'reason' => $reason,
+                'reason_code' => $reasonCode,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -133,9 +134,9 @@ class HandleSupplierReturn
         }, attempts: 3);
     }
 
-    public function followUp(int $id, User $actor, string $decision, string $reason, ?int $supplierId = null): void
+    public function followUp(int $id, User $actor, string $decision, string $reason, ?int $supplierId = null, bool $inspectionConfirmed = false): void
     {
-        DB::transaction(function () use ($id, $actor, $decision, $reason, $supplierId): void {
+        DB::transaction(function () use ($id, $actor, $decision, $reason, $supplierId, $inspectionConfirmed): void {
             $return = DB::table('supplier_returns')->where('id', $id)->lockForUpdate()->first();
             if ($return === null) {
                 abort(404);
@@ -160,6 +161,12 @@ class HandleSupplierReturn
             if ($inventory->quarantined_quantity < $return->quantity) {
                 throw ValidationException::withMessages(['decision' => 'Quarantined stock is no longer available.']);
             }
+            if ($decision === 'release' && ! $inspectionConfirmed) {
+                throw ValidationException::withMessages(['inspection_confirmed' => 'Confirm inspection before releasing stock for sale.']);
+            }
+            if ($decision === 'write_off' && ! $this->hasLinkedEvidence($return)) {
+                throw ValidationException::withMessages(['evidence' => 'Attach evidence to the linked damage or customer-return case before writing off stock.']);
+            }
 
             if ($decision === 'retry') {
                 if ($supplierId === null || ! DB::table('suppliers')->where('id', $supplierId)->where('is_active', true)->exists()) {
@@ -175,6 +182,7 @@ class HandleSupplierReturn
                     'quantity' => $return->quantity,
                     'status' => 'pending',
                     'reason' => $reason,
+                    'reason_code' => $return->reason_code,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -246,6 +254,18 @@ class HandleSupplierReturn
             'quarantined_after' => $inventory->quarantined_quantity,
             'created_at' => now(),
         ]);
+    }
+
+    private function hasLinkedEvidence(object $return): bool
+    {
+        if ($return->damage_report_id !== null) {
+            return DB::table('administration_evidence')->where('subject_type', 'damage_report')->where('subject_id', $return->damage_report_id)->exists();
+        }
+
+        $customerReturnId = DB::table('customer_return_items')->where('id', $return->customer_return_item_id)->value('customer_return_id');
+
+        return $customerReturnId !== null
+            && DB::table('administration_evidence')->where('subject_type', 'customer_return')->where('subject_id', $customerReturnId)->exists();
     }
 
     /**

@@ -16,7 +16,7 @@ test('inventory adjustment requests can be searched by product, requester, or re
         'observed_quantity' => 1,
         'target_quantity' => 2,
         'status' => 'pending',
-        'reason' => 'Search adjustment reason',
+        'reason_code' => 'count_error', 'reason' => 'Search adjustment reason',
         'created_at' => now(),
         'updated_at' => now(),
     ]);
@@ -26,6 +26,73 @@ test('inventory adjustment requests can be searched by product, requester, or re
             ->where('filters.q', 'Search adjustment product')
             ->where('requests.total', 1)
             ->where('requests.data.0.id', $requestId));
+});
+
+test('a physical stock count creates a separate approved adjustment request', function () {
+    $requester = User::factory()->administrator()->create();
+    $reviewer = User::factory()->administrator()->create();
+    $product = Product::factory()->available()->create();
+    $inventory = $product->inventory;
+    $observedQuantity = $inventory->quantity;
+    $countedQuantity = $observedQuantity + 3;
+
+    $this->actingAs($requester)->post(route('administration.inventory.count', $inventory), [
+        'quantity' => $countedQuantity,
+        'observed_quantity' => $observedQuantity,
+        'reason_code' => 'count_error', 'reason' => 'Counted by staff at opening',
+    ])->assertSessionHasNoErrors();
+
+    $requestId = DB::table('inventory_adjustment_requests')->where('product_id', $product->id)->value('id');
+    $this->assertDatabaseHas('inventory_adjustment_requests', [
+        'id' => $requestId,
+        'observed_quantity' => $observedQuantity,
+        'target_quantity' => $countedQuantity,
+        'reason_code' => 'count_error', 'reason' => 'Physical sellable stock count: Counted by staff at opening',
+        'status' => 'pending',
+    ]);
+    expect($inventory->fresh()->quantity)->toBe($observedQuantity);
+
+    $this->actingAs($reviewer)->post(route('administration.inventory-adjustments.decide', $requestId), [
+        'decision' => 'approve',
+        'reason_code' => 'count_error', 'reason' => 'Count reviewed against shelf record',
+    ])->assertSessionHasNoErrors();
+
+    expect($inventory->fresh()->quantity)->toBe($countedQuantity);
+    $this->assertDatabaseHas('inventory_movements', [
+        'product_id' => $product->id,
+        'reference_type' => 'inventory_adjustment_request',
+        'reference_id' => $requestId,
+        'sellable_before' => $observedQuantity,
+        'sellable_after' => $countedQuantity,
+    ]);
+});
+
+test('a physical count cannot be submitted against a stale inventory value', function () {
+    $requester = User::factory()->administrator()->create();
+    $inventory = Product::factory()->available()->create()->inventory;
+    $observedQuantity = $inventory->quantity;
+    $inventory->update(['quantity' => $observedQuantity + 1]);
+
+    $this->actingAs($requester)->post(route('administration.inventory.count', $inventory), [
+        'quantity' => $observedQuantity + 2,
+        'observed_quantity' => $observedQuantity,
+        'reason_code' => 'count_error', 'reason' => 'Shelf count from earlier page',
+    ])->assertSessionHasErrors('quantity');
+
+    $this->assertDatabaseCount('inventory_adjustment_requests', 0);
+});
+
+test('physical stock count requests require a reason category', function () {
+    $requester = User::factory()->administrator()->create();
+    $inventory = Product::factory()->available()->create()->inventory;
+
+    $this->actingAs($requester)->post(route('administration.inventory.count', $inventory), [
+        'quantity' => $inventory->quantity + 1,
+        'observed_quantity' => $inventory->quantity,
+        'reason' => 'Counted by staff at opening',
+    ])->assertSessionHasErrors('reason_code');
+
+    $this->assertDatabaseCount('inventory_adjustment_requests', 0);
 });
 
 test('manager can update the reorder level separately while staff cannot', function () {
@@ -57,7 +124,7 @@ test('manual stock changes require a different authorized reviewer and preserve 
     $this->actingAs($staff)->patch(route('administration.inventory.update', $product->inventory), [
         'quantity' => $before + 4,
         'reorder_level' => $product->inventory->reorder_level,
-        'reason' => 'Physical stock count correction',
+        'reason_code' => 'count_error', 'reason' => 'Physical stock count correction',
     ])->assertSessionHasNoErrors();
 
     expect($product->inventory->fresh()->quantity)->toBe($before);
@@ -91,7 +158,7 @@ test('owners cannot approve their own stock request', function () {
     $this->actingAs($owner)->patch(route('administration.inventory.update', $product->inventory), [
         'quantity' => $product->inventory->quantity + 1,
         'reorder_level' => $product->inventory->reorder_level,
-        'reason' => 'Physical count correction',
+        'reason_code' => 'count_error', 'reason' => 'Physical count correction',
     ])->assertSessionHasNoErrors();
 
     $requestId = DB::table('inventory_adjustment_requests')->where('product_id', $product->id)->value('id');
@@ -112,7 +179,7 @@ test('an authorized reviewer may reject a pending request after its requester is
     $this->actingAs($requester)->patch(route('administration.inventory.update', $product->inventory), [
         'quantity' => $before + 1,
         'reorder_level' => $product->inventory->reorder_level,
-        'reason' => 'Physical count correction',
+        'reason_code' => 'count_error', 'reason' => 'Physical count correction',
     ])->assertSessionHasNoErrors();
     $requestId = DB::table('inventory_adjustment_requests')->where('product_id', $product->id)->value('id');
     $requester->update(['is_active' => false]);
@@ -133,7 +200,7 @@ test('a requester can withdraw and replace a pending stock request without chang
     $product = Product::factory()->available()->create();
     $initial = $product->inventory->quantity;
     $this->actingAs($staff)->patch(route('administration.inventory.update', $product->inventory), [
-        'quantity' => $initial + 2, 'reorder_level' => $product->inventory->reorder_level, 'reason' => 'Physical count differs',
+        'quantity' => $initial + 2, 'reorder_level' => $product->inventory->reorder_level, 'reason_code' => 'count_error', 'reason' => 'Physical count differs',
     ])->assertSessionHasNoErrors();
     $firstId = DB::table('inventory_adjustment_requests')->where('product_id', $product->id)->value('id');
 
@@ -144,10 +211,10 @@ test('a requester can withdraw and replace a pending stock request without chang
         'reason' => 'Request entered by mistake',
     ])->assertSessionHasNoErrors();
     $this->actingAs($staff)->post(route('administration.inventory-adjustments.replace', $firstId), [
-        'quantity' => $initial + 3, 'reason' => 'Corrected physical shelf count',
+        'quantity' => $initial + 3, 'reason_code' => 'count_error', 'reason' => 'Corrected physical shelf count',
     ])->assertSessionHasNoErrors();
     $this->actingAs($staff)->post(route('administration.inventory-adjustments.replace', $firstId), [
-        'quantity' => $initial + 4, 'reason' => 'Another correction attempt',
+        'quantity' => $initial + 4, 'reason_code' => 'count_error', 'reason' => 'Another correction attempt',
     ])->assertSessionHasErrors('replacement');
 
     $this->assertDatabaseHas('inventory_adjustment_requests', ['id' => $firstId, 'status' => 'withdrawn']);
@@ -163,7 +230,7 @@ test('opening stock stays unavailable until a second person approves it', functi
     $this->actingAs($requester)->post(route('administration.products.inventory.store', $product), [
         'quantity' => 7,
         'reorder_level' => 2,
-        'reason' => 'Opening count on shelf',
+        'reason_code' => 'receiving_error', 'reason' => 'Opening count on shelf',
     ])->assertSessionHasNoErrors();
 
     expect($product->inventory()->exists())->toBeFalse();
@@ -184,7 +251,7 @@ test('posted audit and inventory movements reject direct mutation', function () 
     $this->actingAs($owner)->patch(route('administration.inventory.update', $product->inventory), [
         'quantity' => $product->inventory->quantity + 1,
         'reorder_level' => $product->inventory->reorder_level,
-        'reason' => 'Count correction after audit',
+        'reason_code' => 'count_error', 'reason' => 'Count correction after audit',
     ])->assertSessionHasNoErrors();
     $requestId = DB::table('inventory_adjustment_requests')->where('product_id', $product->id)->value('id');
     $this->actingAs($otherOwner)->post(route('administration.inventory-adjustments.decide', $requestId), [

@@ -22,6 +22,10 @@ class AuditLogPresenter
         $detailsVisible = $this->canViewDetails($viewer, $entry->subject_type, $entry->action);
         $changes = $detailsVisible && is_string($entry->changes)
             ? json_decode($entry->changes, true) : null;
+        $containsCostChange = is_array($changes) && $this->containsAcquisitionCost($changes);
+        if (is_array($changes) && ! $viewer->can('products.cost')) {
+            $changes = $this->withoutAcquisitionCost($changes);
+        }
 
         return [
             'id' => (int) $entry->id,
@@ -39,7 +43,7 @@ class AuditLogPresenter
             'subject_label' => Str::headline(str_replace('_', ' ', $entry->subject_type)),
             'subject_id' => $entry->subject_id === null ? null : (int) $entry->subject_id,
             'subject_url' => $this->subjectUrl($viewer, $entry->subject_type, $entry->subject_id),
-            'reason' => $detailsVisible ? $entry->reason : null,
+            'reason' => $detailsVisible && (! $containsCostChange || $viewer->can('products.cost')) ? $entry->reason : null,
             'details_visible' => $detailsVisible,
             'details' => is_array($changes) ? $this->details($changes, $entry->action) : [],
             'has_changes' => $entry->changes !== null,
@@ -169,6 +173,35 @@ class AuditLogPresenter
                 ? '[redacted]'
                 : (is_array($value) ? $this->presentNestedValues($value)
                     : (is_string($value) ? ($this->enumLabel($value) ?? $value) : $value));
+        }
+
+        return $values;
+    }
+
+    /** @param array<string|int, mixed> $values */
+    private function containsAcquisitionCost(array $values): bool
+    {
+        foreach ($values as $key => $value) {
+            if (str_contains(strtolower((string) $key), 'acquisition_cost')
+                || (is_array($value) && $this->containsAcquisitionCost($value))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @param array<string|int, mixed> $values
+     * @return array<string|int, mixed>
+     */
+    private function withoutAcquisitionCost(array $values): array
+    {
+        foreach ($values as $key => $value) {
+            if (str_contains(strtolower((string) $key), 'acquisition_cost')) {
+                unset($values[$key]);
+            } elseif (is_array($value)) {
+                $values[$key] = $this->withoutAcquisitionCost($value);
+            }
         }
 
         return $values;

@@ -107,6 +107,46 @@ test('owners can restore a deleted product with its inventory while keeping it i
     $this->assertDatabaseHas('inventories', ['product_id' => $product->id, 'quantity' => 0]);
 });
 
+test('completed customer returns no longer block deleting a stockless product', function () {
+    $owner = User::factory()->administrator()->create();
+    $product = Product::factory()->has(Inventory::factory()->state(['quantity' => 0, 'quarantined_quantity' => 0]))->create();
+    $order = \App\Models\Order::factory()->create(['status' => 'completed']);
+    $itemId = DB::table('order_items')->insertGetId([
+        'order_id' => $order->id, 'product_id' => $product->id, 'quantity' => 1, 'price_at_time' => '100.00',
+    ]);
+    $returnId = DB::table('customer_returns')->insertGetId([
+        'order_id' => $order->id, 'requester_id' => $owner->id, 'status' => 'accepted', 'reason' => 'Resolved return',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('customer_return_items')->insert([
+        'customer_return_id' => $returnId, 'order_item_id' => $itemId, 'quantity' => 1,
+        'condition' => 'damaged', 'disposition' => 'write_off',
+    ]);
+
+    $this->actingAs($owner)->delete(route('administration.products.destroy', $product))
+        ->assertRedirect(route('administration.products.index'));
+
+    expect(Product::query()->find($product->id))->toBeNull();
+    $this->assertDatabaseHas('customer_return_items', ['customer_return_id' => $returnId, 'order_item_id' => $itemId]);
+});
+
+test('an acknowledged supplier return without resolution blocks product deletion', function () {
+    $owner = User::factory()->administrator()->create();
+    $product = Product::factory()->has(Inventory::factory()->state(['quantity' => 0, 'quarantined_quantity' => 0]))->create();
+    $supplierId = DB::table('suppliers')->insertGetId([
+        'name' => 'Unresolved supplier', 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('supplier_returns')->insert([
+        'supplier_id' => $supplierId, 'product_id' => $product->id, 'requester_id' => $owner->id,
+        'quantity' => 1, 'status' => 'closed', 'reason' => 'Acknowledged return', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    $this->actingAs($owner)->delete(route('administration.products.destroy', $product))
+        ->assertSessionHasErrors('deletion');
+
+    expect(Product::query()->find($product->id))->not->toBeNull();
+});
+
 test('only owners can view or restore deleted products', function () {
     $managerRoleId = DB::table('administration_roles')->where('code', 'manager')->value('id');
     $manager = User::factory()->administrator()->create(['administration_role_id' => $managerRoleId]);

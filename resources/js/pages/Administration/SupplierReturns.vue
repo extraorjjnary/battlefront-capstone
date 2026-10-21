@@ -19,11 +19,19 @@ const props = defineProps({
     filters: Object,
 });
 const page = usePage();
+const supplierReturnProgress = {
+    pending: 'Waiting for a separate administrator to approve or reject.',
+    approved: 'Approved; waiting for staff to dispatch the held units.',
+    dispatched: 'Dispatched; waiting for supplier acknowledgment.',
+    closed: 'Supplier acknowledged receipt; record the supplier outcome if it is not recorded yet.',
+    rejected_follow_up: 'Supplier rejected the return; record whether to release, write off, or retry.',
+    rejected: 'Rejected and resolved through the selected follow-up.',
+};
 const { search, isSearching, clearSearch } = useDebouncedSearch({
     initialSearch: props.filters?.q,
     currentSearch: () => props.filters?.q,
     route: SupplierReturnController.index,
-    query: () => ({ case: props.selected_case ?? undefined }),
+    query: () => ({ case: props.selected_case ?? undefined, overdue: props.filters?.overdue ? 1 : undefined }),
 });
 watch(() => props.filters?.q, (query) => { search.value = query ?? ''; });
 defineOptions({
@@ -109,7 +117,18 @@ defineOptions({
                 /><InputError :message="errors.quantity" />
             </div>
             <div class="space-y-2">
-                <Label for="return-reason">Reason</Label
+                <Label for="supplier-return-reason-code">Reason category</Label>
+                <select id="supplier-return-reason-code" name="reason_code" required class="border-border bg-background w-full border p-2">
+                    <option value="">Select a reason</option>
+                    <option value="defective">Defective</option>
+                    <option value="wrong_item">Wrong item</option>
+                    <option value="supplier_damage">Supplier damage</option>
+                    <option value="other">Other</option>
+                </select>
+                <InputError :message="errors.reason_code" />
+            </div>
+            <div class="space-y-2">
+                <Label for="return-reason">Reason details</Label
                 ><Input
                     id="return-reason"
                     name="reason"
@@ -123,6 +142,9 @@ defineOptions({
             >
         </Form>
         <section class="space-y-3" aria-label="Supplier return cases">
+            <Link :href="SupplierReturnController.index({ query: { case: selected_case ?? undefined, q: filters?.q ?? undefined, overdue: filters?.overdue ? undefined : 1 } })" class="text-primary text-sm underline">
+                {{ filters?.overdue ? 'Show all supplier returns' : 'Show supplier returns over 30 days old' }}
+            </Link>
             <SearchField
                 id="supplier-return-search"
                 v-model="search"
@@ -154,6 +176,7 @@ defineOptions({
                             {{ entry.requester_name }}
                         </p>
                         <p class="mt-1 text-sm">{{ entry.reason }}</p>
+                        <p class="text-muted-foreground text-sm">{{ entry.age_days }} days open</p>
                         <p
                             v-if="entry.dispatch_reference"
                             class="text-muted-foreground text-sm"
@@ -178,6 +201,10 @@ defineOptions({
                         entry.status.replaceAll('_', ' ')
                     }}</span>
                 </div>
+                <p class="text-muted-foreground text-sm">
+                    Next step: {{ supplierReturnProgress[entry.status] ?? 'Review the case history.' }}
+                </p>
+                <p v-if="entry.follow_up_overdue" class="text-destructive text-sm font-semibold">Supplier return follow-up overdue (over 30 days)</p>
                 <p class="text-sm">
                     Held in quarantine: {{ entry.held_quantity }} units ·
                     Origin:
@@ -250,7 +277,7 @@ defineOptions({
                         maxlength="255" /><Button
                         type="submit"
                         :disabled="processing"
-                        >Close return</Button
+                        >Record supplier acknowledgment</Button
                     ><InputError
                         :message="
                             errors.acknowledgement || errors.external_reference
@@ -304,6 +331,10 @@ defineOptions({
                             minlength="5"
                             maxlength="2000"
                     /></label>
+                    <label class="flex items-center gap-2 text-sm sm:col-span-2">
+                        <input name="inspection_confirmed" type="checkbox" value="1" />
+                        I inspected the units and confirmed they are safe to sell
+                    </label>
                     <Button type="submit" :disabled="processing"
                         >Record follow-up</Button
                     ><InputError
@@ -313,6 +344,7 @@ defineOptions({
                             errors.supplier_id
                         "
                     />
+                    <InputError :message="errors.inspection_confirmed || errors.evidence" />
                 </Form>
                 <p v-if="entry.resolution_outcome" class="text-sm">
                     Supplier resolution:

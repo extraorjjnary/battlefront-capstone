@@ -10,6 +10,7 @@ use App\Models\Product;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -22,7 +23,7 @@ class InventoryAdjustmentController extends Controller
         $requests = DB::table('inventory_adjustment_requests as requests')
             ->join('products', 'products.id', '=', 'requests.product_id')
             ->join('users', 'users.id', '=', 'requests.requester_id')
-            ->select('requests.id', 'requests.requester_id', 'requests.replaces_request_id', 'requests.observed_quantity', 'requests.target_quantity', 'requests.initial_reorder_level', 'requests.reason', 'requests.decision_reason', 'requests.status', 'requests.created_at', 'products.name as product_name', 'users.name as requester_name')
+            ->select('requests.id', 'requests.requester_id', 'requests.replaces_request_id', 'requests.observed_quantity', 'requests.target_quantity', 'requests.initial_reorder_level', 'requests.reason_code', 'requests.reason', 'requests.decision_reason', 'requests.status', 'requests.created_at', 'products.name as product_name', 'users.name as requester_name')
             ->when($case, fn ($query, $id) => $query->where('requests.id', $id))
             ->when($filters['q'] ?? null, fn ($query, $search) => $query->where(fn ($query) => $query
                 ->where('products.name', 'like', '%'.$search.'%')
@@ -71,6 +72,7 @@ class InventoryAdjustmentController extends Controller
     {
         $validated = $request->validate([
             'quantity' => ['required', 'integer', 'min:0', 'max:4294967295'],
+            'reason_code' => ['required', Rule::in(['damage', 'theft_loss', 'found_stock', 'count_error', 'receiving_error', 'unit_of_measure_error', 'other'])],
             'reason' => ['required', 'string', 'min:5', 'max:2000'],
             'reorder_level' => ['nullable', 'integer', 'min:0', 'max:4294967295'],
         ]);
@@ -79,7 +81,7 @@ class InventoryAdjustmentController extends Controller
             abort(404);
         }
         $product = Product::query()->whereKey($previous->product_id)->firstOrFail();
-        $replacement->execute($product, $request->user(), $validated['quantity'], $validated['reason'], $validated['reorder_level'] ?? null, $adjustment);
+        $replacement->execute($product, $request->user(), $validated['quantity'], $validated['reason'], $validated['reorder_level'] ?? null, $adjustment, reasonCode: $validated['reason_code']);
 
         return back();
     }

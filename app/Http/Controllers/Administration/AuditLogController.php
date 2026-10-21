@@ -22,7 +22,7 @@ class AuditLogController extends Controller
 
         return Inertia::render('Administration/Reports/AuditLog', [
             'filters' => $filters,
-            'entries' => $this->query($filters)->paginate(25)->withQueryString()
+            'entries' => $this->query($filters, $request->user()->can('products.cost'))->paginate(25)->withQueryString()
                 ->through(fn (stdClass $entry): array => $presenter->present($entry, $request->user())),
             'actors' => DB::table('users')->leftJoin('administration_roles', 'administration_roles.id', '=', 'users.administration_role_id')
                 ->whereIn('users.id', DB::table('audit_logs')->whereNotNull('actor_id')->select('actor_id'))
@@ -92,18 +92,33 @@ class AuditLogController extends Controller
     /**
      * @param  array<string, mixed>  $filters
      */
-    private function query(array $filters): Builder
+    private function query(array $filters, bool $canViewCosts = true): Builder
     {
         return DB::table('audit_logs')
             ->leftJoin('users', 'users.id', '=', 'audit_logs.actor_id')
             ->select('audit_logs.*', 'users.name as actor_name')
             ->addSelect(DB::raw("CASE WHEN audit_logs.actor_id IS NULL OR users.id IS NULL THEN 'system' WHEN users.role = 'administrator' THEN 'administrator' ELSE 'customer' END as actor_type"))
-            ->when($filters['q'] ?? null, fn ($query, $search) => $query->where(fn (Builder $query) => $query
-                ->where('users.name', 'like', '%'.$search.'%')
-                ->orWhere('audit_logs.action', 'like', '%'.$search.'%')
-                ->orWhere('audit_logs.subject_type', 'like', '%'.$search.'%')
-                ->orWhere('audit_logs.reason', 'like', '%'.$search.'%')
-                ->orWhere('audit_logs.changes', 'like', '%'.$search.'%')))
+            ->when($filters['q'] ?? null, function (Builder $query, string $search) use ($canViewCosts): void {
+                $query->where(function (Builder $matches) use ($search, $canViewCosts): void {
+                    $matches->where('users.name', 'like', '%'.$search.'%')
+                        ->orWhere('audit_logs.action', 'like', '%'.$search.'%')
+                        ->orWhere('audit_logs.subject_type', 'like', '%'.$search.'%')
+                        ->orWhere(function (Builder $textMatches) use ($search, $canViewCosts): void {
+                            $textMatches->where(function (Builder $textMatches) use ($search): void {
+                                $textMatches->where('audit_logs.reason', 'like', '%'.$search.'%')
+                                    ->orWhere('audit_logs.changes', 'like', '%'.$search.'%');
+                            });
+
+                            if (! $canViewCosts) {
+                                $textMatches->where(function (Builder $visible): void {
+                                    $visible->where('audit_logs.subject_type', '!=', 'product')
+                                        ->orWhere('audit_logs.action', '!=', 'product.updated')
+                                        ->orWhere('audit_logs.changes', 'not like', '%acquisition_cost%');
+                                });
+                            }
+                        });
+                });
+            })
             ->when($filters['action'] ?? null, fn ($query, $action) => $query->where('audit_logs.action', $action))
             ->when($filters['actor_id'] ?? null, fn ($query, $actor) => $query->where('audit_logs.actor_id', $actor))
             ->when($filters['actor_type'] ?? null, fn ($query, $type) => match ($type) {

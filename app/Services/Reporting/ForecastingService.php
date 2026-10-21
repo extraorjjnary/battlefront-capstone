@@ -233,7 +233,10 @@ class ForecastingService
 
         return [
             'id' => $forecast->id,
-            'product' => $this->productData($forecast->product),
+            'product' => [
+                ...$this->productData($forecast->product),
+                'is_deleted' => $forecast->product->trashed(),
+            ],
             'method' => $forecast->method,
             'method_label' => match ($forecast->method) {
                 'additive_holt_winters' => 'Additive Holt–Winters',

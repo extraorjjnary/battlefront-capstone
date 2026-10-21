@@ -134,6 +134,7 @@ test('administrators can inspect and restock sold out products while inactive re
     $this->patch(route('administration.inventory.update', $inventory), [
         'quantity' => 2,
         'reorder_level' => 2,
+        'reason_code' => 'count_error',
         'reason' => 'Restock after physical count',
     ])->assertRedirect();
     $requestId = DB::table('inventory_adjustment_requests')->where('product_id', $product->id)->value('id');

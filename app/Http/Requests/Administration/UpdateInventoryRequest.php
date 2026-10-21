@@ -4,6 +4,7 @@ namespace App\Http\Requests\Administration;
 
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateInventoryRequest extends FormRequest
 {
@@ -26,6 +27,7 @@ class UpdateInventoryRequest extends FormRequest
             'quantity' => ['bail', 'required', 'integer', 'min:0', 'max:4294967295'],
             'reorder_level' => ['bail', 'required', 'integer', 'min:0', 'max:4294967295'],
             'reason' => ['required', 'string', 'min:5', 'max:2000'],
+            'reason_code' => ['required', Rule::in(['damage', 'theft_loss', 'found_stock', 'count_error', 'receiving_error', 'unit_of_measure_error', 'other'])],
         ];
     }
 

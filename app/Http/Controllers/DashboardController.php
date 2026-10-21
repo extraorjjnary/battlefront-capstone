@@ -31,7 +31,16 @@ class DashboardController extends Controller
                 return to_route('administration.team.index');
             }
             if (! $user->hasAdministrationPermission('reports.view')) {
-                return to_route('administration.orders.index');
+                $route = match (true) {
+                    $user->can('orders.view') => 'administration.orders.index',
+                    $user->can('inventory.view') => 'administration.inventory.index',
+                    $user->can('products.manage') => 'administration.products.index',
+                    $user->can('customers.view') => 'administration.customers.index',
+                    $user->can('suppliers.manage') => 'administration.suppliers.index',
+                    default => 'administration.work-queue.index',
+                };
+
+                return to_route($route);
             }
 
             return Inertia::render('Dashboard/Administration', [

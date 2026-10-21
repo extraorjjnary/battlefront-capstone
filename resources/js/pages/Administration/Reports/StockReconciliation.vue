@@ -1,7 +1,11 @@
 <script setup>
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import StockReconciliationController from '@/actions/App/Http/Controllers/Administration/StockReconciliationController';
+import InventoryController from '@/actions/App/Http/Controllers/Administration/InventoryController';
 import SearchField from '@/components/SearchField.vue';
+import { Form } from '@inertiajs/vue3';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
 import { watch } from 'vue';
 
@@ -11,6 +15,7 @@ const props = defineProps({
     movements: { type: Object, default: null },
     filters: { type: Object, required: true },
 });
+const page = usePage();
 const { search, isSearching, clearSearch } = useDebouncedSearch({
     initialSearch: props.filters.q,
     currentSearch: () => props.filters.q,
@@ -29,8 +34,8 @@ defineOptions({
     <main class="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6 lg:p-10">
         <header class="border-border bg-card border p-6">
             <p class="text-primary text-xs font-semibold tracking-widest uppercase">Inventory control</p>
-            <h1 class="mt-2 text-2xl font-bold">Stock reconciliation</h1>
-            <p class="text-muted-foreground mt-2 text-sm">Compare current stock with recorded movement balances and open quarantine cases. Discrepancies require investigation; this view never changes stock.</p>
+            <h1 class="mt-2 text-2xl font-bold">Stock record checks</h1>
+            <p class="text-muted-foreground mt-2 text-sm">This report checks whether inventory quantities match the movement history and the units currently held by open cases. It does not count physical stock or change inventory. Investigate a mismatch in its linked cases and movements before requesting an adjustment.</p>
         </header>
         <SearchField
             id="reconciliation-search"
@@ -43,15 +48,38 @@ defineOptions({
         />
         <div class="border-border bg-card overflow-x-auto border">
             <table class="w-full min-w-220 text-left text-sm">
-                <thead class="bg-secondary text-xs uppercase"><tr><th class="p-3">Product</th><th class="p-3">Current sellable</th><th class="p-3">Movement balance</th><th class="p-3">Current held</th><th class="p-3">Movement held</th><th class="p-3">Open cases</th><th class="p-3">Result</th></tr></thead>
+                <thead class="bg-secondary text-xs uppercase"><tr><th class="p-3">Product</th><th class="p-3">Sellable now</th><th class="p-3">Last recorded sellable</th><th class="p-3">Held now</th><th class="p-3">Last recorded held</th><th class="p-3">Units held by open cases</th><th class="p-3">Record check</th><th class="p-3">Physical count</th></tr></thead>
                 <tbody>
                     <tr v-for="item in inventories.data" :key="item.product_id" class="border-border border-t">
                         <td class="p-3"><Link :href="StockReconciliationController.index({ query: { product_id: item.product_id, q: filters.q, page: inventories.current_page } })" class="text-primary font-semibold underline">{{ item.name }}</Link><br><span class="text-muted-foreground text-xs">{{ item.product_code }}</span></td>
                         <td class="p-3 tabular-nums">{{ item.sellable }}</td><td class="p-3 tabular-nums">{{ item.ledger_sellable ?? 'Unknown' }}</td>
-                        <td class="p-3 tabular-nums">{{ item.quarantined }}</td><td class="p-3 tabular-nums">{{ item.ledger_quarantined ?? 'Unknown' }}</td><td class="p-3 tabular-nums">{{ item.case_expected }}</td>
-                        <td class="p-3" :class="item.status === 'discrepancy' ? 'text-destructive font-semibold' : 'text-muted-foreground'">{{ item.status === 'legacy_unknown' ? 'No movement baseline' : item.status }}</td>
+                        <td class="p-3 tabular-nums">{{ item.quarantined }}</td><td class="p-3 tabular-nums">{{ item.ledger_quarantined ?? 'Unknown' }}</td><td class="p-3 tabular-nums">{{ item.case_expected }}<span class="text-muted-foreground block text-xs">Damage {{ item.case_breakdown.damage }} · Customer {{ item.case_breakdown.customer_return }} · Supplier {{ item.case_breakdown.supplier_return }}</span></td>
+                        <td class="p-3" :class="item.status === 'discrepancy' ? 'text-destructive font-semibold' : 'text-muted-foreground'">
+                            <p>{{ item.status === 'legacy_unknown' ? 'No movement baseline' : item.status === 'discrepancy' ? 'Investigate mismatch' : 'Records match' }}</p>
+                            <ul v-if="item.findings.length" class="mt-1 space-y-1 text-xs font-normal">
+                                <li v-for="finding in item.findings" :key="finding">{{ finding }}</li>
+                            </ul>
+                            <p v-if="item.sellable_difference !== null && item.sellable_difference !== 0" class="mt-1 text-xs font-normal">Sellable variance: {{ item.sellable_difference > 0 ? '+' : '' }}{{ item.sellable_difference }}</p>
+                            <p v-if="item.held_ledger_difference !== null && item.held_ledger_difference !== 0" class="mt-1 text-xs font-normal">Held ledger variance: {{ item.held_ledger_difference > 0 ? '+' : '' }}{{ item.held_ledger_difference }}</p>
+                            <p v-if="item.case_difference !== 0" class="mt-1 text-xs font-normal">Open case variance: {{ item.case_difference > 0 ? '+' : '' }}{{ item.case_difference }}</p>
+                            <p v-if="item.first_problem_movement_id" class="mt-1 text-xs font-normal">First affected movement #{{ item.first_problem_movement_id }}</p>
+                        </td>
+                        <td class="p-3">
+                            <details v-if="page.props.auth.can?.requestInventory">
+                                <summary class="cursor-pointer text-primary underline">Record shelf count</summary>
+                                <Form v-bind="InventoryController.count.form(item.inventory_id)" v-slot="{ errors, processing }" class="mt-2 grid min-w-56 gap-2">
+                                    <input type="hidden" name="observed_quantity" :value="item.sellable" />
+                                    <label class="text-xs">Sellable units physically counted<Input name="quantity" type="number" min="0" required :default-value="item.sellable" /></label>
+                                    <label class="text-xs">Count reason<select name="reason_code" required class="border-border bg-background mt-1 w-full border p-2"><option value="">Select a reason</option><option value="damage">Damage</option><option value="theft_loss">Theft or loss</option><option value="found_stock">Found stock</option><option value="count_error">Counting error</option><option value="receiving_error">Receiving error</option><option value="unit_of_measure_error">Unit of measure error</option><option value="other">Other</option></select></label>
+                                    <label class="text-xs">Count notes<Input name="reason" required minlength="5" maxlength="2000" placeholder="Who counted and when" /></label>
+                                    <Button type="submit" size="sm" :disabled="processing">Submit for approval</Button>
+                                    <p v-if="errors.quantity || errors.reason_code || errors.reason" class="text-destructive text-xs">{{ errors.quantity || errors.reason_code || errors.reason }}</p>
+                                </Form>
+                            </details>
+                            <span v-else class="text-muted-foreground">Request permission required</span>
+                        </td>
                     </tr>
-                    <tr v-if="inventories.data.length === 0"><td colspan="7" class="p-6">No inventory records.</td></tr>
+                    <tr v-if="inventories.data.length === 0"><td colspan="8" class="p-6">No inventory records.</td></tr>
                 </tbody>
             </table>
         </div>
@@ -60,8 +88,8 @@ defineOptions({
             <Link v-if="inventories.next_page_url" :href="inventories.next_page_url" class="text-primary underline">Next</Link>
         </nav>
         <section v-if="movements" class="border-border bg-card border p-5">
-            <h2 class="text-xl font-semibold">Movement history for product #{{ selected_product_id }}</h2>
-            <p class="text-muted-foreground mt-1 text-sm">Each row records before, change, and after quantities. Older stock without a movement baseline is shown as unknown.</p>
+            <h2 class="text-xl font-semibold">Recorded movement history for product #{{ selected_product_id }}</h2>
+            <p class="text-muted-foreground mt-1 text-sm">Each row shows the quantity before a recorded change, the change, and the resulting quantity. Older stock without a movement baseline cannot be checked against earlier records.</p>
             <div class="mt-4 space-y-2">
                 <article v-for="movement in movements.data" :key="movement.id" class="border-border border p-3 text-sm">
                     <div class="flex flex-wrap justify-between gap-2"><strong>{{ movement.kind.replaceAll('_', ' ') }} #{{ movement.id }}</strong><time>{{ movement.created_at }}</time></div>

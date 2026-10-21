@@ -275,7 +275,7 @@ test('reset restores the complete real catalog with historical sales only when r
             ->assertInertia(fn (Assert $page) => $page->where('products.total', 3));
         $this->get(route('administration.inventory.index', ['stock' => 'out_of_stock']))
             ->assertInertia(fn (Assert $page) => $page->where('products.total', 1));
-        $this->patch(route('administration.inventory.update', $soldOut->inventory), ['quantity' => 6, 'reorder_level' => 5])
+        $this->patch(route('administration.inventory.update', $soldOut->inventory), ['quantity' => 6, 'reorder_level' => 5, 'reason_code' => 'found_stock', 'reason' => 'Found stock during reset check'])
             ->assertRedirect()->assertSessionHasNoErrors();
         expect($soldOut->inventory->refresh()->quantity)->toBe(6);
         expect($soldOut->inventory->reorder_level)->toBe(5);

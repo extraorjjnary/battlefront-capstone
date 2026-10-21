@@ -16,11 +16,11 @@ class StockReconciliationReport
             ->when($search, fn ($query, $search) => $query->where(fn ($query) => $query
                 ->where('products.name', 'like', '%'.$search.'%')
                 ->orWhere('products.product_code', 'like', '%'.$search.'%')))
-            ->select('inventories.product_id', 'inventories.quantity', 'inventories.quarantined_quantity', 'products.name', 'products.product_code')
+            ->select('inventories.id as inventory_id', 'inventories.product_id', 'inventories.quantity', 'inventories.quarantined_quantity', 'products.name', 'products.product_code')
             ->orderBy('products.name')->orderBy('products.id')
             ->paginate(20)->withQueryString();
         $ids = $inventories->getCollection()->pluck('product_id')->map(fn ($id): int => (int) $id)->all();
-        $held = array_fill_keys($ids, 0);
+        $held = array_fill_keys($ids, ['damage' => 0, 'customer_return' => 0, 'supplier_return' => 0]);
 
         $damage = DB::table('damage_reports')->select('product_id')
             ->selectRaw('SUM(quantity) as held')->where('status', 'pending')->whereIn('product_id', $ids)->groupBy('product_id')->get();
@@ -34,9 +34,13 @@ class StockReconciliationReport
             ->selectRaw('SUM(quantity) as held')
             ->whereIn('status', ['pending', 'approved', 'rejected_follow_up'])
             ->whereIn('product_id', $ids)->groupBy('product_id')->get();
-        foreach ([$damage, $customer, $supplier] as $cases) {
+        foreach ([
+            'damage' => $damage,
+            'customer_return' => $customer,
+            'supplier_return' => $supplier,
+        ] as $kind => $cases) {
             foreach ($cases as $case) {
-                $held[$case->product_id] += (int) $case->held;
+                $held[$case->product_id][$kind] += (int) $case->held;
             }
         }
 
@@ -44,35 +48,67 @@ class StockReconciliationReport
         foreach (DB::table('inventory_movements')->whereIn('product_id', $ids)->orderBy('product_id')->orderBy('id')->cursor() as $movement) {
             $id = (int) $movement->product_id;
             $previous = $ledger[$id] ?? null;
-            $gap = (int) $movement->sellable_after !== (int) $movement->sellable_before + (int) $movement->sellable_delta
-                || (int) $movement->quarantined_after !== (int) $movement->quarantined_before + (int) $movement->quarantined_delta
-                || ($previous !== null && ((int) $movement->sellable_before !== $previous['sellable']
-                    || (int) $movement->quarantined_before !== $previous['quarantined']));
+            $arithmeticGap = (int) $movement->sellable_after !== (int) $movement->sellable_before + (int) $movement->sellable_delta
+                || (int) $movement->quarantined_after !== (int) $movement->quarantined_before + (int) $movement->quarantined_delta;
+            $continuityGap = $previous !== null && ((int) $movement->sellable_before !== $previous['sellable']
+                || (int) $movement->quarantined_before !== $previous['quarantined']);
             $ledger[$id] = [
                 'sellable' => (int) $movement->sellable_after,
                 'quarantined' => (int) $movement->quarantined_after,
-                'gap' => $gap || ($previous['gap'] ?? false),
+                'arithmetic_gap' => $arithmeticGap || ($previous['arithmetic_gap'] ?? false),
+                'continuity_gap' => $continuityGap || ($previous['continuity_gap'] ?? false),
+                'first_gap_id' => $previous['first_gap_id'] ?? (($arithmeticGap || $continuityGap) ? (int) $movement->id : null),
+                'last_movement_id' => (int) $movement->id,
             ];
         }
 
         $inventories->through(function ($inventory) use ($held, $ledger): array {
             $id = (int) $inventory->product_id;
             $last = $ledger[$id] ?? null;
-            $caseGap = (int) $inventory->quarantined_quantity !== $held[$id];
+            $caseExpected = array_sum($held[$id]);
+            $caseGap = (int) $inventory->quarantined_quantity !== $caseExpected;
+            $findings = [];
+
+            if ($last === null) {
+                $findings[] = 'No movement baseline is available.';
+            } else {
+                if ($last['arithmetic_gap']) {
+                    $findings[] = 'A movement does not balance its before, change, and after quantities.';
+                }
+                if ($last['continuity_gap']) {
+                    $findings[] = 'Movement records do not join to the previous recorded balance.';
+                }
+                if ($last['sellable'] !== (int) $inventory->quantity) {
+                    $findings[] = 'Current sellable stock differs from the last movement balance.';
+                }
+                if ($last['quarantined'] !== (int) $inventory->quarantined_quantity) {
+                    $findings[] = 'Current held stock differs from the last movement balance.';
+                }
+            }
+
+            if ($caseGap) {
+                $findings[] = 'Held stock differs from the quantity assigned to open cases.';
+            }
 
             return [
                 'product_id' => $id,
+                'inventory_id' => (int) $inventory->inventory_id,
                 'product_code' => $inventory->product_code,
                 'name' => $inventory->name,
                 'sellable' => (int) $inventory->quantity,
                 'quarantined' => (int) $inventory->quarantined_quantity,
-                'case_expected' => $held[$id],
+                'case_expected' => $caseExpected,
+                'case_breakdown' => $held[$id],
                 'ledger_sellable' => $last['sellable'] ?? null,
                 'ledger_quarantined' => $last['quarantined'] ?? null,
+                'sellable_difference' => $last === null ? null : (int) $inventory->quantity - $last['sellable'],
+                'held_ledger_difference' => $last === null ? null : (int) $inventory->quarantined_quantity - $last['quarantined'],
+                'case_difference' => (int) $inventory->quarantined_quantity - $caseExpected,
+                'first_problem_movement_id' => $last['first_gap_id'] ?? ($last !== null && ($last['sellable'] !== (int) $inventory->quantity
+                    || $last['quarantined'] !== (int) $inventory->quarantined_quantity) ? $last['last_movement_id'] : null),
+                'findings' => $findings,
                 'status' => $last === null ? ($caseGap ? 'discrepancy' : 'legacy_unknown')
-                    : (($last['gap'] || $last['sellable'] !== (int) $inventory->quantity
-                        || $last['quarantined'] !== (int) $inventory->quarantined_quantity || $caseGap)
-                        ? 'discrepancy' : 'matched'),
+                    : ($findings === [] ? 'matched' : 'discrepancy'),
             ];
         });
 

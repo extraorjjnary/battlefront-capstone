@@ -8,14 +8,15 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;
 use App\Services\ApprovalMonitor;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class HandleCustomerReturn
 {
-    public function receive(User $actor, int $orderItemId, int $quantity, string $condition, string $reason): int
+    public function receive(User $actor, int $orderItemId, int $quantity, string $condition, string $reason, string $reasonCode): int
     {
-        return DB::transaction(function () use ($actor, $orderItemId, $quantity, $condition, $reason): int {
+        return DB::transaction(function () use ($actor, $orderItemId, $quantity, $condition, $reason, $reasonCode): int {
             $item = OrderItem::query()->findOrFail($orderItemId);
             $order = Order::query()->whereKey($item->order_id)->lockForUpdate()->firstOrFail();
             if ($order->status !== OrderStatus::Completed || $order->sale()->doesntExist()) {
@@ -42,6 +43,7 @@ class HandleCustomerReturn
                 'requester_id' => $actor->id,
                 'status' => 'pending',
                 'reason' => $reason,
+                'reason_code' => $reasonCode,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
@@ -58,9 +60,9 @@ class HandleCustomerReturn
         }, attempts: 3);
     }
 
-    public function decide(int $returnId, User $reviewer, bool $accept, string $disposition, string $approvedAmount, string $reason, ?int $supplierId = null): void
+    public function decide(int $returnId, User $reviewer, bool $accept, string $disposition, string $approvedAmount, string $reason, ?int $supplierId = null, bool $inspectionConfirmed = false): void
     {
-        DB::transaction(function () use ($returnId, $reviewer, $accept, $disposition, $approvedAmount, $reason, $supplierId): void {
+        DB::transaction(function () use ($returnId, $reviewer, $accept, $disposition, $approvedAmount, $reason, $supplierId, $inspectionConfirmed): void {
             $return = DB::table('customer_returns')->where('id', $returnId)->lockForUpdate()->first();
             if ($return === null) {
                 abort(404);
@@ -91,11 +93,18 @@ class HandleCustomerReturn
             if ($inventory->quarantined_quantity < $returnItem->quantity) {
                 throw ValidationException::withMessages(['decision' => 'Received stock is no longer in quarantine.']);
             }
+            if ($accept && $disposition === 'write_off'
+                && ! DB::table('administration_evidence')->where('subject_type', 'customer_return')->where('subject_id', $returnId)->exists()) {
+                throw ValidationException::withMessages(['evidence' => 'Attach evidence before writing off returned stock.']);
+            }
             $beforeSellable = $inventory->quantity;
             $beforeHeld = $inventory->quarantined_quantity;
             if ($accept && $disposition === 'write_off') {
                 $inventory->quarantined_quantity = max(0, (int) ($inventory->quarantined_quantity - $returnItem->quantity));
             } elseif ($accept && $disposition === 'restock') {
+                if (! $inspectionConfirmed) {
+                    throw ValidationException::withMessages(['inspection_confirmed' => 'Confirm that inspection found the item suitable for sale before restocking it.']);
+                }
                 $inventory->quarantined_quantity = max(0, (int) ($inventory->quarantined_quantity - $returnItem->quantity));
                 $inventory->quantity += $returnItem->quantity;
             } elseif ($accept && $disposition === 'supplier_return') {
@@ -110,6 +119,7 @@ class HandleCustomerReturn
                     'quantity' => $returnItem->quantity,
                     'status' => 'pending',
                     'reason' => $return->reason,
+                    'reason_code' => $return->reason_code,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -133,7 +143,9 @@ class HandleCustomerReturn
             DB::table('customer_returns')->where('id', $returnId)->update([
                 'status' => $accept ? 'accepted' : 'rejected_pending_handover',
                 'reviewer_id' => $reviewer->id,
-                'decision_reason' => $reason,
+                'decision_reason' => $accept && $disposition === 'restock'
+                    ? 'Sellability inspected and confirmed. '.$reason
+                    : $reason,
                 'updated_at' => now(),
             ]);
             if ($accept && bccomp($approvedAmount, '0.00', 2) > 0) {
@@ -233,8 +245,37 @@ class HandleCustomerReturn
                 abort(403);
             }
             $latest = DB::table('customer_refund_payment_reviews')->where('customer_refund_payment_id', $paymentId)->orderByDesc('id')->first();
-            if ($latest?->decision === 'verified' || $latest?->decision === $decision) {
+            if (in_array($latest?->decision, ['verified', 'voided'], true) || $latest?->decision === $decision) {
                 throw ValidationException::withMessages(['decision' => 'This payment already has that reconciliation status.']);
+            }
+            if ($decision === 'voided' && $latest?->decision !== 'disputed') {
+                throw ValidationException::withMessages(['decision' => 'Only a disputed payment record can be voided.']);
+            }
+
+            if ($decision === 'voided') {
+                $refund = DB::table('customer_refunds')->where('id', $payment->customer_refund_id)->lockForUpdate()->firstOrFail();
+                $paidAmount = $this->decimal($refund->paid_amount);
+                $paymentAmount = $this->decimal($payment->amount);
+                if (bccomp($paidAmount, $paymentAmount, 2) < 0) {
+                    throw ValidationException::withMessages(['decision' => 'The refund total no longer includes this payment amount.']);
+                }
+                $remainingPayment = DB::table('customer_refund_payments as payments')
+                    ->where('payments.customer_refund_id', $refund->id)
+                    ->where('payments.id', '!=', $paymentId)
+                    ->whereNotExists(fn (Builder $query): Builder => $query->selectRaw('1')
+                        ->from('customer_refund_payment_reviews as reviews')
+                        ->whereColumn('reviews.customer_refund_payment_id', 'payments.id')
+                        ->where('reviews.decision', 'voided'))
+                    ->orderByDesc('payments.paid_at')->orderByDesc('payments.id')->first();
+
+                DB::table('customer_refunds')->where('id', $refund->id)->update([
+                    'paid_amount' => bcsub($paidAmount, $paymentAmount, 2),
+                    'recorded_by' => $remainingPayment?->recorded_by,
+                    'payment_method' => $remainingPayment?->payment_method,
+                    'external_reference' => $remainingPayment?->external_reference,
+                    'paid_at' => $remainingPayment?->paid_at,
+                    'updated_at' => now(),
+                ]);
             }
 
             DB::table('customer_refund_payment_reviews')->insert([
@@ -247,6 +288,7 @@ class HandleCustomerReturn
             $this->audit($reviewer, 'customer_refund.payment_reviewed', $paymentId, [
                 'decision' => $decision,
                 'previous_decision' => $latest?->decision,
+                'amount_removed_from_refund_total' => $decision === 'voided' ? $payment->amount : '0.00',
             ], $reason, 'refund_payment');
         }, attempts: 3);
     }

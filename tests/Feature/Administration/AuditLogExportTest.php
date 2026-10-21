@@ -59,6 +59,37 @@ test('audit events show readable changes only to a role allowed to view the reco
             ->where('entries.data.0.subject_url', null));
 });
 
+test('product audit hides acquisition costs and cost change reasons without cost permission', function () {
+    $owner = User::factory()->administrator()->create();
+    $manager = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'manager')->value('id'),
+    ]);
+    DB::table('audit_logs')->insert([
+        'actor_id' => $owner->id,
+        'action' => 'product.updated',
+        'subject_type' => 'product',
+        'subject_id' => 321,
+        'reason' => 'Acquisition cost changed to 42.50 after supplier invoice review',
+        'changes' => json_encode([
+            'before' => ['acquisition_cost' => '40.00', 'acquisition_cost_source' => 'manual'],
+            'after' => ['acquisition_cost' => '42.50', 'acquisition_cost_source' => 'manual', 'name' => 'Updated product'],
+        ], JSON_THROW_ON_ERROR),
+        'created_at' => now(),
+    ]);
+
+    $this->actingAs($manager)->get(route('administration.reports.audit', ['action' => 'product.updated']))
+        ->assertInertia(fn (Assert $page) => $page->where('entries.data.0.reason', null)
+            ->where('entries.data.0.details.0.label', 'Name')
+            ->where('entries.data.0.details.0.after', 'Updated product')
+            ->missing('entries.data.0.details.1'));
+    $this->get(route('administration.reports.audit', ['q' => '42.50']))
+        ->assertInertia(fn (Assert $page) => $page->where('entries.total', 0));
+
+    $this->actingAs($owner)->get(route('administration.reports.audit', ['action' => 'product.updated']))
+        ->assertInertia(fn (Assert $page) => $page->where('entries.data.0.reason', 'Acquisition cost changed to 42.50 after supplier invoice review')
+            ->where('entries.data.0.details.0.after', '42.50'));
+});
+
 test('audit log can search action, actor, reason, and recorded changes', function () {
     $owner = User::factory()->administrator()->create(['name' => 'Searchable Owner']);
     DB::table('audit_logs')->insert([
