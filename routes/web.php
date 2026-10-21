@@ -153,6 +153,7 @@ Route::middleware(['auth', 'can:access-administration'])
     ->group(function () {
         Route::get('work-queue', [WorkQueueController::class, 'index'])->name('work-queue.index');
         Route::resource('branches', AdministrationBranchController::class)
+            ->middleware('can:branches.manage')
             ->except('destroy')
             ->where(['branch' => '[0-9]+']);
         // notifications

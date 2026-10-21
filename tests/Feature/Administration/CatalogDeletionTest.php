@@ -289,16 +289,17 @@ test('rollback never removes an owned product image', function () {
 });
 
 test('soft deletion retains image and commits its audit record', function () {
-    $product = Product::factory()->create(['image_path' => 'products/owned.jpg']);
-    Storage::fake('public');
-    Storage::disk('public')->put($product->image_path, 'owned image');
+    Storage::fake('public', ['throw' => true]);
+    $product = Product::factory()->create(['image_path' => 'products/soft-delete-audit.jpg']);
+    expect(Storage::disk('public')->put($product->image_path, 'owned image'))->toBeTrue();
+    Storage::disk('public')->assertExists($product->image_path, 'owned image');
 
     $this->actingAs(User::factory()->administrator()->create())->delete(route('administration.products.destroy', $product))
         ->assertSessionHasNoErrors()->assertRedirect(route('administration.products.index'));
 
     expect($product->fresh()->trashed())->toBeTrue();
     $this->assertDatabaseHas('audit_logs', ['action' => 'product.deleted', 'subject_id' => $product->id]);
-    Storage::disk('public')->assertExists($product->image_path);
+    Storage::disk('public')->assertExists($product->image_path, 'owned image');
 });
 
 test('unrelated database update failures are not disguised as protected references', function () {

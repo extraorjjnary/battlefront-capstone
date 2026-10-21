@@ -55,7 +55,7 @@ class AppServiceProvider extends ServiceProvider
             'customers.view', 'reports.view', 'reports.export', 'reports.profit', 'forecast.manage',
             'returns.request', 'returns.approve', 'returns.record_payment', 'returns.dispatch',
             'returns.resolve', 'returns.reconcile',
-            'suppliers.manage', 'staff_reports.view', 'audit.view', 'audit.export',
+            'suppliers.manage', 'branches.manage', 'staff_reports.view', 'audit.view', 'audit.export',
             'users.manage', 'permissions.manage',
         ] as $permission) {
             Gate::define($permission, fn (User $user): bool => $user->hasAdministrationPermission($permission));

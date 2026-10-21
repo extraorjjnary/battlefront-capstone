@@ -35,15 +35,10 @@ class SaveProductRequest extends FormRequest
                 && (! $this->exists('acquisition_cost') || $this->user()->can('products.cost'));
         }
 
-        $pricesUnchanged = is_numeric($this->input('price'))
-            && bccomp($this->numericAmount($this->input('price')), $this->numericAmount($product->price), 2) === 0
-            && ($this->input('discount_price') === null && $product->discount_price === null
-                || is_numeric($this->input('discount_price')) && $product->discount_price !== null
-                    && bccomp($this->numericAmount($this->input('discount_price')), $this->numericAmount($product->discount_price), 2) === 0);
+        $pricesUnchanged = $this->amountsMatch($this->input('price'), $product->price)
+            && $this->amountsMatch($this->input('discount_price'), $product->discount_price);
         $costUnchanged = ! $this->exists('acquisition_cost')
-            || ($this->input('acquisition_cost') === null && $product->acquisition_cost === null)
-            || (is_numeric($this->input('acquisition_cost')) && $product->acquisition_cost !== null
-                && bccomp($this->numericAmount($this->input('acquisition_cost')), $this->numericAmount($product->acquisition_cost), 2) === 0);
+            || $this->amountsMatch($this->input('acquisition_cost'), $product->acquisition_cost);
 
         return ($pricesUnchanged || $this->user()->can('products.price'))
             && ($costUnchanged || $this->user()->can('products.cost'));
@@ -145,13 +140,17 @@ class SaveProductRequest extends FormRequest
         ];
     }
 
-    /** @return numeric-string */
-    private function numericAmount(mixed $amount): string
+    private function amountsMatch(mixed $submittedAmount, ?string $savedAmount): bool
     {
-        if (! is_numeric($amount)) {
-            throw new \InvalidArgumentException('A product price must be numeric.');
+        if ($submittedAmount === null || $savedAmount === null) {
+            return $submittedAmount === $savedAmount;
         }
 
-        return (string) $amount;
+        if (! is_numeric($submittedAmount) || ! is_numeric($savedAmount)
+            || preg_match('/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/D', (string) $submittedAmount) !== 1) {
+            return false;
+        }
+
+        return bccomp((string) $submittedAmount, $savedAmount, 2) === 0;
     }
 }

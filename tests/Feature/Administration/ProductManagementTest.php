@@ -12,6 +12,21 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
+test('new bundle products use the same acquisition cost rate as migrated products', function () {
+    $owner = User::factory()->administrator()->create();
+    $category = Category::factory()->create(['name' => 'Bundles & Packages']);
+
+    $this->actingAs($owner)->post(route('administration.products.store'), [
+        'name' => 'New computer bundle', 'category_id' => $category->id,
+        'price' => '1000.00', 'is_featured' => false,
+    ])->assertSessionHasNoErrors()->assertRedirect();
+
+    $this->assertDatabaseHas('products', [
+        'name' => 'New computer bundle', 'acquisition_cost' => '850.00', 'acquisition_cost_source' => 'category_policy_v1',
+    ]);
+    $this->assertDatabaseHas('audit_logs', ['actor_id' => $owner->id, 'action' => 'product.created']);
+});
+
 test('updated product codes are required and use the safe catalog format', function (mixed $code, string $message) {
     $administrator = User::factory()->administrator()->create();
     $category = Category::factory()->create();

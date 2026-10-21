@@ -3,6 +3,7 @@
 use App\Models\Branch;
 use App\Models\User;
 use Database\Seeders\BranchSeeder;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
 dataset('branch management endpoints', [
@@ -52,6 +53,52 @@ test('administrators can list all branches and view management forms and unpubli
     $this->get(route('administration.branches.show', $draft))
         ->assertInertia(fn (Assert $page) => $page->component('Administration/Branches/Show')
             ->where('branch.id', $draft->id)->where('branch.is_published', false)->missing('branch.seed_key'));
+});
+
+test('restricted administration roles cannot manage branches', function (string $role, string $method, string $action) {
+    $administrator = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', $role)->value('id'),
+    ]);
+    $branch = Branch::factory()->unpublished()->create();
+    $before = $branch->refresh()->toArray();
+
+    $this->actingAs($administrator)->{$method}(route('administration.branches.'.$action, $branch), [
+        'name' => 'Unauthorized branch', 'city' => 'Unauthorized City', 'is_published' => false,
+    ])->assertForbidden();
+
+    expect($branch->refresh()->toArray())->toBe($before);
+    $this->assertDatabaseCount('branches', 1);
+})->with(['staff', 'it'])->with('branch management endpoints');
+
+test('revoking branch management permission blocks every management endpoint', function (string $method, string $action) {
+    $managerRoleId = DB::table('administration_roles')->where('code', 'manager')->value('id');
+    $manager = User::factory()->administrator()->create(['administration_role_id' => $managerRoleId]);
+    DB::table('administration_role_permissions')->where('administration_role_id', $managerRoleId)
+        ->where('administration_permission_id', DB::table('administration_permissions')->where('code', 'branches.manage')->value('id'))
+        ->delete();
+    $branch = Branch::factory()->unpublished()->create();
+    $before = $branch->refresh()->toArray();
+
+    $this->actingAs($manager)->{$method}(route('administration.branches.'.$action, $branch), [
+        'name' => 'Unauthorized branch', 'city' => 'Unauthorized City', 'is_published' => false,
+    ])->assertForbidden();
+
+    expect($branch->refresh()->toArray())->toBe($before);
+    $this->assertDatabaseCount('branches', 1);
+})->with('branch management endpoints');
+
+test('managers can publish informational branches with their default permissions', function () {
+    $manager = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'manager')->value('id'),
+    ]);
+
+    $this->actingAs($manager)->post(route('administration.branches.store'), [
+        'name' => 'Managed branch', 'city' => 'Managed City', 'address' => '12 Confirmed Street',
+        'operating_hours' => '9 AM to 5 PM', 'is_published' => true,
+    ])->assertSessionHasNoErrors()->assertRedirectToRoute('administration.branches.index');
+
+    $this->assertDatabaseHas('branches', ['city' => 'Managed City', 'is_published' => true]);
+    expect(Branch::query()->sole()->is_operational)->toBeFalse();
 });
 
 test('administrators create informational drafts with only a name and city', function () {

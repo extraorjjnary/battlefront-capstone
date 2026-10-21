@@ -12,7 +12,7 @@ class AcquisitionCostEstimator
         $percentage = match ($category) {
             'Processor', 'Graphics Card', 'Laptops & Desktops' => '0.92',
             'Motherboard', 'Monitor', 'Printer' => '0.88',
-            'RAM', 'Storage' => '0.85',
+            'RAM', 'Storage', 'Bundles & Packages' => '0.85',
             'Power Supply', 'PC Case', 'Networking', 'CCTV & Security' => '0.82',
             'Cooling Components', 'Peripherals', 'Audio Equipment', 'Power Accessories' => '0.75',
             'Cables & Adapters', 'Laptop Bags & Stands', 'Cleaning & Maintenance Supplies' => '0.65',
