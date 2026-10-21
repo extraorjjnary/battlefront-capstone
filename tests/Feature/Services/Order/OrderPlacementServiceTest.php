@@ -162,6 +162,7 @@ test('later order and payment status changes do not deduct stock again', functio
     $inventory = Inventory::factory()->for($product)->create(['quantity' => 5]);
     (new CartService)->add($customer, $product->id, 2);
     $order = app(OrderPlacementService::class)->execute($customer, validOrderPlacementData($customer->cart->items->modelKeys()));
+    $this->actingAs($administrator)->post(route('administration.orders.claim', $order))->assertSessionHasNoErrors();
 
     $this->actingAs($administrator)
         ->patch(route('administration.orders.status.update', $order), [

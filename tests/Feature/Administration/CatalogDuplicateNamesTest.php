@@ -24,7 +24,7 @@ test('product create and update reject normalized names across categories and ac
     $this->actingAs($administrator)->post(route('administration.products.store'), [
         ...$payload, 'product_code' => 'NEW001',
     ])->assertSessionHasErrors(['name' => CatalogName::PRODUCT_MESSAGE]);
-    $this->put(route('administration.products.update', $other), $payload)
+    $this->put(route('administration.products.update', $other), [...$payload, 'edit_version' => $other->edit_version])
         ->assertSessionHasErrors(['name' => CatalogName::PRODUCT_MESSAGE]);
 
     expect($other->refresh()->name)->toBe('Other model');
@@ -63,7 +63,9 @@ test('administrator names are normalized and their unchanged edits succeed', fun
     $this->post(route('administration.products.store'), catalogNamePayload($category, '  RTX   4060  Ti '))
         ->assertSessionHasNoErrors();
     $product = Product::query()->sole();
-    $this->put(route('administration.products.update', $product), catalogNamePayload($category, $product->name, $product->product_code))
+    $this->put(route('administration.products.update', $product), [
+        ...catalogNamePayload($category, $product->name, $product->product_code), 'edit_version' => $product->edit_version,
+    ])
         ->assertSessionHasNoErrors();
     $this->put(route('administration.categories.update', $category), ['name' => $category->name])
         ->assertSessionHasNoErrors();
@@ -107,7 +109,8 @@ test('product actions translate a persistence uniqueness conflict into a name er
         expect($exception->errors())->toBe(['name' => [CatalogName::PRODUCT_MESSAGE]]);
     }
     try {
-        app(UpdateProduct::class)->execute($other, [...$payload, 'product_code' => $other->product_code], [], null);
+        app(UpdateProduct::class)->execute($other, [...$payload, 'product_code' => $other->product_code,
+            'edit_version' => $other->edit_version, 'price_change_reason' => 'Catalog correction'], [], null);
         $this->fail('Duplicate update succeeded.');
     } catch (ValidationException $exception) {
         expect($exception->errors())->toBe(['name' => [CatalogName::PRODUCT_MESSAGE]]);

@@ -1,7 +1,7 @@
 <?php
 
+use App\Actions\Cart\BuildCartViewData;
 use App\Actions\Category\DeleteCategory;
-use App\Actions\Product\DeleteManagedProductImage;
 use App\Actions\Product\DeleteProduct;
 use App\Models\CartItem;
 use App\Models\Category;
@@ -20,15 +20,36 @@ use Database\Seeders\DevelopmentHistoricalSalesSeeder;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\HistoricalSalesCatalogFixtures;
 
-test('administrators can delete unused products and their disposable associations', function (bool $imported) {
+function emptyProductInventory(Product $product): void
+{
+    $product->inventory?->update(['quantity' => 0, 'quarantined_quantity' => 0]);
+}
+
+test('administrators can search deleted products by name and catalog code', function () {
+    $administrator = User::factory()->administrator()->create();
+    $product = Product::factory()->available()->create([
+        'name' => 'Deleted search target',
+        'product_code' => 'DEL-SEARCH-01',
+    ]);
+    $product->delete();
+
+    $this->actingAs($administrator)
+        ->get(route('administration.products.index', ['deleted' => 1, 'q' => 'DEL-SEARCH-01']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.q', 'DEL-SEARCH-01')
+            ->where('products.total', 1)
+            ->where('products.data.0.name', 'Deleted search target'));
+});
+
+test('product deletion retains linked inventory and activity for restoration', function (bool $imported) {
     Storage::fake('local');
     $administrator = User::factory()->administrator()->create();
     $product = Product::factory()->available()->create(['is_catalog_imported' => $imported]);
+    emptyProductInventory($product);
     $inventory = $product->inventory;
     $tag = Tag::factory()->create();
     $product->tags()->attach($tag);
@@ -40,14 +61,16 @@ test('administrators can delete unused products and their disposable association
     $unrelated = Product::factory()->available()->create();
 
     $this->actingAs($administrator)->delete(route('administration.products.destroy', $product))
-        ->assertSessionHasNoErrors()->assertRedirect(route('administration.products.index'));
+        ->assertSessionHasNoErrors();
 
-    $this->assertModelMissing($product);
-    $this->assertModelMissing($inventory);
-    $this->assertModelMissing($view);
-    $this->assertModelMissing($guestView);
-    $this->assertModelMissing($interaction);
-    $this->assertDatabaseMissing('product_tag', ['product_id' => $product->id]);
+    expect($product->fresh()->trashed())->toBeTrue()
+        ->and($product->fresh()->is_active)->toBeFalse()
+        ->and($product->fresh()->deleted_by_id)->toBe($administrator->id);
+    $this->assertModelExists($inventory);
+    $this->assertModelExists($view);
+    $this->assertModelExists($guestView);
+    $this->assertModelExists($interaction);
+    $this->assertDatabaseHas('product_tag', ['product_id' => $product->id]);
     $this->assertModelExists($tag);
     $this->assertModelExists($unrelated);
     $this->assertModelExists($unrelated->inventory);
@@ -56,7 +79,7 @@ test('administrators can delete unused products and their disposable association
     $this->assertModelExists($guestView->guestRecommendationProfile);
 })->with(['manual' => false, 'imported' => true]);
 
-test('product deletion removes its owned image after commit', function (bool $imported) {
+test('soft product deletion preserves its owned image for restoration', function (bool $imported) {
     Storage::fake('public');
     Storage::fake('local');
     $product = Product::factory()->create(['is_catalog_imported' => $imported]);
@@ -67,8 +90,8 @@ test('product deletion removes its owned image after commit', function (bool $im
     $this->actingAs(User::factory()->administrator()->create())->delete(route('administration.products.destroy', $product))
         ->assertSessionHasNoErrors();
 
-    $this->assertModelMissing($product);
-    Storage::disk('public')->assertMissing($path);
+    expect($product->fresh()->trashed())->toBeTrue();
+    Storage::disk('public')->assertExists($path);
 })->with(['manual' => false, 'imported with administrator upload' => true]);
 
 test('product deletion preserves shared manifest and unrelated images', function (string $path, bool $shared) {
@@ -91,20 +114,44 @@ test('product deletion preserves shared manifest and unrelated images', function
     'another product owner' => ['products/admin/999/'.str_repeat('a', 64).'.webp', false],
 ]);
 
-test('every order status protects a product from deletion', function (string $status) {
+test('product deletion retains order history when orders are terminal', function (string $status) {
     $product = Product::factory()->available()->create();
+    emptyProductInventory($product);
     $order = Order::factory()->create(['status' => $status]);
     $item = OrderItem::factory()->for($order)->for($product)->create();
 
     $this->actingAs(User::factory()->administrator()->create())->delete(route('administration.products.destroy', $product))
-        ->assertSessionHasErrors(['deletion' => DeleteProduct::PROTECTED_MESSAGE]);
+        ->assertSessionHasNoErrors();
 
-    $this->assertModelExists($product);
+    expect($product->fresh()->trashed())->toBeTrue();
     $this->assertModelExists($product->inventory);
     $this->assertModelExists($item);
-})->with(['pending', 'processing', 'completed', 'cancelled']);
+})->with(['completed', 'cancelled']);
 
-test('recorded sales and all forecast methods protect product history', function (string $reference) {
+test('product deletion is blocked while a customer order is unfinished', function (string $status) {
+    $product = Product::factory()->create();
+    $order = Order::factory()->create(['status' => $status]);
+    OrderItem::factory()->for($order)->for($product)->create();
+
+    $this->actingAs(User::factory()->administrator()->create())
+        ->delete(route('administration.products.destroy', $product))
+        ->assertSessionHasErrors('deletion');
+
+    expect($product->fresh()->trashed())->toBeFalse();
+})->with(['pending', 'processing']);
+
+test('product deletion is blocked while sellable or quarantined stock remains', function (string $column) {
+    $product = Product::factory()->available()->create();
+    $product->inventory()->update([$column => 1]);
+
+    $this->actingAs(User::factory()->administrator()->create())
+        ->delete(route('administration.products.destroy', $product))
+        ->assertSessionHasErrors('deletion');
+
+    expect($product->fresh()->trashed())->toBeFalse();
+})->with(['quantity', 'quarantined_quantity']);
+
+test('product deletion retains recorded sales and forecasts', function (string $reference) {
     $product = Product::factory()->create(['is_catalog_imported' => true]);
     if ($reference === 'sale') {
         $sale = Sale::factory()->create();
@@ -114,28 +161,31 @@ test('recorded sales and all forecast methods protect product history', function
     }
 
     $this->actingAs(User::factory()->administrator()->create())->delete(route('administration.products.destroy', $product))
-        ->assertSessionHasErrors(['deletion' => DeleteProduct::PROTECTED_MESSAGE]);
+        ->assertSessionHasNoErrors();
 
-    $this->assertModelExists($product);
+    expect($product->fresh()->trashed())->toBeTrue();
     $this->assertModelExists($record);
     if (isset($sale)) {
         $this->assertModelExists($sale);
     }
 })->with(['sale', 'additive_holt_winters', 'moving_average', 'linear_trend']);
 
-test('existing customer carts protect even inactive imported products', function () {
+test('product deletion retains existing cart items', function () {
     $product = Product::factory()->available()->create(['is_catalog_imported' => true]);
     $item = CartItem::factory()->for($product)->create();
+    emptyProductInventory($product);
     $product->update(['is_active' => false]);
 
     $this->actingAs(User::factory()->administrator()->create())->delete(route('administration.products.destroy', $product))
-        ->assertSessionHasErrors(['deletion' => DeleteProduct::PROTECTED_MESSAGE]);
+        ->assertSessionHasNoErrors();
 
-    $this->assertModelExists($product);
+    expect($product->fresh()->trashed())->toBeTrue();
     $this->assertModelExists($item);
+    expect(app(BuildCartViewData::class)->execute($item->cart->user)['items'][0]['availability']['status'])
+        ->toBe('product_ineligible');
 });
 
-test('seeded historical transactions protect imported products and inventory from deletion', function (bool $keepCoverage) {
+test('soft deleting seeded products retains historical transactions and inventory', function (bool $keepCoverage) {
     Storage::fake('local');
     $this->travelTo('2026-10-15 12:00:00');
     $products = HistoricalSalesCatalogFixtures::createProducts();
@@ -144,20 +194,21 @@ test('seeded historical transactions protect imported products and inventory fro
         app(SalesHistoryCoverageRepository::class)->clearDevelopment();
     }
     $product = $products['10003'];
+    emptyProductInventory($product);
     $inventory = $product->inventory->toArray();
     $items = $product->orderItems()->with('order.sale')->get()->toArray();
 
     $this->actingAs(User::factory()->administrator()->create())->delete(route('administration.products.destroy', $product))
-        ->assertSessionHasErrors(['deletion' => DeleteProduct::PROTECTED_MESSAGE]);
+        ->assertSessionHasNoErrors();
 
-    $this->assertModelExists($product);
+    expect($product->fresh()->trashed())->toBeTrue();
     expect($product->inventory->refresh()->toArray())->toBe($inventory);
     expect($product->orderItems()->with('order.sale')->get()->toArray())->toBe($items);
     $this->assertDatabaseCount('products', 15);
     $this->assertDatabaseCount('sales', 259);
 })->with(['orders and coverage' => true, 'orders without coverage' => false]);
 
-test('declared historical coverage protects products without sales or forecasts', function (bool $development) {
+test('soft deleting a product preserves historical coverage metadata', function (bool $development) {
     Storage::fake('local');
     $product = Product::factory()->create();
     if ($development) {
@@ -170,21 +221,23 @@ test('declared historical coverage protects products without sales or forecasts'
     }
 
     $this->actingAs(User::factory()->administrator()->create())->delete(route('administration.products.destroy', $product))
-        ->assertSessionHasErrors(['deletion' => DeleteProduct::PROTECTED_MESSAGE]);
+        ->assertSessionHasNoErrors();
 
-    $this->assertModelExists($product);
+    expect($product->fresh()->trashed())->toBeTrue();
     if ($development) {
         expect(Storage::disk('local')->get(config('forecasting.development_manifest')))->toBe($original);
     }
 })->with(['operational' => false, 'development' => true]);
 
-test('a newly detected foreign key rolls back cleanup and returns a friendly error', function () {
+test('a concurrent order item remains attached when a product is soft deleted', function () {
     Storage::fake('public');
     $product = Product::factory()->available()->create(['image_path' => 'products/owned.jpg']);
+    emptyProductInventory($product);
+    emptyProductInventory($product);
     Storage::disk('public')->put($product->image_path, 'owned bytes');
     $tag = Tag::factory()->create();
     $product->tags()->attach($tag);
-    $order = Order::factory()->create();
+    $order = Order::factory()->create(['status' => 'completed']);
     $event = 'eloquent.deleting: '.Product::class;
     Event::listen($event, function (Product $deleting) use ($order): void {
         OrderItem::factory()->for($order)->for($deleting, 'product')->create();
@@ -192,36 +245,35 @@ test('a newly detected foreign key rolls back cleanup and returns a friendly err
 
     try {
         $this->actingAs(User::factory()->administrator()->create())->delete(route('administration.products.destroy', $product))
-            ->assertSessionHasErrors(['deletion' => DeleteProduct::PROTECTED_MESSAGE]);
+            ->assertSessionHasNoErrors();
     } finally {
         Event::forget($event);
     }
 
-    $this->assertModelExists($product);
+    expect($product->fresh()->trashed())->toBeTrue();
     $this->assertModelExists($product->inventory);
     $this->assertDatabaseHas('product_tag', ['product_id' => $product->id, 'tag_id' => $tag->id]);
-    $this->assertDatabaseMissing('order_items', ['product_id' => $product->id]);
+    $this->assertDatabaseHas('order_items', ['product_id' => $product->id]);
     Storage::disk('public')->assertExists($product->image_path);
 });
 
-test('unreadable history metadata refuses deletion without changing product data', function () {
+test('unreadable history metadata does not block recoverable product deletion', function () {
     Storage::fake('local');
-    Exceptions::fake();
     $product = Product::factory()->available()->create();
+    emptyProductInventory($product);
     Storage::disk('local')->put(config('forecasting.development_manifest'), '{invalid json');
 
     $this->actingAs(User::factory()->administrator()->create())->delete(route('administration.products.destroy', $product))
-        ->assertSessionHasErrors(['deletion' => 'This product cannot be deleted because its historical references could not be verified. Check the history metadata and try again.']);
+        ->assertSessionHasNoErrors();
 
-    $this->assertModelExists($product);
+    expect($product->fresh()->trashed())->toBeTrue();
     $this->assertModelExists($product->inventory);
     expect(Storage::disk('local')->get(config('forecasting.development_manifest')))->toBe('{invalid json');
-    Exceptions::assertReported(RuntimeException::class);
 });
 
 test('rollback never removes an owned product image', function () {
     Storage::fake('public');
-    $product = Product::factory()->available()->create(['image_path' => 'products/owned.jpg']);
+    $product = Product::factory()->create(['image_path' => 'products/owned.jpg']);
     Storage::disk('public')->put($product->image_path, 'owned bytes');
     DB::beginTransaction();
 
@@ -233,41 +285,42 @@ test('rollback never removes an owned product image', function () {
     }
 
     $this->assertModelExists($product);
-    $this->assertModelExists($product->inventory);
     Storage::disk('public')->assertExists($product->image_path);
 });
 
-test('image cleanup failure is reported after the deletion remains committed', function () {
-    Exceptions::fake();
-    $product = Product::factory()->create(['image_path' => 'products/owned.jpg']);
-    $this->mock(DeleteManagedProductImage::class)->shouldReceive('execute')->once()
-        ->with($product->image_path, $product->id)->andThrow(new RuntimeException('Storage unavailable.'));
+test('soft deletion retains image and commits its audit record', function () {
+    Storage::fake('public', ['throw' => true]);
+    $product = Product::factory()->create(['image_path' => 'products/soft-delete-audit.jpg']);
+    expect(Storage::disk('public')->put($product->image_path, 'owned image'))->toBeTrue();
+    Storage::disk('public')->assertExists($product->image_path, 'owned image');
 
     $this->actingAs(User::factory()->administrator()->create())->delete(route('administration.products.destroy', $product))
         ->assertSessionHasNoErrors()->assertRedirect(route('administration.products.index'));
 
-    $this->assertModelMissing($product);
-    Exceptions::assertReported(RuntimeException::class);
+    expect($product->fresh()->trashed())->toBeTrue();
+    $this->assertDatabaseHas('audit_logs', ['action' => 'product.deleted', 'subject_id' => $product->id]);
+    Storage::disk('public')->assertExists($product->image_path, 'owned image');
 });
 
-test('unrelated database deletion failures are not disguised as protected references', function () {
-    $product = Product::factory()->available()->create();
-    DB::unprepared("CREATE TRIGGER fail_product_delete BEFORE DELETE ON products BEGIN SELECT RAISE(ABORT, 'Storage constraint failure'); END");
+test('unrelated database update failures are not disguised as protected references', function () {
+    $product = Product::factory()->create();
+    DB::unprepared("CREATE TRIGGER fail_product_delete BEFORE UPDATE OF deleted_at ON products BEGIN SELECT RAISE(ABORT, 'Storage constraint failure'); END");
 
     expect(fn () => app(DeleteProduct::class)->execute($product))->toThrow(QueryException::class);
 
     $this->assertModelExists($product);
-    $this->assertModelExists($product->inventory);
 });
 
-test('administrators can permanently delete empty active or inactive categories', function (bool $active) {
+test('administrators can soft delete empty active or inactive categories', function (bool $active) {
     $category = Category::factory()->create(['is_active' => $active]);
     $otherProduct = Product::factory()->create();
 
     $this->actingAs(User::factory()->administrator()->create())->delete(route('administration.categories.destroy', $category))
         ->assertSessionHasNoErrors()->assertRedirect(route('administration.categories.index'));
 
-    $this->assertModelMissing($category);
+    expect($category->fresh()->trashed())->toBeTrue()
+        ->and($category->fresh()->is_active)->toBeFalse();
+    $this->assertDatabaseHas('audit_logs', ['action' => 'category.deleted', 'subject_id' => $category->id]);
     $this->assertModelExists($otherProduct);
     $this->assertModelExists($otherProduct->category);
 })->with(['active' => true, 'inactive' => false]);
@@ -282,20 +335,20 @@ test('active and inactive products prevent category deletion', function (bool $a
     $this->assertModelExists($product->category);
 })->with(['active' => true, 'inactive' => false]);
 
-test('category foreign key failures preserve newly attached products and return an error', function () {
+test('a concurrently attached product remains linked to a soft deleted category', function () {
     $category = Category::factory()->create();
     $event = 'eloquent.deleting: '.Category::class;
     Event::listen($event, fn (Category $deleting) => Product::factory()->for($deleting)->create());
 
     try {
         $this->actingAs(User::factory()->administrator()->create())->delete(route('administration.categories.destroy', $category))
-            ->assertSessionHasErrors(['deletion' => DeleteCategory::PROTECTED_MESSAGE]);
+            ->assertSessionHasNoErrors();
     } finally {
         Event::forget($event);
     }
 
-    $this->assertModelExists($category);
-    $this->assertDatabaseCount('products', 0);
+    expect($category->fresh()->trashed())->toBeTrue();
+    $this->assertDatabaseCount('products', 1);
 });
 
 test('guests and customers cannot delete administrator catalog records', function (string $resource, bool $authenticated) {

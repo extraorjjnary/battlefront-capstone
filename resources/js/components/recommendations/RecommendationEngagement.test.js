@@ -446,6 +446,17 @@ test('tables have named focusable scroll regions and semantic headers with respo
 
 function salesProps() {
     return {
+        refund_measures: {
+            cutoff: '2026-09-30',
+            gross_item_sales: '500.00',
+            refund_payments: '0.00',
+            gross_less_refunds: '500.00',
+            outstanding_at_cutoff: '0.00',
+            outstanding_refunds: { data: [], last_page: 1 },
+            payments: { data: [], last_page: 1 },
+            reversals: { data: [], last_page: 1 },
+        },
+        sale_transactions: { data: [], last_page: 1 },
         filters: { from: '2026-09-01', to: '2026-09-30', period: 'day' },
         active_filters: { product: null, category: null },
         kpis: {
@@ -453,6 +464,12 @@ function salesProps() {
             total_revenue: '500.00',
             average_order_value: '250.00',
             total_items_sold: 6,
+        },
+        comparison: {
+            from: '2026-08-02',
+            to: '2026-08-31',
+            total_sales: 2,
+            total_revenue: '500.00',
         },
         timeline: { labels: ['Sep 1'], revenue: [500], sales: [2] },
         top_products: {
@@ -496,7 +513,7 @@ function salesProps() {
 
 modules['@inertiajs/vue3'] = {
     Head: primitive,
-    usePage: () => ({ props: { errors: {} } }),
+    usePage: () => ({ props: { errors: {}, auth: { can: { exportReports: true, viewOrders: true } } } }),
     router: { visit() {} },
 };
 modules['chart.js'] = new Proxy(

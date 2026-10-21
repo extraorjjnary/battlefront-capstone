@@ -25,6 +25,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/currency';
+import { formatDateTime } from '@/lib/dateTime';
 import { orderStatusBadgeClass } from '@/lib/orderStatus';
 
 const props = defineProps({
@@ -94,13 +95,8 @@ const hasAppliedFilters = computed(() =>
     ),
 );
 
-const dateFormatter = new Intl.DateTimeFormat('en-PH', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-});
-
 function formatDate(value) {
-    return dateFormatter.format(new Date(value));
+    return formatDateTime(value);
 }
 
 function selectedValue(value) {

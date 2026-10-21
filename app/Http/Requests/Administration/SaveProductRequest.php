@@ -25,7 +25,23 @@ class SaveProductRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()?->can('access-administration') ?? false;
+        if (! ($this->user()?->can('products.manage') ?? false)) {
+            return false;
+        }
+
+        $product = $this->route('product');
+        if (! $product instanceof Product) {
+            return $this->user()->can('products.price')
+                && (! $this->exists('acquisition_cost') || $this->user()->can('products.cost'));
+        }
+
+        $pricesUnchanged = $this->amountsMatch($this->input('price'), $product->price)
+            && $this->amountsMatch($this->input('discount_price'), $product->discount_price);
+        $costUnchanged = ! $this->exists('acquisition_cost')
+            || $this->amountsMatch($this->input('acquisition_cost'), $product->acquisition_cost);
+
+        return ($pricesUnchanged || $this->user()->can('products.price'))
+            && ($costUnchanged || $this->user()->can('products.cost'));
     }
 
     /**
@@ -41,6 +57,10 @@ class SaveProductRequest extends FormRequest
             : [];
 
         return [
+            'edit_version' => $product instanceof Product ? ['required', 'integer', 'min:1'] : ['exclude'],
+            'price_change_reason' => $product instanceof Product ? ['nullable', 'string', 'min:5', 'max:1000'] : ['exclude'],
+            'acquisition_cost' => ['sometimes', 'nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
+            'cost_change_reason' => $product instanceof Product ? ['nullable', 'string', 'min:5', 'max:1000'] : ['exclude'],
             'shipping_profile' => ['sometimes', 'required', Rule::enum(ShippingProfile::class)],
             'product_code' => $product instanceof Product ? [
                 'bail', 'required', 'string', 'regex:'.Product::CODE_PATTERN,
@@ -56,7 +76,7 @@ class SaveProductRequest extends FormRequest
                 'bail',
                 'required',
                 'integer',
-                Rule::exists(Category::class, 'id'),
+                Rule::exists(Category::class, 'id')->whereNull('deleted_at'),
             ],
             'brand' => ['bail', 'nullable', 'string', 'max:255'],
             'price' => [
@@ -94,6 +114,7 @@ class SaveProductRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'edit_version.required' => 'Reload this product and review the latest changes before saving.',
             'product_code.required' => 'Enter a product code.',
             'product_code.regex' => 'Use 1 to 64 letters or digits for the product code.',
             'product_code.unique' => 'This product code is already in use.',
@@ -117,5 +138,19 @@ class SaveProductRequest extends FormRequest
             'tag_ids.*.distinct' => 'Each tag may only be selected once.',
             'tag_ids.*.exists' => 'Select valid product tags.',
         ];
+    }
+
+    private function amountsMatch(mixed $submittedAmount, ?string $savedAmount): bool
+    {
+        if ($submittedAmount === null || $savedAmount === null) {
+            return $submittedAmount === $savedAmount;
+        }
+
+        if (! is_numeric($submittedAmount) || ! is_numeric($savedAmount)
+            || preg_match('/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/D', (string) $submittedAmount) !== 1) {
+            return false;
+        }
+
+        return bccomp((string) $submittedAmount, $savedAmount, 2) === 0;
     }
 }

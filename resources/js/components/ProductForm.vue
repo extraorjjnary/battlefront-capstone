@@ -1,5 +1,5 @@
 <script setup>
-import { Form, Link } from '@inertiajs/vue3';
+import { Form, Link, usePage } from '@inertiajs/vue3';
 import { Image, Save } from '@lucide/vue';
 import { computed, onBeforeUnmount, ref } from 'vue';
 import CategoryController from '@/actions/App/Http/Controllers/Administration/CategoryController';
@@ -30,6 +30,9 @@ const props = defineProps({
     methodOverride: { type: String, default: null },
     submitLabel: { type: String, required: true },
 });
+const page = usePage();
+const canEditPrice = computed(() => page.props.auth?.can?.priceProducts === true);
+const canEditAcquisitionCost = computed(() => page.props.auth?.can?.manageProductCosts === true);
 
 const categoryId = ref(
     String(props.product?.category_id ?? props.categories[0]?.id ?? ''),
@@ -86,6 +89,8 @@ function firstTagError(errors) {
 
 <template>
     <Form v-bind="form" class="space-y-8" v-slot="{ errors, processing }">
+        <input v-if="product" type="hidden" name="edit_version" :value="product.edit_version" />
+        <InputError v-if="product" :message="errors.edit_version" />
         <input
             v-if="methodOverride"
             type="hidden"
@@ -272,6 +277,9 @@ function firstTagError(errors) {
                 <p class="text-muted-foreground mt-1 text-sm">
                     Prices are stored and displayed in Philippine pesos.
                 </p>
+                <p v-if="!canEditPrice" class="text-muted-foreground mt-1 text-sm">
+                    Only the owner can change product prices.
+                </p>
             </div>
 
             <div class="mt-5 grid gap-5 md:grid-cols-2">
@@ -286,6 +294,7 @@ function firstTagError(errors) {
                         step="0.01"
                         inputmode="decimal"
                         :default-value="product?.price"
+                        :readonly="!canEditPrice"
                         placeholder="0.00"
                         :aria-invalid="Boolean(errors.price)"
                         required
@@ -304,10 +313,26 @@ function firstTagError(errors) {
                         step="0.01"
                         inputmode="decimal"
                         :default-value="product?.discount_price"
+                        :readonly="!canEditPrice"
                         placeholder="Optional"
                         :aria-invalid="Boolean(errors.discount_price)"
                     />
                     <InputError :message="errors.discount_price" />
+                </div>
+                <div v-if="canEditAcquisitionCost" class="grid gap-2">
+                    <Label for="acquisition_cost">Acquisition cost (PHP)</Label>
+                    <Input id="acquisition_cost" name="acquisition_cost" type="number" min="0" max="9999999999.99" step="0.01" inputmode="decimal" :default-value="product?.acquisition_cost" placeholder="0.00" :aria-invalid="Boolean(errors.acquisition_cost)" />
+                    <InputError :message="errors.acquisition_cost" />
+                </div>
+                <div v-if="product && canEditAcquisitionCost" class="grid gap-2 md:col-span-2">
+                    <Label for="cost_change_reason">Reason for an acquisition cost change</Label>
+                    <Textarea id="cost_change_reason" name="cost_change_reason" rows="2" maxlength="1000" placeholder="Required when the acquisition cost changes" :aria-invalid="Boolean(errors.cost_change_reason)" />
+                    <InputError :message="errors.cost_change_reason" />
+                </div>
+                <div v-if="product && canEditPrice" class="grid gap-2 md:col-span-2">
+                    <Label for="price_change_reason">Reason for a price change</Label>
+                    <Textarea id="price_change_reason" name="price_change_reason" rows="2" maxlength="1000" placeholder="Required when the regular or discount price changes" :aria-invalid="Boolean(errors.price_change_reason)" />
+                    <InputError :message="errors.price_change_reason" />
                 </div>
 
                 <div class="grid gap-2 md:col-span-2">

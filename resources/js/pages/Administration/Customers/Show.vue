@@ -3,19 +3,20 @@ import PageHeader from '@/components/PageHeader.vue';
 import { Head, Link } from '@inertiajs/vue3';
 import { ArrowLeft, CalendarDays, Mail } from '@lucide/vue';
 import CustomerController from '@/actions/App/Http/Controllers/Administration/CustomerController';
+import OrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
+import CustomerReturnController from '@/actions/App/Http/Controllers/Administration/CustomerReturnController';
 import UserInfo from '@/components/UserInfo.vue';
 import { Button } from '@/components/ui/button';
+import { formatTimestampDate } from '@/lib/dateTime';
 
 defineProps({
     customer: { type: Object, required: true },
-});
-
-const dateFormatter = new Intl.DateTimeFormat('en-PH', {
-    dateStyle: 'long',
+    orders: { type: Object, required: true },
+    order_status_filter: { type: String, required: true },
 });
 
 function formatJoinedDate(value) {
-    return value ? dateFormatter.format(new Date(value)) : 'Not available';
+    return value ? formatTimestampDate(value, 'long') : 'Not available';
 }
 
 defineOptions({
@@ -52,6 +53,35 @@ defineOptions({
                 </Button>
             </template>
         </PageHeader>
+
+        <section aria-labelledby="purchases-heading" class="space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <p class="text-muted-foreground text-sm">Order history</p>
+                    <h2 id="purchases-heading" class="text-xl font-semibold">Purchases</h2>
+                </div>
+                <Link :href="CustomerController.show(customer.id, { query: { status: order_status_filter === 'completed' ? 'all' : 'completed' } })" class="text-primary text-sm underline">
+                    {{ order_status_filter === 'completed' ? 'Show all orders' : 'Show completed only' }}
+                </Link>
+            </div>
+            <div v-if="orders.data.length === 0" class="border-border bg-card border p-6 text-sm text-muted-foreground">
+                No orders match this view.
+            </div>
+            <div v-for="order in orders.data" :key="order.id" class="border-border bg-card space-y-3 border p-5">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex flex-wrap items-center gap-3"><Link :href="OrderController.show(order.id)" class="text-primary font-semibold underline">{{ order.reference }}</Link><Link v-if="order.status === 'completed'" :href="CustomerReturnController.index({ query: { order_id: order.id } })" class="text-primary text-sm underline">Record return</Link></div>
+                    <span class="text-muted-foreground text-sm">{{ formatJoinedDate(order.created_at) }} · {{ order.status }} · {{ order.payment_status }}</span>
+                </div>
+                <ul class="space-y-1 text-sm">
+                    <li v-for="item in order.items" :key="item.name">{{ item.name }} × {{ item.quantity }} · ₱{{ item.price_at_time }}</li>
+                </ul>
+                <p class="text-muted-foreground text-sm">Products ₱{{ order.product_subtotal ?? order.total_amount }} · Delivery ₱{{ order.delivery_fee }} · Order total ₱{{ order.total_amount }}</p>
+            </div>
+            <div class="flex justify-between text-sm" v-if="orders.last_page > 1">
+                <Link v-if="orders.prev_page_url" :href="orders.prev_page_url" class="text-primary underline">Previous</Link><span v-else></span>
+                <Link v-if="orders.next_page_url" :href="orders.next_page_url" class="text-primary underline">Next</Link>
+            </div>
+        </section>
 
         <section aria-labelledby="account-details-heading">
             <div class="mb-4">

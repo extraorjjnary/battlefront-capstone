@@ -10,6 +10,26 @@ test('guests are redirected when viewing catalog categories', function () {
         ->assertRedirect(route('login'));
 });
 
+test('owners can restore deleted categories as inactive', function () {
+    $owner = User::factory()->administrator()->create();
+    $category = Category::factory()->create(['name' => 'Archived category', 'is_active' => true]);
+
+    $this->actingAs($owner)->delete(route('administration.categories.destroy', $category))
+        ->assertRedirect(route('administration.categories.index'));
+
+    expect(Category::query()->find($category->id))->toBeNull();
+    $this->get(route('administration.categories.index', ['deleted' => 1]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('deleted', true)
+            ->where('categories.data.0.name', 'Archived category')
+            ->where('categories.data.0.deleted_by', $owner->name));
+
+    $this->post(route('administration.categories.restore', $category->id))
+        ->assertRedirect(route('administration.categories.index', ['deleted' => 1]));
+
+    expect(Category::query()->findOrFail($category->id)->is_active)->toBeFalse();
+});
+
 test('customers are forbidden from catalog category actions', function () {
     $customer = User::factory()->customer()->create();
 
@@ -64,6 +84,19 @@ test('catalog categories are paginated in stable name order', function () {
         ->where('categories.last_page', 2)
         ->where('categories.data.0.name', 'Category 01')
         ->where('categories.data.14.name', 'Category 15'));
+});
+
+test('administrators can search category names and descriptions in the selected catalog', function () {
+    $administrator = User::factory()->administrator()->create();
+    Category::factory()->create(['name' => 'Processors', 'description' => 'Desktop compute']);
+    Category::factory()->create(['name' => 'Graphics', 'description' => 'Video hardware']);
+
+    $this->actingAs($administrator)
+        ->get(route('administration.categories.index', ['q' => 'Video']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.q', 'Video')
+            ->where('categories.total', 1)
+            ->where('categories.data.0.name', 'Graphics'));
 });
 
 test('administrators can open category create and edit pages', function () {

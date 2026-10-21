@@ -15,16 +15,22 @@ class SalesReportExportService
 {
     private const HEADERS = ['Cache-Control' => 'private, no-store', 'X-Content-Type-Options' => 'nosniff'];
 
-    public function __construct(private readonly SalesReportService $salesReportService) {}
+    public function __construct(
+        private readonly SalesReportService $salesReportService,
+        private readonly RefundPeriodReport $refundPeriodReport,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $filters
      */
-    public function printReport(array $filters): Response
+    public function printReport(array $filters, bool $includeProfitability = true): Response
     {
+        $report = $this->salesReportService->document($filters, $includeProfitability);
+
         return response()->view('reports.sales', [
-            ...$this->salesReportService->document($filters),
-            'generatedAt' => now()->format('M j, Y, g:i A T'),
+            ...$report,
+            'refundMeasures' => $this->refundPeriodReport->generate($report['filters'], $report['kpis']['total_revenue']),
+            'generatedAt' => $this->generatedAt(),
             'print' => true,
         ], 200, self::HEADERS);
     }
@@ -32,9 +38,10 @@ class SalesReportExportService
     /**
      * @param  array<string, mixed>  $filters
      */
-    public function pdf(array $filters): Response
+    public function pdf(array $filters, bool $includeProfitability = true): Response
     {
-        $report = $this->salesReportService->document($filters);
+        $report = $this->salesReportService->document($filters, $includeProfitability);
+        $report['refundMeasures'] = $this->refundPeriodReport->generate($report['filters'], $report['kpis']['total_revenue']);
         $options = new Options;
         $options->setDefaultFont('DejaVu Sans');
         $options->setIsRemoteEnabled(false);
@@ -49,7 +56,7 @@ class SalesReportExportService
         $pdf->addInfo('Title', 'Battlefront Computer Trading Sales Report');
         $pdf->loadHtml(view('reports.sales', [
             ...$report,
-            'generatedAt' => now()->format('M j, Y, g:i A T'),
+            'generatedAt' => $this->generatedAt(),
             'print' => false,
         ])->render(), 'UTF-8');
         $pdf->render();
@@ -64,11 +71,11 @@ class SalesReportExportService
     /**
      * @param  array<string, mixed>  $filters
      */
-    public function csv(array $filters): StreamedResponse
+    public function csv(array $filters, bool $includeProfitability = true): StreamedResponse
     {
-        $report = $this->salesReportService->exportProducts($filters);
+        $report = $this->salesReportService->exportProducts($filters, $includeProfitability);
 
-        return response()->streamDownload(function () use ($report): void {
+        return response()->streamDownload(function () use ($report, $includeProfitability): void {
             $stream = fopen('php://output', 'wb');
 
             if ($stream === false) {
@@ -79,6 +86,10 @@ class SalesReportExportService
                 fwrite($stream, "\xEF\xBB\xBF");
                 $this->writeCsvRow($stream, [
                     'Product', 'Current category', 'Number of sales', 'Quantity sold', 'Item revenue (PHP, excluding third-party delivery charges)',
+                    ...($includeProfitability ? [
+                        'Cost of goods sold (PHP)', 'Gross profit before returns (PHP)', 'Gross margin before returns (%)',
+                        'Sales returns (PHP)', 'Net product sales (PHP)', 'Gross profit (PHP)', 'Gross margin (%)',
+                    ] : []),
                     'Report from', 'Report to', 'Reporting period', 'Product filter', 'Category filter',
                 ]);
 
@@ -89,6 +100,12 @@ class SalesReportExportService
                         $product['sales_count'],
                         $product['quantity_sold'],
                         $product['item_revenue'],
+                        ...($includeProfitability ? [
+                            $product['cost_of_goods_sold'] ?? '',
+                            $product['gross_profit_before_returns'] ?? '',
+                            $product['gross_margin_before_returns'] ?? '',
+                            '', '', '', '',
+                        ] : []),
                         $report['filters']['from'],
                         $report['filters']['to'],
                         $report['filters']['period'],
@@ -111,6 +128,11 @@ class SalesReportExportService
     private function filename(array $filters, string $extension): string
     {
         return 'sales-report_'.$filters['from'].'_to_'.$filters['to'].'.'.$extension;
+    }
+
+    private function generatedAt(): string
+    {
+        return now(config('battlefront.timezone'))->format('M j, Y, g:i A').' '.config('battlefront.timezone');
     }
 
     /**

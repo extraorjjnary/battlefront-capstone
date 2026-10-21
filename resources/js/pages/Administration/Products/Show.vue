@@ -1,9 +1,9 @@
 <script setup>
-import PageHeader from '@/components/PageHeader.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
 import { ArrowLeft, PackageSearch, Pencil } from '@lucide/vue';
+import { computed } from 'vue';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
-import PermanentDeletionDialog from '@/components/PermanentDeletionDialog.vue';
+import RecoverableDeletionDialog from '@/components/RecoverableDeletionDialog.vue';
 import { Badge } from '@/components/ui/badge';
 import ShippingHandling from '@/components/catalog/ShippingHandling.vue';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,9 @@ import { Button } from '@/components/ui/button';
 defineProps({
     product: { type: Object, required: true },
 });
+const page = usePage();
+const canManageProducts = computed(() => page.props.auth?.can?.manageProducts === true);
+const canDeleteProduct = computed(() => page.props.auth?.can?.deleteCatalog === true);
 
 const currencyFormatter = new Intl.NumberFormat('en-PH', {
     style: 'currency',
@@ -36,39 +39,56 @@ defineOptions({
 </script>
 
 <template>
+    <Head :title="product.name" />
+
     <main
-        class="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
+        class="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 p-6 lg:p-10"
     >
-        <Head :title="product.name" />
-        <Link
-            :href="ProductController.index()"
-            class="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 text-sm"
-        >
-            <ArrowLeft class="size-4" />
-            Back to products
-        </Link>
-        <PageHeader :title="product.name" :description="product.product_code">
-            <template #actions>
-                <Button as-child>
+        <div class="flex flex-wrap items-start justify-between gap-4">
+            <div class="space-y-3">
+                <Link
+                    :href="ProductController.index()"
+                    class="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 text-sm"
+                >
+                    <ArrowLeft class="size-4" />
+                    Back to products
+                </Link>
+                <div>
+                    <p
+                        class="text-primary text-xs font-semibold tracking-widest uppercase"
+                    >
+                        Sagay City catalog · {{ product.product_code }}
+                    </p>
+                    <h1
+                        class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
+                    >
+                        {{ product.name }}
+                    </h1>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <Button v-if="canManageProducts" as-child>
                     <Link :href="ProductController.edit(product.id)">
                         <Pencil />
                         Edit product
                     </Link>
                 </Button>
-                <PermanentDeletionDialog
+                <RecoverableDeletionDialog
+                    v-if="canDeleteProduct"
                     :name="product.name"
+                    resource-name="product"
+                    collection-name="Deleted products"
                     :form="ProductController.destroy.form(product.id)"
                     :error-bag="`deleteProduct${product.id}`"
-                    :imported="product.is_catalog_imported"
                 />
-            </template>
-        </PageHeader>
+            </div>
+        </div>
 
         <div
             class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:items-start"
         >
             <section
-                class="surface-panel border-border bg-card border p-4 sm:p-6"
+                class="border-border bg-card border p-4 sm:p-6"
                 aria-label="Product image"
             >
                 <div
@@ -90,7 +110,7 @@ defineOptions({
 
             <div class="flex flex-col gap-6">
                 <section
-                    class="surface-panel border-border bg-card border p-6"
+                    class="border-border bg-card border p-6"
                     aria-labelledby="product-details-heading"
                 >
                     <div
@@ -140,6 +160,10 @@ defineOptions({
                                 {{ formatPrice(product.price) }}
                             </dd>
                         </div>
+                        <div v-if="product.acquisition_cost !== undefined">
+                            <dt class="text-muted-foreground">Acquisition cost</dt>
+                            <dd class="mt-1 font-medium tabular-nums">{{ formatPrice(product.acquisition_cost) }}</dd>
+                        </div>
                         <div>
                             <dt class="text-muted-foreground">
                                 Discount price
@@ -185,7 +209,7 @@ defineOptions({
                 </section>
 
                 <section
-                    class="surface-panel border-border bg-card border p-6"
+                    class="border-border bg-card border p-6"
                     aria-labelledby="product-stock-heading"
                 >
                     <div
@@ -206,7 +230,7 @@ defineOptions({
                         <Badge
                             v-else-if="product.stock_status === 'low_stock'"
                             variant="outline"
-                            class="border-primary/40 text-primary-ink"
+                            class="border-primary/40 text-primary"
                             >Low stock</Badge
                         >
                         <Badge

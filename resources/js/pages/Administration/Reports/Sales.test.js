@@ -26,6 +26,17 @@ const generic = new Proxy(
 
 function salesFixture(empty = false) {
     return {
+        refund_measures: {
+            cutoff: '2026-09-30',
+            gross_item_sales: '400.00',
+            refund_payments: '0.00',
+            gross_less_refunds: '400.00',
+            outstanding_at_cutoff: '0.00',
+            outstanding_refunds: { data: [], last_page: 1 },
+            payments: { data: [], last_page: 1 },
+            reversals: { data: [], last_page: 1 },
+        },
+        sale_transactions: { data: [], last_page: 1 },
         filters: {
             from: '2026-09-01',
             to: '2026-09-30',
@@ -43,6 +54,12 @@ function salesFixture(empty = false) {
             total_revenue: '400.00',
             average_order_value: '200.00',
             total_items_sold: 5,
+        },
+        comparison: {
+            from: '2026-08-02',
+            to: '2026-08-31',
+            total_sales: 1,
+            total_revenue: '200.00',
         },
         timeline: { labels: ['Sep 2026'], sales: [2], revenue: [400] },
         top_products: { ids: [7], labels: ['Ryzen 7'], quantities: [5] },
@@ -75,7 +92,9 @@ function salesFixture(empty = false) {
 
 function salesHarness(t, empty = false) {
     const props = Vue.reactive(salesFixture(empty));
-    const page = Vue.reactive({ props: { errors: {} } });
+    const page = Vue.reactive({
+        props: { errors: {}, auth: { can: { exportReports: true } } },
+    });
     const visits = [];
     const chartColors = Vue.ref({
         primary: 'red',
@@ -250,6 +269,29 @@ test('export links update after applied filters change and omit cleared cross fi
     }
 });
 
+test('cross-filter reload refreshes transaction and refund sections with the charts', (t) => {
+    const harness = salesHarness(t);
+    const product = findNodes(
+        harness.tree(),
+        (node) => node.type === 'button' && 'aria-pressed' in node.props,
+    )[0];
+
+    product.props.onClick();
+
+    assert.deepEqual(harness.visits[0][1].only, [
+        'filters',
+        'active_filters',
+        'kpis',
+        'comparison',
+        'timeline',
+        'top_products',
+        'categories',
+        'products',
+        'sale_transactions',
+        'refund_measures',
+    ]);
+});
+
 function resetControl(harness) {
     return findNodes(
         harness.tree(),
@@ -313,6 +355,53 @@ test('empty reports retain usable export controls', (t) => {
             (link) => link.props['aria-disabled'] === false,
         ),
     );
+});
+
+test('report filters and sales overview come before refund source records', async (t) => {
+    const harness = salesHarness(t);
+    const html = await harness.html();
+    const filterPosition = html.indexOf('Reporting period');
+    const summaryPosition = html.indexOf('Sales summary');
+    const productsPosition = html.indexOf('Product performance report');
+    const refundsPosition = html.indexOf('Sales and refunds by event date');
+
+    assert.ok(filterPosition < summaryPosition);
+    assert.ok(summaryPosition < productsPosition);
+    assert.ok(productsPosition < refundsPosition);
+    assert.match(
+        html,
+        /<details class="border-border mt-6 border"><summary/,
+    );
+    assert.ok(!html.includes('<details open'));
+});
+
+test('profitability values appear only for administrators who can view profit reports', async (t) => {
+    const harness = salesHarness(t);
+    harness.page.props.auth.can.viewProfitReports = true;
+    harness.props.kpis = {
+        ...harness.props.kpis,
+        sales_returns: '10.00',
+        net_sales: '390.00',
+        cost_of_goods_sold: '240.00',
+        cost_recovered: '20.00',
+        gross_profit: '170.00',
+        gross_margin: '43.59',
+        cost_data_complete: true,
+    };
+    harness.props.products.data[0] = {
+        ...harness.props.products.data[0],
+        cost_of_goods_sold: '240.00',
+        gross_profit_before_returns: '160.00',
+        gross_margin_before_returns: '40.00',
+    };
+    const html = await harness.html();
+
+    assert.match(html, /Net product sales/);
+    assert.match(html, /Cost of goods sold/);
+    assert.match(html, /Gross profit/);
+    assert.match(html, /₱170\.00/);
+    assert.match(html, /Gross profit before returns/);
+    assert.match(html, /₱160\.00/);
 });
 
 test('reset posts without current filters and synchronizes the controls and exports from the server response', async (t) => {

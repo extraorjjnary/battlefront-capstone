@@ -18,10 +18,14 @@ class DashboardService
     public function __construct(private readonly SalesReportRepository $salesReportRepository) {}
 
     /** @return array<string, mixed> */
-    public function administration(): array
+    public function administration(User $actor): array
     {
-        $salesSummary = $this->salesReportRepository->recordedSalesSummary();
-        $orderSummary = Order::query()
+        $canViewReports = $actor->can('reports.view');
+        $canViewOrders = $actor->can('orders.view');
+        $canViewInventory = $actor->can('inventory.view');
+        $salesSummary = $canViewReports ? $this->salesReportRepository->recordedSalesSummary() : null;
+        $profitSummary = $actor->can('reports.profit') ? $this->salesReportRepository->recordedProfitabilitySummary() : null;
+        $orderSummary = $canViewOrders ? Order::query()
             ->toBase()
             ->selectRaw(
                 'COUNT(CASE WHEN status = ? THEN 1 END) as pending_orders',
@@ -31,27 +35,31 @@ class DashboardService
                 'COUNT(CASE WHEN status = ? THEN 1 END) as processing_orders',
                 [OrderStatus::Processing->value],
             )
-            ->first();
-        $operationalInventory = Inventory::query()->whereIn('product_id', Product::query()->customerEligible()->select('id'));
-        $lowStockQuery = (clone $operationalInventory)->lowStock();
-        $outOfStockQuery = (clone $operationalInventory)->outOfStock();
+            ->first() : null;
+        $operationalInventory = $canViewInventory
+            ? Inventory::query()->whereIn('product_id', Product::query()->customerEligible()->select('id'))
+            : null;
+        $lowStockQuery = $operationalInventory === null ? null : (clone $operationalInventory)->lowStock();
+        $outOfStockQuery = $operationalInventory === null ? null : (clone $operationalInventory)->outOfStock();
 
         return [
             'kpis' => [
-                'recorded_revenue' => $this->money($salesSummary->total_revenue),
-                'recorded_sales' => (int) $salesSummary->total_sales,
-                'pending_orders' => (int) $orderSummary->pending_orders,
-                'processing_orders' => (int) $orderSummary->processing_orders,
-                'low_stock_products' => (clone $lowStockQuery)->count(),
-                'out_of_stock_products' => (clone $outOfStockQuery)->count(),
+                'recorded_revenue' => $salesSummary === null ? null : $this->money($salesSummary->total_revenue),
+                'recorded_sales' => $salesSummary === null ? null : (int) $salesSummary->total_sales,
+                'recorded_gross_profit' => $profitSummary?->gross_profit,
+                'profit_data_complete' => $profitSummary?->cost_data_complete,
+                'pending_orders' => $orderSummary === null ? null : (int) $orderSummary->pending_orders,
+                'processing_orders' => $orderSummary === null ? null : (int) $orderSummary->processing_orders,
+                'low_stock_products' => $lowStockQuery === null ? null : (clone $lowStockQuery)->count(),
+                'out_of_stock_products' => $outOfStockQuery === null ? null : (clone $outOfStockQuery)->count(),
             ],
             'needs_attention' => [
-                'pending_payment_reviews' => $this->pendingPaymentReviewsQuery()->count(),
-                'payment_orders' => $this->paymentReviewOrders(),
-                'out_of_stock_products' => $this->stockProducts($outOfStockQuery),
-                'low_stock_products' => $this->stockProducts($lowStockQuery),
+                'pending_payment_reviews' => $canViewOrders ? $this->pendingPaymentReviewsQuery()->count() : null,
+                'payment_orders' => $canViewOrders ? $this->paymentReviewOrders() : [],
+                'out_of_stock_products' => $outOfStockQuery === null ? [] : $this->stockProducts($outOfStockQuery),
+                'low_stock_products' => $lowStockQuery === null ? [] : $this->stockProducts($lowStockQuery),
             ],
-            'recent_orders' => $this->recentOrders(),
+            'recent_orders' => $canViewOrders ? $this->recentOrders() : [],
         ];
     }
 

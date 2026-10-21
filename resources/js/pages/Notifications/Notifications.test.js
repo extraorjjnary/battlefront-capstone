@@ -6,6 +6,7 @@ import { compileScript, parse } from '@vue/compiler-sfc';
 import { renderToString } from '@vue/server-renderer';
 import * as Vue from 'vue';
 import { loadSkeletonComponent } from '../../lib/skeletonTestHelpers.js';
+import { formatDateTime } from '../../lib/dateTime.js';
 
 const primitive = {
     render() {
@@ -20,7 +21,7 @@ const button = {
 const link = {
     props: ['href'],
     render() {
-        return Vue.h('a', { href: this.href?.url }, this.$slots.default?.());
+        return Vue.h('a', { href: typeof this.href === 'string' ? this.href : this.href?.url }, this.$slots.default?.());
     },
 };
 
@@ -53,6 +54,7 @@ function loadNotificationComponent(
     const modules = {
         '@/components/PageHeader.vue': pageHeaderModule,
         vue: Vue,
+        '@/lib/dateTime': { formatDateTime },
         '@inertiajs/vue3': { Head: primitive, Link: link, router },
         '@lucide/vue': {
             Bell: primitive,
@@ -164,6 +166,29 @@ test('administrator empty history explains operational events and disables read 
     assert.match(html, /0 unread/);
     assert.match(html, /New orders and submitted wallet proofs/);
     assert.match(html, /disabled/);
+});
+
+test('owner review alerts link to recent decisions with quantities and amounts', async () => {
+    const component = loadNotificationComponent('./Index.vue', { administrator: true });
+    const html = await renderToString(Vue.h(component, {
+        notifications: {
+            data: [notificationFixture({
+                title: 'Repeated approvals need review',
+                order: null,
+                decisions: [{
+                    action: 'customer_return.accepted', subject_id: 7,
+                    quantity: 2, approved_amount: '150.00',
+                    web_url: '/administration/customer-returns?case=7',
+                }],
+            })],
+            current_page: 1,
+            last_page: 1,
+        },
+    }));
+
+    assert.match(html, /href="\/administration\/customer-returns\?case=7"/);
+    assert.match(html, /2 units/);
+    assert.match(html, /₱150.00 approved/);
 });
 
 test('history read actions expose loading failure and completion state', () => {

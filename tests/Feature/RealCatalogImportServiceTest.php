@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
 use Tests\HistoricalSalesCatalogFixtures;
 
-test('deleting imported catalog records preserves sources and images for explicit restoration', function (bool $adminImage) {
+test('soft deleting imported catalog records preserves sources and images for explicit restoration', function (bool $adminImage) {
     Storage::fake('public');
     Storage::fake('local');
     $manifest = realCatalogManifest();
@@ -32,6 +32,7 @@ test('deleting imported catalog records preserves sources and images for explici
         $manifestBytes = file_get_contents($manifest);
         $mappingBytes = file_get_contents($mapping);
         $importedImagePath = $product->image_path;
+        $product->inventory()->update(['quantity' => 0, 'quarantined_quantity' => 0]);
         $imageBytes = Storage::disk('public')->get($importedImagePath);
         Storage::disk('local')->put('catalog/original.csv', 'original catalog CSV bytes');
         Storage::disk('local')->put('catalog/original.xlsx', 'original workbook bytes');
@@ -45,25 +46,28 @@ test('deleting imported catalog records preserves sources and images for explici
         $this->delete(route('administration.products.destroy', $product))->assertSessionHasNoErrors();
         $this->delete(route('administration.categories.destroy', $category))->assertSessionHasNoErrors();
 
-        $this->assertModelMissing($product);
-        $this->assertModelMissing($category);
-        $this->assertDatabaseCount('inventories', 0);
-        $this->assertDatabaseCount('product_tag', 0);
+        expect($product->fresh()->trashed())->toBeTrue()
+            ->and($category->fresh()->trashed())->toBeTrue();
+        $this->assertDatabaseHas('inventories', ['product_id' => $product->id]);
+        $this->assertDatabaseCount('product_tag', 3);
         expect(file_get_contents($manifest))->toBe($manifestBytes);
         expect(file_get_contents($mapping))->toBe($mappingBytes);
         expect(Storage::disk('public')->get($importedImagePath))->toBe($imageBytes);
         expect(Storage::disk('local')->get('catalog/original.csv'))->toBe('original catalog CSV bytes');
         expect(Storage::disk('local')->get('catalog/original.xlsx'))->toBe('original workbook bytes');
         if ($adminImage) {
-            Storage::disk('public')->assertMissing($ownedPath);
+            Storage::disk('public')->assertExists($ownedPath);
         }
 
-        expect($importer->execute($mapping, $manifest))->toBe(['created' => 1, 'updated' => 0]);
+        $this->post(route('administration.categories.restore', $category->id))->assertSessionHasNoErrors();
+        $this->post(route('administration.products.restore', $product->id))->assertSessionHasNoErrors();
+
+        expect($importer->execute($mapping, $manifest))->toBe(['created' => 0, 'updated' => 1]);
         $restored = Product::query()->sole();
         expect($restored->product_code)->toBe('00123');
         expect($restored->name)->toBe('Exact Product™');
         expect($restored->is_catalog_imported)->toBeTrue();
-        expect($restored->inventory->quantity)->toBe(5);
+        expect($restored->inventory->quantity)->toBe(0);
         expect($restored->category->name)->toBe('Graphics Card');
         expect($restored->tags)->toHaveCount(3);
         expect(file_get_contents($manifest))->toBe($manifestBytes);
@@ -410,6 +414,7 @@ test('an admin replacement preserves its manifest image and survives future impo
 
         $this->actingAs($administrator)->post(route('administration.products.update', $product), [
             '_method' => 'put',
+            'edit_version' => $product->edit_version,
             'product_code' => $product->product_code,
             'name' => $product->name,
             'category_id' => $product->category_id,

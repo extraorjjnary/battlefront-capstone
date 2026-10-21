@@ -14,7 +14,10 @@ use RuntimeException;
 
 class RealCatalogImportService
 {
-    public function __construct(private readonly CatalogImagePipeline $images) {}
+    public function __construct(
+        private readonly CatalogImagePipeline $images,
+        private readonly AcquisitionCostEstimator $acquisitionCostEstimator,
+    ) {}
 
     public function writeTemplate(string $outputPath, ?string $manifestPath = null): int
     {
@@ -62,7 +65,10 @@ class RealCatalogImportService
 
         foreach ($prepared as $row) {
             $code = $row['product_code'];
-            $existing = Product::query()->where('product_code', $code)->first();
+            $existing = Product::withTrashed()->where('product_code', $code)->first();
+            if ($existing?->trashed()) {
+                throw new RuntimeException("Product code $code belongs to a deleted product. Restore it before importing. No products were imported.");
+            }
             if ($existing !== null && (! $existing->is_catalog_imported || $existing->product_code !== $code)) {
                 throw new RuntimeException("Product code $code conflicts with an existing product. No products were imported.");
             }
@@ -178,10 +184,16 @@ class RealCatalogImportService
                 $created = 0;
                 $updated = 0;
                 foreach ($prepared as $row) {
-                    $category = Category::query()->where('name_key', CatalogName::key($row['category']))->first()
-                        ?? Category::query()->create(['name' => $row['category']]);
-                    $product = Product::query()->where('product_code', $row['product_code'])->lockForUpdate()->first()
-                        ?? new Product(['product_code' => $row['product_code']]);
+                    $category = Category::withTrashed()->where('name_key', CatalogName::key($row['category']))->first();
+                    if ($category?->trashed()) {
+                        throw new RuntimeException("Category {$row['category']} is deleted. Restore it before importing. No products were imported.");
+                    }
+                    $category ??= Category::query()->create(['name' => $row['category']]);
+                    $product = Product::withTrashed()->where('product_code', $row['product_code'])->lockForUpdate()->first();
+                    if ($product?->trashed()) {
+                        throw new RuntimeException("Product code {$row['product_code']} belongs to a deleted product. Restore it before importing.");
+                    }
+                    $product ??= new Product(['product_code' => $row['product_code']]);
                     $isNew = ! $product->exists;
                     if (! $isNew && (! $product->is_catalog_imported || $product->product_code !== $row['product_code'])) {
                         throw new RuntimeException("Product code {$row['product_code']} conflicts with an existing product.");
@@ -192,10 +204,17 @@ class RealCatalogImportService
                         'brand' => $row['brand'] ?? $product->brand,
                         'price' => $row['price'],
                     ]);
+                    if ($product->acquisition_cost === null) {
+                        $product->acquisition_cost = $this->acquisitionCostEstimator->forProduct($category->name, $row['price']);
+                        $product->acquisition_cost_source = $product->acquisition_cost === null ? null : 'category_policy_v1';
+                    }
                     if (! ProductImagePaths::isAdminOwned($product->image_path, $product->id)) {
                         $product->image_path = $row['image_path'];
                     }
                     $product->is_catalog_imported = true;
+                    if (! $isNew && $product->isDirty()) {
+                        $product->edit_version++;
+                    }
                     $product->save();
                     if ($isNew) {
                         app(CatalogShippingClassification::class)->apply($product);
@@ -233,7 +252,7 @@ class RealCatalogImportService
     private function ensureUniqueProductNames(array $prepared): void
     {
         foreach ($prepared as $row) {
-            if (Product::query()->where('name_key', CatalogName::key($row['name']))
+            if (Product::withTrashed()->where('name_key', CatalogName::key($row['name']))
                 ->where('product_code', '!=', $row['product_code'])->exists()) {
                 throw new RuntimeException("Product name for code {$row['product_code']} conflicts with an existing product. No products were imported.");
             }

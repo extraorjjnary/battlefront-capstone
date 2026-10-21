@@ -48,7 +48,7 @@ class AuthController extends Controller
         /** @var User $user */
         $user = Auth::guard('web')->user();
 
-        if ($user->role !== UserRole::Customer) {
+        if (! $user->is_active || $user->role !== UserRole::Customer) {
             abort(401, 'Invalid credentials.');
         }
 

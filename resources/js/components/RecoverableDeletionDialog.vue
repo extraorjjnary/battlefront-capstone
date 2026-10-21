@@ -21,7 +21,8 @@ defineProps({
     name: { type: String, required: true },
     form: { type: Object, required: true },
     errorBag: { type: String, required: true },
-    imported: { type: Boolean, default: false },
+    collectionName: { type: String, required: true },
+    resourceName: { type: String, required: true },
 });
 
 const open = ref(false);
@@ -36,9 +37,15 @@ function showError(errors) {
 <template>
     <Dialog v-model:open="open">
         <DialogTrigger as-child>
-            <Button variant="destructive-outline" size="sm">
+            <Button
+                variant="destructive-outline"
+                size="sm"
+                class="gap-1.5 px-2 whitespace-nowrap"
+                :aria-label="`Move to ${collectionName}`"
+                :title="`Move to ${collectionName}`"
+            >
                 <Trash2 />
-                Delete
+                Move to Deleted
             </Button>
         </DialogTrigger>
         <DialogContent>
@@ -51,10 +58,13 @@ function showError(errors) {
                 v-slot="{ errors, processing }"
             >
                 <DialogHeader>
-                    <DialogTitle>Delete {{ name }} permanently?</DialogTitle>
+                    <DialogTitle>Move {{ name }} to {{ collectionName }}?</DialogTitle>
                     <DialogDescription>
-                        This cannot be undone. Only records with no protected
-                        references can be deleted.
+                        This hides the {{ resourceName }} from its normal list and records who moved it.
+                        It keeps its history and can be restored by an owner as inactive.
+                        <template v-if="resourceName === 'product'">
+                            Deactivate it instead if you may sell it again before resolving its stock or open work.
+                        </template>
                     </DialogDescription>
                 </DialogHeader>
                 <InputError class="mt-4" :message="errors.deletion" />
@@ -75,7 +85,7 @@ function showError(errors) {
                     >
                         <Spinner v-if="processing" />
                         <Trash2 v-else />
-                        Delete permanently
+                        Move to {{ collectionName }}
                     </Button>
                 </DialogFooter>
             </Form>

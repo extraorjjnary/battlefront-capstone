@@ -110,7 +110,7 @@ test('print reports contain authoritative KPIs and complete sale backed breakdow
         ]));
 
     $response->assertOk()->assertHeader('Content-Type', 'text/html; charset=utf-8')
-        ->assertSee('Battlefront Computer Trading')->assertSee('Oct 12, 2026, 9:30 AM')
+        ->assertSee('Battlefront Computer Trading')->assertSee('Oct 12, 2026, 5:30 PM Asia/Manila')
         ->assertSee('2026-09-01 to 2026-09-30')->assertSee('₱500.00')->assertSee('₱250.00')
         ->assertSee('Sales by reporting period')->assertSee('Category sales breakdown')->assertSee('Product sales breakdown')
         ->assertSee('Ryzen 7')->assertSee('Mechanical Keyboard')->assertSee('window.print()', false)
@@ -118,11 +118,13 @@ test('print reports contain authoritative KPIs and complete sale backed breakdow
         ->assertDontSee('Recommendation engagement')->assertDontSee('₱999.00')
         ->assertViewHas('kpis', [
             'total_sales' => 2, 'total_revenue' => '500.00', 'average_order_value' => '250.00', 'total_items_sold' => 6,
+            'sales_returns' => '0.00', 'net_sales' => '500.00', 'cost_of_goods_sold' => '0.00', 'cost_recovered' => '0.00',
+            'gross_profit' => null, 'gross_margin' => null, 'cost_data_complete' => false,
         ])
-        ->assertViewHas('timeline', ['labels' => ['Sep 2026'], 'sales' => [2], 'revenue' => [500.0]])
+        ->assertViewHas('timeline', ['labels' => ['Sep 2026'], 'sales' => [2], 'revenue' => [500.0], 'gross_profit_before_returns' => [null]])
         ->assertViewHas('categories', [
-            ['id' => $fixture['components']->id, 'name' => 'Components', 'sales_count' => 2, 'quantity_sold' => 5, 'item_revenue' => '400.00'],
-            ['id' => $fixture['peripherals']->id, 'name' => 'Peripherals', 'sales_count' => 1, 'quantity_sold' => 1, 'item_revenue' => '100.00'],
+            ['id' => $fixture['components']->id, 'name' => 'Components', 'sales_count' => 2, 'quantity_sold' => 5, 'item_revenue' => '400.00', 'cost_of_goods_sold' => '0.00', 'gross_profit_before_returns' => null, 'gross_margin_before_returns' => null],
+            ['id' => $fixture['peripherals']->id, 'name' => 'Peripherals', 'sales_count' => 1, 'quantity_sold' => 1, 'item_revenue' => '100.00', 'cost_of_goods_sold' => '0.00', 'gross_profit_before_returns' => null, 'gross_margin_before_returns' => null],
         ]);
     expect($response->headers->get('Cache-Control'))->toContain('private', 'no-store');
 });
@@ -155,11 +157,35 @@ test('CSV downloads contain product totals purchase time revenue and applied fil
     $content = $response->streamedContent();
     expect($content)->toEndWith("\r\n");
     expect(salesExportCsvRows($content))->toBe([
-        ['Product', 'Current category', 'Number of sales', 'Quantity sold', 'Item revenue (PHP, excluding third-party delivery charges)', 'Report from', 'Report to', 'Reporting period', 'Product filter', 'Category filter'],
-        ['Ryzen 7', 'Components', '2', '5', '400.00', '2026-09-01', '2026-09-30', 'week', 'All products', 'All categories'],
-        ['Mechanical Keyboard', 'Peripherals', '1', '1', '100.00', '2026-09-01', '2026-09-30', 'week', 'All products', 'All categories'],
+        ['Product', 'Current category', 'Number of sales', 'Quantity sold', 'Item revenue (PHP, excluding third-party delivery charges)', 'Cost of goods sold (PHP)', 'Gross profit before returns (PHP)', 'Gross margin before returns (%)', 'Sales returns (PHP)', 'Net product sales (PHP)', 'Gross profit (PHP)', 'Gross margin (%)', 'Report from', 'Report to', 'Reporting period', 'Product filter', 'Category filter'],
+        ['Ryzen 7', 'Components', '2', '5', '400.00', '0.00', '', '', '', '', '', '', '2026-09-01', '2026-09-30', 'week', 'All products', 'All categories'],
+        ['Mechanical Keyboard', 'Peripherals', '1', '1', '100.00', '0.00', '', '', '', '', '', '', '2026-09-01', '2026-09-30', 'week', 'All products', 'All categories'],
     ]);
     expect($response->headers->get('Cache-Control'))->toContain('private', 'no-store');
+});
+
+test('CSV omits profitability fields when the administrator lacks the profit permission', function () {
+    $managerRoleId = DB::table('administration_roles')->where('code', 'manager')->value('id');
+    $profitPermissionId = DB::table('administration_permissions')->where('code', 'reports.profit')->value('id');
+    DB::table('administration_role_permissions')
+        ->where('administration_role_id', $managerRoleId)
+        ->where('administration_permission_id', $profitPermissionId)
+        ->delete();
+    DB::table('administration_role_permissions')->insertOrIgnore([
+        'administration_role_id' => $managerRoleId,
+        'administration_permission_id' => DB::table('administration_permissions')->where('code', 'reports.export')->value('id'),
+    ]);
+    $manager = User::factory()->administrator()->create(['administration_role_id' => $managerRoleId]);
+    $fixture = createSalesExportFixture();
+
+    $response = $this->actingAs($manager)->get(route('administration.reports.sales.csv', [
+        'from' => '2026-09-01', 'to' => '2026-09-30',
+    ]));
+    $rows = salesExportCsvRows($response->streamedContent());
+
+    expect($rows[0])->not->toContain('Cost of goods sold (PHP)')
+        ->and($rows[1])->toHaveCount(10)
+        ->and($rows[1][0])->toBe('Ryzen 7');
 });
 
 test('exports restore saved selections and exclude snapshotted LBC fees without changing remembered filters', function (string $format) {
@@ -186,8 +212,8 @@ test('exports restore saved selections and exclude snapshotted LBC fees without 
 
     if ($format === 'print') {
         $response->assertViewHas('filters', $filters)
-            ->assertViewHas('kpis', ['total_sales' => 1, 'total_revenue' => '200.00', 'average_order_value' => '200.00', 'total_items_sold' => 3])
-            ->assertViewHas('timeline', ['labels' => ['Sep 2026'], 'sales' => [1], 'revenue' => [200.0]])
+            ->assertViewHas('kpis', ['total_sales' => 1, 'total_revenue' => '200.00', 'average_order_value' => '200.00', 'total_items_sold' => 3, 'sales_returns' => '0.00', 'net_sales' => '200.00', 'cost_of_goods_sold' => '0.00', 'cost_recovered' => '0.00', 'gross_profit' => null, 'gross_margin' => null, 'cost_data_complete' => false])
+            ->assertViewHas('timeline', ['labels' => ['Sep 2026'], 'sales' => [1], 'revenue' => [200.0], 'gross_profit_before_returns' => [null]])
             ->assertSee('exclude third-party delivery charges')->assertDontSee('₱280.00');
     } elseif ($format === 'pdf') {
         $response->assertDownload('sales-report_2026-09-01_to_2026-09-30.pdf');
@@ -199,8 +225,8 @@ test('exports restore saved selections and exclude snapshotted LBC fees without 
         $rows = salesExportCsvRows($response->streamedContent());
         expect($rows[0][4])->toBe('Item revenue (PHP, excluding third-party delivery charges)');
         expect(array_slice($rows, 1))->toBe([
-            ['Processor', 'Components', '1', '2', '100.00', '2026-09-01', '2026-09-30', 'month', 'All products', 'All categories'],
-            ['Keyboard', 'Peripherals', '1', '1', '100.00', '2026-09-01', '2026-09-30', 'month', 'All products', 'All categories'],
+            ['Processor', 'Components', '1', '2', '100.00', '0.00', '', '', '', '', '', '', '2026-09-01', '2026-09-30', 'month', 'All products', 'All categories'],
+            ['Keyboard', 'Peripherals', '1', '1', '100.00', '0.00', '', '', '', '', '', '', '2026-09-01', '2026-09-30', 'month', 'All products', 'All categories'],
         ]);
     }
 
@@ -213,7 +239,7 @@ test('exports restore saved selections and exclude snapshotted LBC fees without 
     } else {
         $rows = salesExportCsvRows($explicit->streamedContent());
         expect($rows)->toHaveCount(2);
-        expect($rows[1])->toBe(['Processor', 'Components', '1', '2', '100.00', '2026-09-01', '2026-09-30', 'month', 'Processor', 'All categories']);
+        expect($rows[1])->toBe(['Processor', 'Components', '1', '2', '100.00', '0.00', '', '', '', '', '', '', '2026-09-01', '2026-09-30', 'month', 'Processor', 'All categories']);
     }
     $this->get(route('administration.reports.sales'))->assertInertia(fn (Assert $page) => $page->where('filters', $filters)->where('kpis.total_revenue', '200.00'));
     expect($sale->refresh()->amount)->toBe('280.00');
@@ -229,8 +255,10 @@ test('print PDF and CSV agree on product category and combined filters', functio
     $this->actingAs(User::factory()->administrator()->create());
 
     $this->get(route('administration.reports.sales.print', $query))
-        ->assertViewHas('kpis', $expectedKpis)
-        ->assertViewHas('timeline', ['labels' => ['Sep 2026'], 'sales' => [$expectedKpis['total_sales']], 'revenue' => [(float) $expectedKpis['total_revenue']]])
+        ->assertViewHas('kpis', fn (array $kpis): bool => array_intersect_key($kpis, $expectedKpis) === $expectedKpis)
+        ->assertViewHas('timeline', fn (array $timeline): bool => $timeline['labels'] === ['Sep 2026']
+            && $timeline['sales'] === [$expectedKpis['total_sales']]
+            && $timeline['revenue'] === [(float) $expectedKpis['total_revenue']])
         ->assertViewHas('categories', fn (array $rows): bool => array_sum(array_column($rows, 'quantity_sold')) === $expectedKpis['total_items_sold']);
     $csv = $this->get(route('administration.reports.sales.csv', $query));
     $rows = array_slice(salesExportCsvRows($csv->streamedContent()), 1);
@@ -254,7 +282,8 @@ test('documents preserve daily weekly and monthly buckets at inclusive boundarie
         ->get(route('administration.reports.sales.print', ['from' => '2026-09-01', 'to' => '2026-09-30', 'period' => $period]));
 
     $response->assertViewHas('kpis.total_revenue', '500.00')
-        ->assertViewHas('timeline', compact('labels', 'sales', 'revenue'));
+        ->assertViewHas('timeline', fn (array $timeline): bool => $timeline['labels'] === $labels
+            && $timeline['sales'] === $sales && $timeline['revenue'] === $revenue);
     $csv = $this->get(route('administration.reports.sales.csv', ['from' => '2026-09-01', 'to' => '2026-09-30', 'period' => $period]));
     expect(array_column(array_slice(salesExportCsvRows($csv->streamedContent()), 1), 4))->toBe(['400.00', '100.00']);
 })->with([
@@ -271,6 +300,8 @@ test('empty exports use the shared default dates and retain headers zero KPIs an
         ->assertSee('No recorded sales match these filters.')->assertSee('No product sales to report.')
         ->assertSee('No category sales to report.')->assertViewHas('kpis', [
             'total_sales' => 0, 'total_revenue' => '0.00', 'average_order_value' => '0.00', 'total_items_sold' => 0,
+            'sales_returns' => '0.00', 'net_sales' => '0.00', 'cost_of_goods_sold' => '0.00', 'cost_recovered' => '0.00',
+            'gross_profit' => '0.00', 'gross_margin' => null, 'cost_data_complete' => true,
         ]);
     $csv = $this->get(route('administration.reports.sales.csv'))
         ->assertDownload('sales-report_2026-08-19_to_2026-09-17.csv');
@@ -314,9 +345,10 @@ test('CSV safely round trips Unicode quotes commas newlines and backslashes', fu
     $response = $this->actingAs(User::factory()->administrator()->create())
         ->get(route('administration.reports.sales.csv', ['from' => '2026-09-01', 'to' => '2026-09-30']));
 
-    expect(salesExportCsvRows($response->streamedContent())[1])->toBe([
-        $name, 'Peripherals, Élite', '1', '2', '125.50', '2026-09-01', '2026-09-30', 'day', 'All products', 'All categories',
-    ]);
+    $row = salesExportCsvRows($response->streamedContent())[1];
+    expect(array_slice($row, 0, 5))->toBe([$name, $category->name, '1', '2', '125.50']);
+    expect(array_slice($row, 5, 7))->toBe(['0.00', '', '', '', '', '', '']);
+    expect(array_slice($row, 12))->toBe(['2026-09-01', '2026-09-30', 'day', 'All products', 'All categories']);
 });
 
 test('CSV neutralizes spreadsheet formulas in product category and filter text', function (string $prefix) {
@@ -331,7 +363,7 @@ test('CSV neutralizes spreadsheet formulas in product category and filter text',
         ]));
 
     $row = salesExportCsvRows($response->streamedContent())[1];
-    expect([$row[0], $row[1], $row[8], $row[9]])->toBe(array_fill(0, 4, "'".$name));
+    expect([$row[0], $row[1], $row[15], $row[16]])->toBe(array_fill(0, 4, "'".$name));
     expect(array_slice($row, 2, 3))->toBe(['1', '1', '42.75']);
 })->with(['equals' => '=', 'plus' => '+', 'minus' => '-', 'at' => '@', 'tab' => "\t", 'CR' => "\r", 'LF' => "\n", 'padded' => '  =', 'control padded' => "\t =", 'unicode padded' => "\u{00a0}="]);
 

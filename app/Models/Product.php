@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 
@@ -30,11 +31,13 @@ use Illuminate\Support\Facades\Storage;
  * @property int $category_id
  * @property string|null $brand
  * @property string $price
+ * @property numeric-string|null $acquisition_cost
  * @property bool $is_featured
  * @property string|null $discount_price
  * @property string|null $image_path
  * @property-read string|null $image_url
  * @property bool $is_active
+ * @property int $edit_version
  * @property Carbon $created_at
  * @property-read Category $category
  * @property-read Inventory|null $inventory
@@ -53,6 +56,7 @@ use Illuminate\Support\Facades\Storage;
     'category_id',
     'brand',
     'price',
+    'acquisition_cost',
     'is_featured',
     'discount_price',
     'image_path',
@@ -61,6 +65,7 @@ use Illuminate\Support\Facades\Storage;
 class Product extends Model
 {
     use HasCatalogNameKey;
+    use SoftDeletes;
 
     public const CODE_PATTERN = '/^[A-Za-z0-9]{1,64}$/D';
 
@@ -84,6 +89,7 @@ class Product extends Model
         'shipping_profile' => 'standard',
         'is_featured' => false,
         'is_active' => true,
+        'edit_version' => 1,
     ];
 
     /**
@@ -102,7 +108,14 @@ class Product extends Model
                 return asset($this->image_path);
             }
 
-            return Storage::disk('public')->url($this->image_path);
+            $imageUrl = Storage::disk('public')->url($this->image_path);
+            $appUrl = rtrim((string) config('app.url'), '/');
+
+            if (request()->route() !== null && str_starts_with($imageUrl, $appUrl.'/')) {
+                return request()->getSchemeAndHttpHost().substr($imageUrl, strlen($appUrl));
+            }
+
+            return $imageUrl;
         });
     }
 
@@ -113,7 +126,17 @@ class Product extends Model
      */
     public function category(): BelongsTo
     {
-        return $this->belongsTo(Category::class);
+        return $this->belongsTo(Category::class)->withTrashed();
+    }
+
+    /**
+     * Get the administrator who moved the product to Deleted products.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function deletedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'deleted_by_id');
     }
 
     /**
@@ -244,9 +267,12 @@ class Product extends Model
             'is_catalog_imported' => 'boolean',
             'shipping_profile' => ShippingProfile::class,
             'price' => 'decimal:2',
+            'acquisition_cost' => 'decimal:2',
             'is_featured' => 'boolean',
             'discount_price' => 'decimal:2',
             'is_active' => 'boolean',
+            'edit_version' => 'integer',
+            'deleted_at' => 'datetime',
         ];
     }
 }

@@ -30,7 +30,6 @@ return new class extends Migration
 
     private function changeLabelType(bool $expanded): void
     {
-        /** @var list<literal-string> $triggers Application-defined SQL retained from SQLite's schema. */
         $triggers = DB::getDriverName() === 'sqlite'
             ? DB::table('sqlite_master')->where('type', 'trigger')->where('tbl_name', 'orders')->pluck('sql')->all()
             : [];
@@ -45,7 +44,9 @@ return new class extends Migration
 
         /** SQLite column changes rebuild the table and discard its application constraint triggers. */
         foreach ($triggers as $sql) {
-            DB::unprepared($sql);
+            if (is_string($sql)) {
+                DB::connection()->getPdo()->exec($sql);
+            }
         }
     }
 };

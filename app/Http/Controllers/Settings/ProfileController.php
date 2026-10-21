@@ -25,6 +25,9 @@ class ProfileController extends Controller
             'defaultDeliveryAddress' => $canManageDefaultDeliveryAddress
                 ? $request->user()->default_delivery_address
                 : null,
+            'defaultDeliveryContactNumber' => $canManageDefaultDeliveryAddress
+                ? $request->user()->default_delivery_contact_number
+                : null,
             'deliveryLocations' => $canManageDefaultDeliveryAddress ? $locations->destinations() : [],
             'defaultDeliveryAddressPrefill' => $locations->prefill(
                 $canManageDefaultDeliveryAddress ? $request->user()->default_delivery_address : null,

@@ -133,7 +133,7 @@ test('web sorting preserves filters pagination links scroll metadata and mobile 
     $mobile = $this->get(route('api.v1.products.index', $filters));
     expect(collect($mobile->json('data'))->pluck('id')->all())
         ->toBe(collect($response->inertiaProps('products.data'))->pluck('id')->all());
-    $mobile->assertJsonMissingPath('featured_products')->assertJsonMissingPath('data.0.inventory.quantity');
+    $mobile->assertJsonMissingPath('featured_products')->assertJsonPath('data.0.inventory.quantity', 10);
 
     $this->withHeaders([
         'X-Inertia' => 'true', 'X-Inertia-Version' => $response->viewData('page')['version'],

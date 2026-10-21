@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers\Administration;
 
+use App\Enums\OrderStatus;
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
+use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -13,13 +17,17 @@ class CustomerController extends Controller
     /**
      * Display the customer account directory.
      */
-    public function index(): Response
+    public function index(Request $request): Response
     {
         $this->authorize('viewAny', User::class);
+        $filters = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
 
         $customers = User::query()
             ->select(['id', 'name', 'email', 'created_at'])
             ->where('role', UserRole::Customer)
+            ->when($filters['q'] ?? null, fn ($query, $search) => $query->where(fn ($query) => $query
+                ->where('name', 'like', '%'.$search.'%')
+                ->orWhere('email', 'like', '%'.$search.'%')))
             ->orderBy('name')
             ->orderBy('id')
             ->paginate(25)
@@ -28,18 +36,45 @@ class CustomerController extends Controller
 
         return Inertia::render('Administration/Customers/Index', [
             'customers' => $customers,
+            'filters' => ['q' => $filters['q'] ?? null],
         ]);
     }
 
     /**
      * Display a customer account record.
      */
-    public function show(User $customer): Response
+    public function show(User $customer, Request $request): Response
     {
         $this->authorize('view', $customer);
 
+        $status = $request->query('status') === 'all' ? 'all' : 'completed';
+        $orders = $customer->orders()
+            ->with(['items.product:id,name', 'sale'])
+            ->when($status === 'completed', fn ($query) => $query->where('status', OrderStatus::Completed->value))
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->paginate(10)
+            ->withQueryString()
+            ->through(fn (Order $order): array => [
+                'id' => $order->id,
+                'reference' => $order->reference,
+                'created_at' => $order->created_at->toIso8601String(),
+                'status' => $order->status->value,
+                'payment_status' => $order->payment_status->value,
+                'product_subtotal' => $order->product_subtotal,
+                'delivery_fee' => $order->delivery_fee,
+                'total_amount' => $order->total_amount,
+                'items' => $order->items->map(fn (OrderItem $item): array => [
+                    'name' => $item->product->name,
+                    'quantity' => $item->quantity,
+                    'price_at_time' => $item->price_at_time,
+                ])->all(),
+            ]);
+
         return Inertia::render('Administration/Customers/Show', [
             'customer' => $this->customerData($customer),
+            'orders' => $orders,
+            'order_status_filter' => $status,
         ]);
     }
 

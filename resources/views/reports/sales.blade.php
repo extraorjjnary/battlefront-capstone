@@ -37,6 +37,7 @@
 @php
     $currency = static fn (string|float|int $amount): string => '₱'.number_format((float) $amount, 2, '.', ',');
     $isFiltered = $filters['product_id'] !== null || $filters['category_id'] !== null;
+    $canViewProfitability = array_key_exists('gross_profit', $kpis);
 @endphp
 <main>
     <header>
@@ -50,7 +51,7 @@
     </header>
 
     <table class="summary" aria-label="Sales summary">
-        <thead><tr><th>Total sales</th><th>Total revenue</th><th>Average order value</th><th>Items sold</th></tr></thead>
+        <thead><tr><th>Completed orders</th><th>Product sales revenue</th><th>Average order value</th><th>Items sold</th></tr></thead>
         <tbody><tr>
             <td>{{ number_format($kpis['total_sales']) }}</td>
             <td>{{ $currency($kpis['total_revenue']) }}</td>
@@ -59,6 +60,28 @@
         </tr></tbody>
     </table>
     <p class="note">Revenue and average order value reflect product sales only and exclude third-party delivery charges. {{ $isFiltered ? 'The selected filters use purchase-time item revenue.' : 'Product revenue uses saved purchase-time order and item subtotals.' }}</p>
+
+    @if (array_key_exists('gross_profit', $kpis))
+        <h2>Profitability</h2>
+        <table aria-label="Profitability summary">
+            <thead><tr><th>Sales returns</th><th>Net product sales</th><th>Cost of goods sold</th><th>Gross profit</th><th>Gross margin</th></tr></thead>
+            <tbody><tr>
+                <td>{{ $currency($kpis['sales_returns']) }}</td>
+                <td>{{ $currency($kpis['net_sales']) }}</td>
+                <td>{{ $currency($kpis['cost_of_goods_sold']) }}</td>
+                <td>{{ $kpis['cost_data_complete'] ? $currency($kpis['gross_profit']) : 'Unavailable' }}</td>
+                <td>{{ $kpis['gross_margin'] === null ? '—' : $kpis['gross_margin'].'%' }}</td>
+            </tr></tbody>
+        </table>
+        <p class="note">Gross profit subtracts cost of goods sold from net product sales. Product and category gross profit below is before returns.</p>
+    @endif
+
+    <h2>Refund payments and outstanding balances</h2>
+    <p class="note">Refund payments use payment dates. Gross less refunds is a period measure, not profit. Outstanding balances include approvals and payments through {{ $refundMeasures['cutoff'] }}.</p>
+    <table aria-label="Refund summary">
+        <thead><tr><th>Gross item sales</th><th>Refunds paid in period</th><th>Gross less refunds</th><th>Outstanding approved refunds</th></tr></thead>
+        <tbody><tr><td>{{ $currency($refundMeasures['gross_item_sales']) }}</td><td>{{ $currency($refundMeasures['refund_payments']) }}</td><td>{{ $currency($refundMeasures['gross_less_refunds']) }}</td><td>{{ $currency($refundMeasures['outstanding_at_cutoff']) }}</td></tr></tbody>
+    </table>
 
     @if ($kpis['total_sales'] === 0)
         <p class="empty">No recorded sales match these filters.</p>
@@ -77,10 +100,10 @@
 
     <h2>Category sales breakdown</h2>
     <table aria-label="Category sales breakdown">
-        <thead><tr><th style="width: 45%">Current category</th><th class="number" style="width: 12%">Sales</th><th class="number" style="width: 13%">Units sold</th><th class="number" style="width: 30%">Item revenue (PHP)</th></tr></thead>
+        <thead><tr><th>Current category</th><th class="number">Sales</th><th class="number">Units sold</th><th class="number">Item revenue (PHP)</th>@if ($canViewProfitability)<th class="number">Cost (PHP)</th><th class="number">Gross profit before returns</th><th class="number">Margin</th>@endif</tr></thead>
         <tbody>
         @forelse ($categories as $category)
-            <tr><td style="width: 45%">{{ $category['name'] }}</td><td class="number" style="width: 12%">{{ number_format($category['sales_count']) }}</td><td class="number" style="width: 13%">{{ number_format($category['quantity_sold']) }}</td><td class="number" style="width: 30%">{{ $currency($category['item_revenue']) }}</td></tr>
+            <tr><td>{{ $category['name'] }}</td><td class="number">{{ number_format($category['sales_count']) }}</td><td class="number">{{ number_format($category['quantity_sold']) }}</td><td class="number">{{ $currency($category['item_revenue']) }}</td>@if (array_key_exists('cost_of_goods_sold', $category))<td class="number">{{ $currency($category['cost_of_goods_sold']) }}</td><td class="number">{{ $category['gross_profit_before_returns'] === null ? 'Unavailable' : $currency($category['gross_profit_before_returns']) }}</td><td class="number">{{ $category['gross_margin_before_returns'] === null ? '—' : $category['gross_margin_before_returns'].'%' }}</td>@endif</tr>
         @empty
             <tr><td colspan="4">No category sales to report.</td></tr>
         @endforelse
@@ -89,10 +112,10 @@
 
     <h2 @class(['product-report' => $kpis['total_items_sold'] > 0])>Product sales breakdown</h2>
     <table aria-label="Product sales breakdown">
-        <thead><tr><th class="product-name">Product</th><th class="category-name">Current category</th><th class="number sales-count">Sales</th><th class="number quantity">Units<br>sold</th><th class="number revenue">Item revenue (PHP)</th></tr></thead>
+        <thead><tr><th class="product-name">Product</th><th class="category-name">Current category</th><th class="number sales-count">Sales</th><th class="number quantity">Units<br>sold</th><th class="number revenue">Item revenue (PHP)</th>@if ($canViewProfitability)<th class="number">Cost (PHP)</th><th class="number">Gross profit before returns</th><th class="number">Margin</th>@endif</tr></thead>
         <tbody>
         @forelse ($products as $product)
-            <tr><td class="product-name">{{ $product['name'] }}</td><td class="category-name">{{ $product['category'] }}</td><td class="number sales-count">{{ number_format($product['sales_count']) }}</td><td class="number quantity">{{ number_format($product['quantity_sold']) }}</td><td class="number revenue">{{ $currency($product['item_revenue']) }}</td></tr>
+            <tr><td class="product-name">{{ $product['name'] }}</td><td class="category-name">{{ $product['category'] }}</td><td class="number sales-count">{{ number_format($product['sales_count']) }}</td><td class="number quantity">{{ number_format($product['quantity_sold']) }}</td><td class="number revenue">{{ $currency($product['item_revenue']) }}</td>@if (array_key_exists('cost_of_goods_sold', $product))<td class="number">{{ $currency($product['cost_of_goods_sold']) }}</td><td class="number">{{ $product['gross_profit_before_returns'] === null ? 'Unavailable' : $currency($product['gross_profit_before_returns']) }}</td><td class="number">{{ $product['gross_margin_before_returns'] === null ? '—' : $product['gross_margin_before_returns'].'%' }}</td>@endif</tr>
         @empty
             <tr><td colspan="5">No product sales to report.</td></tr>
         @endforelse

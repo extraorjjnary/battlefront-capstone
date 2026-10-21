@@ -1,6 +1,5 @@
 <script setup>
-import PageHeader from '@/components/PageHeader.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import {
     ArrowLeft,
     BadgeCheck,
@@ -10,12 +9,15 @@ import {
     ExternalLink,
     MapPin,
     PackageCheck,
+    ReceiptText,
     ShieldCheck,
     Truck,
     UserRound,
 } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import OrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
+import OrderHandlerController from '@/actions/App/Http/Controllers/Administration/OrderHandlerController';
+import CustomerReturnController from '@/actions/App/Http/Controllers/Administration/CustomerReturnController';
 import OrderPaymentProofController from '@/actions/App/Http/Controllers/Administration/OrderPaymentProofController';
 import OrderPaymentStatusController from '@/actions/App/Http/Controllers/Administration/OrderPaymentStatusController';
 import OrderManualShipmentController from '@/actions/App/Http/Controllers/Administration/OrderManualShipmentController';
@@ -38,6 +40,7 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { formatDateTime } from '@/lib/dateTime';
 import {
     Select,
     SelectContent,
@@ -54,7 +57,12 @@ import { store as confirmPickup } from '@/routes/administration/orders/pickup-co
 
 const props = defineProps({
     order: { type: Object, required: true },
+    handler_options: { type: Array, default: () => [] },
 });
+
+const handlerForm = useForm({ handler_id: props.order.assigned_handler_id ?? '' });
+const claimForm = useForm({});
+const page = usePage();
 
 const selectedOrderStatus = ref('');
 const orderConfirmationOpen = ref(false);
@@ -150,10 +158,7 @@ function submitCodCollection() {
 }
 
 function requestPickupConfirmation() {
-    if (
-        !props.order.payment.can_confirm_pickup ||
-        pickupConfirmationForm.processing
-    ) {
+    if (!props.order.payment.can_confirm_pickup || pickupConfirmationForm.processing) {
         return;
     }
     pickupConfirmationForm.reset();
@@ -178,11 +183,6 @@ function submitPickupConfirmation() {
         },
     });
 }
-
-const dateFormatter = new Intl.DateTimeFormat('en-PH', {
-    dateStyle: 'long',
-    timeStyle: 'short',
-});
 
 function selectOrderStatus(status) {
     selectedOrderStatus.value = status;
@@ -260,10 +260,7 @@ function submitShipmentReference() {
 }
 
 function requestManualShipment() {
-    if (
-        !props.order.can_create_manual_shipment ||
-        manualShipmentForm.processing
-    ) {
+    if (!props.order.can_create_manual_shipment || manualShipmentForm.processing) {
         return;
     }
 
@@ -349,39 +346,88 @@ defineOptions({
 </script>
 
 <template>
+    <Head :title="order.reference" />
+
     <main
-        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
+        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
     >
-        <Head :title="order.reference" />
-        <PageHeader :title="order.reference">
-            <template #metadata>
-                <Badge
-                    variant="outline"
-                    :class="orderStatusBadgeClass(order.status.value)"
-                >
-                    {{ order.status.label }}
-                </Badge>
-                <span
-                    >Placed
-                    {{ dateFormatter.format(new Date(order.created_at)) }}</span
-                >
-            </template>
-            <template #actions>
+        <section class="border-border bg-card relative overflow-hidden border">
+            <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
+            <div
+                class="flex flex-col gap-5 p-6 sm:flex-row sm:items-start sm:justify-between"
+            >
+                <div class="flex min-w-0 items-start gap-4">
+                    <span
+                        class="bg-secondary text-primary flex size-11 shrink-0 items-center justify-center rounded-md"
+                    >
+                        <ReceiptText class="size-5" />
+                    </span>
+                    <div>
+                        <p
+                            class="text-primary text-xs font-semibold tracking-widest uppercase"
+                        >
+                            Administrator order record
+                        </p>
+                        <div class="mt-2 flex flex-wrap items-center gap-3">
+                            <h1
+                                class="text-2xl font-bold tracking-tight tabular-nums sm:text-3xl"
+                            >
+                                {{ order.reference }}
+                            </h1>
+                            <Badge
+                                variant="outline"
+                                :class="
+                                    orderStatusBadgeClass(order.status.value)
+                                "
+                            >
+                                {{ order.status.label }}
+                            </Badge>
+                        </div>
+                        <p class="text-muted-foreground mt-2 text-sm">
+                            Placed
+                            {{
+                                formatDateTime(order.created_at, 'long')
+                            }}
+                        </p>
+                    </div>
+                </div>
                 <Button variant="outline" size="sm" as-child>
                     <Link :href="OrderController.index()">
                         <ArrowLeft />
                         Back to orders
                     </Link>
                 </Button>
-            </template>
-        </PageHeader>
+            </div>
+        </section>
+
+        <section class="border-border bg-card flex flex-wrap items-end gap-4 border p-5">
+            <div class="min-w-48 flex-1">
+                <p class="font-semibold">Assigned sales handler</p>
+                <p class="text-muted-foreground mt-1 text-sm">{{ order.assigned_handler_name ?? 'Unassigned' }}</p>
+                <p v-if="order.handler_required && !order.assigned_handler_id" class="text-destructive mt-1 text-xs">Assign a handler before completing this order.</p>
+            </div>
+            <form v-if="page.props.auth.can?.processOrders && !order.assigned_handler_id && !['completed', 'cancelled'].includes(order.status.value)" @submit.prevent="claimForm.post(OrderHandlerController.claim(order.id))">
+                <Button type="submit" variant="outline" :disabled="claimForm.processing">Claim order</Button>
+            </form>
+            <form v-if="handler_options.length && page.props.auth.can?.assignOrders" class="flex items-end gap-2" @submit.prevent="handlerForm.patch(OrderHandlerController.assign(order.id))">
+                <div>
+                    <Label for="assigned-handler">Assign handler</Label>
+                    <select id="assigned-handler" v-model="handlerForm.handler_id" class="border-input bg-background mt-1 block h-9 min-w-44 border px-2 text-sm">
+                        <option value="">Select staff</option>
+                        <option v-for="handler in handler_options" :key="handler.id" :value="handler.id">{{ handler.name }}</option>
+                    </select>
+                </div>
+                <Button type="submit" :disabled="!handlerForm.handler_id || handlerForm.processing">Assign</Button>
+            </form>
+            <Link v-if="order.status.value === 'completed'" :href="CustomerReturnController.index({ query: { order_id: order.id } })" class="text-primary text-sm underline">Record return</Link>
+        </section>
 
         <div
             class="grid gap-8 xl:grid-cols-[minmax(0,1.6fr)_minmax(20rem,0.8fr)]"
         >
             <div class="flex min-w-0 flex-col gap-8">
                 <ShipmentTracking
-                    v-if="order.shipment"
+                    v-if="order.shipment && page.props.auth.can?.processOrders"
                     :shipment="order.shipment"
                     :quote="order.delivery_quote"
                 />
@@ -390,21 +436,24 @@ defineOptions({
                         order.delivery_quote?.pricing_configured === false &&
                         !order.shipment
                     "
-                    class="border-border grid gap-2 border-l-2 pl-3 text-sm"
+                    class="border-border bg-secondary/40 grid gap-3 border p-5 text-sm"
                     role="status"
                 >
                     <p class="font-semibold">No configured delivery rate</p>
                     <p class="text-muted-foreground leading-6">
-                        Product subtotal only; no delivery fee, LBC quote,
-                        booking, or estimate. Arrange delivery separately.
-                        Manual shipment setup does not change the saved total or
-                        add a fee.
+                        This order remains at its saved product subtotal with
+                        no delivery fee. No LBC quote, booking, or estimate is
+                        implied. Recording a manually arranged LBC shipment
+                        will not change the saved order amount or add a fee.
                     </p>
                     <p class="text-muted-foreground text-xs leading-5">
                         {{ order.delivery_quote.assumption_label }}
                     </p>
-                    <div v-if="order.can_create_manual_shipment">
-                        <Button type="button" @click="requestManualShipment">
+                    <div v-if="order.can_create_manual_shipment && page.props.auth.can?.processOrders">
+                        <Button
+                            type="button"
+                            @click="requestManualShipment"
+                        >
                             <Truck />
                             Create Manual Shipment
                         </Button>
@@ -426,13 +475,8 @@ defineOptions({
                                             Carrier
                                         </Label>
                                         <Select
-                                            :model-value="
-                                                manualShipmentForm.carrier
-                                            "
-                                            @update:model-value="
-                                                manualShipmentForm.carrier =
-                                                    $event
-                                            "
+                                            :model-value="manualShipmentForm.carrier"
+                                            @update:model-value="manualShipmentForm.carrier = $event"
                                         >
                                             <SelectTrigger
                                                 id="manual-shipment-carrier"
@@ -449,10 +493,7 @@ defineOptions({
                                             </SelectContent>
                                         </Select>
                                         <InputError
-                                            :message="
-                                                manualShipmentForm.errors
-                                                    .carrier
-                                            "
+                                            :message="manualShipmentForm.errors.carrier"
                                         />
                                     </div>
                                     <div class="grid gap-2">
@@ -461,17 +502,12 @@ defineOptions({
                                         </Label>
                                         <Input
                                             id="manual-tracking-reference"
-                                            v-model="
-                                                manualShipmentForm.tracking_reference
-                                            "
+                                            v-model="manualShipmentForm.tracking_reference"
                                             maxlength="255"
                                             placeholder="Enter only a reference actually supplied by LBC"
                                         />
                                         <InputError
-                                            :message="
-                                                manualShipmentForm.errors
-                                                    .tracking_reference
-                                            "
+                                            :message="manualShipmentForm.errors.tracking_reference"
                                         />
                                     </div>
                                     <fieldset class="grid gap-2">
@@ -479,9 +515,7 @@ defineOptions({
                                             Estimated delivery from preparation
                                             (optional)
                                         </legend>
-                                        <p
-                                            class="text-muted-foreground text-xs leading-5"
-                                        >
+                                        <p class="text-muted-foreground text-xs leading-5">
                                             Enter both day values only when an
                                             estimate is available. Leave both
                                             blank if no estimate has been
@@ -494,19 +528,14 @@ defineOptions({
                                                 </Label>
                                                 <Input
                                                     id="manual-eta-min"
-                                                    v-model="
-                                                        manualShipmentForm.eta_min_days
-                                                    "
+                                                    v-model="manualShipmentForm.eta_min_days"
                                                     type="number"
                                                     min="0"
                                                     max="3650"
                                                     step="1"
                                                 />
                                                 <InputError
-                                                    :message="
-                                                        manualShipmentForm
-                                                            .errors.eta_min_days
-                                                    "
+                                                    :message="manualShipmentForm.errors.eta_min_days"
                                                 />
                                             </div>
                                             <div class="grid gap-2">
@@ -515,19 +544,14 @@ defineOptions({
                                                 </Label>
                                                 <Input
                                                     id="manual-eta-max"
-                                                    v-model="
-                                                        manualShipmentForm.eta_max_days
-                                                    "
+                                                    v-model="manualShipmentForm.eta_max_days"
                                                     type="number"
                                                     min="0"
                                                     max="3650"
                                                     step="1"
                                                 />
                                                 <InputError
-                                                    :message="
-                                                        manualShipmentForm
-                                                            .errors.eta_max_days
-                                                    "
+                                                    :message="manualShipmentForm.errors.eta_max_days"
                                                 />
                                             </div>
                                         </div>
@@ -536,31 +560,30 @@ defineOptions({
                                         <div class="flex items-start gap-3">
                                             <Checkbox
                                                 id="manual-arrangement-confirmed"
-                                                v-model="
-                                                    manualShipmentForm.arrangement_confirmed
-                                                "
+                                                v-model="manualShipmentForm.arrangement_confirmed"
                                             />
                                             <Label
                                                 for="manual-arrangement-confirmed"
                                                 class="text-sm leading-5 font-normal"
                                             >
-                                                I confirm LBC accepted this
-                                                arrangement. No fee is added; an
-                                                estimate applies only if entered
-                                                above.
+                                                I confirm LBC has accepted this
+                                                delivery arrangement. I
+                                                understand no delivery fee or
+                                                estimate is added unless
+                                                explicitly entered above.
                                             </Label>
                                         </div>
                                         <InputError
-                                            :message="
-                                                manualShipmentForm.errors
-                                                    .arrangement_confirmed
-                                            "
+                                            :message="manualShipmentForm.errors.arrangement_confirmed"
                                         />
                                     </div>
                                 </div>
                                 <DialogFooter>
                                     <DialogClose as-child>
-                                        <Button type="button" variant="outline">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                        >
                                             Keep unconfigured
                                         </Button>
                                     </DialogClose>
@@ -590,7 +613,7 @@ defineOptions({
                 <section aria-labelledby="processing-details-heading">
                     <div class="mb-4">
                         <p class="text-muted-foreground text-sm">
-                            Order snapshot
+                            Order details at purchase
                         </p>
                         <h2
                             id="processing-details-heading"
@@ -601,12 +624,12 @@ defineOptions({
                     </div>
 
                     <div
-                        class="surface-panel border-border bg-card divide-border divide-y border"
+                        class="border-border bg-card divide-border divide-y border"
                     >
                         <div class="grid md:grid-cols-2 md:divide-x">
                             <div class="flex gap-3 p-5">
                                 <UserRound
-                                    class="text-primary-ink mt-0.5 size-5 shrink-0"
+                                    class="text-primary mt-0.5 size-5 shrink-0"
                                 />
                                 <div class="min-w-0">
                                     <p class="text-muted-foreground text-sm">
@@ -624,7 +647,7 @@ defineOptions({
                             </div>
                             <div class="flex gap-3 p-5">
                                 <Truck
-                                    class="text-primary-ink mt-0.5 size-5 shrink-0"
+                                    class="text-primary mt-0.5 size-5 shrink-0"
                                 />
                                 <div>
                                     <p class="text-muted-foreground text-sm">
@@ -639,11 +662,11 @@ defineOptions({
                         <div class="grid md:grid-cols-2 md:divide-x">
                             <div class="flex gap-3 p-5">
                                 <PackageCheck
-                                    class="text-primary-ink mt-0.5 size-5 shrink-0"
+                                    class="text-primary mt-0.5 size-5 shrink-0"
                                 />
                                 <div>
                                     <p class="text-muted-foreground text-sm">
-                                        Recipient snapshot
+                                        Recipient details at purchase
                                     </p>
                                     <p class="mt-1 font-medium">
                                         {{ order.recipient.name }}
@@ -655,7 +678,7 @@ defineOptions({
                             </div>
                             <div class="flex gap-3 p-5">
                                 <MapPin
-                                    class="text-primary-ink mt-0.5 size-5 shrink-0"
+                                    class="text-primary mt-0.5 size-5 shrink-0"
                                 />
                                 <div>
                                     <p class="text-muted-foreground text-sm">
@@ -741,7 +764,7 @@ defineOptions({
                     </div>
 
                     <div
-                        class="surface-panel border-border bg-card divide-border divide-y border"
+                        class="border-border bg-card divide-border divide-y border"
                     >
                         <article
                             v-for="item in order.items"
@@ -779,13 +802,18 @@ defineOptions({
                             </p>
                         </article>
                     </div>
+                    <dl v-if="order.profitability" class="border-border mt-4 grid gap-3 border p-4 sm:grid-cols-3">
+                        <div><dt class="text-muted-foreground text-sm">Cost of goods sold</dt><dd class="mt-1 font-semibold tabular-nums">{{ formatCurrency(order.profitability.cost_of_goods_sold) }}</dd></div>
+                        <div><dt class="text-muted-foreground text-sm">Sales returns</dt><dd class="mt-1 font-semibold tabular-nums">{{ formatCurrency(order.profitability.sales_returns) }}</dd></div>
+                        <div><dt class="text-muted-foreground text-sm">Gross profit</dt><dd class="mt-1 font-semibold tabular-nums">{{ order.profitability.available ? formatCurrency(order.profitability.gross_profit) : 'Unavailable' }}</dd></div>
+                    </dl>
                 </section>
             </div>
 
             <aside class="flex flex-col gap-6" aria-label="Order actions">
                 <section
                     v-if="order.shipment"
-                    class="surface-panel border-border bg-card grid gap-4 border p-5"
+                    class="border-border bg-card grid gap-4 border p-5"
                     aria-label="Shipment actions"
                 >
                     <h2 class="font-semibold">Manual shipment actions</h2>
@@ -892,11 +920,13 @@ defineOptions({
                                     {{ order.reference }}
                                     delivered?</DialogTitle
                                 >
-                                <DialogDescription>{{
-                                    order.payment.method.value === 'cod'
-                                        ? 'Confirm the delivery has finished. Payment remains Pending and the order remains Processing until COD collection is manually confirmed. No sale is recorded yet.'
-                                        : 'Confirm the delivery has finished. This completes the order and records its sale.'
-                                }}</DialogDescription>
+                                <DialogDescription
+                                    >{{
+                                        order.payment.method.value === 'cod'
+                                            ? 'Confirm the delivery has finished. Payment remains Pending and the order remains Processing until COD collection is manually confirmed. No sale is recorded yet.'
+                                            : 'Confirm the delivery has finished. This completes the order and records its sale.'
+                                    }}</DialogDescription
+                                >
                             </DialogHeader>
                             <DialogFooter>
                                 <DialogClose as-child
@@ -918,10 +948,10 @@ defineOptions({
                         </DialogContent>
                     </Dialog>
                 </section>
-                <section class="surface-panel border-border bg-card border p-5">
+                <section class="border-border bg-card border p-5">
                     <div class="flex items-start gap-3">
                         <ShieldCheck
-                            class="text-primary-ink mt-0.5 size-5 shrink-0"
+                            class="text-primary mt-0.5 size-5 shrink-0"
                         />
                         <div>
                             <p class="text-muted-foreground text-sm">
@@ -945,7 +975,7 @@ defineOptions({
                         {{ order.cancellation_blocked_reason }}
                     </p>
                     <div
-                        v-if="order.allowed_status_transitions.length"
+                        v-if="page.props.auth.can?.processOrders && order.allowed_status_transitions.length"
                         class="border-border mt-5 grid gap-4 border-t pt-5"
                     >
                         <div class="grid gap-2">
@@ -1025,15 +1055,12 @@ defineOptions({
                             This order is in a terminal state and cannot be
                             changed.
                         </template>
-                        <template
-                            v-else-if="order.payment.can_confirm_cod_collection"
-                        >
+                        <template v-else-if="order.payment.can_confirm_cod_collection">
                             Delivery is recorded. Confirm COD Collection below
                             to complete the order and record its sale.
                         </template>
                         <template v-else-if="order.payment.pay_at_pickup">
-                            Confirm payment and product handover below to
-                            complete pickup.
+                            Confirm payment and product handover below to complete pickup.
                         </template>
                         <template v-else>
                             Continue delivery using the shipment milestones
@@ -1063,8 +1090,8 @@ defineOptions({
                                 <p class="leading-5 font-medium">
                                     {{
                                         selectedOrderStatus === 'completed'
-                                            ? 'Completing this order cannot be undone.'
-                                            : 'Cancelling this order cannot be undone.'
+                                            ? 'Completed is a terminal order status and cannot be undone.'
+                                            : 'Cancelled is a terminal order status and cannot be undone.'
                                     }}
                                 </p>
                             </div>
@@ -1087,8 +1114,8 @@ defineOptions({
                                     "
                                     :class="
                                         selectedOrderStatus === 'completed'
-                                            ? 'bg-success-action text-success-action-foreground hover:bg-success-action/90 focus-visible:ring-success-action'
-                                            : 'bg-destructive-action text-destructive-action-foreground hover:bg-destructive-action/90 focus-visible:ring-destructive'
+                                            ? 'bg-emerald-600 text-white hover:bg-emerald-700 focus-visible:ring-emerald-500/40 dark:bg-emerald-600 dark:hover:bg-emerald-500'
+                                            : 'bg-red-700 text-white hover:bg-red-800 focus-visible:ring-red-600/40 dark:bg-red-700 dark:hover:bg-red-600'
                                     "
                                     :disabled="orderStatusForm.processing"
                                     @click="submitOrderStatus"
@@ -1103,11 +1130,9 @@ defineOptions({
                     </Dialog>
                 </section>
 
-                <section class="surface-panel border-border bg-card border p-5">
+                <section class="border-border bg-card border p-5">
                     <div class="flex items-start gap-3">
-                        <Banknote
-                            class="text-primary-ink mt-0.5 size-5 shrink-0"
-                        />
+                        <Banknote class="text-primary mt-0.5 size-5 shrink-0" />
                         <div>
                             <p class="text-muted-foreground text-sm">
                                 Payment method
@@ -1187,32 +1212,21 @@ defineOptions({
                     </div>
 
                     <div
-                        v-if="
-                            order.payment.pay_at_pickup &&
-                            !['completed', 'cancelled'].includes(
-                                order.status.value,
-                            )
-                        "
+                        v-if="page.props.auth.can?.processOrders && order.payment.pay_at_pickup && !['completed', 'cancelled'].includes(order.status.value)"
                         class="border-border mt-5 grid gap-4 border-t pt-5"
                     >
-                        <p class="font-semibold">
-                            Payment and pickup confirmation
-                        </p>
+                        <p class="font-semibold">Payment and pickup confirmation</p>
                         <p class="text-muted-foreground text-sm leading-6">
                             {{ order.payment.method.description }}
-                            Move to Processing to prepare pickup. Confirm
-                            payment and product handover together to complete
-                            the order and record its sale.
+                            Move the order to Processing to prepare it. Confirm payment
+                            and product handover together when the customer collects it.
+                            This completes pickup and records the sale once.
                         </p>
-                        <p
-                            v-if="order.payment.status.value === 'verified'"
-                            class="text-muted-foreground text-sm"
-                        >
-                            Payment is already verified. Confirm product
-                            handover to complete pickup.
+                        <p v-if="order.payment.status.value === 'verified'" class="text-muted-foreground text-sm">
+                            Payment is already verified. Confirm product handover to complete pickup.
                         </p>
                         <Button
-                            v-if="order.payment.can_confirm_pickup"
+                        v-if="page.props.auth.can?.processOrders && order.payment.can_confirm_pickup"
                             type="button"
                             class="w-full whitespace-normal"
                             :disabled="pickupConfirmationForm.processing"
@@ -1221,104 +1235,47 @@ defineOptions({
                             Confirm Payment &amp; Complete Pickup
                         </Button>
                         <p v-else class="text-muted-foreground text-sm">
-                            Confirmation requires an eligible Processing pickup
-                            order.
+                            Confirmation requires an eligible Processing pickup order.
                         </p>
-                        <InputError
-                            :message="
-                                pickupConfirmationForm.errors
-                                    .payment_received_confirmed
-                            "
-                        />
-                        <InputError
-                            :message="
-                                pickupConfirmationForm.errors
-                                    .products_handed_over_confirmed
-                            "
-                        />
+                        <InputError :message="pickupConfirmationForm.errors.payment_received_confirmed" />
+                        <InputError :message="pickupConfirmationForm.errors.products_handed_over_confirmed" />
                         <Dialog v-model:open="pickupConfirmationOpen">
                             <DialogContent>
                                 <DialogHeader>
-                                    <DialogTitle
-                                        >Confirm Payment &amp; Complete
-                                        Pickup</DialogTitle
-                                    >
+                                    <DialogTitle>Confirm Payment &amp; Complete Pickup</DialogTitle>
                                     <DialogDescription>
-                                        Confirm payment of
-                                        {{ formatCurrency(order.total) }} and
-                                        product handover for
-                                        {{ order.reference }}. This verifies
-                                        payment, completes pickup, and records
-                                        its sale.
+                                        Confirm payment of {{ formatCurrency(order.total) }} and
+                                        product handover for {{ order.reference }}. This verifies
+                                        payment, completes pickup, and records its sale.
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div class="flex items-start gap-3">
-                                    <Checkbox
-                                        id="pickup-payment-confirmed"
-                                        v-model="
-                                            pickupConfirmationForm.payment_received_confirmed
-                                        "
-                                    />
-                                    <Label
-                                        for="pickup-payment-confirmed"
-                                        class="text-sm leading-5 font-normal"
-                                    >
-                                        {{
-                                            order.payment.method.value ===
-                                            'cash'
-                                                ? 'I confirm that the full cash payment was received.'
-                                                : 'I confirm that the physical debit/credit card terminal transaction succeeded for the full amount.'
-                                        }}
+                                    <Checkbox id="pickup-payment-confirmed" v-model="pickupConfirmationForm.payment_received_confirmed" />
+                                    <Label for="pickup-payment-confirmed" class="text-sm leading-5 font-normal">
+                                        {{ order.payment.method.value === 'cash'
+                                            ? 'I confirm that the full cash payment was received.'
+                                            : 'I confirm that the physical debit/credit card terminal transaction succeeded for the full amount.' }}
                                     </Label>
                                 </div>
                                 <div class="flex items-start gap-3">
-                                    <Checkbox
-                                        id="pickup-handover-confirmed"
-                                        v-model="
-                                            pickupConfirmationForm.products_handed_over_confirmed
-                                        "
-                                    />
-                                    <Label
-                                        for="pickup-handover-confirmed"
-                                        class="text-sm leading-5 font-normal"
-                                    >
-                                        I confirm that the products were handed
-                                        over to the customer.
+                                    <Checkbox id="pickup-handover-confirmed" v-model="pickupConfirmationForm.products_handed_over_confirmed" />
+                                    <Label for="pickup-handover-confirmed" class="text-sm leading-5 font-normal">
+                                        I confirm that the products were handed over to the customer.
                                     </Label>
                                 </div>
-                                <InputError
-                                    :message="
-                                        pickupConfirmationForm.errors
-                                            .payment_received_confirmed
-                                    "
-                                />
-                                <InputError
-                                    :message="
-                                        pickupConfirmationForm.errors
-                                            .products_handed_over_confirmed
-                                    "
-                                />
+                                <InputError :message="pickupConfirmationForm.errors.payment_received_confirmed" />
+                                <InputError :message="pickupConfirmationForm.errors.products_handed_over_confirmed" />
                                 <DialogFooter>
                                     <DialogClose as-child>
-                                        <Button type="button" variant="outline"
-                                            >Keep preparing pickup</Button
-                                        >
+                                        <Button type="button" variant="outline">Keep preparing pickup</Button>
                                     </DialogClose>
                                     <Button
                                         type="button"
                                         class="whitespace-normal"
-                                        :disabled="
-                                            !pickupConfirmationForm.payment_received_confirmed ||
-                                            !pickupConfirmationForm.products_handed_over_confirmed ||
-                                            pickupConfirmationForm.processing
-                                        "
+                                        :disabled="!pickupConfirmationForm.payment_received_confirmed || !pickupConfirmationForm.products_handed_over_confirmed || pickupConfirmationForm.processing"
                                         @click="submitPickupConfirmation"
                                     >
-                                        <Spinner
-                                            v-if="
-                                                pickupConfirmationForm.processing
-                                            "
-                                        />
+                                        <Spinner v-if="pickupConfirmationForm.processing" />
                                         Confirm Payment &amp; Complete Pickup
                                     </Button>
                                 </DialogFooter>
@@ -1327,6 +1284,7 @@ defineOptions({
                     </div>
                     <div
                         v-else-if="
+                            page.props.auth.can?.processOrders &&
                             order.payment.method.value === 'cod' &&
                             order.payment.status.value === 'pending' &&
                             order.status.value !== 'cancelled'
@@ -1335,13 +1293,14 @@ defineOptions({
                     >
                         <p class="font-semibold">COD — Awaiting Collection</p>
                         <p class="text-muted-foreground text-sm leading-6">
-                            Delivered does not verify payment or record a sale.
-                            Confirm collection only after checking that LBC
-                            collected the full COD amount of
-                            {{ formatCurrency(order.total) }}.
+                            Payment is collected upon delivery. Marking the
+                            shipment Delivered does not verify payment or
+                            record a sale. Confirm collection only after
+                            manually verifying that LBC collected the total COD
+                            amount of {{ formatCurrency(order.total) }}.
                         </p>
                         <Button
-                            v-if="order.payment.can_confirm_cod_collection"
+                        v-if="page.props.auth.can?.processOrders && order.payment.can_confirm_cod_collection"
                             type="button"
                             :disabled="codCollectionForm.processing"
                             @click="requestCodConfirmation"
@@ -1353,9 +1312,7 @@ defineOptions({
                             shipment reaches Delivered.
                         </p>
                         <p class="text-muted-foreground text-xs leading-5">
-                            Handle failed delivery, unpaid orders, and returns
-                            manually. No automatic cancellation, refund, return,
-                            or stock restoration; no live LBC settlement check.
+                            Handle failed delivery, unpaid orders, and returns manually. No automatic cancellation, refund, return, or stock restoration occurs. No live LBC settlement is verified.
                         </p>
                         <Dialog v-model:open="codConfirmationOpen">
                             <DialogContent>
@@ -1367,17 +1324,15 @@ defineOptions({
                                     <DialogDescription>
                                         Confirm that you manually verified LBC
                                         collected
-                                        {{ formatCurrency(order.total) }}. This
-                                        verifies payment, completes the order,
-                                        and records its sale.
+                                        {{ formatCurrency(order.total) }}.
+                                        This verifies payment, completes the
+                                        order, and records its sale.
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div class="flex items-start gap-3">
                                     <Checkbox
                                         id="cod-collection-confirmed"
-                                        v-model="
-                                            codCollectionForm.cod_collection_confirmed
-                                        "
+                                        v-model="codCollectionForm.cod_collection_confirmed"
                                     />
                                     <Label
                                         for="cod-collection-confirmed"
@@ -1388,10 +1343,7 @@ defineOptions({
                                     </Label>
                                 </div>
                                 <InputError
-                                    :message="
-                                        codCollectionForm.errors
-                                            .cod_collection_confirmed
-                                    "
+                                    :message="codCollectionForm.errors.cod_collection_confirmed"
                                 />
                                 <DialogFooter>
                                     <DialogClose as-child>
@@ -1407,9 +1359,7 @@ defineOptions({
                                         "
                                         @click="submitCodCollection"
                                     >
-                                        <Spinner
-                                            v-if="codCollectionForm.processing"
-                                        />
+                                        <Spinner v-if="codCollectionForm.processing" />
                                         Confirm COD Collection
                                     </Button>
                                 </DialogFooter>
@@ -1418,6 +1368,7 @@ defineOptions({
                     </div>
                     <div
                         v-else-if="
+                            page.props.auth.can?.processOrders &&
                             !order.payment.pay_at_pickup &&
                             order.payment.status.value === 'pending' &&
                             order.status.value !== 'cancelled'
@@ -1498,8 +1449,8 @@ defineOptions({
                                     for="manual-verification-confirmed"
                                     class="text-sm leading-5 font-normal"
                                 >
-                                    I checked and confirmed payment in the
-                                    receiving account.
+                                    I manually cross-checked and confirmed this
+                                    payment.
                                 </Label>
                             </div>
                             <InputError
@@ -1691,8 +1642,8 @@ defineOptions({
                                     :class="
                                         paymentStatusForm.payment_status ===
                                         'verified'
-                                            ? 'bg-success-action text-success-action-foreground hover:bg-success-action/90 focus-visible:ring-success-action'
-                                            : 'bg-destructive-action text-destructive-action-foreground hover:bg-destructive-action/90 focus-visible:ring-destructive'
+                                            ? 'bg-emerald-600 text-white hover:bg-emerald-700 focus-visible:ring-emerald-500/40 dark:bg-emerald-600 dark:hover:bg-emerald-500'
+                                            : 'bg-red-700 text-white hover:bg-red-800 focus-visible:ring-red-600/40 dark:bg-red-700 dark:hover:bg-red-600'
                                     "
                                     :disabled="paymentStatusForm.processing"
                                     @click="submitPaymentStatus"

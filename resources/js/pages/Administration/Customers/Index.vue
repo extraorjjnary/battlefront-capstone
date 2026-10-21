@@ -4,19 +4,26 @@ import { Head, Link } from '@inertiajs/vue3';
 import { ArrowRight, UsersRound } from '@lucide/vue';
 import CustomerController from '@/actions/App/Http/Controllers/Administration/CustomerController';
 import CatalogPagination from '@/components/CatalogPagination.vue';
+import SearchField from '@/components/SearchField.vue';
 import UserInfo from '@/components/UserInfo.vue';
 import { Button } from '@/components/ui/button';
+import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
+import { formatTimestampDate } from '@/lib/dateTime';
+import { watch } from 'vue';
 
-defineProps({
+const props = defineProps({
     customers: { type: Object, required: true },
+    filters: { type: Object, required: true },
 });
-
-const dateFormatter = new Intl.DateTimeFormat('en-PH', {
-    dateStyle: 'medium',
+const { search, isSearching, clearSearch } = useDebouncedSearch({
+    initialSearch: props.filters.q,
+    currentSearch: () => props.filters.q,
+    route: CustomerController.index,
 });
+watch(() => props.filters.q, (query) => { search.value = query ?? ''; });
 
 function formatJoinedDate(value) {
-    return value ? dateFormatter.format(new Date(value)) : 'Not available';
+    return value ? formatTimestampDate(value) : 'Not available';
 }
 
 defineOptions({
@@ -50,6 +57,16 @@ defineOptions({
                     Account directory
                 </h2>
             </div>
+
+            <SearchField
+                id="customer-search"
+                v-model="search"
+                class="mb-4 max-w-xl"
+                label="Search customers"
+                placeholder="Name or email"
+                :is-searching="isSearching"
+                @clear="clearSearch"
+            />
 
             <div
                 v-if="customers.data.length === 0"

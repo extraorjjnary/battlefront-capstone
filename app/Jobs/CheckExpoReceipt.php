@@ -41,7 +41,8 @@ class CheckExpoReceipt implements ShouldQueue
         }
 
         if (($delivery->accepted_at ?? $delivery->created_at)->lte(now()->subHours(24))) {
-            $delivery->update(['status' => 'receipt_unavailable', 'error_code' => 'ReceiptExpired']);
+            NotificationPushDelivery::query()->whereKey($delivery->id)->where('status', 'accepted')
+                ->update(['status' => 'receipt_unavailable', 'error_code' => 'ReceiptExpired']);
 
             return;
         }
@@ -52,17 +53,19 @@ class CheckExpoReceipt implements ShouldQueue
             return;
         }
 
-        $delivery->update([
+        $updated = NotificationPushDelivery::query()->whereKey($delivery->id)->where('status', 'accepted')->update([
             'status' => $result['status'] === 'ok' ? 'provider_received' : 'failed',
             'error_code' => $result['error_code'] ?? null,
         ]);
-        if (($result['error_code'] ?? null) === 'DeviceNotRegistered') {
+        if ($updated > 0 && ($result['error_code'] ?? null) === 'DeviceNotRegistered') {
             $devices->deactivate($delivery->device, $delivery->registration_version);
         }
     }
 
     public function failed(?Throwable $exception): void
     {
+        NotificationPushDelivery::query()->whereKey($this->deliveryId)->where('status', 'accepted')
+            ->whereNotNull('ticket_id')->update(['status' => 'receipt_unavailable', 'error_code' => 'ReceiptRetriesExhausted']);
         NotificationFailureReporter::report('receipt_exhausted', (string) $this->deliveryId);
     }
 }

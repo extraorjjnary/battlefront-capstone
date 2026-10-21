@@ -285,6 +285,8 @@ test('administrators receive stable empty dashboard data', function () {
             ->where('dashboard.kpis', [
                 'recorded_revenue' => '0.00',
                 'recorded_sales' => 0,
+                'recorded_gross_profit' => '0.00',
+                'profit_data_complete' => true,
                 'pending_orders' => 0,
                 'processing_orders' => 0,
                 'low_stock_products' => 0,
@@ -339,4 +341,25 @@ test('historical seeding preserves operational dashboard stock warnings', functi
         ->where('low_stock_count', 1)
         ->where('out_of_stock_count', 1));
     expect(Inventory::query()->orderBy('product_id')->get()->toArray())->toBe($stockBefore);
+});
+
+test('administrator dashboard hides metrics and data from ungranted business areas', function () {
+    $manager = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'manager')->value('id'),
+    ]);
+    DB::table('administration_role_permissions')
+        ->where('administration_role_id', $manager->administration_role_id)
+        ->whereIn('administration_permission_id', DB::table('administration_permissions')
+            ->whereIn('code', ['orders.view', 'inventory.view'])->select('id'))
+        ->delete();
+
+    $this->actingAs($manager)->get(route('dashboard'))
+        ->assertInertia(fn (Assert $page) => $page->where('auth.can.viewOrders', false)
+            ->where('auth.can.viewInventory', false)
+            ->loadDeferredProps('dashboard', fn (Assert $page) => $page
+                ->where('dashboard.kpis.pending_orders', null)
+                ->where('dashboard.kpis.low_stock_products', null)
+                ->has('dashboard.recent_orders', 0)
+                ->has('dashboard.needs_attention.payment_orders', 0)
+                ->has('dashboard.needs_attention.low_stock_products', 0)));
 });

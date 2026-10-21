@@ -1,14 +1,18 @@
 <script setup>
-import { Link } from '@inertiajs/vue3';
+import { Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import CategoryController from '@/actions/App/Http/Controllers/Administration/CategoryController';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
 
 const { isCurrentUrl } = useCurrentUrl();
-const items = [
+const page = usePage();
+const items = computed(() => [
     { title: 'Products', href: ProductController.index() },
-    { title: 'Categories', href: CategoryController.index() },
-];
+    ...(page.props.auth?.can?.manageProducts
+        ? [{ title: 'Categories', href: CategoryController.index() }]
+        : []),
+]);
 </script>
 
 <template>

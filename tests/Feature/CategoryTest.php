@@ -11,6 +11,8 @@ test('the category schema follows the approved ERD decisions', function () {
         'name_key',
         'description',
         'is_active',
+        'deleted_at',
+        'deleted_by_id',
     ]);
 });
 

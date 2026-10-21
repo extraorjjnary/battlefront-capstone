@@ -6,17 +6,13 @@ import { ref } from 'vue';
 import CatalogPagination from '@/components/CatalogPagination.vue';
 import { Button } from '@/components/ui/button';
 import { useNotificationNavigation } from '@/composables/useNotificationNavigation';
+import { formatDateTime } from '@/lib/dateTime';
 
 defineProps({ notifications: { type: Object, required: true } });
 const navigation = useNotificationNavigation();
 const { summary, isAdministrator } = navigation;
 const busy = ref(false);
 const error = ref('');
-const dateFormatter = new Intl.DateTimeFormat('en-PH', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-});
-
 function markRead(id = null) {
     error.value = '';
     router.patch(
@@ -109,11 +105,7 @@ function markRead(id = null) {
                                     <time
                                         :datetime="notification.occurred_at"
                                         >{{
-                                            dateFormatter.format(
-                                                new Date(
-                                                    notification.occurred_at,
-                                                ),
-                                            )
+                                            formatDateTime(notification.occurred_at)
                                         }}</time
                                     >
                                 </p>
@@ -125,6 +117,11 @@ function markRead(id = null) {
                                 >
                                     {{ notification.body }}
                                 </p>
+                                <div v-if="notification.decisions?.length" class="mt-3 flex flex-wrap gap-2 text-sm">
+                                    <Link v-for="decision in notification.decisions.filter((entry) => entry.web_url)" :key="`${decision.action}-${decision.subject_id}`" :href="decision.web_url" class="text-primary underline">
+                                        {{ decision.action.replaceAll('.', ' ') }} #{{ decision.subject_id }} · {{ decision.quantity ?? 'Unknown' }} units<span v-if="decision.approved_amount !== null"> · ₱{{ decision.approved_amount }} approved</span>
+                                    </Link>
+                                </div>
                             </div>
                             <Button
                                 v-if="!notification.is_read"

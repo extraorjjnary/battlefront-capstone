@@ -7,6 +7,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 test('profile page is displayed', function () {
     $user = User::factory()->create([
         'default_delivery_address' => '12 Mabini Street, Sagay City',
+        'default_delivery_contact_number' => '+639171234567',
     ]);
 
     $response = $this
@@ -17,6 +18,7 @@ test('profile page is displayed', function () {
         ->component('settings/Profile')
         ->where('canManageDefaultDeliveryAddress', true)
         ->where('defaultDeliveryAddress', '12 Mabini Street, Sagay City')
+        ->where('defaultDeliveryContactNumber', '+639171234567')
         ->where('searchRecommendationsEnabled', true));
 });
 
@@ -53,6 +55,42 @@ test('profile information can be updated', function () {
     expect($user->email)->toBe('test@example.com');
     expect($user->email_verified_at)->toBeNull();
 });
+
+test('customer profile saves and clears a normalized default mobile number independently of its address', function () {
+    $user = User::factory()->customer()->create([
+        'default_delivery_address' => 'Saved address',
+    ]);
+
+    $this->actingAs($user)->patch(route('profile.update'), [
+        'name' => $user->name,
+        'email' => $user->email,
+        'default_delivery_contact_number' => '0917 123 4567',
+    ])->assertSessionHasNoErrors();
+
+    expect($user->refresh()->default_delivery_contact_number)->toBe('+639171234567')
+        ->and($user->default_delivery_address)->toBe('Saved address');
+
+    $this->actingAs($user)->patch(route('profile.update'), [
+        'name' => $user->name,
+        'email' => $user->email,
+        'default_delivery_contact_number' => '',
+    ])->assertSessionHasNoErrors();
+
+    expect($user->refresh()->default_delivery_contact_number)->toBeNull()
+        ->and($user->default_delivery_address)->toBe('Saved address');
+});
+
+test('profile rejects unsupported contact numbers', function (string $number) {
+    $user = User::factory()->customer()->create();
+
+    $this->actingAs($user)->patch(route('profile.update'), [
+        'name' => $user->name,
+        'email' => $user->email,
+        'default_delivery_contact_number' => $number,
+    ])->assertSessionHasErrors(['default_delivery_contact_number']);
+
+    expect($user->refresh()->default_delivery_contact_number)->toBeNull();
+})->with(['landline' => '0347222222', 'invalid prefix' => '08171234567', 'letters' => '0917abc4567']);
 
 test('default delivery address can be saved and updated', function () {
     $user = User::factory()->customer()->create();

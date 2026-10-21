@@ -3,12 +3,29 @@
 use App\Enums\ShippingProfile;
 use App\Models\Category;
 use App\Models\Inventory;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\Tag;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+
+test('new bundle products use the same acquisition cost rate as migrated products', function () {
+    $owner = User::factory()->administrator()->create();
+    $category = Category::factory()->create(['name' => 'Bundles & Packages']);
+
+    $this->actingAs($owner)->post(route('administration.products.store'), [
+        'name' => 'New computer bundle', 'category_id' => $category->id,
+        'price' => '1000.00', 'is_featured' => false,
+    ])->assertSessionHasNoErrors()->assertRedirect();
+
+    $this->assertDatabaseHas('products', [
+        'name' => 'New computer bundle', 'acquisition_cost' => '850.00', 'acquisition_cost_source' => 'category_policy_v1',
+    ]);
+    $this->assertDatabaseHas('audit_logs', ['actor_id' => $owner->id, 'action' => 'product.created']);
+});
 
 test('updated product codes are required and use the safe catalog format', function (mixed $code, string $message) {
     $administrator = User::factory()->administrator()->create();
@@ -16,6 +33,7 @@ test('updated product codes are required and use the safe catalog format', funct
     $product = Product::factory()->for($category)->create(['product_code' => 'UNCHANGED']);
 
     $this->actingAs($administrator)->put(route('administration.products.update', $product), [
+        'edit_version' => $product->edit_version,
         'product_code' => $code, 'name' => 'New product', 'category_id' => $category->id,
         'brand' => 'Brand', 'price' => '100', 'is_featured' => false,
     ])->assertSessionHasErrors(['product_code' => $message]);
@@ -33,7 +51,7 @@ test('updating cannot reuse another products code ignoring case', function (stri
     $administrator = User::factory()->administrator()->create();
     $existing = Product::factory()->create(['product_code' => 'ABC123']);
     $other = Product::factory()->create(['product_code' => 'OTHER']);
-    $payload = ['product_code' => $code, 'name' => 'Product', 'category_id' => $existing->category_id,
+    $payload = ['edit_version' => $other->edit_version, 'product_code' => $code, 'name' => 'Product', 'category_id' => $existing->category_id,
         'brand' => 'Brand', 'price' => '100', 'is_featured' => false];
 
     $this->actingAs($administrator)->put(route('administration.products.update', $other), $payload)
@@ -48,8 +66,10 @@ test('imported codes are visible and protected from changes and forged origin fl
     $product = Product::factory()->create(['product_code' => '000123', 'is_catalog_imported' => true]);
 
     $this->actingAs($administrator)->get(route('administration.products.edit', $product))
-        ->assertInertia(fn (Assert $page) => $page->where('product.product_code', '000123')->where('product.is_catalog_imported', true));
+        ->assertInertia(fn (Assert $page) => $page->where('product.product_code', '000123')->where('product.is_catalog_imported', true)
+            ->where('product.edit_version', $product->edit_version));
     $this->put(route('administration.products.update', $product), [
+        'edit_version' => $product->edit_version,
         'product_code' => 'CHANGED', 'is_catalog_imported' => false,
         'name' => $product->name, 'category_id' => $product->category_id,
         'brand' => $product->brand, 'price' => $product->price, 'is_featured' => false,
@@ -74,6 +94,103 @@ test('administration product and inventory search returns matching product codes
 test('guests are redirected when viewing catalog products', function () {
     $this->get(route('administration.products.index'))
         ->assertRedirect(route('login'));
+});
+
+test('owners can restore a deleted product with its inventory while keeping it inactive', function () {
+    $owner = User::factory()->administrator()->create();
+    $product = Product::factory()->has(Inventory::factory()->state(['quantity' => 0]))->create([
+        'is_active' => true,
+    ]);
+
+    $this->actingAs($owner)->delete(route('administration.products.destroy', $product))
+        ->assertRedirect(route('administration.products.index'));
+
+    expect(Product::query()->find($product->id))->toBeNull();
+    $this->assertDatabaseHas('products', ['id' => $product->id, 'is_active' => false, 'deleted_by_id' => $owner->id]);
+    $this->assertDatabaseHas('inventories', ['product_id' => $product->id, 'quantity' => 0]);
+
+    $this->get(route('administration.products.index', ['deleted' => 1]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('deleted', true)
+            ->where('products.data.0.name', $product->name)
+            ->where('products.data.0.deleted_by', $owner->name));
+
+    $this->post(route('administration.products.restore', $product->id))
+        ->assertRedirect(route('administration.products.index', ['deleted' => 1]));
+
+    $restored = Product::query()->findOrFail($product->id);
+    expect($restored->is_active)->toBeFalse();
+    $this->assertDatabaseHas('inventories', ['product_id' => $product->id, 'quantity' => 0]);
+});
+
+test('completed customer returns no longer block deleting a stockless product', function () {
+    $owner = User::factory()->administrator()->create();
+    $product = Product::factory()->has(Inventory::factory()->state(['quantity' => 0, 'quarantined_quantity' => 0]))->create();
+    $order = Order::factory()->create(['status' => 'completed']);
+    $itemId = DB::table('order_items')->insertGetId([
+        'order_id' => $order->id, 'product_id' => $product->id, 'quantity' => 1, 'price_at_time' => '100.00',
+    ]);
+    $returnId = DB::table('customer_returns')->insertGetId([
+        'order_id' => $order->id, 'requester_id' => $owner->id, 'status' => 'accepted', 'reason' => 'Resolved return',
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('customer_return_items')->insert([
+        'customer_return_id' => $returnId, 'order_item_id' => $itemId, 'quantity' => 1,
+        'condition' => 'damaged', 'disposition' => 'write_off',
+    ]);
+
+    $this->actingAs($owner)->delete(route('administration.products.destroy', $product))
+        ->assertRedirect(route('administration.products.index'));
+
+    expect(Product::query()->find($product->id))->toBeNull();
+    $this->assertDatabaseHas('customer_return_items', ['customer_return_id' => $returnId, 'order_item_id' => $itemId]);
+});
+
+test('an acknowledged supplier return without resolution blocks product deletion', function () {
+    $owner = User::factory()->administrator()->create();
+    $product = Product::factory()->has(Inventory::factory()->state(['quantity' => 0, 'quarantined_quantity' => 0]))->create();
+    $supplierId = DB::table('suppliers')->insertGetId([
+        'name' => 'Unresolved supplier', 'is_active' => true, 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    DB::table('supplier_returns')->insert([
+        'supplier_id' => $supplierId, 'product_id' => $product->id, 'requester_id' => $owner->id,
+        'quantity' => 1, 'status' => 'closed', 'reason' => 'Acknowledged return', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    $this->actingAs($owner)->delete(route('administration.products.destroy', $product))
+        ->assertSessionHasErrors('deletion');
+
+    expect(Product::query()->find($product->id))->not->toBeNull();
+});
+
+test('only owners can view or restore deleted products', function () {
+    $managerRoleId = DB::table('administration_roles')->where('code', 'manager')->value('id');
+    $manager = User::factory()->administrator()->create(['administration_role_id' => $managerRoleId]);
+    $product = Product::factory()->create();
+    $product->delete();
+
+    $this->actingAs($manager)->get(route('administration.products.index', ['deleted' => 1]))->assertForbidden();
+    $this->post(route('administration.products.restore', $product->id))->assertForbidden();
+});
+
+test('a deleted product waits for its deleted category to be restored', function () {
+    $owner = User::factory()->administrator()->create();
+    $category = Category::factory()->create();
+    $product = Product::factory()->for($category)->create();
+
+    $this->actingAs($owner)->delete(route('administration.products.destroy', $product));
+    $this->delete(route('administration.categories.destroy', $category));
+
+    $this->get(route('administration.products.index', ['deleted' => 1]))
+        ->assertInertia(fn (Assert $page) => $page->where('products.data.0.category.is_deleted', true));
+
+    $this->post(route('administration.products.restore', $product->id))
+        ->assertSessionHasErrors(['restore' => 'Restore the product category before restoring this product.']);
+
+    $this->post(route('administration.categories.restore', $category->id));
+    $this->post(route('administration.products.restore', $product->id))->assertSessionHasNoErrors();
+
+    expect(Product::query()->findOrFail($product->id)->is_active)->toBeFalse();
 });
 
 test('administrators can view a product with its catalog details and low stock', function () {
@@ -506,6 +623,8 @@ test('administrators can update product details tags and shipping assignments', 
     $response = $this
         ->actingAs($administrator)
         ->put(route('administration.products.update', $product), [
+            'edit_version' => $product->edit_version,
+            'price_change_reason' => 'New catalog price approved',
             'product_code' => 'UPDATED001',
             'name' => 'Updated product name',
             'description' => null,
@@ -542,6 +661,7 @@ test('administrators can add a verified brand to an imported product', function 
     $product->save();
 
     $this->actingAs($administrator)->put(route('administration.products.update', $product), [
+        'edit_version' => $product->edit_version,
         'product_code' => $product->product_code,
         'name' => $product->name,
         'category_id' => $product->category_id,
@@ -566,6 +686,7 @@ test('updating a product without a new image keeps the existing image', function
     $this->actingAs($administrator)
         ->post(route('administration.products.update', $product), [
             '_method' => 'put',
+            'edit_version' => $product->edit_version,
             'product_code' => 'UPDATED001',
             'name' => 'Updated product',
             'category_id' => $category->id,
@@ -593,6 +714,7 @@ test('replacing a product image stores the new path and removes the old managed 
     $this->actingAs($administrator)
         ->post(route('administration.products.update', $product), [
             '_method' => 'put',
+            'edit_version' => $product->edit_version,
             'product_code' => $product->product_code,
             'name' => $product->name,
             'category_id' => $category->id,
@@ -625,6 +747,7 @@ test('an invalid product relationship leaves details and tags unchanged', functi
         ->actingAs($administrator)
         ->from(route('administration.products.edit', $product))
         ->put(route('administration.products.update', $product), [
+            'edit_version' => $product->edit_version,
             'product_code' => 'UPDATED001',
             'name' => 'Changed product',
             'category_id' => $category->id,

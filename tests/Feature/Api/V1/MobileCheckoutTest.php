@@ -26,7 +26,10 @@ function mobileCheckoutData(array $cartItemIds, array $overrides = []): array
 
 beforeEach(function () {
     Storage::fake('local');
-    $this->customer = User::factory()->customer()->create(['default_delivery_address' => 'Saved address']);
+    $this->customer = User::factory()->customer()->create([
+        'default_delivery_address' => 'Saved address',
+        'default_delivery_contact_number' => '+639171234567',
+    ]);
     $this->product = Product::factory()->create(['price' => '10.15', 'discount_price' => '9.33']);
     $this->stock = Inventory::factory()->for($this->product)->create(['quantity' => 5]);
     $this->cartItem = app(CartService::class)->add($this->customer, $this->product->id, 2);
@@ -48,7 +51,8 @@ test('mobile checkout returns shared preparation and manual payment options', fu
         'delivery_address_prefill' => $prepared['deliveryAddressPrefill'],
         'pickup_quote' => $prepared['pickupQuote'],
     ]])->assertJsonPath('data.cart.total', '18.66')
-        ->assertJsonPath('data.customer.default_delivery_address', 'Saved address');
+        ->assertJsonPath('data.customer.default_delivery_address', 'Saved address')
+        ->assertJsonPath('data.customer.default_delivery_contact_number', '+639171234567');
 
     expect($this->stock->refresh()->quantity)->toBe(5);
     $this->assertDatabaseCount('orders', 0);
@@ -89,6 +93,7 @@ test('mobile checkout places all approved payment and fulfillment combinations',
 
     expect($response->json('data.id'))->toBe($order->id)
         ->and($order->user_id)->toBe($this->customer->id)
+        ->and($order->contact_number)->toBe('+639171234567')
         ->and($order->delivery_address)->toBe($fulfillment === 'delivery' ? 'Checkout address' : null)
         ->and($this->stock->refresh()->quantity)->toBe(3)
         ->and($this->customer->refresh()->default_delivery_address)->toBe('Saved address');
@@ -138,6 +143,7 @@ test('mobile checkout applies shared fulfillment payment and upload validation',
     'cash proof' => [fn () => ['payment_proof' => UploadedFile::fake()->image('proof.png')], 'payment_proof'],
     'invalid proof' => [fn () => ['payment_method' => 'maya', 'payment_proof' => UploadedFile::fake()->create('proof.pdf', 10, 'application/pdf')], 'payment_proof'],
     'large proof' => [fn () => ['payment_method' => 'maya', 'payment_proof' => UploadedFile::fake()->image('proof.png')->size(5121)], 'payment_proof'],
+    'invalid mobile contact number' => [fn () => ['contact_number' => '0347222222'], 'contact_number'],
 ]);
 
 test('mobile checkout rejects unavailable stock without orders deductions or orphan proof', function (string $state) {

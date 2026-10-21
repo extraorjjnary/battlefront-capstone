@@ -13,6 +13,7 @@ import { edit } from '@/routes/profile';
 const props = defineProps({
     canManageDefaultDeliveryAddress: { type: Boolean, required: true },
     defaultDeliveryAddress: { type: String, default: '' },
+    defaultDeliveryContactNumber: { type: String, default: '' },
     deliveryLocations: { type: Array, default: () => [] },
     defaultDeliveryAddressPrefill: {
         type: Object,
@@ -77,7 +78,12 @@ const productViewRecommendationsEnabled = ref(
 <template>
     <div class="flex flex-col space-y-6">
         <Head title="Profile settings" />
-        <Heading variant="small" title="Profile" />
+        <h1 class="sr-only">Profile settings</h1>
+        <Heading
+            variant="small"
+            title="Profile"
+            description="Update your account details, contact number, and default delivery address"
+        />
 
         <Form
             v-bind="ProfileController.update.form()"
@@ -116,6 +122,24 @@ const productViewRecommendationsEnabled = ref(
 
             <div
                 v-if="props.canManageDefaultDeliveryAddress"
+                class="grid gap-2"
+            >
+                <Label for="default-delivery-contact-number">Default contact number (optional)</Label>
+                <Input
+                    id="default-delivery-contact-number"
+                    name="default_delivery_contact_number"
+                    type="tel"
+                    maxlength="20"
+                    autocomplete="tel"
+                    placeholder="e.g. 0917 123 4567"
+                    :default-value="props.defaultDeliveryContactNumber"
+                />
+                <InputError :message="errors.default_delivery_contact_number" />
+                <p class="text-muted-foreground text-sm">This number will pre-fill checkout and can be changed for each order.</p>
+            </div>
+
+            <div
+                v-if="props.canManageDefaultDeliveryAddress"
                 class="grid gap-4"
             >
                 <p class="font-medium">Default delivery address (optional)</p>
@@ -143,7 +167,7 @@ const productViewRecommendationsEnabled = ref(
                 >
                     Saved address: {{ props.defaultDeliveryAddress }}
                     Your saved address is kept until you replace or clear it.
-                    Choose all three fields to replace it.
+                    Choose a complete delivery location and enter the street or building details to replace it.
                 </p>
                 <p
                     v-if="defaultAddressAction === 'clear'"

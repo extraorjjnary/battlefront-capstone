@@ -43,22 +43,37 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::define(
             'access-administration',
-            fn (User $user): bool => $user->isAdministrator(),
+            fn (User $user): bool => $user->isAdministrator()
+                && $user->is_active
+                && $user->administration_role_id !== null,
         );
+
+        foreach ([
+            'orders.view', 'orders.process', 'orders.assign', 'inventory.view',
+            'inventory.request', 'inventory.approve', 'inventory.reorder',
+            'products.manage', 'products.price', 'products.cost', 'catalog.delete',
+            'customers.view', 'reports.view', 'reports.export', 'reports.profit', 'forecast.manage',
+            'returns.request', 'returns.approve', 'returns.record_payment', 'returns.dispatch',
+            'returns.resolve', 'returns.reconcile',
+            'suppliers.manage', 'branches.manage', 'staff_reports.view', 'audit.view', 'audit.export',
+            'users.manage', 'permissions.manage',
+        ] as $permission) {
+            Gate::define($permission, fn (User $user): bool => $user->hasAdministrationPermission($permission));
+        }
 
         Gate::define(
             'use-customer-cart',
-            fn (User $user): bool => $user->role === UserRole::Customer,
+            fn (User $user): bool => $user->is_active && $user->role === UserRole::Customer,
         );
 
         Gate::define(
             'use-chatbot',
-            fn (?User $user): bool => $user === null || $user->role === UserRole::Customer,
+            fn (?User $user): bool => $user === null || ($user->is_active && $user->role === UserRole::Customer),
         );
 
         Gate::define(
             'use-recommendations',
-            fn (?User $user): bool => $user === null || $user->role === UserRole::Customer,
+            fn (?User $user): bool => $user === null || ($user->is_active && $user->role === UserRole::Customer),
         );
 
         RateLimiter::for('api-v1', fn (Request $request): Limit => Limit::perMinute(60)

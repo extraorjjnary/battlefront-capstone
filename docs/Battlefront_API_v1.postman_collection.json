@@ -506,10 +506,10 @@
                             "host": ["{{base_url}}"],
                             "path": ["profile"]
                         },
-                        "description": "Name and email required even for PATCH; each max 255. Address nullable/max 255; blank becomes null. Omit address to preserve it. Duplicate email: 422. No password or role update.",
+                        "description": "Name and email required. Optional contact number accepts Philippine mobile formats and saves as +639XXXXXXXXX; omit it to preserve or send null to clear. Address nullable/max 255; omit to preserve it. Duplicate email: 422. No password or role update.",
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n  \"name\": \"{{name}}\",\n  \"email\": \"{{email}}\",\n  \"default_delivery_address\": \"{{delivery_address}}\"\n}",
+                            "raw": "{\n  \"name\": \"{{name}}\",\n  \"email\": \"{{email}}\",\n  \"default_delivery_address\": \"{{delivery_address}}\",\n  \"default_delivery_contact_number\": \"{{default_delivery_contact_number}}\"\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -523,7 +523,7 @@
                             "script": {
                                 "type": "text/javascript",
                                 "exec": [
-                                    "const template = {\"name\":\"{{name}}\",\"email\":\"{{email}}\",\"default_delivery_address\":\"{{delivery_address}}\"};",
+                                    "const template = {\"name\":\"{{name}}\",\"email\":\"{{email}}\",\"default_delivery_address\":\"{{delivery_address}}\",\"default_delivery_contact_number\":\"{{default_delivery_contact_number}}\"};",
                                     "function resolve(value) {",
                                     "  if (typeof value === \"string\") return value.replace(/\\{\\{([^{}]+)\\}\\}/g, (_, key) => String(pm.environment.get(key) ?? \"\"));",
                                     "  if (Array.isArray(value)) return value.map(resolve);",

@@ -22,6 +22,16 @@ import InventoryController from '@/actions/App/Http/Controllers/Administration/I
 import AdministrationOrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import SalesReportController from '@/actions/App/Http/Controllers/Administration/SalesReportController';
+import StaffPerformanceController from '@/actions/App/Http/Controllers/Administration/StaffPerformanceController';
+import StockReconciliationController from '@/actions/App/Http/Controllers/Administration/StockReconciliationController';
+import WorkQueueController from '@/actions/App/Http/Controllers/Administration/WorkQueueController';
+import AuditLogController from '@/actions/App/Http/Controllers/Administration/AuditLogController';
+import InventoryAdjustmentController from '@/actions/App/Http/Controllers/Administration/InventoryAdjustmentController';
+import DamageReportController from '@/actions/App/Http/Controllers/Administration/DamageReportController';
+import SupplierReturnController from '@/actions/App/Http/Controllers/Administration/SupplierReturnController';
+import SupplierController from '@/actions/App/Http/Controllers/Administration/SupplierController';
+import CustomerReturnController from '@/actions/App/Http/Controllers/Administration/CustomerReturnController';
+import TeamController from '@/actions/App/Http/Controllers/Administration/TeamController';
 import { dashboard } from '@/routes';
 import { index as branchIndex } from '@/routes/branches';
 import { index as cartIndex } from '@/routes/cart';
@@ -58,45 +68,119 @@ export function useAppNavigation() {
 
         if (isAdministrator.value) {
             items.push({
-                title: 'Catalog',
-                href: ProductController.index(),
-                icon: PackageSearch,
-                activeRoutes: [
-                    ProductController.index(),
-                    CategoryController.index(),
-                ],
-            });
-            items.push({
-                title: 'Inventory',
-                href: InventoryController.index(),
-                icon: Boxes,
-            });
-            items.push({
-                title: 'Orders',
-                href: AdministrationOrderController.index(),
+                title: 'Work queue',
+                href: WorkQueueController.index(),
                 icon: ReceiptText,
             });
-            items.push({
-                title: 'Sales reports',
-                href: SalesReportController.index(),
-                icon: ChartColumn,
-            });
-            items.push({
-                title: 'Forecasting',
-                href: ForecastingController.index(),
-                icon: TrendingUp,
-            });
-            items.push({
-                title: 'Customers',
-                href: CustomerController.index(),
-                icon: UsersRound,
-            });
-            items.push({
-                title: 'Chatbot FAQs',
-                href: ChatbotKnowledgeController.index(),
-                icon: MessageSquareText,
-                activeRoutes: [ChatbotKnowledgeController.index()],
-            });
+            if (page.props.auth?.can?.browseProductCatalog)
+                items.push({
+                    title: 'Products',
+                    href: productIndex(),
+                    icon: PackageSearch,
+                });
+            if (page.props.auth?.can?.manageProducts)
+                items.push({
+                    title: 'Manage products',
+                    href: ProductController.index(),
+                    icon: PackageSearch,
+                    activeRoutes: [
+                        ProductController.index(),
+                        CategoryController.index(),
+                    ],
+                });
+            if (page.props.auth?.can?.viewInventory)
+                items.push({
+                    title: 'Inventory',
+                    href: InventoryController.index(),
+                    icon: Boxes,
+                });
+            if (page.props.auth?.can?.viewInventory)
+                items.push({
+                    title: 'Stock requests',
+                    href: InventoryAdjustmentController.index(),
+                    icon: Boxes,
+                });
+            if (page.props.auth?.can?.viewInventory)
+                items.push({
+                    title: 'Stock reconciliation',
+                    href: StockReconciliationController.index(),
+                    icon: Boxes,
+                });
+            if (page.props.auth?.can?.viewInventory)
+                items.push({
+                    title: 'Damage reports',
+                    href: DamageReportController.index(),
+                    icon: Boxes,
+                });
+            if (page.props.auth?.can?.viewInventory)
+                items.push({
+                    title: 'Supplier returns',
+                    href: SupplierReturnController.index(),
+                    icon: Boxes,
+                });
+            if (page.props.auth?.can?.viewOrders)
+                items.push({
+                    title: 'Customer returns',
+                    href: CustomerReturnController.index(),
+                    icon: ReceiptText,
+                });
+            if (page.props.auth?.can?.manageSuppliers)
+                items.push({
+                    title: 'Suppliers',
+                    href: SupplierController.index(),
+                    icon: Boxes,
+                });
+            if (page.props.auth?.can?.viewOrders)
+                items.push({
+                    title: 'Orders',
+                    href: AdministrationOrderController.index(),
+                    icon: ReceiptText,
+                });
+            if (page.props.auth?.can?.viewReports)
+                items.push({
+                    title: 'Sales reports',
+                    href: SalesReportController.index(),
+                    icon: ChartColumn,
+                });
+            if (page.props.auth?.can?.viewOrders)
+                items.push({
+                    title: page.props.auth?.can?.viewStaffReports
+                        ? 'Staff sales'
+                        : 'My sales',
+                    href: StaffPerformanceController.index(),
+                    icon: ChartColumn,
+                });
+            if (page.props.auth?.can?.viewAudit)
+                items.push({
+                    title: 'Audit log',
+                    href: AuditLogController.index(),
+                    icon: ReceiptText,
+                });
+            if (page.props.auth?.can?.manageUsers)
+                items.push({
+                    title: 'Team access',
+                    href: TeamController.index(),
+                    icon: UsersRound,
+                });
+            if (page.props.auth?.can?.viewReports)
+                items.push({
+                    title: 'Forecasting',
+                    href: ForecastingController.index(),
+                    icon: TrendingUp,
+                });
+            if (page.props.auth?.can?.viewCustomers)
+                items.push({
+                    title: 'Customers',
+                    href: CustomerController.index(),
+                    icon: UsersRound,
+                });
+            if (page.props.auth?.can?.manageProducts)
+                items.push({
+                    title: 'Chatbot FAQs',
+                    href: ChatbotKnowledgeController.index(),
+                    icon: MessageSquareText,
+                    activeRoutes: [ChatbotKnowledgeController.index()],
+                });
         } else {
             items.push({
                 title: 'Products',

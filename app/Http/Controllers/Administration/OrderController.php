@@ -7,19 +7,22 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
+use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\OrderIndexRequest;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\User;
 use App\Repositories\Order\AdministratorOrderRepository;
 use App\Services\DeliveryQuotePresenter;
 use App\Services\Order\OrderProcessingService;
 use App\Services\ShipmentPresenter;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
-use InvalidArgumentException;
 
 class OrderController extends Controller
 {
@@ -126,15 +129,57 @@ class OrderController extends Controller
     /**
      * Display complete processing details for an order.
      */
-    public function show(Order $order, OrderProcessingService $processing, ShipmentPresenter $shipments, DeliveryQuotePresenter $quotes): Response
+    public function show(Request $request, Order $order, OrderProcessingService $processing, ShipmentPresenter $shipments, DeliveryQuotePresenter $quotes): Response
     {
         $order = $this->orderRepository->loadDetails($order);
         $nextShipmentStatus = $processing->nextShipmentStatus($order);
+        $canViewProfitability = $request->user()->can('reports.profit');
+        $orderHasSale = DB::table('sales')->where('order_id', $order->id)->exists();
+        $salesReturns = (string) DB::table('customer_return_items as return_items')
+            ->join('order_items', 'order_items.id', '=', 'return_items.order_item_id')
+            ->where('order_items.order_id', $order->id)->sum('return_items.sales_return_amount');
+        $costRecovered = (string) DB::table('customer_return_items as return_items')
+            ->join('order_items', 'order_items.id', '=', 'return_items.order_item_id')
+            ->where('order_items.order_id', $order->id)->sum('return_items.cost_recovered_amount');
+        $costOfGoodsSold = '0.00';
+        $hasMissingCost = $order->items->isEmpty();
+        foreach ($order->items as $item) {
+            if ($item->acquisition_cost_at_time === null) {
+                $hasMissingCost = true;
+
+                continue;
+            }
+            $costOfGoodsSold = bcadd($costOfGoodsSold, bcmul($item->acquisition_cost_at_time, (string) $item->quantity, 2), 2);
+        }
+        $productRevenue = $order->product_subtotal ?? $order->items->reduce(
+            fn (string $total, OrderItem $item): string => bcadd(
+                $total,
+                bcmul($item->price_at_time, (string) $item->quantity, 2),
+                2,
+            ),
+            '0.00',
+        );
+        $grossProfit = ! $hasMissingCost && $orderHasSale && $order->status === OrderStatus::Completed
+            ? bcsub(bcsub($productRevenue, $salesReturns, 2), bcsub($costOfGoodsSold, $costRecovered, 2), 2)
+            : null;
 
         return Inertia::render('Administration/Orders/Show', [
+            'handler_options' => $order->status === OrderStatus::Completed || $order->status === OrderStatus::Cancelled
+                ? []
+                : User::query()->where('role', UserRole::Administrator->value)
+                    ->where('is_active', true)
+                    ->whereIn('administration_role_id', DB::table('administration_role_permissions as grants')
+                        ->join('administration_permissions as permissions', 'permissions.id', '=', 'grants.administration_permission_id')
+                        ->join('administration_roles as roles', 'roles.id', '=', 'grants.administration_role_id')
+                        ->where('permissions.code', 'orders.process')->where('roles.code', '!=', 'it')
+                        ->select('grants.administration_role_id'))
+                    ->orderBy('name')->get(['id', 'name']),
             'order' => [
                 'id' => $order->id,
                 'reference' => $order->reference,
+                'handler_required' => $order->handler_required,
+                'assigned_handler_id' => $order->assigned_handler_id,
+                'assigned_handler_name' => $order->assigned_handler_id === null ? null : User::query()->whereKey($order->assigned_handler_id)->value('name'),
                 'created_at' => $order->created_at->toIso8601String(),
                 'customer' => [
                     'id' => $order->user->id,
@@ -198,10 +243,6 @@ class OrderController extends Controller
                 'items' => $order->items->map(function (OrderItem $item): array {
                     $unitPrice = $item->price_at_time;
 
-                    if (! is_numeric($unitPrice)) {
-                        throw new InvalidArgumentException('Order item prices must be numeric.');
-                    }
-
                     return [
                         'id' => $item->id,
                         'product' => [
@@ -215,6 +256,14 @@ class OrderController extends Controller
                         'line_total' => bcmul($unitPrice, (string) $item->quantity, 2),
                     ];
                 })->values()->all(),
+                ...($canViewProfitability ? [
+                    'profitability' => [
+                        'sales_returns' => $salesReturns,
+                        'cost_of_goods_sold' => $costOfGoodsSold,
+                        'gross_profit' => $grossProfit,
+                        'available' => $grossProfit !== null,
+                    ],
+                ] : []),
                 'item_count' => $order->items->count(),
                 'total_quantity' => $order->items->sum('quantity'),
                 'product_subtotal' => $order->product_subtotal,

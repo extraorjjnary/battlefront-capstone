@@ -13,13 +13,28 @@ class DeleteCategory
 
     public function execute(Category $category): void
     {
+        $actorId = auth()->id();
+        $actorId = $actorId === null ? null : max(0, (int) $actorId);
+
         try {
-            DB::transaction(function () use ($category): void {
+            DB::transaction(function () use ($category, $actorId): void {
                 $lockedCategory = Category::query()->lockForUpdate()->findOrFail($category->id);
                 if ($lockedCategory->products()->exists()) {
                     throw ValidationException::withMessages(['deletion' => self::PROTECTED_MESSAGE]);
                 }
 
+                $lockedCategory->is_active = false;
+                $lockedCategory->deleted_by_id = $actorId;
+                $lockedCategory->save();
+
+                DB::table('audit_logs')->insert([
+                    'actor_id' => $actorId,
+                    'action' => 'category.deleted',
+                    'subject_type' => 'category',
+                    'subject_id' => $lockedCategory->id,
+                    'changes' => json_encode(['name' => $lockedCategory->name], JSON_THROW_ON_ERROR),
+                    'created_at' => now(),
+                ]);
                 $lockedCategory->delete();
             }, attempts: 3);
         } catch (QueryException $exception) {

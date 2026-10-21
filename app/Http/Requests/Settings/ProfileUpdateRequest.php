@@ -5,6 +5,7 @@ namespace App\Http\Requests\Settings;
 use App\Concerns\ProfileValidationRules;
 use App\Concerns\ValidatesDeliveryGeography;
 use App\Services\Order\PsgcDeliveryLocations;
+use App\Support\PhilippineMobileNumber;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -38,6 +39,14 @@ class ProfileUpdateRequest extends FormRequest
         $rules['default_delivery_address_action'] = [
             Rule::excludeIf(! $canManageAddress),
             'bail', 'sometimes', 'required', 'string', Rule::in(['keep', 'save', 'clear']),
+        ];
+        $rules['default_delivery_contact_number'] = [
+            Rule::excludeIf(! $canManageAddress),
+            'nullable', 'string', 'max:20', function (string $attribute, mixed $value, \Closure $fail): void {
+                if ($value !== null && ! PhilippineMobileNumber::isValid($value)) {
+                    $fail('Enter a valid Philippine mobile number.');
+                }
+            },
         ];
         $rules['default_delivery_destination'] = [
             Rule::excludeIf(! $canManageAddress || $addressAction !== 'save'),

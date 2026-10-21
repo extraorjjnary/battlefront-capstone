@@ -23,6 +23,7 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { useChartTheme } from '@/composables/useChartTheme';
 import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
+import { BUSINESS_TIMEZONE, formatDateTime } from '@/lib/dateTime';
 import { formatForecastUnits } from '@/lib/forecastUnits';
 
 ChartJS.register(
@@ -44,7 +45,8 @@ const props = defineProps({
     forecasts: { type: Object, required: true },
 });
 
-const initialResult = usePage().flash?.forecast_result ?? null;
+const page = usePage();
+const initialResult = page.flash?.forecast_result ?? null;
 const result = ref(initialResult);
 const resultMessage = computed(() =>
     result.value?.status === 'ready'
@@ -63,15 +65,6 @@ const { search, isSearching, cancelPendingSearch } = useDebouncedSearch({
         product_id: props.filters.product_id ?? undefined,
     }),
 });
-const dateFormatter = computed(
-    () =>
-        new Intl.DateTimeFormat('en-PH', {
-            dateStyle: 'medium',
-            timeStyle: 'short',
-            timeZone: props.timezone,
-        }),
-);
-
 watch(
     () => props.selected_product?.id,
     (id) => {
@@ -126,7 +119,7 @@ function pageRoute(options, saved = false) {
 }
 
 function generatedTime(value) {
-    return dateFormatter.value.format(new Date(value));
+    return formatDateTime(value);
 }
 
 const chartColors = useChartTheme();
@@ -244,6 +237,18 @@ const chartOptions = computed(() => ({
                     Only forecast-ready products are listed, including inactive
                     products with eligible history.
                 </p>
+                <details class="border-border mt-3 border p-3 text-sm">
+                    <summary class="cursor-pointer font-medium">
+                        Why might a product be missing?
+                    </summary>
+                    <p class="text-muted-foreground mt-2">
+                        A product appears after the system confirms 36 completed
+                        monthly periods with complete eligible sales history.
+                        Missing months, unsuitable history, or unavailable
+                        source data can keep it out of this list. Select a
+                        listed product to see its current readiness details.
+                    </p>
+                </details>
                 <Label for="product-search" class="mt-4 mb-2 block"
                     >Product name or code</Label
                 >
@@ -396,7 +401,11 @@ const chartOptions = computed(() => ({
                         are excluded. Dates use {{ readiness.timezone }}.
                     </p>
                 </div>
-                <form class="mt-5 space-y-3" @submit.prevent="generate">
+                <form
+                    v-if="page.props.auth.can?.manageForecast"
+                    class="mt-5 space-y-3"
+                    @submit.prevent="generate"
+                >
                     <InputError :message="form.errors.product_id" />
                     <InputError :message="form.errors.forecast" />
                     <Button
@@ -484,7 +493,7 @@ const chartOptions = computed(() => ({
                         <dt class="text-muted-foreground text-xs">Generated</dt>
                         <dd class="mt-1 font-medium">
                             {{ generatedTime(result.generated_at) }} ({{
-                                result.timezone
+                                BUSINESS_TIMEZONE
                             }})
                         </dd>
                     </div>
@@ -610,7 +619,7 @@ const chartOptions = computed(() => ({
             >
                 <table class="w-full min-w-3xl text-left text-sm">
                     <caption class="sr-only">
-                        Persisted product demand forecasts
+                        Saved product demand forecasts
                     </caption>
                     <thead>
                         <tr
@@ -624,7 +633,7 @@ const chartOptions = computed(() => ({
                             <th scope="col" class="p-3">Target</th>
                             <th scope="col" class="p-3">Source period</th>
                             <th scope="col" class="p-3">
-                                Generated ({{ timezone }})
+                                Generated ({{ BUSINESS_TIMEZONE }})
                             </th>
                         </tr>
                     </thead>

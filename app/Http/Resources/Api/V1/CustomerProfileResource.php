@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Api\V1;
 
 use App\Models\User;
+use App\Services\Order\PsgcDeliveryLocations;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -21,6 +22,11 @@ class CustomerProfileResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'default_delivery_address' => $this->default_delivery_address,
+            'default_delivery_address_prefill' => app(PsgcDeliveryLocations::class)->prefill(
+                $this->default_delivery_address,
+                $this->default_delivery_address_components,
+            ),
+            'default_delivery_contact_number' => $this->default_delivery_contact_number,
             'search_recommendations_enabled' => $this->search_recommendations_enabled,
             'product_view_recommendations_enabled' => $this->product_view_recommendations_enabled,
             'personalized_recommendations_enabled' => $this->personalized_recommendations_enabled,

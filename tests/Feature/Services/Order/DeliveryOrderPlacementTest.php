@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Order\AssignOrderHandler;
 use App\Actions\Order\ResubmitPaymentProof;
 use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
@@ -230,6 +231,8 @@ test('verified shipment delivery records the product subtotal while preserving p
     $stock = Inventory::factory()->for($product)->create(['quantity' => 10]);
     app(CartService::class)->add($customer, $product->id, 2);
     $order = app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData($customer->cart->items->modelKeys()), 'Sagay City');
+    $handler = User::factory()->administrator()->create();
+    app(AssignOrderHandler::class)->execute($order, $handler, $handler->id, claimOnly: true);
     $processing = app(OrderProcessingService::class);
 
     $processing->updatePaymentStatus($order, PaymentStatus::Verified);

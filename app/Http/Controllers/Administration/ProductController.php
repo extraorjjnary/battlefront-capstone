@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Administration;
 
 use App\Actions\Product\CreateProduct;
 use App\Actions\Product\DeleteProduct;
+use App\Actions\Product\RestoreProduct;
 use App\Actions\Product\UpdateProduct;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\ProductIndexRequest;
@@ -15,6 +16,7 @@ use App\Services\CatalogProductPresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -28,6 +30,56 @@ class ProductController extends Controller
     public function index(ProductIndexRequest $request): Response
     {
         $filters = $request->validated();
+        if ((bool) ($filters['deleted'] ?? false)) {
+            $this->authorize('catalog.delete');
+
+            $products = Product::onlyTrashed()
+                ->when($filters['q'] ?? null, fn (Builder $query, string $search): Builder => $query->where(
+                    fn (Builder $query): Builder => $query
+                        ->where('name', 'like', "%{$search}%")
+                        ->orWhere('product_code', 'like', "%{$search}%")
+                        ->orWhere('brand', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%"),
+                ))
+                ->with([
+                    'category' => fn ($query) => $query->withTrashed()->select(['id', 'name', 'is_active', 'deleted_at']),
+                    'deletedBy:id,name',
+                    'inventory:id,product_id,quantity,quarantined_quantity',
+                ])
+                ->orderByDesc('deleted_at')->orderBy('id')
+                ->paginate(12)->withQueryString()
+                ->through(fn (Product $product): array => [
+                    'id' => $product->id,
+                    'product_code' => $product->product_code,
+                    'is_catalog_imported' => $product->is_catalog_imported,
+                    'name' => $product->name,
+                    'brand' => $product->brand,
+                    'price' => $product->price,
+                    'discount_price' => $product->discount_price,
+                    'image_url' => $product->image_url,
+                    'is_featured' => $product->is_featured,
+                    'is_active' => false,
+                    'deleted_at' => $product->deleted_at?->toDateTimeString(),
+                    'deleted_by' => $product->deletedBy?->name,
+                    'inventory' => $product->inventory === null ? null : [
+                        'quantity' => $product->inventory->quantity,
+                        'quarantined_quantity' => $product->inventory->quarantined_quantity,
+                    ],
+                    'category' => [
+                        'name' => $product->category->name,
+                        'is_active' => $product->category->is_active,
+                        'is_deleted' => $product->category->trashed(),
+                    ],
+                    'tags' => [],
+                ]);
+
+            return Inertia::render('Administration/Products/Index', [
+                'products' => $products,
+                'deleted' => true,
+                'filters' => ['q' => $filters['q'] ?? null, 'category_id' => null, 'brand' => null, 'tag_id' => null, 'status' => null],
+                'filter_options' => ['categories' => [], 'tags' => [], 'brands' => []],
+            ]);
+        }
         $filters['category_id'] = $request->filled('category_id')
             ? $request->integer('category_id')
             : null;
@@ -50,9 +102,11 @@ class ProductController extends Controller
                 'is_active',
                 'shipping_profile',
             ])
+            ->when($request->user()->can('products.cost'), fn (Builder $query): Builder => $query->addSelect('acquisition_cost'))
             ->with([
                 'category:id,name,is_active',
                 'tags:id,name',
+                'inventory:id,product_id,quantity,quarantined_quantity',
             ])
             ->when(
                 $filters['q'] ?? null,
@@ -94,10 +148,22 @@ class ProductController extends Controller
                 'name' => $product->name,
                 'brand' => $product->brand,
                 'price' => $product->price,
+                ...($request->user()->can('products.cost') ? ['acquisition_cost' => $product->acquisition_cost] : []),
                 'discount_price' => $product->discount_price,
                 'image_url' => $product->image_url,
                 'is_featured' => $product->is_featured,
                 'is_active' => $product->is_active,
+                'inventory' => $product->inventory === null ? null : [
+                    'quantity' => $product->inventory->quantity,
+                    'quarantined_quantity' => $product->inventory->quarantined_quantity,
+                ],
+                'storefront_visibility' => match (true) {
+                    ! $product->is_active => 'Inactive product',
+                    ! $product->category->is_active => 'Inactive category',
+                    $product->inventory === null => 'Inventory not initialized',
+                    $product->inventory->quantity === 0 => 'Out of stock',
+                    default => 'Visible in storefront',
+                },
                 'shipping_handling' => $this->presenter->handling($product->shipping_profile),
                 'category' => [
                     'name' => $product->category->name,
@@ -137,6 +203,8 @@ class ProductController extends Controller
      */
     public function create(): Response
     {
+        $this->authorize('products.price');
+
         return Inertia::render('Administration/Products/Create', $this->productOptions());
     }
 
@@ -167,7 +235,7 @@ class ProductController extends Controller
     /**
      * Display the specified product and its current stock.
      */
-    public function show(Product $product): Response
+    public function show(Request $request, Product $product): Response
     {
         $product->load(['category:id,name,is_active', 'tags:id,name', 'inventory:id,product_id,quantity,reorder_level']);
         $product->loadExists('lowStockInventory as is_low_stock');
@@ -184,7 +252,9 @@ class ProductController extends Controller
                     'price',
                     'discount_price',
                     'is_active',
+                    'edit_version',
                 ]),
+                ...($request->user()->can('products.cost') ? ['acquisition_cost' => $product->acquisition_cost] : []),
                 'image_url' => $product->image_url,
                 'category' => $product->category->only(['name', 'is_active']),
                 'shipping_handling' => $this->presenter->handling($product->shipping_profile),
@@ -203,7 +273,7 @@ class ProductController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Product $product): Response
+    public function edit(Request $request, Product $product): Response
     {
         $product->load('tags:id,name');
 
@@ -211,6 +281,7 @@ class ProductController extends Controller
             ...$this->productOptions(),
             'product' => [
                 'shipping_profile' => $product->shipping_profile->value,
+                ...($request->user()->can('products.cost') ? ['acquisition_cost' => $product->acquisition_cost] : []),
                 ...$product->only([
                     'id',
                     'product_code',
@@ -223,6 +294,7 @@ class ProductController extends Controller
                     'is_featured',
                     'discount_price',
                     'is_active',
+                    'edit_version',
                 ]),
                 'image_url' => $product->image_url,
                 'tag_ids' => $product->tags->pluck('id')->all(),
@@ -253,14 +325,25 @@ class ProductController extends Controller
 
     public function destroy(Product $product, DeleteProduct $deleteProduct): RedirectResponse
     {
+        $this->authorize('catalog.delete');
         $deleteProduct->execute($product);
 
         Inertia::flash('toast', [
             'type' => 'success',
-            'message' => __('Product permanently deleted.'),
+            'message' => __('Product moved to Deleted products. An owner can restore it.'),
         ]);
 
         return to_route('administration.products.index');
+    }
+
+    public function restore(int $product, RestoreProduct $restoreProduct): RedirectResponse
+    {
+        $this->authorize('catalog.delete');
+        $restoreProduct->execute($product);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Product restored as inactive.')]);
+
+        return to_route('administration.products.index', ['deleted' => 1]);
     }
 
     /**

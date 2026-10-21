@@ -40,7 +40,8 @@ class SaveChatbotKnowledgeRequest extends FormRequest
             }
             /** @var ChatbotKnowledge|null $record */
             $record = $this->route('chatbotKnowledge');
-            $error = app(ValidateChatbotFaq::class)->execute($this->string('question_pattern')->toString(), $record?->id);
+            $recordId = $record instanceof ChatbotKnowledge ? $record->id : null;
+            $error = app(ValidateChatbotFaq::class)->execute($this->string('question_pattern')->toString(), $recordId);
             if ($error !== null) {
                 $validator->errors()->add('question_pattern', $error);
             }

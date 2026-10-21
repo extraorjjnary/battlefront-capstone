@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id
  * @property int $product_id
  * @property int $quantity
+ * @property int<0, max> $quarantined_quantity
  * @property int $reorder_level
  * @property CarbonInterface $last_updated
  * @property-read Product $product
@@ -24,6 +25,10 @@ class Inventory extends Model
 {
     /** @use HasFactory<InventoryFactory> */
     use HasFactory;
+
+    protected $attributes = [
+        'quarantined_quantity' => 0,
+    ];
 
     /**
      * The name of the "created at" column.
@@ -79,6 +84,7 @@ class Inventory extends Model
     {
         return [
             'quantity' => 'integer',
+            'quarantined_quantity' => 'integer',
             'reorder_level' => 'integer',
             'last_updated' => 'datetime',
         ];

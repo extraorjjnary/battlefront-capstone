@@ -10,7 +10,6 @@ use App\Enums\ShipmentStatus;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Services\Order\OrderProcessingService;
-use InvalidArgumentException;
 
 class CustomerOrderPresenter
 {
@@ -97,10 +96,6 @@ class CustomerOrderPresenter
             ],
             'items' => $order->items->map(function (OrderItem $item): array {
                 $unitPrice = $item->price_at_time;
-
-                if (! is_numeric($unitPrice)) {
-                    throw new InvalidArgumentException('Order item prices must be numeric.');
-                }
 
                 return [
                     'id' => $item->id,

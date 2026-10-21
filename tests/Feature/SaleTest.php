@@ -15,6 +15,7 @@ test('the sale schema follows the approved ERD decisions', function () {
         'id',
         'order_id',
         'amount',
+        'handler_id',
         'sale_date',
     ]);
 });

@@ -15,6 +15,7 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DevelopmentCustomerSeeder;
 use Database\Seeders\DevelopmentHistoricalSalesSeeder;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -70,15 +71,15 @@ test('noninteractive reset requires force', function () {
 });
 
 test('invalid restore inputs preserve the existing database', function (string $problem) {
-    Storage::fake('public');
+    $publicDisk = Storage::fake('reset-dev-'.getmypid().'-'.bin2hex(random_bytes(6)), ['throw' => true]);
+    Storage::set('public', $publicDisk);
     $sentinel = User::factory()->create();
     $manifest = tempnam(sys_get_temp_dir(), 'reset-manifest-');
     $mapping = tempnam(sys_get_temp_dir(), 'reset-mapping-');
     $imagePath = 'products/graphics-card/00123.webp';
-    Storage::disk('public')->makeDirectory(dirname($imagePath));
-    $image = imagecreatetruecolor(1024, 1024);
-    imagewebp($image, Storage::disk('public')->path($imagePath));
-    $bytes = Storage::disk('public')->get($imagePath);
+    $bytes = UploadedFile::fake()->image('00123.webp', 1024, 1024)->getContent();
+    expect($publicDisk->put($imagePath, $bytes))->toBeTrue();
+    $publicDisk->assertExists($imagePath, $bytes);
     file_put_contents($manifest, json_encode(['version' => 1, 'entries' => [[
         'product_code' => '00123',
         'name' => 'Test GPU',
@@ -95,6 +96,8 @@ test('invalid restore inputs preserve the existing database', function (string $
     $options = ['--force' => true, '--manifest' => $manifest, '--mapping' => $mapping];
 
     try {
+        expect(app(RealCatalogImportService::class)->inspectFiles($mapping, $manifest))->toHaveCount(1);
+
         match ($problem) {
             'missing manifest' => $options['--manifest'] = $manifest.'.missing',
             'missing mapping' => $options['--mapping'] = $mapping.'.missing',
@@ -216,9 +219,6 @@ test('reset restores the complete real catalog with historical sales only when r
         expect($products->filter(fn ($product) => $product->inventory->quantity > 0 && $product->inventory->quantity <= $product->inventory->reorder_level))->toHaveCount(3);
         expect($products->filter(fn ($product) => $product->inventory->quantity === 0))->toHaveCount(1);
         expect(Product::query()->customerAvailable()->count())->toBe(653);
-        $dashboard = app(DashboardService::class)->administration();
-        expect($dashboard['kpis']['low_stock_products'])->toBe(3);
-        expect($dashboard['kpis']['out_of_stock_products'])->toBe(1);
         foreach (['80520996', '10044', '6940056198471'] as $code) {
             expect($products[$code]->lowStockInventory()->exists())->toBeTrue();
             $this->get(route('products.show', $products[$code]))->assertInertia(fn (Assert $page) => $page
@@ -270,14 +270,54 @@ test('reset restores the complete real catalog with historical sales only when r
             $this->seed(DevelopmentHistoricalSalesSeeder::class);
             expect(DB::table('inventories')->orderBy('id')->get()->all())->toEqual($inventoryBefore);
         }
-        $administrator = User::query()->where('email', 'admin@example.com')->sole();
-        $this->actingAs($administrator)->get(route('administration.inventory.index', ['stock' => 'low_stock']))
+        $itAdministrator = User::query()->where('email', 'admin@example.com')->sole();
+        expect($itAdministrator->administrationRoleCode())->toBe('it');
+        $this->actingAs($itAdministrator)->get(route('administration.inventory.index'))->assertForbidden();
+
+        $manager = User::factory()->administrator()->create([
+            'administration_role_id' => DB::table('administration_roles')->where('code', 'manager')->value('id'),
+        ]);
+        $staff = User::factory()->administrator()->create([
+            'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+        ]);
+        $dashboard = app(DashboardService::class)->administration($manager);
+        expect($dashboard['kpis']['low_stock_products'])->toBe(3);
+        expect($dashboard['kpis']['out_of_stock_products'])->toBe(1);
+
+        $this->actingAs($manager)->get(route('administration.inventory.index', ['stock' => 'low_stock']))
             ->assertInertia(fn (Assert $page) => $page->where('products.total', 3));
         $this->get(route('administration.inventory.index', ['stock' => 'out_of_stock']))
             ->assertInertia(fn (Assert $page) => $page->where('products.total', 1));
-        $this->patch(route('administration.inventory.update', $soldOut->inventory), ['quantity' => 6, 'reorder_level' => 5])
+        $reorderLevelBefore = $soldOut->inventory->reorder_level;
+        $this->actingAs($staff)->patch(route('administration.inventory.update', $soldOut->inventory), ['quantity' => 6, 'reorder_level' => $reorderLevelBefore, 'reason_code' => 'found_stock', 'reason' => 'Found stock during reset check'])
             ->assertRedirect()->assertSessionHasNoErrors();
+
+        expect($soldOut->inventory->refresh()->quantity)->toBe(0);
+        expect(Product::query()->customerAvailable()->whereKey($soldOut->id)->exists())->toBeFalse();
+        $adjustment = DB::table('inventory_adjustment_requests')->where('product_id', $soldOut->id)->sole();
+        expect($adjustment->status)->toBe('pending');
+        expect((int) $adjustment->requester_id)->toBe($staff->id);
+
+        $this->actingAs($manager)->post(route('administration.inventory-adjustments.decide', $adjustment->id), [
+            'decision' => 'approve', 'reason' => 'Found stock independently verified',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('inventory_adjustment_requests', [
+            'id' => $adjustment->id, 'status' => 'approved', 'reviewer_id' => $manager->id,
+        ]);
+        $this->assertDatabaseHas('inventory_movements', [
+            'product_id' => $soldOut->id, 'actor_id' => $manager->id,
+            'reference_type' => 'inventory_adjustment_request', 'reference_id' => $adjustment->id,
+            'kind' => 'approved_adjustment', 'sellable_before' => 0, 'sellable_delta' => 6, 'sellable_after' => 6,
+        ]);
         expect($soldOut->inventory->refresh()->quantity)->toBe(6);
+        expect($soldOut->inventory->reorder_level)->toBe($reorderLevelBefore);
+
+        $this->patch(route('administration.inventory.reorder-level.update', $soldOut->inventory), [
+            'reorder_level' => 5, 'reason' => 'Reorder threshold adjusted during reset check',
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $soldOut->inventory->refresh();
         expect($soldOut->inventory->reorder_level)->toBe(5);
         expect(Product::query()->customerAvailable()->whereKey($soldOut->id)->exists())->toBeTrue();
         expect($soldOut->refresh()->is_active)->toBeTrue();

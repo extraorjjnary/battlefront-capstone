@@ -182,8 +182,8 @@ class RecommendationEngagementReport
     private function eventCounts(CarbonImmutable $from, CarbonImmutable $to): Builder
     {
         return DB::table('recommendation_interactions')
-            ->where('recommendation_interactions.created_at', '>=', $from->startOfDay())
-            ->where('recommendation_interactions.created_at', '<', $to->addDay()->startOfDay())
+            ->where('recommendation_interactions.created_at', '>=', $from->startOfDay()->utc()->toDateTimeString())
+            ->where('recommendation_interactions.created_at', '<', $to->addDay()->startOfDay()->utc()->toDateTimeString())
             ->where('recommendation_interactions.expires_at', '>', now());
     }
 }

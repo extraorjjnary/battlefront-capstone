@@ -41,6 +41,9 @@ class HandleInertiaRequests extends Middleware
     {
         $customer = $request->user();
         $canUseCustomerCart = $customer?->can('use-customer-cart') ?? false;
+        $canBrowseProductCatalog = $customer?->isAdministrator()
+            && $customer->is_active
+            && in_array($customer->administrationRoleCode(), ['staff', 'manager', 'owner'], true);
         $sidebarCookieName = $request->user() === null
             ? null
             : 'sidebar_state_'.$request->user()->getKey();
@@ -52,6 +55,7 @@ class HandleInertiaRequests extends Middleware
             ] : []),
             'name' => config('app.name'),
             'notificationSummary' => fn (): ?array => $request->user() === null
+                || (! $request->user()->can('access-administration') && ! $request->user()->can('use-customer-cart'))
                 ? null : app(NotificationHistory::class)->summary($request->user()),
             'appearance' => $request->user()?->appearance->resolved()->value
                 ?? AppearancePreference::Light->value,
@@ -59,7 +63,35 @@ class HandleInertiaRequests extends Middleware
                 'user' => $request->user(),
                 'can' => [
                     'accessAdministration' => $request->user()?->can('access-administration') ?? false,
+                    'approveInventory' => $request->user()?->can('inventory.approve') ?? false,
+                    'approveReturns' => $request->user()?->can('returns.approve') ?? false,
+                    'resolveReturns' => $request->user()?->can('returns.resolve') ?? false,
+                    'reconcileReturns' => $request->user()?->can('returns.reconcile') ?? false,
+                    'assignOrders' => $request->user()?->can('orders.assign') ?? false,
+                    'viewReports' => $request->user()?->can('reports.view') ?? false,
+                    'viewStaffReports' => $request->user()?->can('staff_reports.view') ?? false,
+                    'viewAudit' => $request->user()?->can('audit.view') ?? false,
+                    'exportAudit' => $request->user()?->can('audit.export') ?? false,
+                    'browseProductCatalog' => $canBrowseProductCatalog,
+                    'manageProducts' => $request->user()?->can('products.manage') ?? false,
+                    'priceProducts' => $request->user()?->can('products.price') ?? false,
+                    'manageProductCosts' => $request->user()?->can('products.cost') ?? false,
+                    'viewProfitReports' => $request->user()?->can('reports.profit') ?? false,
+                    'deleteCatalog' => $request->user()?->can('catalog.delete') ?? false,
+                    'manageSuppliers' => $request->user()?->can('suppliers.manage') ?? false,
+                    'manageUsers' => $request->user()?->can('users.manage') ?? false,
+                    'viewCustomers' => $request->user()?->can('customers.view') ?? false,
+                    'viewInventory' => $request->user()?->can('inventory.view') ?? false,
+                    'viewOrders' => $request->user()?->can('orders.view') ?? false,
                     'useCustomerCart' => $canUseCustomerCart,
+                    'requestInventory' => $request->user()?->can('inventory.request') ?? false,
+                    'reorderInventory' => $request->user()?->can('inventory.reorder') ?? false,
+                    'processOrders' => $request->user()?->can('orders.process') ?? false,
+                    'requestReturns' => $request->user()?->can('returns.request') ?? false,
+                    'dispatchReturns' => $request->user()?->can('returns.dispatch') ?? false,
+                    'recordRefundPayments' => $request->user()?->can('returns.record_payment') ?? false,
+                    'manageForecast' => $request->user()?->can('forecast.manage') ?? false,
+                    'exportReports' => $request->user()?->can('reports.export') ?? false,
                 ],
             ],
             'sidebarOpen' => $sidebarCookieName === null

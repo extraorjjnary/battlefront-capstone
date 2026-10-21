@@ -109,9 +109,12 @@ test('an existing cart item cannot be changed to an ineligible product', functio
     expect($item->refresh()->product->is($originalProduct))->toBeTrue();
 });
 
-test('a product referenced by a cart item cannot be deleted', function () {
+test('soft deleting a product preserves its existing cart reference', function () {
     $item = CartItem::factory()->create();
 
-    expect(fn () => $item->product->delete())
-        ->toThrow(QueryException::class);
+    $product = $item->product;
+    $product->delete();
+
+    expect($product->fresh()->trashed())->toBeTrue();
+    $this->assertDatabaseHas('cart_items', ['id' => $item->id, 'product_id' => $product->id]);
 });

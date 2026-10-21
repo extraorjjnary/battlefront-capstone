@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\SaveChatbotKnowledgeRequest;
 use App\Models\ChatbotKnowledge;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -19,8 +20,9 @@ class ChatbotKnowledgeController extends Controller
         private MatchChatbotKnowledge $matcher,
     ) {}
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $filters = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
         $knowledge = ChatbotKnowledge::query()
             ->select([
                 'id',
@@ -30,6 +32,9 @@ class ChatbotKnowledgeController extends Controller
                 'priority',
                 'is_active',
             ])
+            ->when($filters['q'] ?? null, fn ($query, $search) => $query->where(fn ($query) => $query
+                ->where('question_pattern', 'like', '%'.$search.'%')
+                ->orWhere('response_template', 'like', '%'.$search.'%')))
             ->orderBy('id')
             ->paginate(15)
             ->withQueryString()
@@ -37,6 +42,7 @@ class ChatbotKnowledgeController extends Controller
 
         return Inertia::render('Administration/ChatbotKnowledge/Index', [
             'knowledge' => $knowledge,
+            'filters' => ['q' => $filters['q'] ?? null],
         ]);
     }
 

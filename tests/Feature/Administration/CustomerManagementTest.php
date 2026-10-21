@@ -70,6 +70,19 @@ test('customer accounts are paginated', function () {
         ->where('customers.data.24.name', 'Customer 25'));
 });
 
+test('administrators can search customer names and email addresses', function () {
+    $administrator = User::factory()->administrator()->create();
+    User::factory()->customer()->create(['name' => 'Jamie Customer', 'email' => 'jamie@example.com']);
+    User::factory()->customer()->create(['name' => 'Taylor Customer', 'email' => 'taylor@example.com']);
+
+    $this->actingAs($administrator)
+        ->get(route('administration.customers.index', ['q' => 'jamie@example.com']))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('filters.q', 'jamie@example.com')
+            ->where('customers.total', 1)
+            ->where('customers.data.0.name', 'Jamie Customer'));
+});
+
 test('administrators can view a minimal customer account record', function () {
     $administrator = User::factory()->administrator()->create();
     $customer = User::factory()->customer()->unverified()->create([

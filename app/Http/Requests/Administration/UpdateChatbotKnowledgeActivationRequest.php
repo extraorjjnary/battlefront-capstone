@@ -38,8 +38,10 @@ class UpdateChatbotKnowledgeActivationRequest extends FormRequest
             if ($validator->errors()->isNotEmpty() || ! $this->boolean('is_active')) {
                 return;
             }
-            /** @var ChatbotKnowledge $record */
             $record = $this->route('chatbotKnowledge');
+            if (! $record instanceof ChatbotKnowledge) {
+                return;
+            }
             $error = $record->category !== ChatbotCategory::Faq
                 ? 'Edit this legacy record into an eligible FAQ before reactivating it.'
                 : app(ValidateChatbotFaq::class)->execute($record->question_pattern, $record->id);

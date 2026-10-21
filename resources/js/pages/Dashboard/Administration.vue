@@ -1,6 +1,7 @@
 <script setup>
 import PageHeader from '@/components/PageHeader.vue';
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import {
     ArrowRight,
     Boxes,
@@ -17,6 +18,7 @@ import InventoryController from '@/actions/App/Http/Controllers/Administration/I
 import OrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import SalesReportController from '@/actions/App/Http/Controllers/Administration/SalesReportController';
+import WorkQueueController from '@/actions/App/Http/Controllers/Administration/WorkQueueController';
 import DeferredContent from '@/components/DeferredContent.vue';
 import ListSkeleton from '@/components/ListSkeleton.vue';
 import StatSkeleton from '@/components/StatSkeleton.vue';
@@ -24,6 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatCurrency } from '@/lib/currency';
+import { formatDateTime } from '@/lib/dateTime';
 import { orderStatusBadgeClass } from '@/lib/orderStatus';
 import { dashboard as dashboardRoute } from '@/routes';
 
@@ -31,39 +34,59 @@ const props = defineProps({
     dashboard: { type: Object },
 });
 
-const quickLinks = [
+const page = usePage();
+const user = computed(() => page.props.auth.user);
+const permissions = computed(() => page.props.auth.can ?? {});
+const quickLinks = computed(() => [
     {
-        title: 'Orders',
-        description: 'Review payments and process active orders.',
-        href: OrderController.index(),
+        title: 'Work queue',
+        description: 'Find open work available to your role.',
+        href: WorkQueueController.index(),
         icon: ReceiptText,
     },
-    {
-        title: 'Inventory',
-        description: 'Check stock levels and update quantities.',
-        href: InventoryController.index(),
-        icon: Boxes,
-    },
-    {
-        title: 'Catalog',
-        description: 'Maintain products and categories.',
-        href: ProductController.index(),
-        icon: PackageSearch,
-    },
-    {
-        title: 'Sales reports',
-        description: 'Open detailed revenue and product reports.',
-        href: SalesReportController.index(),
-        icon: ChartNoAxesCombined,
-    },
-];
-const dateFormatter = new Intl.DateTimeFormat('en-PH', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-});
-
+    ...(permissions.value.viewOrders
+        ? [
+              {
+                  title: 'Orders',
+                  description: 'Review payments and process active orders.',
+                  href: OrderController.index(),
+                  icon: ReceiptText,
+              },
+          ]
+        : []),
+    ...(permissions.value.viewInventory
+        ? [
+              {
+                  title: 'Inventory',
+                  description: 'Check stock levels and update quantities.',
+                  href: InventoryController.index(),
+                  icon: Boxes,
+              },
+          ]
+        : []),
+    ...(permissions.value.manageProducts
+        ? [
+              {
+                  title: 'Manage products',
+                  description: 'Maintain products and categories.',
+                  href: ProductController.index(),
+                  icon: PackageSearch,
+              },
+          ]
+        : []),
+    ...(permissions.value.viewReports
+        ? [
+              {
+                  title: 'Sales reports',
+                  description: 'Open detailed revenue and product reports.',
+                  href: SalesReportController.index(),
+                  icon: ChartNoAxesCombined,
+              },
+          ]
+        : []),
+]);
 function formatDate(value) {
-    return dateFormatter.format(new Date(value));
+    return formatDateTime(value);
 }
 
 defineOptions({
@@ -91,7 +114,14 @@ defineOptions({
                 description="Sagay City operations"
             />
 
-            <section aria-labelledby="operations-summary-heading">
+            <section
+                v-if="
+                    permissions.viewReports ||
+                    permissions.viewOrders ||
+                    permissions.viewInventory
+                "
+                aria-labelledby="operations-summary-heading"
+            >
                 <h2 id="operations-summary-heading" class="sr-only">
                     Operations summary
                 </h2>
@@ -102,15 +132,17 @@ defineOptions({
                 >
                     <template #fallback>
                         <div
+                            v-if="permissions.viewReports"
                             aria-hidden="true"
-                            class="surface-panel border-border bg-card grid border sm:grid-cols-2 xl:grid-cols-5"
+                            class="border-border bg-card grid border sm:grid-cols-2"
+                            :class="permissions.viewProfitReports ? 'xl:grid-cols-6' : 'xl:grid-cols-5'"
                         >
                             <StatSkeleton
-                                v-for="stat in 5"
+                                v-for="stat in permissions.viewProfitReports ? 6 : 5"
                                 :key="stat"
                                 class="border-border border-b sm:border-r xl:border-b-0"
                                 :class="
-                                    stat === 5
+                                    stat === (permissions.viewProfitReports ? 6 : 5)
                                         ? 'sm:col-span-2 xl:col-span-1'
                                         : ''
                                 "
@@ -118,13 +150,14 @@ defineOptions({
                         </div>
                     </template>
                     <dl
-                        class="surface-panel border-border bg-card grid border sm:grid-cols-2 xl:grid-cols-5"
+                        class="border-border bg-card grid border sm:grid-cols-2"
+                        :class="permissions.viewProfitReports ? 'xl:grid-cols-6' : 'xl:grid-cols-5'"
                     >
                         <div
                             class="border-border border-b p-5 sm:border-r xl:border-b-0"
                         >
                             <dt class="text-muted-foreground text-sm">
-                                Recorded product revenue
+                                All-time product revenue
                             </dt>
                             <dd class="mt-2 text-2xl font-bold tabular-nums">
                                 {{
@@ -146,6 +179,19 @@ defineOptions({
                             </p>
                         </div>
                         <div
+                            v-if="permissions.viewProfitReports"
+                            class="border-border border-b p-5 sm:border-r xl:border-b-0"
+                        >
+                            <dt class="text-muted-foreground text-sm">
+                                Gross profit
+                            </dt>
+                            <dd class="mt-2 text-2xl font-bold tabular-nums">
+                                {{ dashboard.kpis.profit_data_complete ? formatCurrency(dashboard.kpis.recorded_gross_profit) : 'Unavailable' }}
+                            </dd>
+                            <p class="text-muted-foreground mt-1 text-xs">All-time product sales</p>
+                        </div>
+                        <div
+                            v-if="permissions.viewOrders"
                             class="border-border border-b p-5 sm:border-r-0 xl:border-r xl:border-b-0"
                         >
                             <dt class="text-muted-foreground text-sm">
@@ -159,6 +205,7 @@ defineOptions({
                             </p>
                         </div>
                         <div
+                            v-if="permissions.viewOrders"
                             class="border-border border-b p-5 sm:border-r sm:border-b-0"
                         >
                             <dt class="text-muted-foreground text-sm">
@@ -172,6 +219,7 @@ defineOptions({
                             </p>
                         </div>
                         <div
+                            v-if="permissions.viewInventory"
                             class="border-border border-b p-5 sm:border-r sm:border-b-0"
                         >
                             <dt class="text-muted-foreground text-sm">
@@ -185,6 +233,7 @@ defineOptions({
                             </p>
                         </div>
                         <div
+                            v-if="permissions.viewInventory"
                             class="border-destructive/50 bg-destructive/5 border-t p-5 sm:col-span-2 xl:col-span-1 xl:border-t-0 xl:border-l"
                         >
                             <dt class="text-destructive text-sm font-semibold">
@@ -204,6 +253,7 @@ defineOptions({
             </section>
 
             <section
+                v-if="permissions.viewOrders || permissions.viewInventory"
                 class="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(22rem,0.85fr)]"
                 aria-labelledby="needs-attention-heading"
             >
@@ -222,7 +272,12 @@ defineOptions({
                                 Needs attention
                             </h2>
                         </div>
-                        <Button variant="outline" size="sm" as-child>
+                        <Button
+                            v-if="permissions.viewOrders"
+                            variant="outline"
+                            size="sm"
+                            as-child
+                        >
                             <Link :href="OrderController.index()">
                                 View orders
                                 <ArrowRight aria-hidden="true" />
@@ -250,8 +305,11 @@ defineOptions({
                                 </div>
                             </div>
                         </template>
-                        <div class="surface-panel border-border bg-card border">
-                            <div class="border-border border-b p-5">
+                        <div class="border-border bg-card border">
+                            <div
+                                v-if="permissions.viewOrders"
+                                class="border-border border-b p-5"
+                            >
                                 <div
                                     class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
                                 >
@@ -332,6 +390,7 @@ defineOptions({
                             </div>
 
                             <div
+                                v-if="permissions.viewInventory"
                                 class="border-destructive/40 bg-destructive/5 border-b p-5"
                             >
                                 <div
@@ -410,7 +469,7 @@ defineOptions({
                                 </div>
                             </div>
 
-                            <div class="p-5">
+                            <div v-if="permissions.viewInventory" class="p-5">
                                 <div
                                     class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
                                 >
@@ -512,7 +571,7 @@ defineOptions({
                     </DeferredContent>
                 </div>
 
-                <div class="min-w-0">
+                <div v-if="permissions.viewOrders" class="min-w-0">
                     <div class="mb-4">
                         <p class="text-muted-foreground text-sm">
                             Latest activity
@@ -621,7 +680,10 @@ defineOptions({
                 </div>
             </section>
 
-            <section aria-labelledby="quick-links-heading">
+            <section
+                v-if="quickLinks.length"
+                aria-labelledby="quick-links-heading"
+            >
                 <div class="mb-4">
                     <p class="text-muted-foreground text-sm">Shortcuts</p>
                     <h2 id="quick-links-heading" class="text-xl font-semibold">

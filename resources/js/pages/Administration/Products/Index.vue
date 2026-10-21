@@ -1,6 +1,5 @@
 <script setup>
-import PageHeader from '@/components/PageHeader.vue';
-import { Form, Head, Link, router } from '@inertiajs/vue3';
+import { Form, Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     Eye,
     Pencil,
@@ -17,7 +16,9 @@ import ProductController from '@/actions/App/Http/Controllers/Administration/Pro
 import CatalogNavigation from '@/components/CatalogNavigation.vue';
 import CatalogPagination from '@/components/CatalogPagination.vue';
 import DeactivationDialog from '@/components/DeactivationDialog.vue';
-import PermanentDeletionDialog from '@/components/PermanentDeletionDialog.vue';
+import InputError from '@/components/InputError.vue';
+import RecoverableDeletionDialog from '@/components/RecoverableDeletionDialog.vue';
+import SearchField from '@/components/SearchField.vue';
 import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,7 +37,18 @@ const props = defineProps({
     products: { type: Object, required: true },
     filters: { type: Object, required: true },
     filter_options: { type: Object, required: true },
+    deleted: { type: Boolean, default: false },
 });
+const page = usePage();
+const canManageProducts = computed(
+    () => page.props.auth?.can?.manageProducts === true,
+);
+const canCreateProduct = computed(
+    () => page.props.auth?.can?.priceProducts === true,
+);
+const canDeleteProduct = computed(
+    () => page.props.auth?.can?.deleteCatalog === true,
+);
 
 const categoryId = ref(String(props.filters.category_id ?? 'all'));
 const brand = ref(props.filters.brand ?? 'all');
@@ -91,6 +103,7 @@ function productPage(options) {
     return ProductController.index({
         query: {
             ...props.filters,
+            deleted: props.deleted ? 1 : undefined,
             page: options.query.page,
         },
     });
@@ -98,6 +111,7 @@ function productPage(options) {
 
 function selectedFilters() {
     return {
+        deleted: props.deleted ? 1 : undefined,
         category_id: selectedValue(categoryId.value),
         brand: selectedValue(brand.value),
         tag_id: selectedValue(tagId.value),
@@ -163,24 +177,84 @@ defineOptions({
     <main
         class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
     >
-        <Head title="Products" />
-        <PageHeader title="Products">
-            <template #actions>
-                <Button as-child class="shrink-0">
+        <section class="border-border bg-card relative overflow-hidden border">
+            <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
+            <div
+                class="flex flex-col gap-5 p-6 sm:flex-row sm:items-start sm:justify-between"
+            >
+                <div class="flex items-start gap-4">
+                    <span
+                        class="bg-secondary text-primary flex size-11 shrink-0 items-center justify-center rounded-md"
+                    >
+                        <PackageSearch class="size-5" />
+                    </span>
+                    <div>
+                        <p
+                            class="text-primary text-xs font-semibold tracking-widest uppercase"
+                        >
+                            Sagay City catalog
+                        </p>
+                        <h1
+                            class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
+                        >
+                            {{
+                                canManageProducts
+                                    ? 'Product management'
+                                    : 'Products'
+                            }}
+                        </h1>
+                        <p
+                            class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6"
+                        >
+                            {{
+                                canCreateProduct
+                                    ? 'Maintain the hardware details, pricing, categories, and tags used across Battlefront catalog workflows.'
+                                    : canManageProducts
+                                      ? 'Manage product details, categories, and tags. The owner controls prices.'
+                                      : 'Browse product details, prices, availability, and catalog status.'
+                            }}
+                        </p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                <Button v-if="canDeleteProduct" variant="outline" as-child class="shrink-0">
+                    <Link :href="ProductController.index({ query: { deleted: deleted ? undefined : 1 } })">
+                        <RotateCcw />
+                        {{ deleted ? 'Back to Catalog products' : 'Restore deleted products' }}
+                    </Link>
+                </Button>
+                <Button v-if="canCreateProduct && !deleted" as-child class="shrink-0">
                     <Link :href="ProductController.create()">
                         <Plus />
                         Add product
                     </Link>
                 </Button>
-            </template>
-        </PageHeader>
+                </div>
+            </div>
+            <CatalogNavigation />
+        </section>
 
-        <CatalogNavigation />
-
-        <section class="space-y-3" aria-labelledby="product-query-heading">
-            <h2 id="product-query-heading" class="sr-only">
-                Search and filters
-            </h2>
+        <section
+            v-if="!deleted"
+            class="border-border bg-card border p-5"
+            aria-labelledby="product-query-heading"
+        >
+            <div class="flex items-start gap-3">
+                <span
+                    class="bg-secondary text-primary flex size-10 shrink-0 items-center justify-center rounded-md"
+                >
+                    <SlidersHorizontal class="size-4" />
+                </span>
+                <div>
+                    <h2 id="product-query-heading" class="font-semibold">
+                        Find catalog records
+                    </h2>
+                    <p class="text-muted-foreground mt-1 text-sm">
+                        Search immediately; catalog attributes and lifecycle
+                        status update results as they change.
+                    </p>
+                </div>
+            </div>
 
             <div
                 class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
@@ -303,13 +377,29 @@ defineOptions({
             </div>
         </section>
 
+        <section
+            v-else
+            class="border-border bg-card border p-5"
+            aria-label="Search deleted products"
+        >
+            <SearchField
+                id="deleted-product-search"
+                v-model="search"
+                class="max-w-xl"
+                label="Search deleted products"
+                placeholder="Code, name, brand, or description"
+                :is-searching="isSearching"
+                @clear="clearSearch"
+            />
+        </section>
+
         <section aria-labelledby="product-list-heading">
             <div class="mb-4">
                 <p class="text-muted-foreground text-sm">
-                    {{ products.total }} products
+                    {{ products.total }} {{ deleted ? 'deleted products' : 'products' }}
                 </p>
                 <h2 id="product-list-heading" class="text-xl font-semibold">
-                    Catalog products
+                    {{ deleted ? 'Deleted products' : 'Catalog products' }}
                 </h2>
             </div>
 
@@ -325,17 +415,23 @@ defineOptions({
                         {{
                             hasActiveQuery
                                 ? 'No products match this query'
-                                : 'No products available'
+                                : deleted ? 'No deleted products' : 'No products available'
                         }}
                     </p>
                     <p class="text-muted-foreground mt-1 text-sm">
                         {{
                             hasActiveQuery
                                 ? 'Try another search term or clear the applied filters.'
-                                : 'Add the first Battlefront catalog product to get started.'
+                                : canCreateProduct
+                                  ? 'Add the first Battlefront catalog product to get started.'
+                                  : 'No product records are available yet.'
                         }}
                     </p>
-                    <Button v-if="!hasActiveQuery" as-child class="mt-5">
+                    <Button
+                        v-if="!deleted && !hasActiveQuery && canCreateProduct"
+                        as-child
+                        class="mt-5"
+                    >
                         <Link :href="ProductController.create()">
                             <Plus />
                             Add product
@@ -369,15 +465,13 @@ defineOptions({
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
                             <h3 class="font-semibold">{{ product.name }}</h3>
-                            <Badge variant="outline">{{
-                                product.shipping_handling.label
-                            }}</Badge>
+                            <Badge v-if="!deleted" variant="outline">{{ product.shipping_handling.label }}</Badge>
                             <Badge
                                 :variant="
                                     product.is_active ? 'secondary' : 'outline'
                                 "
                             >
-                                {{ product.is_active ? 'Active' : 'Inactive' }}
+                                {{ deleted ? 'Deleted' : product.is_active ? 'Active' : 'Inactive' }}
                             </Badge>
                             <Badge v-if="product.is_featured" variant="outline">
                                 <Star />
@@ -395,7 +489,13 @@ defineOptions({
                                 (Inactive category)
                             </span>
                         </p>
-                        <p class="text-muted-foreground mt-2 text-xs">
+                        <p v-if="deleted && product.category.is_deleted" class="text-destructive mt-2 text-xs">
+                            Restore this product's category before restoring the product.
+                        </p>
+                        <p v-if="deleted" class="text-muted-foreground mt-2 text-xs">
+                            Deleted {{ product.deleted_at }} by {{ product.deleted_by || 'an administrator' }}
+                        </p>
+                        <p v-else class="text-muted-foreground mt-2 text-xs">
                             {{
                                 formatPrice(product.shipping_handling.surcharge)
                             }}
@@ -408,6 +508,26 @@ defineOptions({
                             }}
                             preparation on configured routes
                         </p>
+                        <div
+                            class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs"
+                        >
+                            <span v-if="!deleted" class="text-muted-foreground"
+                                >Storefront:
+                                {{ product.storefront_visibility }}</span
+                            >
+                            <span
+                                v-if="product.inventory"
+                                class="text-muted-foreground"
+                                >Sellable {{ product.inventory.quantity }} ·
+                                Quarantined
+                                {{
+                                    product.inventory.quarantined_quantity
+                                }}</span
+                            >
+                            <span v-else class="text-muted-foreground"
+                                >Stock not initialized</span
+                            >
+                        </div>
                         <div
                             v-if="product.tags.length > 0"
                             class="mt-3 flex flex-wrap gap-1.5"
@@ -449,33 +569,41 @@ defineOptions({
                         >
                             {{ formatPrice(product.price) }}
                         </p>
+                        <p v-if="product.acquisition_cost !== undefined" class="text-muted-foreground mt-2 text-xs">
+                            Acquisition cost · {{ formatPrice(product.acquisition_cost) }}
+                        </p>
                     </div>
 
                     <div
                         class="flex flex-wrap items-center gap-2 lg:justify-end"
                     >
-                        <Button variant="outline" size="sm" as-child>
+                        <Button v-if="!deleted" variant="outline" size="sm" as-child>
                             <Link :href="ProductController.show(product.id)">
                                 <Eye />
                                 View
                             </Link>
                         </Button>
 
-                        <Button variant="outline" size="sm" as-child>
+                        <Button
+                            v-if="canManageProducts && !deleted"
+                            variant="outline"
+                            size="sm"
+                            as-child
+                        >
                             <Link :href="ProductController.edit(product.id)">
                                 <Pencil />
                                 Edit
                             </Link>
                         </Button>
                         <DeactivationDialog
-                            v-if="product.is_active"
+                            v-if="!deleted && canManageProducts && product.is_active"
                             :name="product.name"
                             :form="ProductActivationController.form(product.id)"
-                            description="This product will no longer appear in customer catalog, cart, or recommendation workflows. Its record, category, tags, and inventory are preserved."
+                            description="This temporarily hides the product from customer browsing and recommendations. It remains in Catalog products and its inventory and history are preserved. Existing cart lines stay visible as unavailable."
                         />
 
                         <Form
-                            v-else
+                            v-else-if="!deleted && canManageProducts"
                             v-bind="
                                 ProductActivationController.form(product.id)
                             "
@@ -493,11 +621,21 @@ defineOptions({
                                 Reactivate
                             </Button>
                         </Form>
-                        <PermanentDeletionDialog
+                        <Form v-if="deleted" v-bind="ProductController.restore.form(product.id)" :options="{ preserveScroll: true }" v-slot="{ processing, errors }">
+                            <Button variant="outline" size="sm" :disabled="processing">
+                                <Spinner v-if="processing" />
+                                <RotateCcw v-else />
+                                Restore deleted product
+                            </Button>
+                            <InputError :message="errors.restore" />
+                        </Form>
+                        <RecoverableDeletionDialog
+                            v-if="canDeleteProduct && !deleted"
                             :name="product.name"
+                            resource-name="product"
+                            collection-name="Deleted products"
                             :form="ProductController.destroy.form(product.id)"
                             :error-bag="`deleteProduct${product.id}`"
-                            :imported="product.is_catalog_imported"
                         />
                     </div>
                 </article>

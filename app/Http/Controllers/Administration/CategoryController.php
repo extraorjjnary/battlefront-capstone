@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Administration;
 
 use App\Actions\Catalog\CatalogName;
 use App\Actions\Category\DeleteCategory;
+use App\Actions\Category\RestoreCategory;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\SaveCategoryRequest;
 use App\Models\Category;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -17,18 +19,44 @@ class CategoryController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index(): Response
+    public function index(Request $request): Response
     {
-        $categories = Category::query()
-            ->select(['id', 'name', 'description', 'is_active'])
-            ->withCount('products')
+        $showDeleted = $request->boolean('deleted');
+        $filters = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
+        if ($showDeleted) {
+            $this->authorize('catalog.delete');
+        }
+
+        $query = $showDeleted ? Category::onlyTrashed() : Category::query();
+        $categories = $query
+            ->when($filters['q'] ?? null, fn ($query, $search) => $query->where(fn ($query) => $query
+                ->where('name', 'like', '%'.$search.'%')
+                ->orWhere('description', 'like', '%'.$search.'%')))
+            ->select(['id', 'name', 'description', 'is_active', ...($showDeleted ? ['deleted_at', 'deleted_by_id'] : [])])
+            ->when($showDeleted, fn ($query) => $query->with('deletedBy:id,name'))
+            ->withCount($showDeleted
+                ? ['products' => fn ($products) => $products->withTrashed()]
+                : 'products')
             ->orderBy('name')
             ->orderBy('id')
             ->paginate(15)
+            ->through(fn (Category $category): array => [
+                'id' => $category->id,
+                'name' => $category->name,
+                'description' => $category->description,
+                'is_active' => $category->is_active,
+                'products_count' => (int) $category->products_count,
+                ...($showDeleted ? [
+                    'deleted_at' => $category->deleted_at?->toDateTimeString(),
+                    'deleted_by' => $category->deletedBy?->name,
+                ] : []),
+            ])
             ->withQueryString();
 
         return Inertia::render('Administration/Categories/Index', [
             'categories' => $categories,
+            'deleted' => $showDeleted,
+            'filters' => ['q' => $filters['q'] ?? null],
         ]);
     }
 
@@ -95,13 +123,24 @@ class CategoryController extends Controller
 
     public function destroy(Category $category, DeleteCategory $deleteCategory): RedirectResponse
     {
+        $this->authorize('catalog.delete');
         $deleteCategory->execute($category);
 
         Inertia::flash('toast', [
             'type' => 'success',
-            'message' => __('Category permanently deleted.'),
+            'message' => __('Category moved to Deleted categories. An owner can restore it.'),
         ]);
 
         return to_route('administration.categories.index');
+    }
+
+    public function restore(int $category, RestoreCategory $restoreCategory): RedirectResponse
+    {
+        $this->authorize('catalog.delete');
+        $restoreCategory->execute($category);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => __('Category restored as inactive.')]);
+
+        return to_route('administration.categories.index', ['deleted' => 1]);
     }
 }

@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Administration\AdministrationEvidenceController;
+use App\Http\Controllers\Administration\AuditLogController;
 use App\Http\Controllers\Administration\BranchController as AdministrationBranchController;
 use App\Http\Controllers\Administration\CategoryActivationController;
 use App\Http\Controllers\Administration\CategoryController;
@@ -7,11 +9,15 @@ use App\Http\Controllers\Administration\ChatbotKnowledgeActivationController;
 use App\Http\Controllers\Administration\ChatbotKnowledgeController;
 use App\Http\Controllers\Administration\ChatbotKnowledgePreviewController;
 use App\Http\Controllers\Administration\CustomerController;
+use App\Http\Controllers\Administration\CustomerReturnController;
+use App\Http\Controllers\Administration\DamageReportController;
 use App\Http\Controllers\Administration\ForecastingController;
+use App\Http\Controllers\Administration\InventoryAdjustmentController;
 use App\Http\Controllers\Administration\InventoryController;
 use App\Http\Controllers\Administration\NotificationController as AdministrationNotificationController;
 use App\Http\Controllers\Administration\OrderCodCollectionController;
 use App\Http\Controllers\Administration\OrderController as AdministrationOrderController;
+use App\Http\Controllers\Administration\OrderHandlerController;
 use App\Http\Controllers\Administration\OrderManualShipmentController;
 use App\Http\Controllers\Administration\OrderPaymentProofController;
 use App\Http\Controllers\Administration\OrderPaymentStatusController;
@@ -21,7 +27,14 @@ use App\Http\Controllers\Administration\OrderShipmentStatusController;
 use App\Http\Controllers\Administration\OrderStatusController;
 use App\Http\Controllers\Administration\ProductActivationController;
 use App\Http\Controllers\Administration\ProductController;
+use App\Http\Controllers\Administration\RolePermissionController;
 use App\Http\Controllers\Administration\SalesReportController;
+use App\Http\Controllers\Administration\StaffPerformanceController;
+use App\Http\Controllers\Administration\StockReconciliationController;
+use App\Http\Controllers\Administration\SupplierController;
+use App\Http\Controllers\Administration\SupplierReturnController;
+use App\Http\Controllers\Administration\TeamController;
+use App\Http\Controllers\Administration\WorkQueueController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CartItemController;
@@ -138,10 +151,11 @@ Route::middleware(['auth', 'can:access-administration'])
     ->prefix('administration')
     ->name('administration.')
     ->group(function () {
+        Route::get('work-queue', [WorkQueueController::class, 'index'])->name('work-queue.index');
         Route::resource('branches', AdministrationBranchController::class)
+            ->middleware('can:branches.manage')
             ->except('destroy')
             ->where(['branch' => '[0-9]+']);
-
         // notifications
         Route::get('notifications', [AdministrationNotificationController::class, 'index'])->name('notifications.index');
         Route::get('notifications/summary', [AdministrationNotificationController::class, 'summary'])->name('notifications.summary');
@@ -149,80 +163,178 @@ Route::middleware(['auth', 'can:access-administration'])
         Route::patch('notifications/{notification}/read', [AdministrationNotificationController::class, 'update'])->whereUuid('notification')->name('notifications.update');
 
         // products
-        Route::resource('products', ProductController::class);
+        Route::post('products/{product}/restore', [ProductController::class, 'restore'])
+            ->middleware('can:catalog.delete')
+            ->name('products.restore');
+        Route::resource('products', ProductController::class)
+            ->middleware('can:products.manage');
         Route::patch('products/{product}/activation', ProductActivationController::class)
+            ->middleware('can:products.manage')
             ->name('products.activation.update');
 
         // product inventory
         Route::post('products/{product}/inventory', [InventoryController::class, 'store'])
+            ->middleware('can:inventory.request')
             ->name('products.inventory.store');
 
         // categories
+        Route::post('categories/{category}/restore', [CategoryController::class, 'restore'])
+            ->middleware('can:catalog.delete')
+            ->name('categories.restore');
         Route::resource('categories', CategoryController::class)
+            ->middleware('can:products.manage')
             ->except(['show']);
         Route::patch('categories/{category}/activation', CategoryActivationController::class)
+            ->middleware('can:products.manage')
             ->name('categories.activation.update');
 
         // inventories
         Route::get('inventory', [InventoryController::class, 'index'])
+            ->middleware('can:inventory.view')
             ->name('inventory.index');
         Route::patch('inventory/{inventory}', [InventoryController::class, 'update'])
+            ->middleware('can:inventory.request')
             ->name('inventory.update');
+        Route::post('inventory/{inventory}/physical-count', [InventoryController::class, 'count'])
+            ->middleware('can:inventory.request')->name('inventory.count');
+        Route::get('inventory-adjustments', [InventoryAdjustmentController::class, 'index'])
+            ->middleware('can:inventory.view')
+            ->name('inventory-adjustments.index');
+        Route::patch('inventory/{inventory}/reorder-level', [InventoryController::class, 'updateReorderLevel'])
+            ->middleware('can:inventory.reorder')->name('inventory.reorder-level.update');
+        Route::post('inventory-adjustments/{adjustment}/decision', [InventoryAdjustmentController::class, 'decide'])
+            ->middleware('can:inventory.approve')
+            ->name('inventory-adjustments.decide');
+        Route::post('inventory-adjustments/{adjustment}/withdrawal', [InventoryAdjustmentController::class, 'withdraw'])
+            ->middleware('can:inventory.request')->name('inventory-adjustments.withdraw');
+        Route::post('inventory-adjustments/{adjustment}/replacement', [InventoryAdjustmentController::class, 'replace'])
+            ->middleware('can:inventory.request')->name('inventory-adjustments.replace');
+        Route::get('damage-reports', [DamageReportController::class, 'index'])->middleware('can:inventory.view')->name('damage-reports.index');
+        Route::post('damage-reports', [DamageReportController::class, 'store'])->middleware('can:returns.request')->name('damage-reports.store');
+        Route::post('damage-reports/{damageReport}/decision', [DamageReportController::class, 'decide'])
+            ->middleware('can:returns.approve')->name('damage-reports.decide');
+        Route::get('suppliers', [SupplierController::class, 'index'])->middleware('can:suppliers.manage')->name('suppliers.index');
+        Route::post('suppliers', [SupplierController::class, 'store'])->middleware('can:suppliers.manage')->name('suppliers.store');
+        Route::patch('suppliers/{supplier}', [SupplierController::class, 'update'])->middleware('can:suppliers.manage')->name('suppliers.update');
+        Route::get('supplier-returns', [SupplierReturnController::class, 'index'])->middleware('can:inventory.view')->name('supplier-returns.index');
+        Route::post('supplier-returns', [SupplierReturnController::class, 'store'])->middleware('can:returns.request')->name('supplier-returns.store');
+        Route::post('supplier-returns/{supplierReturn}/decision', [SupplierReturnController::class, 'decide'])
+            ->middleware('can:returns.approve')->name('supplier-returns.decide');
+        Route::post('supplier-returns/{supplierReturn}/dispatch', [SupplierReturnController::class, 'dispatch'])
+            ->middleware('can:returns.dispatch')->name('supplier-returns.dispatch');
+        Route::post('supplier-returns/{supplierReturn}/acknowledgement', [SupplierReturnController::class, 'acknowledge'])
+            ->middleware('can:returns.approve')->name('supplier-returns.acknowledge');
+        Route::post('supplier-returns/{supplierReturn}/follow-up', [SupplierReturnController::class, 'followUp'])
+            ->middleware('can:returns.approve')->name('supplier-returns.follow-up');
+        Route::post('supplier-returns/{supplierReturn}/resolution', [SupplierReturnController::class, 'resolve'])
+            ->middleware('can:returns.resolve')->name('supplier-returns.resolve');
+        Route::get('customer-returns', [CustomerReturnController::class, 'index'])->middleware('can:orders.view')->name('customer-returns.index');
+        Route::post('customer-returns', [CustomerReturnController::class, 'store'])->middleware('can:returns.request')->name('customer-returns.store');
+        Route::post('customer-returns/{customerReturn}/decision', [CustomerReturnController::class, 'decide'])
+            ->middleware('can:returns.approve')->name('customer-returns.decide');
+        Route::post('customer-returns/{customerReturn}/handover', [CustomerReturnController::class, 'handBack'])
+            ->middleware('can:returns.dispatch')->name('customer-returns.handover');
+        Route::post('customer-refunds/{refund}/payments', [CustomerReturnController::class, 'recordPayment'])
+            ->middleware('can:returns.record_payment')->name('customer-refunds.payments.store');
+        Route::post('customer-refund-payments/{payment}/review', [CustomerReturnController::class, 'reviewPayment'])
+            ->middleware('can:returns.reconcile')->name('customer-refund-payments.review');
+        Route::post('evidence/{subjectType}/{subjectId}', [AdministrationEvidenceController::class, 'store'])
+            ->whereIn('subjectType', ['damage_report', 'customer_return', 'refund_payment'])
+            ->whereNumber('subjectId')->name('evidence.store');
+        Route::get('evidence/{evidence}', [AdministrationEvidenceController::class, 'show'])
+            ->whereNumber('evidence')->name('evidence.show');
 
         // chatbots
         Route::post('chatbot-knowledge/preview', ChatbotKnowledgePreviewController::class)
+            ->middleware('can:products.manage')
             ->name('chatbot-knowledge.preview');
         Route::resource('chatbot-knowledge', ChatbotKnowledgeController::class)
+            ->middleware('can:products.manage')
             ->parameters(['chatbot-knowledge' => 'chatbotKnowledge'])
             ->except('destroy');
         Route::patch(
             'chatbot-knowledge/{chatbotKnowledge}/activation',
             ChatbotKnowledgeActivationController::class,
-        )->name('chatbot-knowledge.activation.update');
+        )->middleware('can:products.manage')->name('chatbot-knowledge.activation.update');
 
         // preview customer orders
         Route::resource('customers', CustomerController::class)
+            ->middleware('can:customers.view')
             ->only(['index', 'show']);
 
         // handling customer orders
         Route::resource('orders', AdministrationOrderController::class)
+            ->middleware('can:orders.view')
             ->only(['index', 'show']);
+        Route::post('orders/{order}/claim', [OrderHandlerController::class, 'claim'])
+            ->middleware('can:orders.process')->name('orders.claim');
+        Route::patch('orders/{order}/handler', [OrderHandlerController::class, 'assign'])
+            ->middleware('can:orders.assign')->name('orders.handler.update');
         Route::patch('orders/{order}/status', [OrderStatusController::class, 'update'])
+            ->middleware('can:orders.process')
             ->name('orders.status.update');
         Route::post('orders/{order}/shipment/manual', [OrderManualShipmentController::class, 'store'])
+            ->middleware('can:orders.process')
             ->name('orders.shipment.manual.store');
         Route::patch('orders/{order}/shipment/status', [OrderShipmentStatusController::class, 'update'])
+            ->middleware('can:orders.process')
             ->name('orders.shipment.status.update');
         Route::patch('orders/{order}/shipment/reference', [OrderShipmentReferenceController::class, 'update'])
+            ->middleware('can:orders.process')
             ->name('orders.shipment.reference.update');
         Route::patch('orders/{order}/payment-status', [OrderPaymentStatusController::class, 'update'])
+            ->middleware('can:orders.process')
             ->name('orders.payment-status.update');
         Route::post('orders/{order}/cod-collection', [OrderCodCollectionController::class, 'store'])
+            ->middleware('can:orders.process')
             ->whereNumber('order')
             ->name('orders.cod-collection.store');
         Route::post('orders/{order}/pickup-confirmation', [OrderPickupConfirmationController::class, 'store'])
+            ->middleware('can:orders.process')
             ->whereNumber('order')
             ->name('orders.pickup-confirmation.store');
         Route::get('orders/{order}/payment-proof', OrderPaymentProofController::class)
+            ->middleware('can:orders.view')
             ->name('orders.payment-proof.show');
 
         // sales report
         Route::get('reports/sales', [SalesReportController::class, 'index'])
+            ->middleware('can:reports.view')
             ->name('reports.sales');
+        Route::get('reports/staff', [StaffPerformanceController::class, 'index'])
+            ->middleware('can:orders.view')->name('reports.staff');
+        Route::get('reports/stock-reconciliation', [StockReconciliationController::class, 'index'])
+            ->middleware('can:inventory.view')->name('reports.stock-reconciliation');
+        Route::get('reports/audit', [AuditLogController::class, 'index'])
+            ->middleware('can:audit.view')->name('reports.audit');
+        Route::get('reports/audit/export', [AuditLogController::class, 'export'])
+            ->middleware('can:audit.export')->name('reports.audit.export');
         Route::post('reports/sales/reset', [SalesReportController::class, 'reset'])
+            ->middleware('can:reports.view')
             ->name('reports.sales.reset');
         Route::get('reports/sales/print', [SalesReportController::class, 'printReport'])
+            ->middleware('can:reports.export')
             ->name('reports.sales.print');
         Route::get('reports/sales/pdf', [SalesReportController::class, 'pdf'])
+            ->middleware('can:reports.export')
             ->name('reports.sales.pdf');
         Route::get('reports/sales/csv', [SalesReportController::class, 'csv'])
+            ->middleware('can:reports.export')
             ->name('reports.sales.csv');
 
         // predictive analytics
         Route::get('forecasting', [ForecastingController::class, 'index'])
+            ->middleware('can:reports.view')
             ->name('forecasting.index');
         Route::post('forecasting', [ForecastingController::class, 'store'])
+            ->middleware('can:forecast.manage')
             ->name('forecasting.store');
+
+        Route::get('team', [TeamController::class, 'index'])->middleware('can:users.manage')->name('team.index');
+        Route::post('team', [TeamController::class, 'store'])->middleware('can:users.manage')->name('team.store');
+        Route::patch('team/{user}', [TeamController::class, 'update'])->middleware('can:users.manage')->name('team.update');
+        Route::put('team/roles/{role}/permissions', [RolePermissionController::class, 'update'])
+            ->middleware('can:permissions.manage')->name('team.permissions.update');
     });
 
 // profile settings

@@ -13,6 +13,8 @@ test('the order item schema follows the approved ERD decisions', function () {
         'product_id',
         'quantity',
         'price_at_time',
+        'acquisition_cost_at_time',
+        'acquisition_cost_source',
     ]);
 });
 
@@ -89,17 +91,23 @@ test('required order item fields cannot be omitted', function (string $missingFi
     'purchase-time price' => 'price_at_time',
 ]);
 
-test('products referenced by order items cannot be deleted', function () {
+test('soft deleted products remain available to their historical order items', function () {
     $item = OrderItem::factory()->create();
+    $product = $item->product;
 
-    expect(fn () => $item->product->delete())->toThrow(QueryException::class);
+    $product->delete();
+
+    expect($item->fresh()->product->is($product))->toBeTrue()
+        ->and($item->fresh()->product->trashed())->toBeTrue();
     $this->assertModelExists($item);
+
+    expect(fn () => $product->forceDelete())->toThrow(QueryException::class);
 });
 
-test('deleting an order removes its dependent items', function () {
+test('an order with purchase history cannot be deleted', function () {
     $item = OrderItem::factory()->create();
 
-    $item->order->delete();
+    expect(fn () => $item->order->delete())->toThrow(QueryException::class);
 
-    $this->assertModelMissing($item);
+    $this->assertModelExists($item);
 });

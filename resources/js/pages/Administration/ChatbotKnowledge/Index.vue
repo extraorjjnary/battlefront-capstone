@@ -1,5 +1,4 @@
-<script setup>
-import PageHeader from '@/components/PageHeader.vue';
+﻿<script setup>
 import { Form, Head, Link, useHttp } from '@inertiajs/vue3';
 import {
     ChevronDown,
@@ -9,13 +8,15 @@ import {
     Plus,
     RotateCcw,
 } from '@lucide/vue';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import ChatbotKnowledgeActivationController from '@/actions/App/Http/Controllers/Administration/ChatbotKnowledgeActivationController';
 import ChatbotKnowledgeController from '@/actions/App/Http/Controllers/Administration/ChatbotKnowledgeController';
 import ChatbotKnowledgePreviewController from '@/actions/App/Http/Controllers/Administration/ChatbotKnowledgePreviewController';
 import CatalogPagination from '@/components/CatalogPagination.vue';
 import DeactivationDialog from '@/components/DeactivationDialog.vue';
 import InputError from '@/components/InputError.vue';
+import SearchField from '@/components/SearchField.vue';
+import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
@@ -27,8 +28,9 @@ import {
     CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 
-defineProps({
+const props = defineProps({
     knowledge: { type: Object, required: true },
+    filters: { type: Object, required: true },
 });
 
 const previewOpen = ref(false);
@@ -36,6 +38,12 @@ const preview = useHttp({ message: '' });
 const previewResult = ref(null);
 const previewError = ref('');
 const testedQuestion = ref('');
+const { search, isSearching, clearSearch } = useDebouncedSearch({
+    initialSearch: props.filters.q,
+    currentSearch: () => props.filters.q,
+    route: ChatbotKnowledgeController.index,
+});
+watch(() => props.filters.q, (query) => { search.value = query ?? ''; });
 const categoryLabels = {
     faq: 'FAQ',
     product: 'Product',
@@ -76,27 +84,62 @@ defineOptions({
 </script>
 
 <template>
+    <Head title="Chatbot FAQs" />
+
     <main
-        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
+        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
     >
-        <Head title="Chatbot FAQs" />
-        <PageHeader
-            title="Chatbot FAQs"
-            description="Manage support FAQs. Live facts and store rules are answered automatically."
-        >
-            <template #actions>
+        <section class="border-border bg-card relative overflow-hidden border">
+            <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
+            <div
+                class="flex flex-col gap-5 p-6 sm:flex-row sm:items-start sm:justify-between"
+            >
+                <div class="flex items-start gap-4">
+                    <span
+                        class="bg-secondary text-primary flex size-11 shrink-0 items-center justify-center rounded-md"
+                    >
+                        <MessageSquareText class="size-5" />
+                    </span>
+                    <div>
+                        <p
+                            class="text-primary text-xs font-semibold tracking-widest uppercase"
+                        >
+                            Customer support content
+                        </p>
+                        <h1
+                            class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
+                        >
+                            Chatbot FAQs
+                        </h1>
+                        <p
+                            class="text-muted-foreground mt-2 max-w-2xl text-sm leading-6"
+                        >
+                            Manage approved support FAQs. Live facts and application rules are answered automatically.
+                        </p>
+                    </div>
+                </div>
                 <Button as-child class="shrink-0">
                     <Link :href="ChatbotKnowledgeController.create()">
                         <Plus />
                         Add FAQ
                     </Link>
                 </Button>
-            </template>
-        </PageHeader>
+            </div>
+
+            <SearchField
+                id="knowledge-search"
+                v-model="search"
+                class="mt-5 max-w-xl"
+                label="Search FAQs"
+                placeholder="Question or response"
+                :is-searching="isSearching"
+                @clear="clearSearch"
+            />
+        </section>
 
         <Collapsible
             v-model:open="previewOpen"
-            class="surface-panel border-border bg-card border"
+            class="border-border bg-card border"
         >
             <h2>
                 <CollapsibleTrigger as-child>
@@ -117,9 +160,11 @@ defineOptions({
             </h2>
             <CollapsibleContent class="px-6 pb-6">
                 <p class="text-muted-foreground max-w-3xl text-sm leading-6">
-                    Test a question against routing and active FAQs. This
-                    preview excludes live product, store, and order data and
-                    does not generate a reply.
+                    Enter a customer question to see its category and matching
+                    active eligible FAQs across all records. This
+                    checks routing and saved FAQs only; it does not
+                    retrieve live product, branch, or customer order data, or
+                    generate a chatbot reply.
                 </p>
                 <form class="mt-5 space-y-3" @submit.prevent="testQuestion">
                     <Label for="knowledge-preview-message"
@@ -168,7 +213,9 @@ defineOptions({
                         </p>
                         <p>{{ previewResult.explanation }}</p>
                         <template v-if="previewResult.matches.length">
-                            <h3 class="pt-2 font-semibold">Matched FAQs</h3>
+                            <h3 class="pt-2 font-semibold">
+                                Matched FAQs
+                            </h3>
                             <ol class="space-y-4">
                                 <li
                                     v-for="match in previewResult.matches"
@@ -233,13 +280,15 @@ defineOptions({
 
             <div
                 v-if="knowledge.data.length === 0"
-                class="surface-panel border-border bg-card flex min-h-52 items-center justify-center border p-6 text-center"
+                class="border-border bg-card flex min-h-52 items-center justify-center border p-6 text-center"
             >
                 <div>
                     <MessageSquareText
                         class="text-muted-foreground mx-auto size-9"
                     />
-                    <p class="mt-3 font-medium">No chatbot FAQs available</p>
+                    <p class="mt-3 font-medium">
+                        No chatbot FAQs available
+                    </p>
                     <p class="text-muted-foreground mt-1 text-sm">
                         Add approved support guidance to begin managing FAQs.
                     </p>
@@ -248,7 +297,7 @@ defineOptions({
 
             <div
                 v-else
-                class="surface-panel border-border bg-card divide-border divide-y border"
+                class="border-border bg-card divide-border divide-y border"
             >
                 <article
                     v-for="item in knowledge.data"
@@ -267,18 +316,9 @@ defineOptions({
                             >
                                 {{ item.is_active ? 'Active' : 'Inactive' }}
                             </Badge>
-                            <Badge
-                                v-if="!item.eligible_for_faq"
-                                variant="outline"
-                                >Needs review</Badge
-                            >
+                            <Badge v-if="!item.eligible_for_faq" variant="outline">Needs review</Badge>
                         </div>
-                        <p
-                            v-if="!item.eligible_for_faq"
-                            class="text-muted-foreground mt-2 text-xs"
-                        >
-                            {{ item.eligibility_reason }}
-                        </p>
+                        <p v-if="!item.eligible_for_faq" class="text-muted-foreground mt-2 text-xs">{{ item.eligibility_reason }}</p>
                         <h3 class="mt-3 font-semibold">
                             {{ item.question_pattern }}
                         </h3>

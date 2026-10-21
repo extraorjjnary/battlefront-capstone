@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EncryptCookies;
+use App\Http\Middleware\EnforceActiveAccount;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\ResolveGuestRecommendationProfile;
@@ -25,6 +26,7 @@ return Application::configure(basePath: dirname(__DIR__))
             ],
             append: [
                 ResolveGuestRecommendationProfile::class,
+                EnforceActiveAccount::class,
                 HandleAppearance::class,
                 HandleInertiaRequests::class,
                 AddLinkHeadersForPreloadedAssets::class,

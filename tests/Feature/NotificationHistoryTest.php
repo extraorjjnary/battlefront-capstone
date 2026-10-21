@@ -20,7 +20,7 @@ function historyNotification(User $recipient, string $kind = 'payment.verified',
     return $recipient->notifications()->latest()->first();
 }
 
-test('web summary polling returns only scoped notification data with three bounded queries', function (string $role) {
+test('web summary polling returns only scoped notification data with four bounded queries', function (string $role) {
     $user = $role === 'administrator' ? User::factory()->administrator()->create() : User::factory()->customer()->create();
     $other = $role === 'administrator' ? User::factory()->administrator()->create() : User::factory()->customer()->create();
     $order = $role === 'administrator' ? Order::factory()->create() : Order::factory()->for($user)->create();
@@ -43,7 +43,7 @@ test('web summary polling returns only scoped notification data with three bound
     expect(array_keys($response->json()))->toBe(['data', 'meta']);
     $response->assertJsonPath('meta.user_id', $user->id)->assertJsonPath('meta.audience', $role);
     expect(array_keys($response->json('data')))->toBe(['unread_count', 'recent']);
-    expect($queries)->toHaveCount(3);
+    expect($queries)->toHaveCount($role === 'administrator' ? 4 : 3);
     expect($user->unreadNotifications()->count())->toBe(8);
 })->with(['customer', 'administrator']);
 
