@@ -43,7 +43,11 @@ const { isCurrentOrParentUrl, isCurrentUrl } = useCurrentUrl();
                             v-if="item.badgeCount !== undefined"
                             class="relative size-4 shrink-0"
                         >
-                            <component :is="item.icon" class="size-4" />
+                            <component
+                                :is="item.icon"
+                                class="size-4"
+                                aria-hidden="true"
+                            />
                             <span
                                 v-if="item.badgeCount > 0"
                                 data-slot="cart-quantity-badge"
@@ -57,7 +61,7 @@ const { isCurrentOrParentUrl, isCurrentUrl } = useCurrentUrl();
                                 }}
                             </span>
                         </span>
-                        <component :is="item.icon" v-else />
+                        <component :is="item.icon" v-else aria-hidden="true" />
                         <span>{{ item.title }}</span>
                     </Link>
                 </SidebarMenuButton>

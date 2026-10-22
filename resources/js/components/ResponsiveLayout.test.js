@@ -453,6 +453,8 @@ async function openBrowser(t, { built = true } = {}) {
     let fixture;
     let fixtureNumber = 0;
     const navigationFixtures = new Map();
+    const formFixtures = new Map();
+    const formRequests = [];
     const navigationRequests = [];
     const filterRequests = [];
     const appearanceRequests = [];
@@ -480,7 +482,7 @@ async function openBrowser(t, { built = true } = {}) {
             ...current.props,
             appearance: current.appearance,
             auth: current.auth ?? { user: null, can: {} },
-            errors: {},
+            errors: current.props.errors ?? {},
             notificationSummary: { unread_count: 0, recent: [] },
             responsiveFixtureNumber: current.number,
         },
@@ -650,6 +652,23 @@ async function openBrowser(t, { built = true } = {}) {
                 ],
                 body: Buffer.from(JSON.stringify(page)).toString('base64'),
             });
+        } else if (
+            request.method !== 'GET' &&
+            formFixtures.has(new URL(request.url).pathname)
+        ) {
+            formRequests.push(request);
+            const page = fixturePage(
+                formFixtures.get(new URL(request.url).pathname),
+            );
+            await command('Fetch.fulfillRequest', {
+                requestId,
+                responseCode: 200,
+                responseHeaders: [
+                    { name: 'Content-Type', value: 'application/json' },
+                    { name: 'X-Inertia', value: 'true' },
+                ],
+                body: Buffer.from(JSON.stringify(page)).toString('base64'),
+            });
         } else if (request.method !== 'GET') {
             await command('Fetch.failRequest', {
                 requestId,
@@ -684,6 +703,10 @@ async function openBrowser(t, { built = true } = {}) {
         navigationRequests,
         appearanceRequests,
         filterRequests,
+        formRequests,
+        registerForm(url, props) {
+            formFixtures.set(url, { ...fixture, props });
+        },
         registerPage(url, component, props, appearance, auth = fixture.auth) {
             navigationFixtures.set(url, {
                 ...fixture,
@@ -701,6 +724,7 @@ async function openBrowser(t, { built = true } = {}) {
             customer = true,
             appearance = 'light',
             flash = {},
+            capabilities = {},
         ) {
             if (!customer && appearance !== null) {
                 await evaluate(
@@ -728,6 +752,7 @@ async function openBrowser(t, { built = true } = {}) {
                           can: {
                               useCustomerCart: customer !== 'admin',
                               accessAdministration: customer === 'admin',
+                              ...capabilities,
                           },
                       }
                     : undefined,
@@ -787,6 +812,579 @@ async function assertFits(browser, label) {
         `${label}: content must fit the viewport even when the shell clips overflow`,
     );
 }
+
+test(
+    'compact administration editors preserve drafts, request fields and visible validation errors',
+    {
+        skip: !baseUrl || !executable,
+        timeout: 120000,
+    },
+    async (t) => {
+        const browser = await openBrowser(t);
+        const paginated = (data) => ({
+            data,
+            total: data.length,
+            current_page: 1,
+            last_page: 1,
+        });
+        const inventory = {
+            products: paginated([
+                {
+                    ...product,
+                    category: 'RAM',
+                    product_code: 'RAM-007',
+                    is_active: true,
+                    stock_status: 'low_stock',
+                    inventory: {
+                        ...product.inventory,
+                        quarantined_quantity: 2,
+                    },
+                },
+            ]),
+            filters: { q: null, category_id: null, stock: 'all' },
+            filter_options: { categories: [] },
+            low_stock_count: 1,
+            out_of_stock_count: 0,
+        };
+        const staff = { viewInventory: true, requestInventory: true };
+        const trigger = `document.querySelector('main [data-slot="collapsible-trigger"]')`;
+        const form = `document.querySelector('main article form')`;
+        const expanded = `${trigger}.getAttribute('aria-expanded')`;
+        async function space() {
+            for (const type of ['keyDown', 'keyUp']) {
+                await browser.command('Input.dispatchKeyEvent', {
+                    type,
+                    key: ' ',
+                    code: 'Space',
+                    windowsVirtualKeyCode: 32,
+                });
+            }
+        }
+
+        for (const theme of ['light', 'dark']) {
+            await browser.resize(375);
+            await browser.show(
+                'Administration/Inventory',
+                inventory,
+                'admin',
+                theme,
+                {},
+                staff,
+            );
+            assert.equal(await browser.evaluate(expanded), 'false');
+            assert.equal(
+                await browser.evaluate(
+                    `${form}.getBoundingClientRect().height`,
+                ),
+                0,
+            );
+            assert.equal(
+                await browser.evaluate(
+                    `document.querySelectorAll('main article form').length`,
+                ),
+                1,
+                'staff cannot change reorder levels',
+            );
+            await browser.evaluate(`${trigger}.focus()`);
+            await space();
+            assert.equal(await browser.evaluate(expanded), 'true');
+            await browser.evaluate(
+                `(() => { const form = ${form}; form.elements.quantity.value = '12'; form.elements.reason_code.value = 'count_error'; form.elements.reason.value = 'Shelf count checked'; for (const field of [form.elements.quantity, form.elements.reason_code, form.elements.reason]) { field.dispatchEvent(new Event('input', { bubbles: true })); field.dispatchEvent(new Event('change', { bubbles: true })); } })()`,
+            );
+            await space();
+            assert.equal(await browser.evaluate(expanded), 'false');
+            await space();
+            assert.equal(
+                await browser.evaluate(`${form}.elements.quantity.value`),
+                '12',
+                'closing retains the draft',
+            );
+            assert.deepEqual(
+                await browser.evaluate(
+                    `Object.fromEntries(new FormData(${form}))`,
+                ),
+                {
+                    quantity: '12',
+                    reorder_level: '10',
+                    reason_code: 'count_error',
+                    reason: 'Shelf count checked',
+                },
+            );
+            for (const width of [320, 375, 768, 1024, 1440]) {
+                await browser.resize(width);
+                await assertFits(browser, `inventory editor ${theme} ${width}`);
+            }
+            await browser.evaluate(`${trigger}.click()`);
+            assert.ok(
+                await browser.evaluate(
+                    `document.querySelector('main article').getBoundingClientRect().height < 220`,
+                ),
+                'closed rows stay compact on desktop',
+            );
+            if (process.env.BATTLEFRONT_ADMIN_PREVIEW) {
+                for (const width of [375, 1440]) {
+                    await browser.resize(width);
+                    const { data } = await browser.command(
+                        'Page.captureScreenshot',
+                        { format: 'png' },
+                    );
+                    await writeFile(
+                        join(
+                            process.env.BATTLEFRONT_ADMIN_PREVIEW,
+                            `${theme}-inventory-${width}.png`,
+                        ),
+                        Buffer.from(data, 'base64'),
+                    );
+                }
+            }
+
+            const path = await browser.evaluate(
+                `new URL(${form}.action).pathname`,
+            );
+            browser.registerForm(path, {
+                ...inventory,
+                errors: {
+                    quantity: 'Stock changed. Check the latest quantity.',
+                },
+            });
+            const previous = browser.formRequests.length;
+            await browser.evaluate(`${form}.requestSubmit()`);
+            for (let attempt = 0; attempt < 100; attempt++) {
+                if (
+                    await browser.evaluate(
+                        `${expanded} === 'true' && document.querySelector('main article').textContent.includes('Stock changed. Check the latest quantity.')`,
+                    )
+                )
+                    break;
+                await delay(50);
+            }
+            assert.equal(browser.formRequests.length, previous + 1);
+            assert.equal(
+                await browser.evaluate(expanded),
+                'true',
+                'server errors reveal the submitted editor',
+            );
+            assert.equal(
+                await browser.evaluate(`${form}.elements.quantity.value`),
+                '12',
+            );
+            assert.equal(
+                await browser.evaluate(
+                    `document.querySelector('main article [aria-invalid="true"]').name`,
+                ),
+                'quantity',
+            );
+        }
+
+        await browser.show(
+            'Administration/Inventory',
+            inventory,
+            'admin',
+            'light',
+            {},
+            { viewInventory: true, reorderInventory: true },
+        );
+        assert.equal(
+            await browser.evaluate(
+                `document.querySelectorAll('main article form').length`,
+            ),
+            1,
+        );
+        assert.equal(
+            await browser.evaluate(`${form}.elements.reorder_level.value`),
+            '10',
+        );
+        assert.match(
+            await browser.evaluate(`${trigger}.textContent`),
+            /Edit reorder level/,
+        );
+        await browser.show(
+            'Administration/Inventory',
+            inventory,
+            'admin',
+            'light',
+            {},
+            { viewInventory: true },
+        );
+        assert.equal(
+            await browser.evaluate(
+                `document.querySelectorAll('main article form').length`,
+            ),
+            0,
+        );
+        const uninitialized = {
+            ...inventory,
+            products: paginated([
+                {
+                    ...inventory.products.data[0],
+                    inventory: null,
+                    stock_status: 'not_initialized',
+                },
+            ]),
+        };
+        await browser.show(
+            'Administration/Inventory',
+            uninitialized,
+            'admin',
+            'light',
+            {},
+            staff,
+        );
+        assert.match(
+            await browser.evaluate(`${trigger}.textContent`),
+            /Set up stock/,
+        );
+        assert.equal(
+            await browser.evaluate(`${form}.elements.quantity.required`),
+            true,
+        );
+        assert.equal(
+            await browser.evaluate(`${form}.elements.reorder_level.required`),
+            true,
+        );
+
+        const suppliers = {
+            suppliers: paginated([
+                {
+                    id: 3,
+                    name: 'Verified supplier',
+                    contact_name: 'Supplier contact',
+                    contact_number: '09123456789',
+                    email: 'supplier@example.test',
+                    is_active: true,
+                    edit_version: 4,
+                },
+            ]),
+            filters: {},
+        };
+        const team = {
+            users: paginated([
+                {
+                    id: 3,
+                    name: 'Staff member',
+                    email: 'staff@example.test',
+                    role: 'staff',
+                    is_active: true,
+                    can_edit: true,
+                    open_order_count: 1,
+                    open_order_ids: [7],
+                },
+            ]),
+            permissions: [],
+            grants: [],
+            availableRoles: ['staff', 'manager'],
+            canManagePermissions: true,
+            roleVersions: { staff: 1, manager: 1 },
+            filters: {},
+            canViewOrders: true,
+            canAssignOrders: true,
+        };
+        for (const [component, props, field, value] of [
+            [
+                'Administration/Suppliers',
+                suppliers,
+                'contact_name',
+                'Updated contact',
+            ],
+            ['Administration/Team', team, 'role', 'manager'],
+        ]) {
+            await browser.show(component, props, 'admin');
+            const editor = `document.querySelector('main [data-slot="collapsible"]')`;
+            const button = `${editor}.querySelector('button')`;
+            assert.equal(
+                await browser.evaluate(
+                    `${button}.getAttribute('aria-expanded')`,
+                ),
+                'false',
+            );
+            await browser.evaluate(`${button}.click()`);
+            await browser.evaluate(
+                `(() => { const input = ${editor}.querySelector('form').elements.${field}; input.value = ${JSON.stringify(value)}; input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })); })()`,
+            );
+            await browser.evaluate(`${button}.click()`);
+            await browser.evaluate(`${button}.click()`);
+            assert.equal(
+                await browser.evaluate(
+                    `${editor}.querySelector('form').elements.${field}.value`,
+                ),
+                value,
+            );
+            for (const width of [320, 375, 768, 1440]) {
+                await browser.resize(width);
+                await assertFits(browser, `${component} ${width}`);
+            }
+            if (component.endsWith('Suppliers')) {
+                assert.equal(
+                    await browser.evaluate(
+                        `${editor}.querySelector('form').elements.edit_version.value`,
+                    ),
+                    '4',
+                );
+            } else {
+                assert.match(
+                    await browser.evaluate(
+                        `document.querySelector('main').textContent`,
+                    ),
+                    /Deactivation takes effect immediately/,
+                );
+            }
+        }
+        assert.deepEqual(browser.exceptions, []);
+    },
+);
+
+test(
+    'new administration pages keep unboxed titles and usable case actions in both themes',
+    {
+        skip: !baseUrl || !executable,
+        timeout: 120000,
+    },
+    async (t) => {
+        const browser = await openBrowser(t);
+        const paginated = (data) => ({
+            data,
+            total: data.length,
+            current_page: 1,
+            last_page: 1,
+        });
+        const entry = {
+            id: 3,
+            product_name: longName,
+            quantity: 2,
+            held_quantity: 2,
+            requester_id: 12,
+            requester_name: 'Staff member',
+            status: 'pending',
+            reason: 'Inspection requested',
+            age_days: 2,
+            customer_name: 'Customer',
+            purchase_order_id: 7,
+            condition: 'opened',
+            supplier_name: 'Verified supplier',
+        };
+        const products = [
+            {
+                id: 7,
+                name: longName,
+                product_code: 'GPU-007',
+                available_quantity: 8,
+            },
+        ];
+        const suppliers = [{ id: 3, name: 'Verified supplier' }];
+        const capabilities = {
+            viewInventory: true,
+            requestInventory: true,
+            approveInventory: true,
+            requestReturns: true,
+            approveReturns: true,
+            viewOrders: true,
+            viewAudit: true,
+            exportAudit: true,
+        };
+        const fixtures = [
+            [
+                'Administration/WorkQueue',
+                'Tasks',
+                {
+                    entries: paginated([
+                        {
+                            id: 3,
+                            kind: 'stock_adjustment',
+                            reference: longName,
+                            required_action: 'Review request',
+                            responsible_name: 'Staff member',
+                            created_at: '2026-10-12T08:00:00Z',
+                            age_days: 2,
+                            href: '/administration/inventory-adjustments',
+                        },
+                    ]),
+                    filters: {},
+                },
+            ],
+            [
+                'Administration/InventoryAdjustments',
+                'Stock requests',
+                {
+                    requests: paginated([
+                        { ...entry, observed_quantity: 8, target_quantity: 10 },
+                    ]),
+                    filters: {},
+                },
+            ],
+            [
+                'Administration/DamageReports',
+                'Damage reports',
+                {
+                    reports: paginated([entry]),
+                    products,
+                    suppliers,
+                    evidence: {},
+                    filters: {},
+                },
+            ],
+            [
+                'Administration/SupplierReturns',
+                'Supplier returns',
+                {
+                    returns: paginated([entry]),
+                    products,
+                    suppliers,
+                    filters: {},
+                },
+            ],
+            [
+                'Administration/CustomerReturns',
+                'Customer returns',
+                {
+                    returns: paginated([
+                        entry,
+                        {
+                            ...entry,
+                            id: 4,
+                            status: 'accepted',
+                            disposition: 'supplier_return',
+                            held_quantity: 0,
+                        },
+                    ]),
+                    selected_order: null,
+                    suppliers,
+                    refundPayments: {},
+                    evidence: {},
+                    paymentEvidence: {},
+                    filters: {},
+                },
+            ],
+            [
+                'Administration/Reports/AuditLog',
+                'Activity log',
+                {
+                    entries: paginated([
+                        {
+                            id: 3,
+                            action_label: 'Stock change requested',
+                            actor_name: 'Staff member',
+                            actor_id: 12,
+                            actor_type: 'administrator',
+                            created_at: '2026-10-12T08:00:00Z',
+                            subject_label: longName,
+                            subject_id: 7,
+                            details: [
+                                { label: 'Quantity', before: '8', after: '10' },
+                            ],
+                            details_visible: true,
+                        },
+                    ]),
+                    filters: {},
+                    actors: [],
+                    actions: [],
+                    subjectTypes: [],
+                },
+            ],
+            [
+                'Administration/Reports/StockReconciliation',
+                'Stock checks',
+                {
+                    inventories: paginated([
+                        {
+                            product_id: 7,
+                            inventory_id: 17,
+                            name: longName,
+                            product_code: 'GPU-007',
+                            sellable: 8,
+                            ledger_sellable: 8,
+                            quarantined: 2,
+                            ledger_quarantined: 2,
+                            case_expected: 2,
+                            case_breakdown: {
+                                damage: 2,
+                                customer_return: 0,
+                                supplier_return: 0,
+                            },
+                            status: 'matches',
+                            findings: [],
+                            sellable_difference: 0,
+                            held_ledger_difference: 0,
+                            case_difference: 0,
+                        },
+                    ]),
+                    filters: {},
+                },
+            ],
+            [
+                'Administration/Reports/StaffPerformance',
+                'My sales',
+                {
+                    filters: {},
+                    staff: [
+                        {
+                            id: 12,
+                            name: 'Staff member',
+                            orders_count: 1,
+                            gross_sales: '100.00',
+                            refunds_paid: '0.00',
+                            net_sales: '100.00',
+                        },
+                    ],
+                    unattributed_count: 0,
+                    can_view_all: false,
+                    selected_handler_id: 12,
+                    selected_handler_name: 'Staff member',
+                    transactions: paginated([]),
+                },
+            ],
+        ];
+        for (const theme of ['light', 'dark']) {
+            for (const [component, title, props] of fixtures) {
+                await browser.show(
+                    component,
+                    props,
+                    'admin',
+                    theme,
+                    {},
+                    capabilities,
+                );
+                assert.equal(
+                    await browser.evaluate(
+                        `document.querySelectorAll('main h1').length`,
+                    ),
+                    1,
+                    component,
+                );
+                assert.equal(
+                    await browser.evaluate(
+                        `document.querySelector('main h1').textContent.trim()`,
+                    ),
+                    title,
+                );
+                assert.deepEqual(
+                    await browser.evaluate(
+                        `(() => { const style = getComputedStyle(document.querySelector('[data-page-header]')); return [style.backgroundColor, style.boxShadow, style.borderTopWidth]; })()`,
+                    ),
+                    ['rgba(0, 0, 0, 0)', 'none', '0px'],
+                );
+                if (component === 'Administration/CustomerReturns') {
+                    assert.match(
+                        await browser.evaluate(
+                            `document.querySelector('main').textContent`,
+                        ),
+                        /Supplier return: no units on hold/,
+                    );
+                    assert.doesNotMatch(
+                        await browser.evaluate(
+                            `document.querySelector('main').textContent`,
+                        ),
+                        /Supplier return complete/,
+                    );
+                }
+                for (const width of [320, 375, 768, 1024, 1440]) {
+                    await browser.resize(width);
+                    await assertFits(browser, `${component} ${theme} ${width}`);
+                }
+            }
+        }
+        assert.deepEqual(browser.exceptions, []);
+    },
+);
 
 test(
     'website branding stays transparent and fits public and authenticated layouts in both themes',

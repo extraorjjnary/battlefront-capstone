@@ -1,4 +1,5 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Form, Head, Link, usePage } from '@inertiajs/vue3';
 import SupplierReturnController from '@/actions/App/Http/Controllers/Administration/SupplierReturnController';
 import SupplierController from '@/actions/App/Http/Controllers/Administration/SupplierController';
@@ -19,21 +20,38 @@ const props = defineProps({
     filters: Object,
 });
 const page = usePage();
+const returnLabels = {
+    pending: 'Awaiting review',
+    approved: 'Ready to send',
+    dispatched: 'Sent to supplier',
+    closed: 'Received by supplier',
+    rejected_follow_up: 'Follow-up needed',
+    rejected: 'Rejected',
+};
 const supplierReturnProgress = {
-    pending: 'Waiting for a separate administrator to approve or reject.',
-    approved: 'Approved; waiting for staff to dispatch the held units.',
-    dispatched: 'Dispatched; waiting for supplier acknowledgment.',
-    closed: 'Supplier acknowledged receipt; record the supplier outcome if it is not recorded yet.',
-    rejected_follow_up: 'Supplier rejected the return; record whether to release, write off, or retry.',
-    rejected: 'Rejected and resolved through the selected follow-up.',
+    pending: 'Another administrator must review this request.',
+    approved: 'Send the held units to the supplier.',
+    dispatched: 'Waiting for the supplier to confirm receipt.',
+    closed: 'Supplier received the items. Record the outcome if still missing.',
+    rejected_follow_up:
+        'Supplier rejected the return. Choose a stock action or try again.',
+    rejected: 'Rejected; follow-up complete.',
 };
 const { search, isSearching, clearSearch } = useDebouncedSearch({
     initialSearch: props.filters?.q,
     currentSearch: () => props.filters?.q,
     route: SupplierReturnController.index,
-    query: () => ({ case: props.selected_case ?? undefined, overdue: props.filters?.overdue ? 1 : undefined }),
+    query: () => ({
+        case: props.selected_case ?? undefined,
+        overdue: props.filters?.overdue ? 1 : undefined,
+    }),
 });
-watch(() => props.filters?.q, (query) => { search.value = query ?? ''; });
+watch(
+    () => props.filters?.q,
+    (query) => {
+        search.value = query ?? '';
+    },
+);
 defineOptions({
     layout: {
         breadcrumbs: [
@@ -47,8 +65,10 @@ defineOptions({
 </script>
 
 <template>
-    <Head title="Supplier returns" />
-    <main class="mx-auto flex w-full max-w-5xl flex-col gap-7 p-6 lg:p-10">
+    <main
+        class="mx-auto flex w-full max-w-5xl min-w-0 flex-col gap-6 p-4 wrap-anywhere sm:p-6 lg:p-8"
+    >
+        <Head title="Supplier returns" />
         <p v-if="selected_case" class="text-sm">
             Showing supplier return #{{ selected_case }} ·
             <Link
@@ -57,26 +77,20 @@ defineOptions({
                 >Show all</Link
             >
         </p>
-        <div class="flex flex-wrap justify-between gap-3">
-            <div>
-                <p
-                    class="text-primary text-xs font-semibold tracking-widest uppercase"
-                >
-                    Inventory control
-                </p>
-                <h1 class="mt-2 text-2xl font-bold">Supplier returns</h1>
-            </div>
-            <Link
-                :href="SupplierController.index()"
-                class="text-primary underline"
-                >Suppliers</Link
+        <PageHeader title="Supplier returns">
+            <template #actions
+                ><Button variant="outline" as-child
+                    ><Link :href="SupplierController.index()"
+                        >Suppliers</Link
+                    ></Button
+                ></template
             >
-        </div>
+        </PageHeader>
         <Form
             v-if="page.props.auth.can?.requestReturns"
             v-bind="SupplierReturnController.store.form()"
             v-slot="{ errors, processing }"
-            class="border-border bg-card grid gap-4 border p-5 sm:grid-cols-2"
+            class="surface-card border-border bg-card grid max-w-full min-w-0 gap-4 border p-5 sm:grid-cols-2"
         >
             <h2 class="text-lg font-semibold sm:col-span-2">
                 Request a return
@@ -87,7 +101,7 @@ defineOptions({
                     id="return-supplier"
                     name="supplier_id"
                     required
-                    class="border-border bg-background w-full border p-2"
+                    class="border-input bg-background focus-visible:ring-ring min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
                 >
                     <option value="">Select supplier</option>
                     <option
@@ -109,6 +123,7 @@ defineOptions({
             <div class="space-y-2">
                 <Label for="return-quantity">Units</Label
                 ><Input
+                    class="min-h-11"
                     id="return-quantity"
                     name="quantity"
                     type="number"
@@ -117,8 +132,13 @@ defineOptions({
                 /><InputError :message="errors.quantity" />
             </div>
             <div class="space-y-2">
-                <Label for="supplier-return-reason-code">Reason category</Label>
-                <select id="supplier-return-reason-code" name="reason_code" required class="border-border bg-background w-full border p-2">
+                <Label for="supplier-return-reason-code">Reason</Label>
+                <select
+                    id="supplier-return-reason-code"
+                    name="reason_code"
+                    required
+                    class="border-input bg-background focus-visible:ring-ring min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
+                >
                     <option value="">Select a reason</option>
                     <option value="defective">Defective</option>
                     <option value="wrong_item">Wrong item</option>
@@ -128,8 +148,9 @@ defineOptions({
                 <InputError :message="errors.reason_code" />
             </div>
             <div class="space-y-2">
-                <Label for="return-reason">Reason details</Label
+                <Label for="return-reason">Notes</Label
                 ><Input
+                    class="min-h-11"
                     id="return-reason"
                     name="reason"
                     required
@@ -137,13 +158,28 @@ defineOptions({
                     maxlength="2000"
                 /><InputError :message="errors.reason" />
             </div>
-            <Button type="submit" :disabled="processing"
-                >Reserve stock and request</Button
+            <Button class="min-h-11" type="submit" :disabled="processing"
+                >Hold stock and request return</Button
             >
         </Form>
         <section class="space-y-3" aria-label="Supplier return cases">
-            <Link :href="SupplierReturnController.index({ query: { case: selected_case ?? undefined, q: filters?.q ?? undefined, overdue: filters?.overdue ? undefined : 1 } })" class="text-primary text-sm underline">
-                {{ filters?.overdue ? 'Show all supplier returns' : 'Show supplier returns over 30 days old' }}
+            <Link
+                :href="
+                    SupplierReturnController.index({
+                        query: {
+                            case: selected_case ?? undefined,
+                            q: filters?.q ?? undefined,
+                            overdue: filters?.overdue ? undefined : 1,
+                        },
+                    })
+                "
+                class="text-primary text-sm underline"
+            >
+                {{
+                    filters?.overdue
+                        ? 'Show all supplier returns'
+                        : 'Open over 30 days'
+                }}
             </Link>
             <SearchField
                 id="supplier-return-search"
@@ -163,7 +199,7 @@ defineOptions({
             <article
                 v-for="entry in returns.data"
                 :key="entry.id"
-                class="border-border bg-card space-y-3 border p-5"
+                class="surface-card border-border bg-card space-y-3 border p-5"
             >
                 <div class="flex flex-wrap justify-between gap-2">
                     <div>
@@ -176,7 +212,9 @@ defineOptions({
                             {{ entry.requester_name }}
                         </p>
                         <p class="mt-1 text-sm">{{ entry.reason }}</p>
-                        <p class="text-muted-foreground text-sm">{{ entry.age_days }} days open</p>
+                        <p class="text-muted-foreground text-sm">
+                            {{ entry.age_days }} days open
+                        </p>
                         <p
                             v-if="entry.dispatch_reference"
                             class="text-muted-foreground text-sm"
@@ -198,16 +236,25 @@ defineOptions({
                         </p>
                     </div>
                     <span class="text-sm capitalize">{{
+                        returnLabels[entry.status] ??
                         entry.status.replaceAll('_', ' ')
                     }}</span>
                 </div>
                 <p class="text-muted-foreground text-sm">
-                    Next step: {{ supplierReturnProgress[entry.status] ?? 'Review the case history.' }}
+                    Next step:
+                    {{
+                        supplierReturnProgress[entry.status] ??
+                        'Review the case history.'
+                    }}
                 </p>
-                <p v-if="entry.follow_up_overdue" class="text-destructive text-sm font-semibold">Supplier return follow-up overdue (over 30 days)</p>
+                <p
+                    v-if="entry.follow_up_overdue"
+                    class="text-destructive text-sm font-semibold"
+                >
+                    Follow-up overdue: over 30 days
+                </p>
                 <p class="text-sm">
-                    Held in quarantine: {{ entry.held_quantity }} units ·
-                    Origin:
+                    On hold: {{ entry.held_quantity }} units · Origin:
                     {{
                         entry.damage_report_id
                             ? `damage report #${entry.damage_report_id}`
@@ -224,20 +271,24 @@ defineOptions({
                     "
                     v-bind="SupplierReturnController.decide.form(entry.id)"
                     v-slot="{ errors, processing }"
-                    class="flex flex-wrap items-end gap-2"
-                    ><label class="text-sm"
-                        >Decision reason<Input
+                    class="flex max-w-full min-w-0 flex-wrap items-end gap-2"
+                    ><label class="max-w-full min-w-0 text-sm"
+                        >Review notes<Input
+                            aria-label="Notes"
+                            class="min-h-11"
                             name="reason"
                             required
                             minlength="5"
                             maxlength="2000" /></label
                     ><Button
+                        class="min-h-11"
                         type="submit"
                         name="decision"
                         value="approve"
                         :disabled="processing"
                         >Approve</Button
                     ><Button
+                        class="min-h-11"
                         type="submit"
                         name="decision"
                         value="reject"
@@ -253,11 +304,16 @@ defineOptions({
                     "
                     v-bind="SupplierReturnController.dispatch.form(entry.id)"
                     v-slot="{ errors, processing }"
-                    class="flex flex-wrap gap-2"
+                    class="flex max-w-full min-w-0 flex-wrap gap-2"
                     ><Input
+                        aria-label="Receipt or reference"
+                        class="min-h-11"
                         name="external_reference"
                         placeholder="Dispatch reference"
-                        required /><Button type="submit" :disabled="processing"
+                        required /><Button
+                        class="min-h-11"
+                        type="submit"
+                        :disabled="processing"
                         >Record dispatch</Button
                     ><InputError
                         :message="errors.dispatch || errors.external_reference"
@@ -269,12 +325,15 @@ defineOptions({
                     "
                     v-bind="SupplierReturnController.acknowledge.form(entry.id)"
                     v-slot="{ errors, processing }"
-                    class="flex flex-wrap gap-2"
+                    class="flex max-w-full min-w-0 flex-wrap gap-2"
                     ><Input
+                        aria-label="Receipt or reference"
+                        class="min-h-11"
                         name="external_reference"
                         placeholder="Supplier acknowledgement"
                         required
                         maxlength="255" /><Button
+                        class="min-h-11"
                         type="submit"
                         :disabled="processing"
                         >Record supplier acknowledgment</Button
@@ -292,13 +351,14 @@ defineOptions({
                     "
                     v-bind="SupplierReturnController.followUp.form(entry.id)"
                     v-slot="{ errors, processing }"
-                    class="grid gap-3 sm:grid-cols-2"
+                    class="grid max-w-full min-w-0 gap-3 sm:grid-cols-2"
                 >
-                    <label class="text-sm"
+                    <label class="max-w-full min-w-0 text-sm"
                         >Follow-up decision<select
+                            aria-label="Decision"
                             name="decision"
                             required
-                            class="border-border bg-background mt-1 block w-full border p-2"
+                            class="border-input bg-background focus-visible:ring-ring mt-1 block min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
                         >
                             <option value="release">
                                 Release after inspection
@@ -309,10 +369,11 @@ defineOptions({
                             </option>
                         </select></label
                     >
-                    <label class="text-sm"
+                    <label class="max-w-full min-w-0 text-sm"
                         >Supplier for retry<select
+                            aria-label="Supplier"
                             name="supplier_id"
-                            class="border-border bg-background mt-1 block w-full border p-2"
+                            class="border-input bg-background focus-visible:ring-ring mt-1 block min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
                         >
                             <option value="">Select if retrying</option>
                             <option
@@ -324,18 +385,30 @@ defineOptions({
                             </option>
                         </select></label
                     >
-                    <label class="text-sm sm:col-span-2"
+                    <label class="max-w-full min-w-0 text-sm sm:col-span-2"
                         >Reason<Input
+                            aria-label="Notes"
+                            class="min-h-11"
                             name="reason"
                             required
                             minlength="5"
                             maxlength="2000"
                     /></label>
-                    <label class="flex items-center gap-2 text-sm sm:col-span-2">
-                        <input name="inspection_confirmed" type="checkbox" value="1" />
-                        I inspected the units and confirmed they are safe to sell
+                    <label
+                        class="flex max-w-full min-w-0 items-center gap-2 text-sm sm:col-span-2"
+                    >
+                        <input
+                            name="inspection_confirmed"
+                            type="checkbox"
+                            value="1"
+                        />
+                        I inspected the units and confirmed they are safe to
+                        sell
                     </label>
-                    <Button type="submit" :disabled="processing"
+                    <Button
+                        class="min-h-11"
+                        type="submit"
+                        :disabled="processing"
                         >Record follow-up</Button
                     ><InputError
                         :message="
@@ -344,10 +417,14 @@ defineOptions({
                             errors.supplier_id
                         "
                     />
-                    <InputError :message="errors.inspection_confirmed || errors.evidence" />
+                    <InputError
+                        :message="
+                            errors.inspection_confirmed || errors.evidence
+                        "
+                    />
                 </Form>
                 <p v-if="entry.resolution_outcome" class="text-sm">
-                    Supplier resolution:
+                    Supplier outcome:
                     {{ entry.resolution_outcome.replaceAll('_', ' ') }} ·
                     {{ entry.resolution_reference }} ·
                     {{ entry.resolution_notes }}
@@ -360,13 +437,13 @@ defineOptions({
                     "
                     v-bind="SupplierReturnController.resolve.form(entry.id)"
                     v-slot="{ errors, processing }"
-                    class="grid gap-3 sm:grid-cols-2"
+                    class="grid max-w-full min-w-0 gap-3 sm:grid-cols-2"
                 >
-                    <label class="text-sm"
+                    <label class="max-w-full min-w-0 text-sm"
                         >Supplier outcome<select
                             name="outcome"
                             required
-                            class="border-border bg-background mt-1 block w-full border p-2"
+                            class="border-input bg-background focus-visible:ring-ring mt-1 block min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
                         >
                             <option value="replacement">Replacement</option>
                             <option value="credit">Credit</option>
@@ -374,20 +451,26 @@ defineOptions({
                             <option value="rejected">Rejected</option>
                         </select></label
                     >
-                    <label class="text-sm"
+                    <label class="max-w-full min-w-0 text-sm"
                         >Supplier reference<Input
+                            aria-label="Receipt or reference"
+                            class="min-h-11"
                             name="external_reference"
                             required
                             maxlength="255"
                     /></label>
-                    <label class="text-sm sm:col-span-2"
-                        >Resolution notes<Input
+                    <label class="max-w-full min-w-0 text-sm sm:col-span-2"
+                        >Outcome notes<Input
+                            class="min-h-11"
                             name="notes"
                             required
                             minlength="5"
                             maxlength="2000"
                     /></label>
-                    <Button type="submit" :disabled="processing"
+                    <Button
+                        class="min-h-11"
+                        type="submit"
+                        :disabled="processing"
                         >Record supplier outcome</Button
                     ><InputError
                         :message="

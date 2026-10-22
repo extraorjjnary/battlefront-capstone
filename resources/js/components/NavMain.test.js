@@ -30,6 +30,7 @@ function navigationHarness({
     catalogRole = false,
     manageCatalog = false,
     mode = 'expanded',
+    capabilities = {},
 } = {}) {
     const page = Vue.reactive({
         props: {
@@ -41,6 +42,7 @@ function navigationHarness({
                     manageProducts: manageCatalog,
                     viewOrders: administrator,
                     useCustomerCart: !administrator,
+                    ...capabilities,
                 },
             },
         },
@@ -302,4 +304,66 @@ test('business roles can open the storefront catalog from administration navigat
         ),
         false,
     );
+});
+
+test('administration tasks have distinct icons and clear labels without granting access', async () => {
+    const harness = navigationHarness({
+        administrator: true,
+        capabilities: {
+            viewInventory: true,
+            manageSuppliers: true,
+            viewAudit: true,
+            manageUsers: true,
+            viewStaffReports: true,
+        },
+    });
+    const expected = {
+        Tasks: icons.ListTodo,
+        'Stock requests': icons.ClipboardList,
+        'Stock checks': icons.ClipboardCheck,
+        'Damage reports': icons.PackageX,
+        'Supplier returns': icons.Truck,
+        'Customer returns': icons.Undo2,
+        Suppliers: icons.Handshake,
+        'Staff sales': icons.ChartColumnIncreasing,
+        'Activity log': icons.Logs,
+        Team: icons.UserRoundCog,
+    };
+
+    const html = await harness.render();
+    for (const [title, icon] of Object.entries(expected)) {
+        const item = harness.navigation.mainNavItems.value.find(
+            (entry) => entry.title === title,
+        );
+        assert.equal(item?.icon, icon, title);
+        assert.ok(html.includes(title), title + ' is visible');
+    }
+    assert.equal(new Set(Object.values(expected)).size, 10);
+    for (const svg of html.matchAll(/<svg\b[^>]*>/g)) {
+        assert.match(svg[0], /aria-hidden="true"/);
+    }
+
+    harness.page.props.auth.can.viewInventory = false;
+    harness.page.props.auth.can.manageSuppliers = false;
+    harness.page.props.auth.can.viewAudit = false;
+    harness.page.props.auth.can.manageUsers = false;
+    harness.page.props.auth.can.viewStaffReports = false;
+    const titles = harness.navigation.mainNavItems.value.map(
+        (item) => item.title,
+    );
+    assert.ok(titles.includes('My sales'));
+    for (const hidden of [
+        'Stock requests',
+        'Stock checks',
+        'Damage reports',
+        'Supplier returns',
+        'Suppliers',
+        'Activity log',
+        'Team',
+    ]) {
+        assert.ok(
+            !titles.includes(hidden),
+            hidden + ' requires its existing permission',
+        );
+    }
 });

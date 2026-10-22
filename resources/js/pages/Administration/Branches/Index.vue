@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 
 defineProps({ branches: { type: Object, required: true } });
 defineOptions({
-    layout: { breadcrumbs: [{ title: 'Branches', href: index() }] },
+    layout: { breadcrumbs: [{ title: 'Stores', href: index() }] },
 });
 </script>
 
@@ -22,14 +22,14 @@ defineOptions({
     <main
         class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 wrap-anywhere sm:p-6 lg:p-8"
     >
-        <Head title="Branches" />
+        <Head title="Stores" />
         <PageHeader
-            title="Branches"
-            description="Manage store details shown to customers."
+            title="Stores"
+            description="Store details shown to customers."
         >
             <template #actions>
                 <Button as-child
-                    ><Link :href="create()"><Plus />Add branch</Link></Button
+                    ><Link :href="create()"><Plus />Add store</Link></Button
                 >
             </template>
         </PageHeader>
@@ -37,7 +37,7 @@ defineOptions({
         <section aria-label="Branch records">
             <p class="text-muted-foreground mb-3 text-sm">
                 {{ branches.total }}
-                {{ branches.total === 1 ? 'branch' : 'branches' }}
+                {{ branches.total === 1 ? 'store' : 'stores' }}
             </p>
             <div
                 v-if="!branches.data.length"
@@ -47,9 +47,9 @@ defineOptions({
                     class="text-muted-foreground mx-auto size-7"
                     aria-hidden="true"
                 />
-                <p class="mt-3 font-medium">No branches available</p>
+                <p class="mt-3 font-medium">No stores available</p>
                 <p class="text-muted-foreground mt-1 text-sm">
-                    Add a branch to prepare its store information.
+                    Add a store to enter its details.
                 </p>
             </div>
             <div
@@ -85,7 +85,7 @@ defineOptions({
                             <Badge
                                 v-if="branch.is_operational"
                                 variant="outline"
-                                >Operational</Badge
+                                >Orders handled here</Badge
                             >
                         </div>
                         <p

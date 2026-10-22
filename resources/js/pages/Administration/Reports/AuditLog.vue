@@ -1,4 +1,5 @@
 <script setup>
+import PageHeader from '@/components/PageHeader.vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 import AuditLogController from '@/actions/App/Http/Controllers/Administration/AuditLogController';
@@ -17,21 +18,27 @@ const props = defineProps({
     subjectTypes: { type: Array, required: true },
 });
 const page = usePage();
-const { search, isSearching, clearSearch, cancelPendingSearch } = useDebouncedSearch({
-    initialSearch: props.filters.q,
-    currentSearch: () => props.filters.q,
-    route: AuditLogController.index,
-    query: () => ({
-        action: props.filters.action ?? undefined,
-        actor_id: props.filters.actor_id ?? undefined,
-        actor_type: props.filters.actor_type ?? undefined,
-        subject_type: props.filters.subject_type ?? undefined,
-        subject_id: props.filters.subject_id ?? undefined,
-        from: props.filters.from ?? undefined,
-        to: props.filters.to ?? undefined,
-    }),
-});
-watch(() => props.filters.q, (query) => { search.value = query ?? ''; });
+const { search, isSearching, clearSearch, cancelPendingSearch } =
+    useDebouncedSearch({
+        initialSearch: props.filters.q,
+        currentSearch: () => props.filters.q,
+        route: AuditLogController.index,
+        query: () => ({
+            action: props.filters.action ?? undefined,
+            actor_id: props.filters.actor_id ?? undefined,
+            actor_type: props.filters.actor_type ?? undefined,
+            subject_type: props.filters.subject_type ?? undefined,
+            subject_id: props.filters.subject_id ?? undefined,
+            from: props.filters.from ?? undefined,
+            to: props.filters.to ?? undefined,
+        }),
+    });
+watch(
+    () => props.filters.q,
+    (query) => {
+        search.value = query ?? '';
+    },
+);
 const action = ref(props.filters.action ?? '');
 const actorId = ref(String(props.filters.actor_id ?? ''));
 const actorType = ref(props.filters.actor_type ?? '');
@@ -55,54 +62,58 @@ function applyFilters() {
 
 defineOptions({
     layout: {
-        breadcrumbs: [{ title: 'Audit log', href: AuditLogController.index() }],
+        breadcrumbs: [
+            { title: 'Activity log', href: AuditLogController.index() },
+        ],
     },
 });
 </script>
 
 <template>
     <div class="contents">
-        <Head title="Audit log" />
-        <main class="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6 lg:p-10">
-            <header class="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                    <p
-                        class="text-primary text-xs font-semibold tracking-widest uppercase"
-                    >
-                        Accountability
-                    </p>
-                    <h1 class="mt-2 text-2xl font-bold">Audit log</h1>
-                    <p class="text-muted-foreground mt-2 text-sm">
-                        Review who changed a record, when it happened, and the
-                        values recorded at the time.
-                    </p>
-                </div>
-                <a
-                    v-if="page.props.auth.can?.exportAudit"
-                    :href="
-                        AuditLogController.export({ query: props.filters }).url
-                    "
-                    class="text-primary text-sm font-semibold underline"
-                    >Export filtered CSV</a
+        <Head title="Activity log" />
+        <main
+            class="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-6 p-4 wrap-anywhere sm:p-6 lg:p-8"
+        >
+            <PageHeader title="Activity log">
+                <template #actions
+                    ><Button
+                        v-if="page.props.auth.can?.exportAudit"
+                        variant="outline"
+                        as-child
+                        ><a
+                            :href="
+                                AuditLogController.export({
+                                    query: props.filters,
+                                }).url
+                            "
+                            >Export CSV</a
+                        ></Button
+                    ></template
                 >
-            </header>
+            </PageHeader>
 
             <form
-                class="border-border bg-card grid gap-4 border p-5 sm:grid-cols-2 lg:grid-cols-3"
+                class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
                 @submit.prevent="applyFilters"
             >
                 <SearchField
                     id="audit-search"
                     v-model="search"
                     class="sm:col-span-2 lg:col-span-3"
-                    label="Search audit entries"
-                    placeholder="Actor, action, record type, reason, or changes"
+                    label="Search activity"
+                    placeholder="Person, action, record, or reason"
                     :is-searching="isSearching"
                     @clear="clearSearch"
                 />
                 <div class="space-y-1">
                     <Label for="audit-from">From</Label
-                    ><Input id="audit-from" v-model="from" type="date" />
+                    ><Input
+                        class="min-h-11"
+                        id="audit-from"
+                        v-model="from"
+                        type="date"
+                    />
                     <p
                         v-if="page.props.errors?.from"
                         class="text-destructive text-xs"
@@ -112,7 +123,12 @@ defineOptions({
                 </div>
                 <div class="space-y-1">
                     <Label for="audit-to">To</Label
-                    ><Input id="audit-to" v-model="to" type="date" />
+                    ><Input
+                        class="min-h-11"
+                        id="audit-to"
+                        v-model="to"
+                        type="date"
+                    />
                     <p
                         v-if="page.props.errors?.to"
                         class="text-destructive text-xs"
@@ -121,26 +137,26 @@ defineOptions({
                     </p>
                 </div>
                 <div class="space-y-1">
-                    <Label for="audit-actor-type">Actor type</Label
+                    <Label for="audit-actor-type">Person type</Label
                     ><select
                         id="audit-actor-type"
                         v-model="actorType"
-                        class="border-input bg-background w-full border p-2"
+                        class="border-input bg-background focus-visible:ring-ring min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
                     >
-                        <option value="">All actor types</option>
+                        <option value="">All types</option>
                         <option value="customer">Customer</option>
                         <option value="administrator">Administrator</option>
                         <option value="system">System</option>
                     </select>
                 </div>
                 <div class="space-y-1">
-                    <Label for="audit-actor">Actor</Label
+                    <Label for="audit-actor">Person</Label
                     ><select
                         id="audit-actor"
                         v-model="actorId"
-                        class="border-input bg-background w-full border p-2"
+                        class="border-input bg-background focus-visible:ring-ring min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
                     >
-                        <option value="">All actors</option>
+                        <option value="">All people</option>
                         <option
                             v-for="actor in actors"
                             :key="actor.id"
@@ -155,6 +171,7 @@ defineOptions({
                 <div class="space-y-1">
                     <Label for="audit-action">Action</Label
                     ><Input
+                        class="min-h-11"
                         id="audit-action"
                         v-model="action"
                         list="audit-action-options"
@@ -171,6 +188,7 @@ defineOptions({
                 <div class="space-y-1">
                     <Label for="audit-subject-type">Record type</Label
                     ><Input
+                        class="min-h-11"
                         id="audit-subject-type"
                         v-model="subjectType"
                         list="audit-subject-options"
@@ -187,6 +205,7 @@ defineOptions({
                 <div class="space-y-1">
                     <Label for="audit-subject-id">Record ID</Label
                     ><Input
+                        class="min-h-11"
                         id="audit-subject-id"
                         v-model="subjectId"
                         type="number"
@@ -197,7 +216,7 @@ defineOptions({
                 <div
                     class="flex flex-wrap items-center gap-3 sm:col-span-2 lg:col-span-3"
                 >
-                    <Button type="submit">Apply filters</Button
+                    <Button class="min-h-11" type="submit">Apply filters</Button
                     ><Link
                         :href="AuditLogController.index()"
                         class="text-primary text-sm underline"
@@ -207,13 +226,13 @@ defineOptions({
             </form>
 
             <p class="text-muted-foreground text-sm">
-                {{ entries.total }} matching events, newest first
+                {{ entries.total }} entries, newest first
             </p>
             <section class="grid gap-3" aria-label="Audit events">
                 <article
                     v-for="entry in entries.data"
                     :key="entry.id"
-                    class="border-border bg-card border p-5 text-sm"
+                    class="surface-card border-border bg-card border p-5 text-sm"
                 >
                     <div
                         class="flex flex-wrap items-start justify-between gap-3"
@@ -267,7 +286,7 @@ defineOptions({
                         <summary
                             class="text-primary cursor-pointer font-medium"
                         >
-                            View recorded changes
+                            View changes
                         </summary>
                         <dl class="mt-3 grid gap-2">
                             <div
@@ -290,20 +309,20 @@ defineOptions({
                         v-else-if="!entry.details_visible && entry.has_changes"
                         class="text-muted-foreground mt-2 text-xs"
                     >
-                        Change details are restricted for this role.
+                        Your role cannot view these changes.
                     </p>
                 </article>
                 <p
                     v-if="entries.data.length === 0"
                     class="border-border bg-card border p-6 text-sm"
                 >
-                    No audit events match these filters.
+                    No activity matches these filters.
                 </p>
             </section>
             <nav
                 v-if="entries.last_page > 1"
                 class="flex justify-between text-sm"
-                aria-label="Audit log pages"
+                aria-label="Activity log pages"
             >
                 <Link
                     v-if="entries.prev_page_url"

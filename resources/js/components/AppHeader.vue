@@ -82,6 +82,7 @@ const activeItemStyles = 'bg-accent text-accent-foreground';
                                         <component
                                             v-if="item.icon"
                                             :is="item.icon"
+                                            aria-hidden="true"
                                             class="h-5 w-5"
                                         />
                                         {{ item.title }}
@@ -125,6 +126,7 @@ const activeItemStyles = 'bg-accent text-accent-foreground';
                                     <component
                                         v-if="item.icon"
                                         :is="item.icon"
+                                        aria-hidden="true"
                                         class="mr-2 h-4 w-4"
                                     />
                                     {{ item.title }}

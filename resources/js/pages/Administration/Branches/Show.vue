@@ -12,8 +12,8 @@ defineProps({ branch: { type: Object, required: true } });
 defineOptions({
     layout: {
         breadcrumbs: [
-            { title: 'Branches', href: index() },
-            { title: 'Branch details', href: index() },
+            { title: 'Stores', href: index() },
+            { title: 'Store details', href: index() },
         ],
     },
 });
@@ -33,12 +33,12 @@ defineOptions({
                     }}</Badge
                 >
                 <Badge v-if="branch.is_operational" variant="outline"
-                    >Operational</Badge
+                    >Orders handled here</Badge
                 >
             </template>
             <template #actions>
                 <Button as-child
-                    ><Link :href="edit(branch.id)">Edit branch</Link></Button
+                    ><Link :href="edit(branch.id)">Edit store</Link></Button
                 >
                 <Button variant="outline" as-child
                     ><Link :href="index()">Back</Link></Button
@@ -50,13 +50,13 @@ defineOptions({
             class="surface-panel border-border bg-card grid gap-6 border p-4 sm:grid-cols-2 sm:p-6"
         >
             <div class="sm:col-span-2">
-                <dt class="text-muted-foreground text-sm">Complete address</dt>
+                <dt class="text-muted-foreground text-sm">Address</dt>
                 <dd class="mt-1 break-words">
                     {{ branch.address || 'Not yet confirmed' }}
                 </dd>
             </div>
             <div>
-                <dt class="text-muted-foreground text-sm">Contact number</dt>
+                <dt class="text-muted-foreground text-sm">Phone</dt>
                 <dd class="mt-1">
                     {{ branch.contact_number || 'Not yet confirmed' }}
                 </dd>
@@ -68,7 +68,7 @@ defineOptions({
                 </dd>
             </div>
             <div class="sm:col-span-2">
-                <dt class="text-muted-foreground text-sm">Operating hours</dt>
+                <dt class="text-muted-foreground text-sm">Store hours</dt>
                 <dd class="mt-1 break-words whitespace-pre-wrap">
                     {{ branch.operating_hours || 'Not yet confirmed' }}
                 </dd>
@@ -83,8 +83,7 @@ defineOptions({
             </div>
         </dl>
         <p v-if="!branch.is_operational" class="text-muted-foreground text-sm">
-            This branch provides store information only. Operations remain at
-            Sagay City.
+            Orders and stock are managed at Sagay City.
         </p>
     </main>
 </template>

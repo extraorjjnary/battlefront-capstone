@@ -11,6 +11,7 @@ import {
     Clock3,
     PackageSearch,
     ReceiptText,
+    ListTodo,
     WalletCards,
 } from '@lucide/vue';
 
@@ -39,10 +40,10 @@ const user = computed(() => page.props.auth.user);
 const permissions = computed(() => page.props.auth.can ?? {});
 const quickLinks = computed(() => [
     {
-        title: 'Work queue',
-        description: 'Find open work available to your role.',
+        title: 'Tasks',
+        description: 'Review open tasks.',
         href: WorkQueueController.index(),
-        icon: ReceiptText,
+        icon: ListTodo,
     },
     ...(permissions.value.viewOrders
         ? [
@@ -58,7 +59,7 @@ const quickLinks = computed(() => [
         ? [
               {
                   title: 'Inventory',
-                  description: 'Check stock levels and update quantities.',
+                  description: 'Check stock and request changes.',
                   href: InventoryController.index(),
                   icon: Boxes,
               },
@@ -135,14 +136,21 @@ defineOptions({
                             v-if="permissions.viewReports"
                             aria-hidden="true"
                             class="border-border bg-card grid border sm:grid-cols-2"
-                            :class="permissions.viewProfitReports ? 'xl:grid-cols-6' : 'xl:grid-cols-5'"
+                            :class="
+                                permissions.viewProfitReports
+                                    ? 'xl:grid-cols-6'
+                                    : 'xl:grid-cols-5'
+                            "
                         >
                             <StatSkeleton
-                                v-for="stat in permissions.viewProfitReports ? 6 : 5"
+                                v-for="stat in permissions.viewProfitReports
+                                    ? 6
+                                    : 5"
                                 :key="stat"
                                 class="border-border border-b sm:border-r xl:border-b-0"
                                 :class="
-                                    stat === (permissions.viewProfitReports ? 6 : 5)
+                                    stat ===
+                                    (permissions.viewProfitReports ? 6 : 5)
                                         ? 'sm:col-span-2 xl:col-span-1'
                                         : ''
                                 "
@@ -151,7 +159,11 @@ defineOptions({
                     </template>
                     <dl
                         class="border-border bg-card grid border sm:grid-cols-2"
-                        :class="permissions.viewProfitReports ? 'xl:grid-cols-6' : 'xl:grid-cols-5'"
+                        :class="
+                            permissions.viewProfitReports
+                                ? 'xl:grid-cols-6'
+                                : 'xl:grid-cols-5'
+                        "
                     >
                         <div
                             class="border-border border-b p-5 sm:border-r xl:border-b-0"
@@ -186,9 +198,18 @@ defineOptions({
                                 Gross profit
                             </dt>
                             <dd class="mt-2 text-2xl font-bold tabular-nums">
-                                {{ dashboard.kpis.profit_data_complete ? formatCurrency(dashboard.kpis.recorded_gross_profit) : 'Unavailable' }}
+                                {{
+                                    dashboard.kpis.profit_data_complete
+                                        ? formatCurrency(
+                                              dashboard.kpis
+                                                  .recorded_gross_profit,
+                                          )
+                                        : 'Unavailable'
+                                }}
                             </dd>
-                            <p class="text-muted-foreground mt-1 text-xs">All-time product sales</p>
+                            <p class="text-muted-foreground mt-1 text-xs">
+                                All-time product sales
+                            </p>
                         </div>
                         <div
                             v-if="permissions.viewOrders"

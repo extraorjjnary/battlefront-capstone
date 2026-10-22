@@ -27,7 +27,7 @@ const requiresDetail = (field) =>
     <Form v-bind="form" class="space-y-6" v-slot="{ errors, processing }">
         <div class="grid gap-5 sm:grid-cols-2">
             <div class="grid gap-2">
-                <Label for="name">Branch name</Label>
+                <Label for="name">Store name</Label>
                 <Input
                     id="name"
                     name="name"
@@ -55,7 +55,7 @@ const requiresDetail = (field) =>
         </div>
 
         <div class="grid gap-2">
-            <Label for="address">Complete address</Label>
+            <Label for="address">Address</Label>
             <Textarea
                 id="address"
                 name="address"
@@ -70,7 +70,7 @@ const requiresDetail = (field) =>
 
         <div class="grid gap-5 sm:grid-cols-2">
             <div class="grid gap-2">
-                <Label for="contact-number">Contact number</Label>
+                <Label for="contact-number">Phone</Label>
                 <Input
                     id="contact-number"
                     name="contact_number"
@@ -96,7 +96,7 @@ const requiresDetail = (field) =>
         </div>
 
         <div class="grid gap-2">
-            <Label for="operating-hours">Operating hours</Label>
+            <Label for="operating-hours">Store hours</Label>
             <Input
                 id="operating-hours"
                 name="operating_hours"
@@ -120,8 +120,7 @@ const requiresDetail = (field) =>
                 >
             </legend>
             <p id="coordinate-help" class="text-muted-foreground text-sm">
-                Enter only verified coordinates. Leave both blank if
-                unconfirmed; the branch will still be listed.
+                Use verified coordinates, or leave both blank.
             </p>
             <div class="grid gap-5 sm:grid-cols-2">
                 <div class="grid gap-2">
@@ -176,8 +175,8 @@ const requiresDetail = (field) =>
             <p id="publication-help" class="text-muted-foreground text-sm">
                 {{
                     branch?.is_operational
-                        ? 'Sagay City stays published as the operational store.'
-                        : 'Publish after verifying these details. Unpublished branches are visible only to administrators.'
+                        ? 'Sagay City must remain visible to customers.'
+                        : 'Verify details before publishing. Unpublished stores are visible only to administrators.'
                 }}
             </p>
             <InputError :message="errors.is_published" />
@@ -185,8 +184,7 @@ const requiresDetail = (field) =>
                 v-if="!branch?.is_operational"
                 class="text-muted-foreground text-xs"
             >
-                This record provides store information only. Operations remain
-                at Sagay City.
+                Orders and stock are managed at Sagay City.
             </p>
         </div>
 

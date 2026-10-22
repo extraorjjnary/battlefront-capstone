@@ -38,7 +38,7 @@ const filteredProducts = computed(() => {
         <Input
             v-model="search"
             type="search"
-            :aria-label="`Search ${id}`"
+            aria-label="Search products"
             placeholder="Search product name or code"
             autocomplete="off"
         />
@@ -47,7 +47,7 @@ const filteredProducts = computed(() => {
             v-model="selectedId"
             :name="name"
             required
-            class="border-border bg-background w-full border p-2"
+            class="border-input bg-background focus-visible:ring-ring min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
         >
             <option value="">Select product</option>
             <option

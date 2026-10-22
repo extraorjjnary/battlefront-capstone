@@ -1,14 +1,13 @@
 <script setup>
 import PageHeader from '@/components/PageHeader.vue';
+import InlineEditor from '@/components/administration/InlineEditor.vue';
 import { Form, Head, Link, router } from '@inertiajs/vue3';
 import {
     Boxes,
     ChevronLeft,
     ChevronRight,
-    CircleX,
     Save,
     Search,
-    SlidersHorizontal,
     TriangleAlert,
     X,
 } from '@lucide/vue';
@@ -55,15 +54,6 @@ const hasAppliedFilters = computed(
 );
 const hasActiveQuery = computed(
     () => Boolean(props.filters.q) || hasAppliedFilters.value,
-);
-const stockFilterSummary = computed(
-    () =>
-        ({
-            in_stock: 'in-stock',
-            low_stock: 'low-stock',
-            out_of_stock: 'out-of-stock',
-            not_initialized: 'not-initialized',
-        })[props.filters.stock] ?? '',
 );
 
 function formatLastUpdated(value) {
@@ -156,183 +146,119 @@ defineOptions({
         <PageHeader title="Inventory" description="Sagay City stock" />
 
         <section aria-labelledby="inventory-ledger-heading">
-            <div
-                class="mb-4 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between"
-            >
-                <div>
-                    <p class="text-muted-foreground text-sm">
-                        {{ products.total }}
-                        {{ stockFilterSummary }}
-                        products
-                    </p>
-                    <h2
-                        id="inventory-ledger-heading"
-                        class="text-xl font-semibold"
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h2
+                    id="inventory-ledger-heading"
+                    class="flex flex-wrap items-baseline gap-2 text-lg font-semibold"
+                >
+                    Stock
+                    <span class="text-muted-foreground text-sm font-normal"
+                        >{{ products.total }}
+                        {{
+                            products.total === 1 ? 'product' : 'products'
+                        }}</span
                     >
-                        Stock ledger
-                    </h2>
-                </div>
-
-                <div class="flex flex-wrap gap-3">
-                    <div
-                        class="surface-card border-border bg-card flex items-center gap-3 border px-4 py-3"
+                </h2>
+                <div class="flex flex-wrap gap-3 text-sm">
+                    <span>{{ low_stock_count }} low stock</span>
+                    <span
+                        :class="{ 'text-destructive': out_of_stock_count > 0 }"
+                        >{{ out_of_stock_count }} out of stock</span
                     >
-                        <TriangleAlert
-                            class="text-primary-ink size-4"
-                            aria-hidden="true"
-                        />
-                        <div>
-                            <p class="text-sm font-semibold tabular-nums">
-                                {{ low_stock_count }} low-stock products
-                            </p>
-                            <p class="text-muted-foreground text-xs">
-                                Units remain below reorder level
-                            </p>
-                        </div>
-                    </div>
-                    <div
-                        class="border-destructive/50 bg-destructive/5 flex items-center gap-3 border px-4 py-3"
-                    >
-                        <CircleX
-                            class="text-destructive size-4"
-                            aria-hidden="true"
-                        />
-                        <div>
-                            <p
-                                class="text-destructive text-sm font-bold tabular-nums"
-                            >
-                                {{ out_of_stock_count }} out-of-stock products
-                            </p>
-                            <p class="text-muted-foreground text-xs">
-                                No units available
-                            </p>
-                        </div>
-                    </div>
                 </div>
             </div>
-
             <section
-                class="space-y-3"
-                aria-labelledby="inventory-query-heading"
+                class="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)]"
+                aria-label="Inventory filters"
             >
-                <div class="flex items-start gap-3">
-                    <span
-                        class="bg-secondary text-primary-ink flex size-10 shrink-0 items-center justify-center rounded-md"
-                    >
-                        <SlidersHorizontal class="size-4" />
-                    </span>
-                    <div>
-                        <h3 id="inventory-query-heading" class="font-semibold">
-                            Find inventory records
-                        </h3>
-                        <p class="text-muted-foreground mt-1 text-sm">
-                            Search immediately; category and stock attention
-                            update the ledger as they change.
-                        </p>
-                    </div>
-                </div>
-
-                <div
-                    class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
-                >
-                    <div class="grid gap-2">
-                        <Label for="inventory-search">Search inventory</Label>
-                        <div class="relative">
+                <div class="grid gap-2 sm:col-span-2 lg:col-span-1">
+                    <Label for="inventory-search">Search products</Label>
+                    <div class="flex gap-2">
+                        <div class="relative min-w-0 flex-1">
                             <Search
                                 class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
+                                aria-hidden="true"
                             />
                             <Input
                                 id="inventory-search"
                                 v-model="search"
-                                class="pl-9"
+                                class="min-h-11 pl-9"
                                 maxlength="255"
-                                placeholder="Product code, name, or brand"
+                                placeholder="Name, code, or brand"
                                 autocomplete="off"
                             />
                         </div>
-                        <p
-                            class="text-muted-foreground text-xs"
-                            aria-live="polite"
-                        >
-                            {{
-                                isSearching
-                                    ? 'Updating results...'
-                                    : 'Results update automatically as you type.'
-                            }}
-                        </p>
-                    </div>
-                    <Button
-                        v-if="hasSearchInput"
-                        type="button"
-                        variant="outline"
-                        @click="clearSearch"
-                    >
-                        <X />
-                        Clear search
-                    </Button>
-                </div>
-
-                <div class="grid gap-3 md:grid-cols-2">
-                    <div class="grid gap-2">
-                        <Label for="inventory-category">Category</Label>
-                        <Select v-model="categoryId">
-                            <SelectTrigger
-                                id="inventory-category"
-                                class="w-full"
-                            >
-                                <SelectValue placeholder="All categories" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all"
-                                    >All categories</SelectItem
-                                >
-                                <SelectItem
-                                    v-for="category in filter_options.categories"
-                                    :key="category.id"
-                                    :value="String(category.id)"
-                                >
-                                    {{ category.name }}
-                                    {{ category.is_active ? '' : '(Inactive)' }}
-                                </SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="inventory-stock">Stock status</Label>
-                        <Select v-model="stock">
-                            <SelectTrigger id="inventory-stock" class="w-full">
-                                <SelectValue placeholder="All statuses" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All</SelectItem>
-                                <SelectItem value="in_stock"
-                                    >In stock</SelectItem
-                                >
-                                <SelectItem value="low_stock"
-                                    >Low stock</SelectItem
-                                >
-                                <SelectItem value="out_of_stock"
-                                    >Out of stock</SelectItem
-                                >
-                                <SelectItem value="not_initialized"
-                                    >Not initialized</SelectItem
-                                >
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div
-                        class="flex flex-wrap gap-2 md:col-span-2 md:justify-end"
-                    >
                         <Button
-                            v-if="hasAppliedFilters"
+                            class="min-h-11"
+                            v-if="hasSearchInput"
                             type="button"
                             variant="outline"
-                            @click="clearFilters"
+                            @click="clearSearch"
+                            >Clear search</Button
                         >
-                            <X />
-                            Clear filters
-                        </Button>
                     </div>
+                    <p
+                        v-if="isSearching"
+                        class="text-muted-foreground text-xs"
+                        role="status"
+                    >
+                        Updating results...
+                    </p>
+                </div>
+                <div class="grid content-start gap-2">
+                    <Label for="inventory-category">Category</Label>
+                    <Select v-model="categoryId">
+                        <SelectTrigger
+                            id="inventory-category"
+                            class="min-h-11 w-full"
+                            ><SelectValue placeholder="All categories"
+                        /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All categories</SelectItem>
+                            <SelectItem
+                                v-for="category in filter_options.categories"
+                                :key="category.id"
+                                :value="String(category.id)"
+                                >{{ category.name }}
+                                {{
+                                    category.is_active ? '' : '(Inactive)'
+                                }}</SelectItem
+                            >
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div class="grid content-start gap-2">
+                    <Label for="inventory-stock">Stock status</Label>
+                    <Select v-model="stock">
+                        <SelectTrigger
+                            id="inventory-stock"
+                            class="min-h-11 w-full"
+                            ><SelectValue placeholder="All statuses"
+                        /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All statuses</SelectItem>
+                            <SelectItem value="in_stock">In stock</SelectItem>
+                            <SelectItem value="low_stock">Low stock</SelectItem>
+                            <SelectItem value="out_of_stock"
+                                >Out of stock</SelectItem
+                            >
+                            <SelectItem value="not_initialized"
+                                >Stock not set</SelectItem
+                            >
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div
+                    v-if="hasAppliedFilters"
+                    class="sm:col-span-2 lg:col-span-3"
+                >
+                    <Button
+                        class="min-h-11"
+                        type="button"
+                        variant="outline"
+                        @click="clearFilters"
+                        ><X />Clear filters</Button
+                    >
                 </div>
             </section>
 
@@ -346,11 +272,10 @@ defineOptions({
                             class="text-muted-foreground mx-auto size-8"
                         />
                         <p class="mt-3 font-medium">
-                            No inventory records match this query
+                            No products match your search
                         </p>
                         <p class="text-muted-foreground mt-1 text-sm">
-                            Try another search term or clear the applied
-                            filters.
+                            Try another search or clear the filters.
                         </p>
                     </template>
                     <template v-else>
@@ -371,278 +296,425 @@ defineOptions({
                 <article
                     v-for="product in products.data"
                     :key="product.id"
-                    class="grid gap-5 p-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,2fr)] xl:items-center"
+                    class="space-y-3 p-4 sm:p-5"
                 >
-                    <div class="min-w-0">
-                        <div class="flex flex-wrap items-center gap-2">
-                            <h3 class="truncate font-semibold">
-                                {{ product.name }}
-                            </h3>
-                            <Badge
-                                :variant="
-                                    product.is_active ? 'secondary' : 'outline'
-                                "
+                    <div
+                        class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start"
+                    >
+                        <div class="min-w-0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <h3 class="min-w-0 font-semibold wrap-anywhere">
+                                    {{ product.name }}
+                                </h3>
+                                <Badge
+                                    :variant="
+                                        product.is_active
+                                            ? 'secondary'
+                                            : 'outline'
+                                    "
+                                    >{{
+                                        product.is_active
+                                            ? 'Active'
+                                            : 'Inactive'
+                                    }}</Badge
+                                >
+                                <Badge
+                                    v-if="
+                                        product.stock_status === 'out_of_stock'
+                                    "
+                                    variant="outline"
+                                    class="border-destructive/50 text-destructive"
+                                    >Out of stock</Badge
+                                >
+                                <Badge
+                                    v-else-if="
+                                        product.stock_status === 'low_stock'
+                                    "
+                                    variant="outline"
+                                    class="text-primary-ink"
+                                    >Low stock</Badge
+                                >
+                            </div>
+                            <p class="text-muted-foreground mt-1 text-sm">
+                                {{ product.product_code
+                                }}<span v-if="product.brand">
+                                    · {{ product.brand }}</span
+                                >
+                                · {{ product.category }}
+                            </p>
+                            <p
+                                v-if="product.inventory"
+                                class="text-muted-foreground mt-1 text-xs"
                             >
-                                {{ product.is_active ? 'Active' : 'Inactive' }}
-                            </Badge>
-                            <Badge
-                                v-if="product.stock_status === 'out_of_stock'"
-                                variant="outline"
-                                class="border-destructive/50 bg-destructive/10 text-destructive"
-                            >
-                                <CircleX />
-                                Out of stock
-                            </Badge>
-                            <Badge
-                                v-else-if="product.stock_status === 'low_stock'"
-                                variant="outline"
-                                class="border-primary/40 text-primary-ink"
-                            >
-                                <TriangleAlert />
-                                Low stock
-                            </Badge>
+                                Updated
+                                {{
+                                    formatLastUpdated(
+                                        product.inventory.last_updated,
+                                    )
+                                }}
+                            </p>
                         </div>
-                        <p class="text-muted-foreground mt-1 text-sm">
-                            {{ product.product_code
-                            }}<span v-if="product.brand">
-                                · {{ product.brand }}</span
-                            >
-                            ·
-                            {{ product.category }}
-                        </p>
-                        <p
+                        <dl
                             v-if="product.inventory"
-                            class="text-muted-foreground mt-3 text-xs"
+                            class="grid grid-cols-3 gap-4 text-sm lg:gap-6"
                         >
-                            Sellable {{ product.inventory.quantity }} ·
-                            Quarantined
-                            {{ product.inventory.quarantined_quantity }}
-                        </p>
-                        <p
-                            v-if="product.inventory"
-                            class="text-muted-foreground mt-1 text-xs"
-                        >
-                            Last updated
-                            {{
-                                formatLastUpdated(
-                                    product.inventory.last_updated,
-                                )
-                            }}
+                            <div>
+                                <dt class="text-muted-foreground">Available</dt>
+                                <dd class="font-semibold tabular-nums">
+                                    {{ product.inventory.quantity }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-muted-foreground">On hold</dt>
+                                <dd class="tabular-nums">
+                                    {{ product.inventory.quarantined_quantity }}
+                                </dd>
+                            </div>
+                            <div>
+                                <dt class="text-muted-foreground">
+                                    Reorder level
+                                </dt>
+                                <dd class="tabular-nums">
+                                    {{ product.inventory.reorder_level }}
+                                </dd>
+                            </div>
+                        </dl>
+                        <p v-else class="text-muted-foreground text-sm">
+                            Stock not set
                         </p>
                     </div>
-
-                    <Form
-                        v-if="
-                            product.inventory &&
-                            $page.props.auth.can?.requestInventory
-                        "
-                        v-bind="
-                            InventoryController.update.form(
-                                product.inventory.id,
-                            )
-                        "
-                        :options="{ preserveScroll: true }"
-                        class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-start"
-                        v-slot="{ errors, processing }"
-                    >
-                        <div class="grid gap-2">
-                            <Label :for="`quantity-${product.inventory.id}`">
-                                Current quantity
-                            </Label>
-                            <Input
-                                :id="`quantity-${product.inventory.id}`"
-                                name="quantity"
-                                type="number"
-                                min="0"
-                                max="4294967295"
-                                step="1"
-                                inputmode="numeric"
-                                :default-value="product.inventory.quantity"
-                                :aria-invalid="Boolean(errors.quantity)"
-                                required
-                            />
-                            <InputError :message="errors.quantity" />
-                        </div>
-
-                        <div class="grid gap-2">
-                            <Label
-                                :for="`reorder-level-${product.inventory.id}`"
-                            >
-                                Reorder level
-                            </Label>
-                            <p
-                                :id="`reorder-level-${product.inventory.id}`"
-                                class="py-2 text-sm"
-                            >
-                                {{ product.inventory.reorder_level }}
-                            </p>
-                            <input
-                                type="hidden"
-                                name="reorder_level"
-                                :value="product.inventory.reorder_level"
-                            />
-                        </div>
-
-                        <div class="grid gap-2 sm:col-span-3">
-                            <Label :for="`reason-code-${product.inventory.id}`">Reason category</Label>
-                            <select :id="`reason-code-${product.inventory.id}`" name="reason_code" required class="border-border bg-background w-full border p-2">
-                                <option value="">Select a reason</option>
-                                <option value="damage">Damage</option>
-                                <option value="theft_loss">Theft or loss</option>
-                                <option value="found_stock">Found stock</option>
-                                <option value="count_error">Count correction</option>
-                                <option value="receiving_error">Receiving error</option>
-                                <option value="unit_of_measure_error">Unit-of-measure error</option>
-                                <option value="other">Other</option>
-                            </select>
-                            <InputError :message="errors.reason_code" />
-                            <Label :for="`reason-${product.inventory.id}`"
-                                >Reason for stock request</Label
-                            >
-                            <Input
-                                :id="`reason-${product.inventory.id}`"
-                                name="reason"
-                                required
-                                minlength="5"
-                                maxlength="2000"
-                            />
-                            <InputError :message="errors.reason" />
-                        </div>
-
-                        <Button class="sm:mt-7" :disabled="processing">
-                            <Spinner v-if="processing" />
-                            <Save v-else />
-                            Request stock change
-                        </Button>
-                    </Form>
-
-                    <Form
-                        v-if="
-                            product.inventory &&
-                            $page.props.auth.can?.reorderInventory
-                        "
-                        v-bind="
-                            InventoryController.updateReorderLevel.form(
-                                product.inventory.id,
-                            )
-                        "
-                        v-slot="{ errors, processing }"
-                        class="flex flex-wrap items-end gap-3"
-                    >
-                        <label class="text-sm"
-                            >New reorder level<Input
-                                name="reorder_level"
-                                type="number"
-                                min="0"
-                                required
-                                :default-value="
-                                    product.inventory.reorder_level
-                                "
-                        /></label>
-                        <label class="text-sm"
-                            >Reason<Input
-                                name="reason"
-                                required
-                                minlength="5"
-                                maxlength="2000"
-                        /></label>
-                        <Button
-                            type="submit"
-                            variant="outline"
-                            :disabled="processing"
-                            >Update reorder level</Button
+                    <div class="flex flex-wrap gap-2">
+                        <InlineEditor
+                            v-if="
+                                product.inventory &&
+                                $page.props.auth.can?.requestInventory
+                            "
+                            :trigger-label="
+                                'Request stock change for ' + product.name
+                            "
+                            label="Request stock change"
+                            v-slot="{ reveal }"
                         >
-                        <InputError
-                            :message="errors.reorder_level || errors.reason"
-                        />
-                    </Form>
-
-                    <Form
-                        v-if="
-                            !product.inventory &&
-                            $page.props.auth.can?.requestInventory
-                        "
-                        v-bind="InventoryController.store.form(product.id)"
-                        :options="{
-                            preserveScroll: true,
-                            preserveState: 'errors',
-                        }"
-                        :error-bag="`initializeInventory${product.id}`"
-                        class="border-border bg-muted/40 grid gap-4 border p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-start"
-                        v-slot="{ errors, processing }"
-                    >
-                        <div class="sm:col-span-3">
-                            <Badge variant="outline">Not initialized</Badge>
-                            <p class="text-muted-foreground mt-2 text-sm">
-                                This product does not have an inventory record
-                                yet.
-                            </p>
-                        </div>
-
-                        <div class="grid gap-2">
-                            <Label :for="`initial-quantity-${product.id}`">
-                                Initial quantity
-                            </Label>
-                            <Input
-                                :id="`initial-quantity-${product.id}`"
-                                name="quantity"
-                                type="number"
-                                min="0"
-                                max="4294967295"
-                                step="1"
-                                inputmode="numeric"
-                                :aria-invalid="Boolean(errors.quantity)"
-                                required
-                            />
-                            <InputError :message="errors.quantity" />
-                        </div>
-
-                        <div class="grid gap-2">
-                            <Label :for="`initial-reorder-level-${product.id}`">
-                                Reorder level
-                            </Label>
-                            <Input
-                                :id="`initial-reorder-level-${product.id}`"
-                                name="reorder_level"
-                                type="number"
-                                min="0"
-                                max="4294967295"
-                                step="1"
-                                inputmode="numeric"
-                                :aria-invalid="Boolean(errors.reorder_level)"
-                                required
-                            />
-                            <InputError :message="errors.reorder_level" />
-                        </div>
-
-                        <div class="grid gap-2 sm:col-span-3">
-                            <Label :for="`opening-reason-code-${product.id}`">Reason category</Label>
-                            <select :id="`opening-reason-code-${product.id}`" name="reason_code" required class="border-border bg-background w-full border p-2">
-                                <option value="">Select a reason</option>
-                                <option value="receiving_error">Initial receipt</option>
-                                <option value="found_stock">Found stock</option>
-                                <option value="other">Other</option>
-                            </select>
-                            <InputError :message="errors.reason_code" />
-                            <Label :for="`opening-reason-${product.id}`"
-                                >Reason for opening stock</Label
+                            <p
+                                class="text-muted-foreground mb-3 text-sm"
+                                role="note"
                             >
-                            <Input
-                                :id="`opening-reason-${product.id}`"
-                                name="reason"
-                                required
-                                minlength="5"
-                                maxlength="2000"
-                            />
-                            <InputError :message="errors.reason" />
-                        </div>
+                                Another administrator must approve this request
+                                before stock changes.
+                            </p>
+                            <Form
+                                @error="reveal"
+                                v-if="
+                                    product.inventory &&
+                                    $page.props.auth.can?.requestInventory
+                                "
+                                v-bind="
+                                    InventoryController.update.form(
+                                        product.inventory.id,
+                                    )
+                                "
+                                :options="{ preserveScroll: true }"
+                                class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-start"
+                                v-slot="{ errors, processing }"
+                            >
+                                <div class="grid gap-2">
+                                    <Label
+                                        :for="`quantity-${product.inventory.id}`"
+                                    >
+                                        New quantity
+                                    </Label>
+                                    <Input
+                                        class="min-h-11"
+                                        :id="`quantity-${product.inventory.id}`"
+                                        name="quantity"
+                                        type="number"
+                                        min="0"
+                                        max="4294967295"
+                                        step="1"
+                                        inputmode="numeric"
+                                        :default-value="
+                                            product.inventory.quantity
+                                        "
+                                        :aria-invalid="Boolean(errors.quantity)"
+                                        required
+                                    />
+                                    <InputError :message="errors.quantity" />
+                                </div>
 
-                        <Button class="sm:mt-7" :disabled="processing">
-                            <Spinner v-if="processing" />
-                            <Save v-else />
-                            Request opening stock
-                        </Button>
-                    </Form>
+                                <div class="grid gap-2">
+                                    <Label
+                                        :for="`reorder-level-${product.inventory.id}`"
+                                    >
+                                        Reorder level
+                                    </Label>
+                                    <p
+                                        :id="`reorder-level-${product.inventory.id}`"
+                                        class="py-2 text-sm"
+                                    >
+                                        {{ product.inventory.reorder_level }}
+                                    </p>
+                                    <input
+                                        type="hidden"
+                                        name="reorder_level"
+                                        :value="product.inventory.reorder_level"
+                                    />
+                                </div>
+
+                                <div class="grid gap-2 sm:col-span-3">
+                                    <Label
+                                        :for="`reason-code-${product.inventory.id}`"
+                                        >Reason</Label
+                                    >
+                                    <select
+                                        :id="`reason-code-${product.inventory.id}`"
+                                        name="reason_code"
+                                        required
+                                        class="border-input bg-background focus-visible:ring-ring min-h-11 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
+                                    >
+                                        <option value="">
+                                            Select a reason
+                                        </option>
+                                        <option value="damage">Damage</option>
+                                        <option value="theft_loss">
+                                            Theft or loss
+                                        </option>
+                                        <option value="found_stock">
+                                            Found stock
+                                        </option>
+                                        <option value="count_error">
+                                            Count correction
+                                        </option>
+                                        <option value="receiving_error">
+                                            Receiving error
+                                        </option>
+                                        <option value="unit_of_measure_error">
+                                            Wrong stock unit
+                                        </option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                    <InputError :message="errors.reason_code" />
+                                    <Label
+                                        :for="`reason-${product.inventory.id}`"
+                                        >Notes</Label
+                                    >
+                                    <Input
+                                        class="min-h-11"
+                                        :id="`reason-${product.inventory.id}`"
+                                        name="reason"
+                                        required
+                                        minlength="5"
+                                        maxlength="2000"
+                                    />
+                                    <InputError :message="errors.reason" />
+                                </div>
+
+                                <Button
+                                    class="min-h-11 sm:justify-self-start"
+                                    :disabled="processing"
+                                >
+                                    <Spinner v-if="processing" />
+                                    <Save v-else />
+                                    Request stock change
+                                </Button>
+                            </Form>
+                        </InlineEditor>
+                        <InlineEditor
+                            v-if="
+                                product.inventory &&
+                                $page.props.auth.can?.reorderInventory
+                            "
+                            :trigger-label="
+                                'Edit reorder level for ' + product.name
+                            "
+                            label="Edit reorder level"
+                            v-slot="{ reveal }"
+                        >
+                            <Form
+                                @error="reveal"
+                                v-if="
+                                    product.inventory &&
+                                    $page.props.auth.can?.reorderInventory
+                                "
+                                v-bind="
+                                    InventoryController.updateReorderLevel.form(
+                                        product.inventory.id,
+                                    )
+                                "
+                                v-slot="{ errors, processing }"
+                                class="flex flex-wrap items-end gap-3"
+                            >
+                                <label class="text-sm"
+                                    >New reorder level<Input
+                                        class="min-h-11"
+                                        name="reorder_level"
+                                        type="number"
+                                        min="0"
+                                        required
+                                        :default-value="
+                                            product.inventory.reorder_level
+                                        "
+                                /></label>
+                                <label class="text-sm"
+                                    >Reason<Input
+                                        class="min-h-11"
+                                        name="reason"
+                                        required
+                                        minlength="5"
+                                        maxlength="2000"
+                                /></label>
+                                <Button
+                                    class="min-h-11"
+                                    type="submit"
+                                    variant="outline"
+                                    :disabled="processing"
+                                    >Update reorder level</Button
+                                >
+                                <InputError
+                                    :message="
+                                        errors.reorder_level || errors.reason
+                                    "
+                                />
+                            </Form>
+                        </InlineEditor>
+                        <InlineEditor
+                            v-if="
+                                !product.inventory &&
+                                $page.props.auth.can?.requestInventory
+                            "
+                            :trigger-label="'Set up stock for ' + product.name"
+                            label="Set up stock"
+                            v-slot="{ reveal }"
+                        >
+                            <p
+                                class="text-muted-foreground mb-3 text-sm"
+                                role="note"
+                            >
+                                Another administrator must approve the opening
+                                stock.
+                            </p>
+                            <Form
+                                @error="reveal"
+                                v-if="
+                                    !product.inventory &&
+                                    $page.props.auth.can?.requestInventory
+                                "
+                                v-bind="
+                                    InventoryController.store.form(product.id)
+                                "
+                                :options="{
+                                    preserveScroll: true,
+                                    preserveState: 'errors',
+                                }"
+                                :error-bag="`initializeInventory${product.id}`"
+                                class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-start"
+                                v-slot="{ errors, processing }"
+                            >
+                                <div class="sm:col-span-3">
+                                    <Badge variant="outline"
+                                        >Stock not set</Badge
+                                    >
+                                    <p
+                                        class="text-muted-foreground mt-2 text-sm"
+                                    >
+                                        Request starting quantities for this
+                                        product.
+                                    </p>
+                                </div>
+
+                                <div class="grid gap-2">
+                                    <Label
+                                        :for="`initial-quantity-${product.id}`"
+                                    >
+                                        Initial quantity
+                                    </Label>
+                                    <Input
+                                        class="min-h-11"
+                                        :id="`initial-quantity-${product.id}`"
+                                        name="quantity"
+                                        type="number"
+                                        min="0"
+                                        max="4294967295"
+                                        step="1"
+                                        inputmode="numeric"
+                                        :aria-invalid="Boolean(errors.quantity)"
+                                        required
+                                    />
+                                    <InputError :message="errors.quantity" />
+                                </div>
+
+                                <div class="grid gap-2">
+                                    <Label
+                                        :for="`initial-reorder-level-${product.id}`"
+                                    >
+                                        Reorder level
+                                    </Label>
+                                    <Input
+                                        class="min-h-11"
+                                        :id="`initial-reorder-level-${product.id}`"
+                                        name="reorder_level"
+                                        type="number"
+                                        min="0"
+                                        max="4294967295"
+                                        step="1"
+                                        inputmode="numeric"
+                                        :aria-invalid="
+                                            Boolean(errors.reorder_level)
+                                        "
+                                        required
+                                    />
+                                    <InputError
+                                        :message="errors.reorder_level"
+                                    />
+                                </div>
+
+                                <div class="grid gap-2 sm:col-span-3">
+                                    <Label
+                                        :for="`opening-reason-code-${product.id}`"
+                                        >Reason</Label
+                                    >
+                                    <select
+                                        :id="`opening-reason-code-${product.id}`"
+                                        name="reason_code"
+                                        required
+                                        class="border-input bg-background focus-visible:ring-ring min-h-11 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
+                                    >
+                                        <option value="">
+                                            Select a reason
+                                        </option>
+                                        <option value="receiving_error">
+                                            Initial receipt
+                                        </option>
+                                        <option value="found_stock">
+                                            Found stock
+                                        </option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                    <InputError :message="errors.reason_code" />
+                                    <Label :for="`opening-reason-${product.id}`"
+                                        >Notes</Label
+                                    >
+                                    <Input
+                                        class="min-h-11"
+                                        :id="`opening-reason-${product.id}`"
+                                        name="reason"
+                                        required
+                                        minlength="5"
+                                        maxlength="2000"
+                                    />
+                                    <InputError :message="errors.reason" />
+                                </div>
+
+                                <Button
+                                    class="min-h-11 sm:justify-self-start"
+                                    :disabled="processing"
+                                >
+                                    <Spinner v-if="processing" />
+                                    <Save v-else />
+                                    Request opening stock
+                                </Button>
+                            </Form>
+                        </InlineEditor>
+                    </div>
                 </article>
             </div>
 
@@ -652,6 +724,7 @@ defineOptions({
                 class="mt-5 flex items-center justify-between gap-4"
             >
                 <Button
+                    class="min-h-11"
                     v-if="products.current_page > 1"
                     variant="outline"
                     size="sm"
@@ -665,7 +738,13 @@ defineOptions({
                         Previous
                     </Link>
                 </Button>
-                <Button v-else variant="outline" size="sm" disabled>
+                <Button
+                    class="min-h-11"
+                    v-else
+                    variant="outline"
+                    size="sm"
+                    disabled
+                >
                     <ChevronLeft />
                     Previous
                 </Button>
@@ -686,7 +765,13 @@ defineOptions({
                         <ChevronRight />
                     </Link>
                 </Button>
-                <Button v-else variant="outline" size="sm" disabled>
+                <Button
+                    class="min-h-11"
+                    v-else
+                    variant="outline"
+                    size="sm"
+                    disabled
+                >
                     Next
                     <ChevronRight />
                 </Button>

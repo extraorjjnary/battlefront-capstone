@@ -1,5 +1,15 @@
 import {
     Boxes,
+    ListTodo,
+    ClipboardList,
+    ClipboardCheck,
+    PackageX,
+    Truck,
+    Undo2,
+    Handshake,
+    ChartColumnIncreasing,
+    Logs,
+    UserRoundCog,
     ChartColumn,
     LayoutDashboard,
     MapPin,
@@ -58,7 +68,7 @@ export function useAppNavigation() {
                 icon: LayoutDashboard,
             },
             {
-                title: 'Branches',
+                title: isAdministrator.value ? 'Stores' : 'Our stores',
                 href: isAdministrator.value
                     ? administrationBranchIndex()
                     : branchIndex(),
@@ -68,9 +78,9 @@ export function useAppNavigation() {
 
         if (isAdministrator.value) {
             items.push({
-                title: 'Work queue',
+                title: 'Tasks',
                 href: WorkQueueController.index(),
-                icon: ReceiptText,
+                icon: ListTodo,
             });
             if (page.props.auth?.can?.browseProductCatalog)
                 items.push({
@@ -98,37 +108,37 @@ export function useAppNavigation() {
                 items.push({
                     title: 'Stock requests',
                     href: InventoryAdjustmentController.index(),
-                    icon: Boxes,
+                    icon: ClipboardList,
                 });
             if (page.props.auth?.can?.viewInventory)
                 items.push({
-                    title: 'Stock reconciliation',
+                    title: 'Stock checks',
                     href: StockReconciliationController.index(),
-                    icon: Boxes,
+                    icon: ClipboardCheck,
                 });
             if (page.props.auth?.can?.viewInventory)
                 items.push({
                     title: 'Damage reports',
                     href: DamageReportController.index(),
-                    icon: Boxes,
+                    icon: PackageX,
                 });
             if (page.props.auth?.can?.viewInventory)
                 items.push({
                     title: 'Supplier returns',
                     href: SupplierReturnController.index(),
-                    icon: Boxes,
+                    icon: Truck,
                 });
             if (page.props.auth?.can?.viewOrders)
                 items.push({
                     title: 'Customer returns',
                     href: CustomerReturnController.index(),
-                    icon: ReceiptText,
+                    icon: Undo2,
                 });
             if (page.props.auth?.can?.manageSuppliers)
                 items.push({
                     title: 'Suppliers',
                     href: SupplierController.index(),
-                    icon: Boxes,
+                    icon: Handshake,
                 });
             if (page.props.auth?.can?.viewOrders)
                 items.push({
@@ -148,19 +158,19 @@ export function useAppNavigation() {
                         ? 'Staff sales'
                         : 'My sales',
                     href: StaffPerformanceController.index(),
-                    icon: ChartColumn,
+                    icon: ChartColumnIncreasing,
                 });
             if (page.props.auth?.can?.viewAudit)
                 items.push({
-                    title: 'Audit log',
+                    title: 'Activity log',
                     href: AuditLogController.index(),
-                    icon: ReceiptText,
+                    icon: Logs,
                 });
             if (page.props.auth?.can?.manageUsers)
                 items.push({
-                    title: 'Team access',
+                    title: 'Team',
                     href: TeamController.index(),
-                    icon: UsersRound,
+                    icon: UserRoundCog,
                 });
             if (page.props.auth?.can?.viewReports)
                 items.push({
