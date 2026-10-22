@@ -5,6 +5,201 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
+test('IT can inspect account access changes independently of the event actor', function (string $actorRole, string $action, string $subjectType, bool $wasActive) {
+    $it = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'it')->value('id'),
+    ]);
+    $actor = $actorRole === 'system' ? null : User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', $actorRole)->value('id'),
+    ]);
+    $id = DB::table('audit_logs')->insertGetId([
+        'actor_id' => $actor?->id,
+        'action' => $action,
+        'subject_type' => $subjectType,
+        'subject_id' => 123,
+        'reason' => 'Account access review',
+        'changes' => json_encode([
+            'before' => ['role' => 'staff', 'is_active' => $wasActive],
+            'after' => ['role' => 'manager', 'is_active' => ! $wasActive],
+        ], JSON_THROW_ON_ERROR),
+        'created_at' => now(),
+    ]);
+    $original = DB::table('audit_logs')->where('id', $id)->first();
+
+    $this->actingAs($it)->get(route('administration.reports.audit'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('entries.total', 1)
+            ->where('entries.data.0.details_visible', true)
+            ->where('entries.data.0.reason', 'Account access review')
+            ->where('entries.data.0.details', [
+                ['label' => 'Role', 'before' => 'staff', 'after' => 'manager'],
+                ['label' => 'Is Active', 'before' => $wasActive ? 'Yes' : 'No', 'after' => $wasActive ? 'No' : 'Yes'],
+            ]));
+
+    expect(DB::table('audit_logs')->where('id', $id)->first())->toEqual($original);
+})->with(['owner', 'it', 'system'])->with([
+    'web access update' => ['team.updated', 'administrator_account'],
+    'CLI assignment' => ['team.role.assigned_by_cli', 'user'],
+])->with(['deactivation' => true, 'activation' => false]);
+
+test('IT can inspect recorded account creation details', function (string $action, string $subjectType) {
+    $it = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'it')->value('id'),
+    ]);
+    DB::table('audit_logs')->insert([
+        'actor_id' => null,
+        'action' => $action,
+        'subject_type' => $subjectType,
+        'subject_id' => 123,
+        'changes' => json_encode(['role' => 'owner'], JSON_THROW_ON_ERROR),
+        'created_at' => now(),
+    ]);
+
+    $this->actingAs($it)->get(route('administration.reports.audit'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('entries.data.0.details_visible', true)
+            ->where('entries.data.0.details', [['label' => 'Role', 'before' => null, 'after' => 'owner']]));
+})->with([
+    'web creation' => ['team.created', 'administrator_account'],
+    'CLI Owner creation' => ['team.owner.created_by_cli', 'user'],
+    'seeded account' => ['team.created_by_seeder', 'user'],
+    'seeded Owner' => ['team.owner.created_by_seeder', 'user'],
+]);
+
+test('IT and Owner can inspect Owner permission changes while other roles retain restricted details', function (string $viewerRole, bool $visible) {
+    $owner = User::factory()->administrator()->create();
+    $viewer = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', $viewerRole)->value('id'),
+    ]);
+    DB::table('audit_logs')->insert([
+        'actor_id' => $owner->id,
+        'action' => 'role.permissions.updated',
+        'subject_type' => 'administrator_account',
+        'subject_id' => DB::table('administration_roles')->where('code', 'manager')->value('id'),
+        'changes' => json_encode([
+            'before' => ['orders.view', 'inventory.view'],
+            'after' => ['orders.view', 'reports.view'],
+        ], JSON_THROW_ON_ERROR),
+        'created_at' => now(),
+    ]);
+
+    $this->actingAs($viewer)->get(route('administration.reports.audit'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('entries.data.0.details_visible', $visible)
+            ->where('entries.data.0.details', $visible ? [
+                ['label' => '', 'before' => 'orders.view', 'after' => 'orders.view'],
+                ['label' => '1', 'before' => 'inventory.view', 'after' => 'reports.view'],
+            ] : []));
+})->with(['IT' => ['it', true], 'Owner' => ['owner', true], 'Manager' => ['manager', false]]);
+
+test('IT never receives restricted business details even for events performed by IT', function (string $action, string $subjectType) {
+    $it = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'it')->value('id'),
+    ]);
+    DB::table('audit_logs')->insert([
+        'actor_id' => $it->id,
+        'action' => $action,
+        'subject_type' => $subjectType,
+        'subject_id' => 123,
+        'reason' => 'Restricted business explanation',
+        'changes' => json_encode(['before' => ['value' => 'restricted-before'], 'after' => ['value' => 'restricted-after']], JSON_THROW_ON_ERROR),
+        'created_at' => now(),
+    ]);
+
+    $this->actingAs($it)->get(route('administration.reports.audit'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('entries.data.0.details_visible', false)
+            ->where('entries.data.0.details', [])
+            ->where('entries.data.0.reason', null)
+            ->where('entries.data.0.subject_url', null)
+            ->missing('entries.data.0.changes'));
+})->with([
+    'pricing and costs' => ['product.updated', 'product'],
+    'inventory' => ['inventory.adjusted', 'inventory'],
+    'orders' => ['order.status.updated', 'order'],
+    'payments' => ['order.payment_status.updated', 'order'],
+    'returns' => ['customer_return.accepted', 'customer_return'],
+    'refunds' => ['refund.updated', 'customer_refund'],
+    'refund payments' => ['refund.payment.recorded', 'refund_payment'],
+    'financial records' => ['sale.recorded', 'sale'],
+    'business alert on user' => ['approval.concentration_alert', 'user'],
+    'unknown account event' => ['account.unknown', 'administrator_account'],
+    'account action on business subject' => ['team.updated', 'product'],
+]);
+
+test('IT account details preserve recursive credential and private path redaction', function () {
+    $it = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'it')->value('id'),
+    ]);
+    $credentials = ['password' => 'password-value', 'remember_token' => 'token-value', 'two_factor_secret' => 'secret-value', 'private_path' => 'private/credential-file'];
+    DB::table('audit_logs')->insert([
+        'actor_id' => null,
+        'action' => 'team.updated',
+        'subject_type' => 'administrator_account',
+        'subject_id' => 123,
+        'changes' => json_encode(['before' => $credentials, 'after' => $credentials, 'nested' => $credentials], JSON_THROW_ON_ERROR),
+        'created_at' => now(),
+    ]);
+
+    $this->actingAs($it)->get(route('administration.reports.audit'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('entries.data.0.details', [
+                ['label' => 'Password', 'before' => '[redacted]', 'after' => '[redacted]'],
+                ['label' => 'Remember Token', 'before' => '[redacted]', 'after' => '[redacted]'],
+                ['label' => 'Two Factor Secret', 'before' => '[redacted]', 'after' => '[redacted]'],
+                ['label' => 'Private Path', 'before' => '[redacted]', 'after' => '[redacted]'],
+                ['label' => 'Nested', 'before' => null, 'after' => '{"password":"[redacted]","remember_token":"[redacted]","two_factor_secret":"[redacted]","private_path":"[redacted]"}'],
+            ])
+            ->missing('entries.data.0.changes'));
+});
+
+test('IT audit access does not permit permission changes or exports', function () {
+    $it = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'it')->value('id'),
+    ]);
+    $grants = DB::table('administration_role_permissions')->orderBy('administration_role_id')->orderBy('administration_permission_id')->get()->all();
+
+    $this->actingAs($it)->put(route('administration.team.permissions.update', 'manager'), [
+        'permissions' => ['orders.view'], 'edit_version' => 1,
+    ])->assertForbidden();
+    $this->get(route('administration.reports.audit.export'))->assertForbidden();
+
+    expect($it->can('audit.view'))->toBeTrue()
+        ->and($it->can('permissions.manage'))->toBeFalse()
+        ->and($it->can('audit.export'))->toBeFalse()
+        ->and($it->can('products.manage'))->toBeFalse()
+        ->and($it->can('products.cost'))->toBeFalse()
+        ->and($it->can('inventory.view'))->toBeFalse()
+        ->and($it->can('orders.view'))->toBeFalse()
+        ->and($it->can('reports.view'))->toBeFalse();
+    expect(DB::table('administration_role_permissions')->orderBy('administration_role_id')->orderBy('administration_permission_id')->get()->all())->toEqual($grants);
+    $this->assertDatabaseCount('audit_logs', 0);
+});
+
+test('IT text search matches visible account details without matching hidden business values', function () {
+    $owner = User::factory()->administrator()->create();
+    $it = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'it')->value('id'),
+    ]);
+    DB::table('audit_logs')->insert([
+        ['actor_id' => $owner->id, 'action' => 'team.updated', 'subject_type' => 'administrator_account', 'subject_id' => 1,
+            'reason' => 'Account review', 'changes' => json_encode(['role' => 'manager']), 'created_at' => now()],
+        ['actor_id' => $owner->id, 'action' => 'order.updated', 'subject_type' => 'order', 'subject_id' => 2,
+            'reason' => 'Hidden financial note', 'changes' => json_encode(['amount' => 'restricted-amount']), 'created_at' => now()],
+    ]);
+
+    $this->actingAs($it)->get(route('administration.reports.audit', ['q' => 'manager']))
+        ->assertInertia(fn (Assert $page) => $page->where('filters.q', 'manager')->where('entries.total', 1));
+    $this->get(route('administration.reports.audit', ['q' => 'restricted-amount']))
+        ->assertInertia(fn (Assert $page) => $page->where('entries.total', 0));
+    $this->get(route('administration.reports.audit', ['q' => 'Hidden financial note']))
+        ->assertInertia(fn (Assert $page) => $page->where('entries.total', 0));
+    $this->get(route('administration.reports.audit', ['action' => 'order.updated']))
+        ->assertInertia(fn (Assert $page) => $page->where('entries.total', 1)->where('entries.data.0.details', []));
+    $this->actingAs($owner)->get(route('administration.reports.audit', ['q' => 'restricted-amount']))
+        ->assertInertia(fn (Assert $page) => $page->where('entries.total', 1));
+});
+
 test('audit export protects spreadsheet cells containing staff supplied text', function () {
     $owner = User::factory()->administrator()->create();
     DB::table('audit_logs')->insert([

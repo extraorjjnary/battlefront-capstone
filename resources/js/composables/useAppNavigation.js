@@ -80,11 +80,13 @@ export function useAppNavigation() {
         }
 
         if (isAdministrator.value) {
-            items.push({
-                title: 'Tasks',
-                href: WorkQueueController.index(),
-                icon: ListTodo,
-            });
+            if (page.props.auth?.can?.browseProductCatalog) {
+                items.push({
+                    title: 'Tasks',
+                    href: WorkQueueController.index(),
+                    icon: ListTodo,
+                });
+            }
             if (page.props.auth?.can?.manageProducts)
                 items.push({
                     title: 'Manage products',

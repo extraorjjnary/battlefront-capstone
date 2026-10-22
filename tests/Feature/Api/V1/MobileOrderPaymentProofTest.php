@@ -11,7 +11,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
-    Storage::fake('local');
+    $this->fakeIsolatedStorage('local');
     $this->customer = User::factory()->customer()->create();
     $this->withToken($this->customer->createToken('Phone')->plainTextToken);
 });

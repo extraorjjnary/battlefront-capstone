@@ -344,6 +344,11 @@ test('business navigation uses Inventory and reacts to customizable product mana
     assert.equal(toUrl(inventory().href), '/administration/inventory');
     harness.page.props.auth.can.viewInventory = false;
     assert.equal(inventory(), undefined);
+    assert.ok(
+        harness.navigation.mainNavItems.value.some(
+            (item) => item.title === 'Tasks',
+        ),
+    );
 });
 
 test('Manager and Owner navigation retains permitted management links without public shopping links', async () => {
@@ -374,6 +379,11 @@ test('Manager and Owner navigation retains permitted management links without pu
         await harness.render(),
         /href="\/(?:products|branches|cart)"/,
     );
+    assert.ok(
+        harness.navigation.mainNavItems.value.some(
+            (item) => item.title === 'Tasks',
+        ),
+    );
 });
 
 test('IT navigation keeps technical functions without Stores or product modules', async () => {
@@ -384,7 +394,7 @@ test('IT navigation keeps technical functions without Stores or product modules'
 
     assert.deepEqual(
         harness.navigation.mainNavItems.value.map((item) => item.title),
-        ['Dashboard', 'Tasks', 'Activity log', 'Team', 'Account'],
+        ['Dashboard', 'Activity log', 'Team', 'Account'],
     );
     assert.doesNotMatch(
         await harness.render(),
@@ -395,6 +405,7 @@ test('IT navigation keeps technical functions without Stores or product modules'
 test('administration tasks have distinct icons and clear labels without granting access', async () => {
     const harness = navigationHarness({
         administrator: true,
+        catalogRole: true,
         capabilities: {
             viewInventory: true,
             manageSuppliers: true,
