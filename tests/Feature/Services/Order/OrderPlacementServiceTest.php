@@ -36,7 +36,7 @@ function validOrderPlacementData(array $cartItemIds, array $overrides = []): arr
     ], $overrides);
 }
 
-test('places an order with current price snapshots and consumes stock and cart', function () {
+test('places an order with current price and name snapshots and consumes stock and cart', function () {
     $customer = User::factory()->customer()->create();
     $regularProduct = Product::factory()->create(['price' => '12500.00']);
     $discountedProduct = Product::factory()->create([
@@ -74,6 +74,10 @@ test('places an order with current price snapshots and consumes stock and cart',
         ->and($order->items->pluck('price_at_time', 'product_id')->all())->toBe([
             $regularProduct->id => '12500.00',
             $discountedProduct->id => '4500.00',
+        ])
+        ->and($order->items->pluck('product_name_at_time', 'product_id')->all())->toBe([
+            $regularProduct->id => $regularProduct->name,
+            $discountedProduct->id => $discountedProduct->name,
         ])
         ->and($regularInventory->refresh()->quantity)->toBe(3)
         ->and($discountedInventory->refresh()->quantity)->toBe(1)

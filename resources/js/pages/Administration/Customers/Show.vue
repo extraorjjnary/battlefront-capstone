@@ -58,28 +58,103 @@ defineOptions({
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <p class="text-muted-foreground text-sm">Order history</p>
-                    <h2 id="purchases-heading" class="text-xl font-semibold">Purchases</h2>
+                    <h2 id="purchases-heading" class="text-xl font-semibold">
+                        Purchases
+                    </h2>
                 </div>
-                <Link :href="CustomerController.show(customer.id, { query: { status: order_status_filter === 'completed' ? 'all' : 'completed' } })" class="text-primary text-sm underline">
-                    {{ order_status_filter === 'completed' ? 'Show all orders' : 'Show completed only' }}
+                <Link
+                    :href="
+                        CustomerController.show(customer.id, {
+                            query: {
+                                status:
+                                    order_status_filter === 'completed'
+                                        ? 'all'
+                                        : 'completed',
+                            },
+                        })
+                    "
+                    class="text-primary text-sm underline"
+                >
+                    {{
+                        order_status_filter === 'completed'
+                            ? 'Show all orders'
+                            : 'Show completed only'
+                    }}
                 </Link>
             </div>
-            <div v-if="orders.data.length === 0" class="border-border bg-card border p-6 text-sm text-muted-foreground">
+            <div
+                v-if="orders.data.length === 0"
+                class="border-border bg-card text-muted-foreground border p-6 text-sm"
+            >
                 No orders match this view.
             </div>
-            <div v-for="order in orders.data" :key="order.id" class="border-border bg-card space-y-3 border p-5">
+            <div
+                v-for="order in orders.data"
+                :key="order.id"
+                class="border-border bg-card space-y-3 border p-5"
+            >
                 <div class="flex flex-wrap items-center justify-between gap-2">
-                    <div class="flex flex-wrap items-center gap-3"><Link :href="OrderController.show(order.id)" class="text-primary font-semibold underline">{{ order.reference }}</Link><Link v-if="order.status === 'completed'" :href="CustomerReturnController.index({ query: { order_id: order.id } })" class="text-primary text-sm underline">Record return</Link></div>
-                    <span class="text-muted-foreground text-sm">{{ formatJoinedDate(order.created_at) }} · {{ order.status }} · {{ order.payment_status }}</span>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <Link
+                            v-if="$page.props.auth.can?.viewOrders"
+                            :href="OrderController.show(order.id)"
+                            class="text-primary font-semibold underline"
+                            >{{ order.reference }}</Link
+                        ><span v-else class="font-semibold">{{
+                            order.reference
+                        }}</span
+                        ><Link
+                            v-if="
+                                order.status === 'completed' &&
+                                $page.props.auth.can?.viewOrders &&
+                                $page.props.auth.can?.requestReturns
+                            "
+                            :href="
+                                CustomerReturnController.index({
+                                    query: { order_id: order.id },
+                                })
+                            "
+                            class="text-primary text-sm underline"
+                            >Record return</Link
+                        >
+                    </div>
+                    <span class="text-muted-foreground text-sm"
+                        >{{ formatJoinedDate(order.created_at) }} ·
+                        {{ order.status }} · {{ order.payment_status }}</span
+                    >
                 </div>
                 <ul class="space-y-1 text-sm">
-                    <li v-for="item in order.items" :key="item.name">{{ item.name }} × {{ item.quantity }} · ₱{{ item.price_at_time }}</li>
+                    <li v-for="item in order.items" :key="item.name">
+                        {{ item.name }} × {{ item.quantity }} · ₱{{
+                            item.price_at_time
+                        }}
+                    </li>
                 </ul>
-                <p class="text-muted-foreground text-sm">Products ₱{{ order.product_subtotal ?? order.total_amount }} · Delivery ₱{{ order.delivery_fee }} · Order total ₱{{ order.total_amount }}</p>
+                <p class="text-muted-foreground text-sm">
+                    Products ₱{{
+                        order.product_subtotal ?? order.total_amount
+                    }}
+                    · Delivery ₱{{ order.delivery_fee }} · Order total ₱{{
+                        order.total_amount
+                    }}
+                </p>
             </div>
-            <div class="flex justify-between text-sm" v-if="orders.last_page > 1">
-                <Link v-if="orders.prev_page_url" :href="orders.prev_page_url" class="text-primary underline">Previous</Link><span v-else></span>
-                <Link v-if="orders.next_page_url" :href="orders.next_page_url" class="text-primary underline">Next</Link>
+            <div
+                class="flex justify-between text-sm"
+                v-if="orders.last_page > 1"
+            >
+                <Link
+                    v-if="orders.prev_page_url"
+                    :href="orders.prev_page_url"
+                    class="text-primary underline"
+                    >Previous</Link
+                ><span v-else></span>
+                <Link
+                    v-if="orders.next_page_url"
+                    :href="orders.next_page_url"
+                    class="text-primary underline"
+                    >Next</Link
+                >
             </div>
         </section>
 

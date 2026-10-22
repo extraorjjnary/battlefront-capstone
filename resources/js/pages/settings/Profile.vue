@@ -124,7 +124,9 @@ const productViewRecommendationsEnabled = ref(
                 v-if="props.canManageDefaultDeliveryAddress"
                 class="grid gap-2"
             >
-                <Label for="default-delivery-contact-number">Default contact number (optional)</Label>
+                <Label for="default-delivery-contact-number"
+                    >Default contact number (optional)</Label
+                >
                 <Input
                     id="default-delivery-contact-number"
                     name="default_delivery_contact_number"
@@ -135,7 +137,10 @@ const productViewRecommendationsEnabled = ref(
                     :default-value="props.defaultDeliveryContactNumber"
                 />
                 <InputError :message="errors.default_delivery_contact_number" />
-                <p class="text-muted-foreground text-sm">This number will pre-fill checkout and can be changed for each order.</p>
+                <p class="text-muted-foreground text-sm">
+                    This number will pre-fill checkout and can be changed for
+                    each order.
+                </p>
             </div>
 
             <div
@@ -167,7 +172,8 @@ const productViewRecommendationsEnabled = ref(
                 >
                     Saved address: {{ props.defaultDeliveryAddress }}
                     Your saved address is kept until you replace or clear it.
-                    Choose a complete delivery location and enter the street or building details to replace it.
+                    Choose a complete delivery location and enter the street or
+                    building details to replace it.
                 </p>
                 <p
                     v-if="defaultAddressAction === 'clear'"

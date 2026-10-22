@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
 use Tests\HistoricalSalesCatalogFixtures;
 
-test('soft deleting imported catalog records preserves sources and images for explicit restoration', function (bool $adminImage) {
+test('legacy archived imported catalog records preserve sources and images for explicit restoration', function (bool $adminImage) {
     Storage::fake('public');
     Storage::fake('local');
     $manifest = realCatalogManifest();
@@ -44,7 +44,7 @@ test('soft deleting imported catalog records preserves sources and images for ex
         $this->actingAs(User::factory()->administrator()->create());
 
         $this->delete(route('administration.products.destroy', $product))->assertSessionHasNoErrors();
-        $this->delete(route('administration.categories.destroy', $category))->assertSessionHasNoErrors();
+        $category->delete();
 
         expect($product->fresh()->trashed())->toBeTrue()
             ->and($category->fresh()->trashed())->toBeTrue();

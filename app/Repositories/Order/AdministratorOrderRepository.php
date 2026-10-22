@@ -45,7 +45,7 @@ class AdministratorOrderRepository
             'shipment',
             'user:id,name,email',
             'items' => fn ($query) => $query
-                ->select(['id', 'order_id', 'product_id', 'quantity', 'price_at_time'])
+                ->select(['id', 'order_id', 'product_id', 'quantity', 'price_at_time', 'product_name_at_time'])
                 ->orderBy('id'),
             'items.product:id,name,brand,image_path',
         ]);

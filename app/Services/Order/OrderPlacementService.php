@@ -238,6 +238,7 @@ class OrderPlacementService
             foreach ($lines as $line) {
                 $order->items()->create([
                     'product_id' => $line['product']->id,
+                    'product_name_at_time' => $line['product']->name,
                     'quantity' => $line['quantity'],
                     'price_at_time' => $line['unit_price'],
                     'acquisition_cost_at_time' => $line['product']->acquisition_cost,

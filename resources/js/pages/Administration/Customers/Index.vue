@@ -20,7 +20,12 @@ const { search, isSearching, clearSearch } = useDebouncedSearch({
     currentSearch: () => props.filters.q,
     route: CustomerController.index,
 });
-watch(() => props.filters.q, (query) => { search.value = query ?? ''; });
+watch(
+    () => props.filters.q,
+    (query) => {
+        search.value = query ?? '';
+    },
+);
 
 function formatJoinedDate(value) {
     return value ? formatTimestampDate(value) : 'Not available';

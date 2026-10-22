@@ -183,6 +183,31 @@ function cartLink(html) {
     return html.match(/<a\b[^>]*href="\/cart"[^>]*>.*?<\/a>/s)?.[0];
 }
 
+test('store navigation follows the branch capability and reacts to permission changes', async () => {
+    const harness = navigationHarness({ administrator: true });
+    const stores = () =>
+        harness.navigation.mainNavItems.value.find(
+            (item) => item.title === 'Stores',
+        );
+
+    assert.equal(toUrl(stores().href), '/branches');
+    assert.match(await harness.render(), /href="\/branches"/);
+    harness.page.props.auth.can.manageBranches = true;
+    assert.equal(toUrl(stores().href), '/administration/branches');
+    harness.page.props.auth.can.manageBranches = false;
+    assert.equal(toUrl(stores().href), '/branches');
+
+    const customer = navigationHarness();
+    assert.equal(
+        toUrl(
+            customer.navigation.mainNavItems.value.find(
+                (item) => item.title === 'Our stores',
+            ).href,
+        ),
+        '/branches',
+    );
+});
+
 for (const mode of ['expanded', 'collapsed', 'mobile']) {
     for (const [quantity, label] of [
         [0, null],

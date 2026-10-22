@@ -1,12 +1,53 @@
 <?php
 
+use App\Actions\Order\AssignOrderHandler;
 use App\Actions\Order\RecordCompletedOrderSale;
 use App\Enums\OrderStatus;
+use App\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\Order\OrderProcessingService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
+
+test('only completion records a sale for the final assigned handler and subsequent reassignment is rejected', function () {
+    $manager = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'manager')->value('id'),
+    ]);
+    $staffRoleId = DB::table('administration_roles')->where('code', 'staff')->value('id');
+    $first = User::factory()->administrator()->create(['administration_role_id' => $staffRoleId]);
+    $final = User::factory()->administrator()->create(['administration_role_id' => $staffRoleId]);
+    $order = Order::factory()->paidWithGCash()->create([
+        'handler_required' => true, 'status' => OrderStatus::Processing,
+        'payment_status' => PaymentStatus::Verified, 'total_amount' => '100.00',
+    ]);
+    app(AssignOrderHandler::class)->execute($order, $manager, $first->id);
+    app(AssignOrderHandler::class)->execute($order, $manager, $final->id);
+    $this->assertDatabaseCount('sales', 0);
+
+    app(OrderProcessingService::class)->updateStatus($order, OrderStatus::Completed);
+    $this->actingAs($manager)->patch(route('administration.orders.handler.update', $order), ['handler_id' => $first->id])->assertSessionHasErrors('handler');
+    expect($order->sale()->sole()->handler_id)->toBe($final->id);
+    expect(fn () => app(OrderProcessingService::class)->updateStatus($order->fresh(), OrderStatus::Completed))->toThrow(ValidationException::class);
+    $this->assertDatabaseCount('sales', 1);
+    $this->actingAs($final)->get(route('administration.reports.staff'))->assertInertia(fn (Assert $page) => $page
+        ->where('staff.0.orders_count', 1)->where('transactions.total', 1)->where('transactions.data.0.order_id', $order->id));
+});
+
+test('assigned pending and cancelled orders do not count and historical sales stay unattributed', function () {
+    $manager = User::factory()->administrator()->create();
+    foreach ([OrderStatus::Pending, OrderStatus::Cancelled] as $status) {
+        Order::factory()->create(['status' => $status, 'assigned_handler_id' => $manager->id]);
+    }
+    $legacy = Order::factory()->create(['status' => OrderStatus::Completed]);
+    $legacy->sale()->create(['amount' => '100.00', 'sale_date' => today(config('battlefront.timezone')), 'handler_id' => null]);
+
+    $this->actingAs($manager)->get(route('administration.reports.staff'))->assertInertia(fn (Assert $page) => $page
+        ->where('unattributed_count', 1)->where('staff.0.orders_count', 0)->where('transactions.total', 0));
+    expect($legacy->sale->handler_id)->toBeNull();
+});
 
 test('a staff member claims an order and the completed sale keeps that handler', function () {
     $staff = User::factory()->administrator()->create([

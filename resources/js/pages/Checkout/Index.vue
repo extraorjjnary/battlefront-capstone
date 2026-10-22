@@ -251,7 +251,9 @@ defineOptions({
                                     maxlength="20"
                                     autocomplete="tel"
                                     placeholder="e.g. 0917 123 4567"
-                                    :default-value="customer.default_delivery_contact_number"
+                                    :default-value="
+                                        customer.default_delivery_contact_number
+                                    "
                                     :aria-invalid="
                                         Boolean(errors.contact_number)
                                     "

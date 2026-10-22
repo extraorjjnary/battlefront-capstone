@@ -1,6 +1,10 @@
 export const BUSINESS_TIMEZONE = 'Asia/Manila';
 
-export function formatDateTime(value, dateStyle = 'medium', timezone = BUSINESS_TIMEZONE) {
+export function formatDateTime(
+    value,
+    dateStyle = 'medium',
+    timezone = BUSINESS_TIMEZONE,
+) {
     return new Intl.DateTimeFormat('en-PH', {
         dateStyle,
         timeStyle: 'short',
@@ -8,7 +12,11 @@ export function formatDateTime(value, dateStyle = 'medium', timezone = BUSINESS_
     }).format(new Date(value));
 }
 
-export function formatTimestampDate(value, dateStyle = 'medium', timezone = BUSINESS_TIMEZONE) {
+export function formatTimestampDate(
+    value,
+    dateStyle = 'medium',
+    timezone = BUSINESS_TIMEZONE,
+) {
     return new Intl.DateTimeFormat('en-PH', {
         dateStyle,
         timeZone: timezone,

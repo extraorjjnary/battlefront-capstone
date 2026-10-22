@@ -20,14 +20,21 @@ const props = defineProps({
     filters: { type: Object, required: true },
 });
 const page = usePage();
-const canDeleteCatalog = computed(() => page.props.auth?.can?.deleteCatalog === true);
+const canDeleteCatalog = computed(
+    () => page.props.auth?.can?.deleteCatalog === true,
+);
 const { search, isSearching, clearSearch } = useDebouncedSearch({
     initialSearch: props.filters.q,
     currentSearch: () => props.filters.q,
     route: CategoryController.index,
     query: () => ({ deleted: props.deleted ? 1 : undefined }),
 });
-watch(() => props.filters.q, (query) => { search.value = query ?? ''; });
+watch(
+    () => props.filters.q,
+    (query) => {
+        search.value = query ?? '';
+    },
+);
 
 defineOptions({
     layout: {
@@ -76,18 +83,33 @@ defineOptions({
                     </div>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                <Button v-if="canDeleteCatalog" variant="outline" as-child class="shrink-0">
-                    <Link :href="CategoryController.index({ query: { deleted: deleted ? undefined : 1 } })">
-                        <RotateCcw />
-                        {{ deleted ? 'Active categories' : 'Deleted categories' }}
-                    </Link>
-                </Button>
-                <Button v-if="!deleted" as-child class="shrink-0">
-                    <Link :href="CategoryController.create()">
-                        <Plus />
-                        Add category
-                    </Link>
-                </Button>
+                    <Button
+                        v-if="canDeleteCatalog"
+                        variant="outline"
+                        as-child
+                        class="shrink-0"
+                    >
+                        <Link
+                            :href="
+                                CategoryController.index({
+                                    query: { deleted: deleted ? undefined : 1 },
+                                })
+                            "
+                        >
+                            <RotateCcw />
+                            {{
+                                deleted
+                                    ? 'Active categories'
+                                    : 'Archived categories'
+                            }}
+                        </Link>
+                    </Button>
+                    <Button v-if="!deleted" as-child class="shrink-0">
+                        <Link :href="CategoryController.create()">
+                            <Plus />
+                            Add category
+                        </Link>
+                    </Button>
                 </div>
             </div>
             <CatalogNavigation />
@@ -95,11 +117,12 @@ defineOptions({
 
         <section aria-labelledby="category-list-heading">
             <div class="mb-4">
-                    <p class="text-muted-foreground text-sm">
-                    {{ categories.total }} {{ deleted ? 'deleted categories' : 'categories' }}
+                <p class="text-muted-foreground text-sm">
+                    {{ categories.total }}
+                    {{ deleted ? 'archived categories' : 'categories' }}
                 </p>
                 <h2 id="category-list-heading" class="text-xl font-semibold">
-                    {{ deleted ? 'Deleted categories' : 'Catalog categories' }}
+                    {{ deleted ? 'Archived categories' : 'Catalog categories' }}
                 </h2>
             </div>
 
@@ -119,11 +142,17 @@ defineOptions({
             >
                 <div>
                     <FolderTree class="text-muted-foreground mx-auto size-9" />
-                    <p class="mt-3 font-medium">{{ deleted ? 'No deleted categories' : 'No categories available' }}</p>
+                    <p class="mt-3 font-medium">
+                        {{
+                            deleted
+                                ? 'No archived categories'
+                                : 'No categories available'
+                        }}
+                    </p>
                     <p class="text-muted-foreground mt-1 text-sm">
                         Add a category before creating catalog products.
                     </p>
-                        <Button v-if="!deleted" as-child class="mt-5">
+                    <Button v-if="!deleted" as-child class="mt-5">
                         <Link :href="CategoryController.create()">
                             <Plus />
                             Add category
@@ -149,7 +178,13 @@ defineOptions({
                                     category.is_active ? 'secondary' : 'outline'
                                 "
                             >
-                                {{ deleted ? 'Deleted' : category.is_active ? 'Active' : 'Inactive' }}
+                                {{
+                                    deleted
+                                        ? 'Archived'
+                                        : category.is_active
+                                          ? 'Active'
+                                          : 'Inactive'
+                                }}
                             </Badge>
                             <Badge variant="outline">
                                 {{ category.products_count }}
@@ -168,10 +203,17 @@ defineOptions({
                                 'No category description provided.'
                             }}
                         </p>
-                        <p v-if="deleted" class="text-muted-foreground mt-2 text-xs">
-                            Deleted {{ category.deleted_at }} by {{ category.deleted_by || 'an administrator' }}
+                        <p
+                            v-if="deleted"
+                            class="text-muted-foreground mt-2 text-xs"
+                        >
+                            Archived {{ category.deleted_at }} by
+                            {{ category.deleted_by || 'an administrator' }}
                         </p>
-                        <p v-if="deleted && category.products_count > 0" class="text-muted-foreground mt-1 text-xs">
+                        <p
+                            v-if="deleted && category.products_count > 0"
+                            class="text-muted-foreground mt-1 text-xs"
+                        >
                             Restore this category before restoring its products.
                         </p>
                     </div>
@@ -179,7 +221,12 @@ defineOptions({
                     <div
                         class="flex flex-wrap items-center gap-2 md:justify-end"
                     >
-                        <Button v-if="!deleted" variant="outline" size="sm" as-child>
+                        <Button
+                            v-if="!deleted"
+                            variant="outline"
+                            size="sm"
+                            as-child
+                        >
                             <Link :href="CategoryController.edit(category.id)">
                                 <Pencil />
                                 Edit
@@ -214,8 +261,19 @@ defineOptions({
                                 Reactivate
                             </Button>
                         </Form>
-                        <Form v-if="deleted" v-bind="CategoryController.restore.form(category.id)" :options="{ preserveScroll: true }" v-slot="{ processing }">
-                            <Button variant="outline" size="sm" :disabled="processing">
+                        <Form
+                            v-if="deleted"
+                            v-bind="
+                                CategoryController.restore.form(category.id)
+                            "
+                            :options="{ preserveScroll: true }"
+                            v-slot="{ processing }"
+                        >
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                :disabled="processing"
+                            >
                                 <Spinner v-if="processing" />
                                 <RotateCcw v-else />
                                 Restore inactive
@@ -225,7 +283,7 @@ defineOptions({
                             v-if="!deleted && canDeleteCatalog"
                             :name="category.name"
                             resource-name="category"
-                            collection-name="Deleted categories"
+                            collection-name="Archived categories"
                             :form="CategoryController.destroy.form(category.id)"
                             :error-bag="`deleteCategory${category.id}`"
                         />

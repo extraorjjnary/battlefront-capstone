@@ -368,10 +368,7 @@ test('report filters and sales overview come before refund source records', asyn
     assert.ok(filterPosition < summaryPosition);
     assert.ok(summaryPosition < productsPosition);
     assert.ok(productsPosition < refundsPosition);
-    assert.match(
-        html,
-        /<details class="border-border mt-6 border"><summary/,
-    );
+    assert.match(html, /<details class="border-border mt-6 border"><summary/);
     assert.ok(!html.includes('<details open'));
 });
 

@@ -2,6 +2,7 @@
 paths:
     - 'database/seeders/DevelopmentHistoricalSalesSeeder.php,app/Console/Commands/ResetDevCommand.php'
     - 'database/seeders/DevelopmentCustomerSeeder.php,app/Console/Commands/ResetDevCommand.php'
+    - 'database/seeders/DatabaseSeeder.php,app/Console/Commands/ResetDevCommand.php'
 ---
 
 # Commands
@@ -21,3 +22,7 @@ Historical demo orders may mix supported pickup/payment methods and online-only 
 ## Keep the thirty customer demo identities development-only and immutable on reruns
 
 DevelopmentCustomerSeeder owns only demo.customer01@example.test through demo.customer30@example.test in local/testing and runs by default during battlefront:reset-dev, independently of sales history. Preserve matching accounts unchanged; reject reserved email/name/Customer-role/password/verification conflicts atomically without overwriting credentials or unrelated users. Keep DatabaseSeeder and the separate historical-sales account/transactions unchanged; never create commerce or recommendation activity for this roster.
+
+## Seed a development account for each administration role
+
+The approved demo roster is admin@example.com (Owner), staff@example.com, manager@example.com, and it@example.com, plus test@example.com (Customer), all local/testing only. Supersedes the earlier single-administration-demo-account assumption. DatabaseSeeder creates missing identities and audits role assignment only for newly created accounts; never overwrite existing roles, passwords, status, or customer collisions. reset-dev reuses DatabaseSeeder; never execute a real reset or account seeding without explicit authorization.

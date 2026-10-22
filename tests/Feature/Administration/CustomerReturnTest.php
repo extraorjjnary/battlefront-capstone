@@ -15,7 +15,7 @@ test('customer return cases can be searched by product, requester, order, or rea
     $administrator = User::factory()->administrator()->create();
     $product = Product::factory()->create(['name' => 'Search return product']);
     $order = Order::factory()->create();
-    $item = OrderItem::factory()->for($order)->for($product)->create();
+    $item = OrderItem::factory()->for($order)->for($product)->create(['product_name_at_time' => 'Recorded return product name']);
     $returnId = DB::table('customer_returns')->insertGetId([
         'order_id' => $order->id,
         'requester_id' => $administrator->id,
@@ -37,7 +37,11 @@ test('customer return cases can be searched by product, requester, order, or rea
         ->where('filters.q', 'Search return product')
         ->where('filters.overdue', true)
         ->where('returns.total', 1)
+        ->where('returns.data.0.product_name', 'Recorded return product name')
         ->where('returns.data.0.id', $returnId));
+
+    $this->get(route('administration.customer-returns.index', ['q' => 'Recorded return product name']))
+        ->assertInertia(fn (Assert $page) => $page->where('returns.total', 1));
 
     expect(fn () => DB::table('customer_returns')->where('id', $returnId)->delete())
         ->toThrow(QueryException::class);

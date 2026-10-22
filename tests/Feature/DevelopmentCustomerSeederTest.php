@@ -100,7 +100,7 @@ test('demonstration seeding leaves administrator test and unrelated customer acc
     $this->seed(DevelopmentCustomerSeeder::class);
     $this->seed(DevelopmentCustomerSeeder::class);
 
-    $this->assertDatabaseCount('users', 34);
+    $this->assertDatabaseCount('users', 37);
     expect(DB::table('users')->whereIn('id', $before->pluck('id'))->orderBy('id')->get()->all())
         ->toEqual($before->all());
 });

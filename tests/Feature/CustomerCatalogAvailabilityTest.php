@@ -1,6 +1,8 @@
 <?php
 
 use App\Actions\Inventory\AdjustInventoryStock;
+use App\Actions\Inventory\DecideInventoryAdjustment;
+use App\Actions\Inventory\RequestInventoryAdjustment;
 use App\Models\Category;
 use App\Models\Inventory;
 use App\Models\Product;
@@ -91,7 +93,11 @@ test('restocking and depletion update catalog and filter visibility without chan
     };
 
     $assertDiscovery(false);
-    app(AdjustInventoryStock::class)->set($inventory, 2, 2);
+    $requester = User::factory()->administrator()->create();
+    $reviewer = User::factory()->administrator()->create();
+    $adjustmentId = app(RequestInventoryAdjustment::class)->execute($product, $requester, 2, 'Receiving count confirmed');
+    $assertDiscovery(false);
+    app(DecideInventoryAdjustment::class)->execute($adjustmentId, $reviewer, true, 'Receiving count reviewed');
     $assertDiscovery(true);
     app(AdjustInventoryStock::class)->decrease($inventory, 2);
     $assertDiscovery(false);

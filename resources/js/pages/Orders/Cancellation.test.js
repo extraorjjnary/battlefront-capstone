@@ -71,7 +71,13 @@ function loadPage(path, inlineTemplate = false) {
             '@inertiajs/vue3': {
                 Head: primitive,
                 Link: primitive,
-                usePage: () => ({ props: { auth: { can: { assignOrders: true, processOrders: true } } } }),
+                usePage: () => ({
+                    props: {
+                        auth: {
+                            can: { assignOrders: true, processOrders: true },
+                        },
+                    },
+                }),
                 useForm(initial) {
                     const form = Vue.reactive({
                         ...initial,
@@ -678,18 +684,35 @@ test('COD delivery confirmation explains that delivery alone does not complete o
         const candidates = [];
         function inspect(node) {
             if (!node || typeof node !== 'object') return;
-            if (node.props?.onClick) candidates.push({ type: node.type, name: node.props.onClick.name, props: node.props, children: node.children });
+            if (node.props?.onClick)
+                candidates.push({
+                    type: node.type,
+                    name: node.props.onClick.name,
+                    props: node.props,
+                    children: node.children,
+                });
             const children = node.children;
             if (Array.isArray(children)) children.forEach(inspect);
-            else if (children && typeof children === 'object') Object.values(children).forEach((child) => inspect(typeof child === 'function' ? child() : child));
+            else if (children && typeof children === 'object')
+                Object.values(children).forEach((child) =>
+                    inspect(typeof child === 'function' ? child() : child),
+                );
         }
         inspect(root);
-        const markDelivered = candidates.find(({ name }) => name === 'requestShipmentUpdate');
-        assert.ok(markDelivered, 'The eligible shipment milestone must be actionable.');
+        const markDelivered = candidates.find(
+            ({ name }) => name === 'requestShipmentUpdate',
+        );
+        assert.ok(
+            markDelivered,
+            'The eligible shipment milestone must be actionable.',
+        );
         markDelivered.props.onClick();
 
         assert.equal(loaded.submissions.length, 0);
-        assert.equal(loaded.forms.some((form) => form.status === 'delivered'), true);
+        assert.equal(
+            loaded.forms.some((form) => form.status === 'delivered'),
+            true,
+        );
     } finally {
         scope.stop();
     }

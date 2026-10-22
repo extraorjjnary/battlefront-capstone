@@ -85,7 +85,7 @@ test('mobile detail uses persisted prices shared status labels and safe payment 
         'payment_proof_path' => 'payment-proofs/private.png',
     ]);
     $product = Product::factory()->inactive()->create(['price' => '999.00']);
-    OrderItem::factory()->for($order)->for($product)->create(['quantity' => 2, 'price_at_time' => '10.15']);
+    OrderItem::factory()->for($order)->for($product)->create(['quantity' => 2, 'price_at_time' => '10.15', 'product_name_at_time' => 'Name recorded at purchase']);
 
     $response = $this->withToken($customer->createToken('Phone')->plainTextToken)
         ->get('/api/v1/orders/'.$order->id)->assertOk()
@@ -95,6 +95,8 @@ test('mobile detail uses persisted prices shared status labels and safe payment 
         ->assertJsonPath('data.status.label', 'Processing')
         ->assertJsonPath('data.items.0.unit_price', '10.15')
         ->assertJsonPath('data.items.0.line_total', '20.30')
+        ->assertJsonPath('data.items.0.product.name', 'Name recorded at purchase')
+        ->assertJsonMissingPath('data.items.0.product_name_at_time')
         ->assertJsonPath('data.payment.can_resubmit_proof', true)
         ->assertJsonMissingPath('data.user_id')
         ->assertJsonMissingPath('data.payment_proof_path');

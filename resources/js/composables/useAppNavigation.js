@@ -69,7 +69,7 @@ export function useAppNavigation() {
             },
             {
                 title: isAdministrator.value ? 'Stores' : 'Our stores',
-                href: isAdministrator.value
+                href: page.props.auth?.can?.manageBranches
                     ? administrationBranchIndex()
                     : branchIndex(),
                 icon: MapPin,

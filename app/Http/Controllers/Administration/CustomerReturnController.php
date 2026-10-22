@@ -46,7 +46,7 @@ class CustomerReturnController extends Controller
 
             return [
                 'id' => $item->id,
-                'product' => $item->product->name,
+                'product' => $item->purchasedProductName(),
                 'quantity' => $item->quantity,
                 'remaining_returnable' => max(0, $item->quantity - $alreadyReturned),
                 'price_at_time' => $item->price_at_time,
@@ -61,11 +61,13 @@ class CustomerReturnController extends Controller
             ->join('products', 'products.id', '=', 'order_items.product_id')
             ->leftJoin('customer_refunds as refunds', 'refunds.customer_return_id', '=', 'returns.id')
             ->select('returns.*', 'users.name as requester_name', 'customers.name as customer_name', 'items.quantity', 'items.condition', 'items.disposition',
-                'products.name as product_name', 'orders.id as purchase_order_id', 'refunds.id as refund_id',
+                'orders.id as purchase_order_id', 'refunds.id as refund_id',
                 'refunds.approved_amount', 'refunds.paid_amount')
+            ->selectRaw('COALESCE(order_items.product_name_at_time, products.name) as product_name')
             ->when($case, fn ($query, $id) => $query->where('returns.id', $id))
             ->when($filters['q'] ?? null, fn ($query, $search) => $query->where(function ($query) use ($search): void {
                 $query->where('products.name', 'like', '%'.$search.'%')
+                    ->orWhere('order_items.product_name_at_time', 'like', '%'.$search.'%')
                     ->orWhere('users.name', 'like', '%'.$search.'%')
                     ->orWhere('customers.name', 'like', '%'.$search.'%')
                     ->orWhere('returns.reason', 'like', '%'.$search.'%');

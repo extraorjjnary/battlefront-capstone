@@ -25,22 +25,6 @@ class AdjustInventoryStock
     }
 
     /**
-     * Set the current quantity and reorder level.
-     */
-    public function set(Inventory $inventory, int $quantity, int $reorderLevel): Inventory
-    {
-        $this->ensureNonNegative($quantity, 'Quantity');
-        $this->ensureNonNegative($reorderLevel, 'Reorder level');
-
-        $inventory->update([
-            'quantity' => $quantity,
-            'reorder_level' => $reorderLevel,
-        ]);
-
-        return $inventory->refresh();
-    }
-
-    /**
      * Increase the current quantity atomically.
      */
     public function increase(Inventory $inventory, int $amount, ?int $orderId = null): Inventory

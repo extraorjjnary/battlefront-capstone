@@ -128,7 +128,7 @@ class CategoryController extends Controller
 
         Inertia::flash('toast', [
             'type' => 'success',
-            'message' => __('Category moved to Deleted categories. An owner can restore it.'),
+            'message' => __('Category moved to Archived categories. An owner can restore it.'),
         ]);
 
         return to_route('administration.categories.index');

@@ -513,7 +513,12 @@ function salesProps() {
 
 modules['@inertiajs/vue3'] = {
     Head: primitive,
-    usePage: () => ({ props: { errors: {}, auth: { can: { exportReports: true, viewOrders: true } } } }),
+    usePage: () => ({
+        props: {
+            errors: {},
+            auth: { can: { exportReports: true, viewOrders: true } },
+        },
+    }),
     router: { visit() {} },
 };
 modules['chart.js'] = new Proxy(

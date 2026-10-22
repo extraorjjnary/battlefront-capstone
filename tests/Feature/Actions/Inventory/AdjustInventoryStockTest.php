@@ -1,23 +1,29 @@
 <?php
 
 use App\Actions\Inventory\AdjustInventoryStock;
+use App\Actions\Inventory\DecideInventoryAdjustment;
+use App\Actions\Inventory\RequestInventoryAdjustment;
 use App\Models\Inventory;
+use App\Models\User;
 
-test('stock levels can be set to zero', function () {
+test('stock corrections to zero require a separately approved request', function () {
     $inventory = Inventory::factory()->create([
         'quantity' => 10,
         'reorder_level' => 5,
     ]);
-    $action = new AdjustInventoryStock;
-
-    $updatedInventory = $action->set($inventory, 0, 0);
+    $requester = User::factory()->administrator()->create();
+    $reviewer = User::factory()->administrator()->create();
+    $requestId = app(RequestInventoryAdjustment::class)->execute($inventory->product, $requester, 0, 'Count confirmed no remaining units');
+    expect($inventory->refresh()->quantity)->toBe(10);
+    app(DecideInventoryAdjustment::class)->execute($requestId, $reviewer, true, 'Physical count reviewed');
+    $updatedInventory = $inventory->refresh();
 
     expect($updatedInventory->quantity)->toBe(0)
-        ->and($updatedInventory->reorder_level)->toBe(0);
+        ->and($updatedInventory->reorder_level)->toBe(5);
     $this->assertDatabaseHas('inventories', [
         'id' => $inventory->id,
         'quantity' => 0,
-        'reorder_level' => 0,
+        'reorder_level' => 5,
     ]);
 });
 
@@ -69,7 +75,9 @@ test('invalid stock changes are rejected without changing inventory', function (
     ]);
     $action = new AdjustInventoryStock;
 
-    expect(fn () => $action->{$operation}($inventory, ...$arguments))
+    expect(fn () => $operation === 'initialize'
+        ? $action->initialize($inventory->product, ...$arguments)
+        : $action->{$operation}($inventory, ...$arguments))
         ->toThrow(InvalidArgumentException::class);
     $this->assertDatabaseHas('inventories', [
         'id' => $inventory->id,
@@ -77,13 +85,21 @@ test('invalid stock changes are rejected without changing inventory', function (
         'reorder_level' => 5,
     ]);
 })->with([
-    'negative quantity' => ['set', [-1, 5]],
-    'negative reorder level' => ['set', [10, -1]],
+    'negative quantity' => ['initialize', [-1, 5]],
+    'negative reorder level' => ['initialize', [10, -1]],
     'zero increase' => ['increase', [0]],
     'negative increase' => ['increase', [-1]],
     'zero decrease' => ['decrease', [0]],
     'negative decrease' => ['decrease', [-1]],
 ]);
+
+test('initialization cannot overwrite previously encoded stock', function () {
+    $inventory = Inventory::factory()->create(['quantity' => 10, 'reorder_level' => 5]);
+
+    (new AdjustInventoryStock)->initialize($inventory->product, 50, 20);
+
+    expect($inventory->refresh()->quantity)->toBe(10)->and($inventory->reorder_level)->toBe(5);
+});
 
 test('successful stock changes update the inventory timestamp', function () {
     $this->travelTo('2026-09-06 08:00:00');

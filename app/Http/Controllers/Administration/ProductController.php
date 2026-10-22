@@ -330,7 +330,7 @@ class ProductController extends Controller
 
         Inertia::flash('toast', [
             'type' => 'success',
-            'message' => __('Product moved to Deleted products. An owner can restore it.'),
+            'message' => __('Product moved to Archived products. An owner can restore it.'),
         ]);
 
         return to_route('administration.products.index');

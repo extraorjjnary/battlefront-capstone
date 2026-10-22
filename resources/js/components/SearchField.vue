@@ -35,9 +35,16 @@ const emit = defineEmits(['update:modelValue', 'clear']);
                 @update:model-value="emit('update:modelValue', $event)"
             />
         </div>
-        <p class="text-muted-foreground flex min-h-5 items-center gap-1 text-xs" aria-live="polite">
+        <p
+            class="text-muted-foreground flex min-h-5 items-center gap-1 text-xs"
+            aria-live="polite"
+        >
             <Spinner v-if="isSearching" class="size-3" />
-            {{ isSearching ? 'Updating results...' : 'Results update automatically as you type.' }}
+            {{
+                isSearching
+                    ? 'Updating results...'
+                    : 'Results update automatically as you type.'
+            }}
         </p>
         <Button
             v-if="modelValue.trim()"

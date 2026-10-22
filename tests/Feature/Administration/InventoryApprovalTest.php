@@ -1,11 +1,46 @@
 <?php
 
+use App\Actions\Inventory\AdjustInventoryStock;
+use App\Actions\Inventory\RequestInventoryAdjustment;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia;
+
+test('ordinary product editing cannot overwrite sellable or quarantined quantities', function () {
+    $product = Product::factory()->available()->create();
+    $inventory = $product->inventory;
+    $before = $inventory->refresh()->getAttributes();
+
+    $this->actingAs(User::factory()->administrator()->create())->put(route('administration.products.update', $product), [
+        'edit_version' => $product->edit_version, 'product_code' => $product->product_code,
+        'name' => $product->name, 'category_id' => $product->category_id,
+        'price' => $product->price, 'discount_price' => $product->discount_price, 'is_featured' => false,
+        'quantity' => 1000, 'quarantined_quantity' => 1000, 'inventory' => ['quantity' => 1000],
+    ])->assertSessionHasNoErrors();
+
+    expect($inventory->refresh()->getAttributes())->toBe($before);
+    $this->assertDatabaseCount('inventory_adjustment_requests', 0);
+});
+
+test('an automatic stock movement invalidates a stale manual adjustment without applying it', function () {
+    $requester = User::factory()->administrator()->create();
+    $reviewer = User::factory()->administrator()->create();
+    $product = Product::factory()->available()->create();
+    $before = $product->inventory->quantity;
+    $requestId = app(RequestInventoryAdjustment::class)->execute($product, $requester, $before + 5, 'Physical stock count correction');
+    app(AdjustInventoryStock::class)->decrease($product->inventory, 1);
+
+    $this->actingAs($reviewer)->post(route('administration.inventory-adjustments.decide', $requestId), [
+        'decision' => 'approve', 'reason' => 'Count checked on site',
+    ])->assertSessionHasErrors(['decision' => 'Stock changed after this request. Submit a new request.']);
+
+    expect($product->inventory->refresh()->quantity)->toBe($before - 1);
+    $this->assertDatabaseHas('inventory_adjustment_requests', ['id' => $requestId, 'status' => 'pending']);
+    $this->assertDatabaseMissing('inventory_movements', ['reference_type' => 'inventory_adjustment_request', 'reference_id' => $requestId]);
+});
 
 test('inventory adjustment requests can be searched by product, requester, or reason', function () {
     $administrator = User::factory()->administrator()->create();

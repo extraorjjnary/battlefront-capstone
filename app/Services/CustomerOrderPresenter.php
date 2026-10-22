@@ -101,7 +101,7 @@ class CustomerOrderPresenter
                     'id' => $item->id,
                     'product' => [
                         'id' => $item->product->id,
-                        'name' => $item->product->name,
+                        'name' => $item->purchasedProductName(),
                         'brand' => $item->product->brand,
                         'image_url' => $item->product->image_url,
                     ],

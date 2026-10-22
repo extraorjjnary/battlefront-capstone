@@ -18,7 +18,7 @@ class DeleteProduct
             DB::table('inventories')->where('product_id', $lockedProduct->id)->lockForUpdate()->first();
             if ($this->hasOutstandingOperations($lockedProduct)) {
                 throw ValidationException::withMessages([
-                    'deletion' => 'This product still has stock or unfinished work. Deactivate it, then resolve its inventory and open operations before moving it to Deleted products.',
+                    'deletion' => 'This product still has stock or unfinished work. Deactivate it, then resolve its inventory and open operations before moving it to Archived products.',
                 ]);
             }
 

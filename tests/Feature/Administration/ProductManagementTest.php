@@ -173,13 +173,13 @@ test('only owners can view or restore deleted products', function () {
     $this->post(route('administration.products.restore', $product->id))->assertForbidden();
 });
 
-test('a deleted product waits for its deleted category to be restored', function () {
+test('legacy archived products wait for their archived category to be restored', function () {
     $owner = User::factory()->administrator()->create();
     $category = Category::factory()->create();
     $product = Product::factory()->for($category)->create();
 
     $this->actingAs($owner)->delete(route('administration.products.destroy', $product));
-    $this->delete(route('administration.categories.destroy', $category));
+    $category->delete();
 
     $this->get(route('administration.products.index', ['deleted' => 1]))
         ->assertInertia(fn (Assert $page) => $page->where('products.data.0.category.is_deleted', true));

@@ -15,6 +15,32 @@ dataset('branch management endpoints', [
     'update' => ['put', 'update'],
 ]);
 
+test('shared branch capability matches management authorization while the directory remains readable', function (string $role, bool $canManage) {
+    $administrator = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', $role)->value('id'),
+    ]);
+
+    $this->actingAs($administrator)->get(route('branches.index'))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('auth.can.manageBranches', $canManage));
+    $response = $this->get(route('administration.branches.index'));
+    if ($canManage) {
+        $response->assertOk();
+    } else {
+        $response->assertForbidden();
+    }
+})->with([['staff', false], ['it', false], ['manager', true], ['owner', true]]);
+
+test('removing the Manager branch permission removes its shared management capability', function () {
+    $manager = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'manager')->value('id'),
+    ]);
+    DB::table('administration_role_permissions')->where('administration_role_id', $manager->administration_role_id)
+        ->where('administration_permission_id', DB::table('administration_permissions')->where('code', 'branches.manage')->value('id'))->delete();
+
+    $this->actingAs($manager)->get(route('branches.index'))->assertInertia(fn (Assert $page) => $page->where('auth.can.manageBranches', false));
+    $this->get(route('administration.branches.index'))->assertForbidden();
+});
+
 test('guests must sign in for branch management', function (string $method, string $action) {
     $branch = Branch::factory()->create();
 

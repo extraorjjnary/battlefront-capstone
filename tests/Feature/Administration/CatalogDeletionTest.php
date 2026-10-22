@@ -29,6 +29,16 @@ function emptyProductInventory(Product $product): void
     $product->inventory?->update(['quantity' => 0, 'quarantined_quantity' => 0]);
 }
 
+test('an archived product still prevents category archival', function () {
+    $product = Product::factory()->create();
+    $product->delete();
+
+    $this->actingAs(User::factory()->administrator()->create())->delete(route('administration.categories.destroy', $product->category))
+        ->assertSessionHasErrors(['deletion' => DeleteCategory::PROTECTED_MESSAGE]);
+
+    expect($product->category->refresh()->trashed())->toBeFalse();
+});
+
 test('administrators can search deleted products by name and catalog code', function () {
     $administrator = User::factory()->administrator()->create();
     $product = Product::factory()->available()->create([

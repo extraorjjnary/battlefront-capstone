@@ -150,9 +150,10 @@ async function renderPage(
                     ],
                 ),
             ),
-            '@/actions/App/Http/Controllers/Administration/WorkQueueController': {
-                default: { index: route },
-            },
+            '@/actions/App/Http/Controllers/Administration/WorkQueueController':
+                {
+                    default: { index: route },
+                },
         },
         { get: (target, key) => target[key] ?? generic },
     );
@@ -240,7 +241,12 @@ test('administrator skeletons preserve tool navigation and resolve to operationa
     const props = {
         auth: {
             user: { id: 2, name: 'Administrator' },
-            can: { viewReports: true, viewOrders: true, viewInventory: true, manageProducts: true },
+            can: {
+                viewReports: true,
+                viewOrders: true,
+                viewInventory: true,
+                manageProducts: true,
+            },
         },
     };
     let html = await renderPage('Dashboard/Administration', props);

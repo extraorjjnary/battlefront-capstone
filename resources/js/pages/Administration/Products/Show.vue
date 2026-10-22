@@ -12,8 +12,12 @@ defineProps({
     product: { type: Object, required: true },
 });
 const page = usePage();
-const canManageProducts = computed(() => page.props.auth?.can?.manageProducts === true);
-const canDeleteProduct = computed(() => page.props.auth?.can?.deleteCatalog === true);
+const canManageProducts = computed(
+    () => page.props.auth?.can?.manageProducts === true,
+);
+const canDeleteProduct = computed(
+    () => page.props.auth?.can?.deleteCatalog === true,
+);
 
 const currencyFormatter = new Intl.NumberFormat('en-PH', {
     style: 'currency',
@@ -77,7 +81,7 @@ defineOptions({
                     v-if="canDeleteProduct"
                     :name="product.name"
                     resource-name="product"
-                    collection-name="Deleted products"
+                    collection-name="Archived products"
                     :form="ProductController.destroy.form(product.id)"
                     :error-bag="`deleteProduct${product.id}`"
                 />
@@ -161,8 +165,12 @@ defineOptions({
                             </dd>
                         </div>
                         <div v-if="product.acquisition_cost !== undefined">
-                            <dt class="text-muted-foreground">Acquisition cost</dt>
-                            <dd class="mt-1 font-medium tabular-nums">{{ formatPrice(product.acquisition_cost) }}</dd>
+                            <dt class="text-muted-foreground">
+                                Acquisition cost
+                            </dt>
+                            <dd class="mt-1 font-medium tabular-nums">
+                                {{ formatPrice(product.acquisition_cost) }}
+                            </dd>
                         </div>
                         <div>
                             <dt class="text-muted-foreground">

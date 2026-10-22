@@ -6,13 +6,14 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-test('the order item schema follows the approved ERD decisions', function () {
+test('the order item schema includes the approved purchase name snapshot', function () {
     expect(Schema::getColumnListing('order_items'))->toEqualCanonicalizing([
         'id',
         'order_id',
         'product_id',
         'quantity',
         'price_at_time',
+        'product_name_at_time',
         'acquisition_cost_at_time',
         'acquisition_cost_source',
     ]);

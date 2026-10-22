@@ -9,7 +9,7 @@ use Illuminate\Validation\ValidationException;
 
 class DeleteCategory
 {
-    public const PROTECTED_MESSAGE = 'This category cannot be deleted because it contains products. Move or remove its products first, or deactivate the category.';
+    public const PROTECTED_MESSAGE = 'This category cannot be archived because it contains products, including any archived products. Move its products to another category, or deactivate the category.';
 
     public function execute(Category $category): void
     {
@@ -19,7 +19,7 @@ class DeleteCategory
         try {
             DB::transaction(function () use ($category, $actorId): void {
                 $lockedCategory = Category::query()->lockForUpdate()->findOrFail($category->id);
-                if ($lockedCategory->products()->exists()) {
+                if ($lockedCategory->products()->withTrashed()->exists()) {
                     throw ValidationException::withMessages(['deletion' => self::PROTECTED_MESSAGE]);
                 }
 

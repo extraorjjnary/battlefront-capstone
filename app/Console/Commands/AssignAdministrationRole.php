@@ -2,21 +2,23 @@
 
 namespace App\Console\Commands;
 
+use App\Concerns\PasswordValidationRules;
 use App\Enums\UserRole;
 use App\Models\User;
+use App\Services\TeamAccessService;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
-#[Signature('administration:assign-role {email} {role : staff, manager, owner, or it}')]
-#[Description('Assign an existing administrator to an administration role during rollout.')]
+#[Signature('administration:assign-role {email} {role : staff, manager, owner, or it} {--create : Create the first Owner using hidden password prompts} {--name= : Name required when creating the first Owner}')]
+#[Description('Explicitly assign an existing Administrator role or provision the first Owner.')]
 class AssignAdministrationRole extends Command
 {
-    /**
-     * Execute the console command.
-     */
-    public function handle(): int
+    use PasswordValidationRules;
+
+    public function handle(TeamAccessService $access): int
     {
         $roleCode = (string) $this->argument('role');
         if (! in_array($roleCode, ['staff', 'manager', 'owner', 'it'], true)) {
@@ -25,33 +27,44 @@ class AssignAdministrationRole extends Command
             return self::FAILURE;
         }
 
-        $user = User::query()->where('email', (string) $this->argument('email'))
-            ->where('role', UserRole::Administrator->value)->first();
-        if ($user === null) {
-            $this->error('No administrator has that email address.');
+        $email = (string) $this->argument('email');
+
+        try {
+            if ($this->option('create')) {
+                if ($roleCode !== 'owner' || ! $this->input->isInteractive()) {
+                    $this->error('First Owner creation requires role owner and an interactive terminal for hidden password prompts.');
+
+                    return self::FAILURE;
+                }
+                $attributes = Validator::make(['email' => $email, 'name' => $this->option('name')], [
+                    'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+                    'name' => ['required', 'string', 'max:255'],
+                ])->validate();
+                $credentials = Validator::make([
+                    'password' => $this->secret('Password', false),
+                    'password_confirmation' => $this->secret('Confirm password', false),
+                ], ['password' => $this->passwordRules()])->validate();
+                $user = $access->createInitialOwner($attributes['name'], $attributes['email'], $credentials['password']);
+            } else {
+                $user = User::query()->where('email', $email)
+                    ->where('role', UserRole::Administrator->value)->first();
+                if ($user === null) {
+                    $this->error('No administrator has that email address. No account was changed.');
+
+                    return self::FAILURE;
+                }
+
+                $access->assignRoleFromConsole($user, $roleCode);
+            }
+        } catch (ValidationException $exception) {
+            foreach ($exception->validator->errors()->all() as $message) {
+                $this->error($message);
+            }
 
             return self::FAILURE;
         }
 
-        DB::transaction(function () use ($user, $roleCode): void {
-            $roleId = DB::table('administration_roles')->where('code', $roleCode)->value('id');
-            $previous = $user->administration_role_id;
-            $user->administration_role_id = $roleId;
-            $user->save();
-            DB::table('sessions')->where('user_id', $user->id)->delete();
-            $user->tokens()->delete();
-            DB::table('audit_logs')->insert([
-                'actor_id' => null,
-                'action' => 'team.role.assigned_by_cli',
-                'subject_type' => 'user',
-                'subject_id' => $user->id,
-                'reason' => 'Explicit existing administrator rollout',
-                'changes' => json_encode(['before' => $previous, 'after' => $roleCode], JSON_THROW_ON_ERROR),
-                'created_at' => now(),
-            ]);
-        });
-
-        $this->info("Assigned {$user->email} to {$roleCode}.");
+        $this->info("Assigned {$user->email} to {$roleCode}.".($user->is_active ? '' : ' The account remains inactive.'));
 
         return self::SUCCESS;
     }

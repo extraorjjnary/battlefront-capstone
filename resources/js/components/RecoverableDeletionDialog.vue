@@ -1,6 +1,6 @@
 <script setup>
 import { Form } from '@inertiajs/vue3';
-import { Trash2 } from '@lucide/vue';
+import { Archive } from '@lucide/vue';
 import { ref } from 'vue';
 import { toast } from 'vue-sonner';
 import InputError from '@/components/InputError.vue';
@@ -44,8 +44,8 @@ function showError(errors) {
                 :aria-label="`Move to ${collectionName}`"
                 :title="`Move to ${collectionName}`"
             >
-                <Trash2 />
-                Move to Deleted
+                <Archive />
+                Archive
             </Button>
         </DialogTrigger>
         <DialogContent>
@@ -58,12 +58,16 @@ function showError(errors) {
                 v-slot="{ errors, processing }"
             >
                 <DialogHeader>
-                    <DialogTitle>Move {{ name }} to {{ collectionName }}?</DialogTitle>
+                    <DialogTitle
+                        >Move {{ name }} to {{ collectionName }}?</DialogTitle
+                    >
                     <DialogDescription>
-                        This hides the {{ resourceName }} from its normal list and records who moved it.
-                        It keeps its history and can be restored by an owner as inactive.
+                        This hides the {{ resourceName }} from its normal list
+                        and records who moved it. It keeps its history and can
+                        be restored by an owner as inactive.
                         <template v-if="resourceName === 'product'">
-                            Deactivate it instead if you may sell it again before resolving its stock or open work.
+                            Deactivate it instead if you may sell it again
+                            before resolving its stock or open work.
                         </template>
                     </DialogDescription>
                 </DialogHeader>
@@ -84,7 +88,7 @@ function showError(errors) {
                         :disabled="processing"
                     >
                         <Spinner v-if="processing" />
-                        <Trash2 v-else />
+                        <Archive v-else />
                         Move to {{ collectionName }}
                     </Button>
                 </DialogFooter>

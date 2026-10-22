@@ -61,11 +61,13 @@ class CustomerController extends Controller
                 'created_at' => $order->created_at->toIso8601String(),
                 'status' => $order->status->value,
                 'payment_status' => $order->payment_status->value,
-                'product_subtotal' => $order->product_subtotal,
+                'product_subtotal' => $order->product_subtotal ?? ($order->items->isEmpty()
+                    ? bcsub($order->total_amount, $order->delivery_fee, 2)
+                    : $order->items->reduce(fn (string $total, OrderItem $item): string => bcadd($total, bcmul((string) $item->quantity, $item->price_at_time, 2), 2), '0.00')),
                 'delivery_fee' => $order->delivery_fee,
                 'total_amount' => $order->total_amount,
                 'items' => $order->items->map(fn (OrderItem $item): array => [
-                    'name' => $item->product->name,
+                    'name' => $item->purchasedProductName(),
                     'quantity' => $item->quantity,
                     'price_at_time' => $item->price_at_time,
                 ])->all(),

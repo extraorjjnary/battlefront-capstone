@@ -36,41 +36,86 @@ class TeamAccessService
 
     public function update(User $actor, User $target, string $role, bool $active): void
     {
+        $this->changeAccess($actor, $target, $role, $active);
+    }
+
+    /**
+     * Explicit trusted-console assignment; never exposed through a web route.
+     */
+    public function assignRoleFromConsole(User $target, string $role): void
+    {
+        $this->changeAccess(null, $target, $role, null);
+    }
+
+    public function createInitialOwner(string $name, string $email, string $password): User
+    {
+        return DB::transaction(function () use ($name, $email, $password): User {
+            $ownerRoleId = $this->roleId('owner');
+            DB::table('administration_roles')->where('id', $ownerRoleId)->lockForUpdate()->first();
+            if (User::query()->where('administration_role_id', $ownerRoleId)->lockForUpdate()->first(['id']) !== null) {
+                throw ValidationException::withMessages(['role' => 'An Owner account already exists. Use the existing Owner or explicitly assign an existing Administrator.']);
+            }
+            if (User::query()->where('email', $email)->exists()) {
+                throw ValidationException::withMessages(['email' => 'That email address already belongs to an account. No account was changed.']);
+            }
+
+            $user = new User;
+            $user->name = $name;
+            $user->email = $email;
+            $user->password = $password;
+            $user->role = UserRole::Administrator;
+            $user->administration_role_id = $ownerRoleId;
+            $user->save();
+            $this->audit(null, 'team.owner.created_by_cli', $user->id, ['role' => 'owner'], 'Explicit first Owner provisioning');
+
+            return $user;
+        }, attempts: 3);
+    }
+
+    private function changeAccess(?User $actor, User $target, string $role, ?bool $active): void
+    {
         DB::transaction(function () use ($actor, $target, $role, $active): void {
             $ownerRoleId = $this->roleId('owner');
             $roleId = $this->roleId($role);
             DB::table('administration_roles')->where('id', $ownerRoleId)->lockForUpdate()->first();
             $locked = User::query()->whereKey($target->id)->lockForUpdate()->firstOrFail();
 
-            $this->authorizeRoleChange($actor, $locked, $role);
+            if ($actor !== null) {
+                $this->authorizeRoleChange($actor, $locked, $role);
+            }
+            $active ??= $locked->is_active;
 
             if (! $locked->isAdministrator()) {
                 throw ValidationException::withMessages(['user' => 'Only administrator accounts may be changed here.']);
             }
-            if ($locked->id === $actor->id && (! $active || $roleId !== $ownerRoleId)) {
+            if ($actor !== null && $locked->id === $actor->id && (! $active || $roleId !== $ownerRoleId)) {
                 throw ValidationException::withMessages(['user' => 'You cannot deactivate or demote your own owner account.']);
             }
             if ($locked->is_active && $locked->administration_role_id === $ownerRoleId
                 && (! $active || $roleId !== $ownerRoleId)
                 && User::query()->where('role', UserRole::Administrator->value)->where('is_active', true)
-                    ->where('administration_role_id', $ownerRoleId)->count() <= 1) {
+                    ->where('administration_role_id', $ownerRoleId)->where('id', '!=', $locked->id)
+                    ->lockForUpdate()->first(['id']) === null) {
                 throw ValidationException::withMessages(['user' => 'The last active owner cannot be removed.']);
             }
 
             $before = ['role' => $locked->administrationRoleCode(), 'is_active' => $locked->is_active];
+            $accessChanged = $locked->administration_role_id !== $roleId || $locked->is_active !== $active;
             $locked->administration_role_id = $roleId;
             $locked->is_active = $active;
-            if (! $active) {
+            if ($accessChanged) {
                 $locked->remember_token = null;
             }
             $locked->save();
 
-            if (! $active || $before['role'] !== $role) {
+            if ($accessChanged) {
                 DB::table('sessions')->where('user_id', $locked->id)->delete();
                 $locked->tokens()->delete();
             }
 
-            $this->audit($actor, 'team.updated', $locked->id, ['before' => $before, 'after' => ['role' => $role, 'is_active' => $active]]);
+            $this->audit($actor, $actor === null ? 'team.role.assigned_by_cli' : 'team.updated', $locked->id,
+                ['before' => $before, 'after' => ['role' => $role, 'is_active' => $active]],
+                $actor === null ? 'Explicit existing administrator rollout' : null);
         }, attempts: 3);
     }
 
@@ -149,16 +194,21 @@ class TeamAccessService
     /**
      * @param  array<string, mixed>  $changes
      */
-    private function audit(User $actor, string $action, int $subjectId, array $changes): void
+    private function audit(?User $actor, string $action, int $subjectId, array $changes, ?string $reason = null): void
     {
         DB::table('audit_logs')->insert([
-            'actor_id' => $actor->id,
+            'actor_id' => $actor?->id,
             'action' => $action,
-            'subject_type' => 'administrator_account',
+            'subject_type' => $actor === null ? 'user' : 'administrator_account',
             'subject_id' => $subjectId,
+            'reason' => $reason,
             'changes' => json_encode($changes, JSON_THROW_ON_ERROR),
             'created_at' => now(),
         ]);
+
+        if ($actor === null) {
+            return;
+        }
 
         DB::afterCommit(function () use ($actor, $action, $subjectId): void {
             User::query()->where('role', UserRole::Administrator->value)

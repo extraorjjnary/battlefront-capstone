@@ -79,6 +79,7 @@ class HandleInertiaRequests extends Middleware
                     'viewProfitReports' => $request->user()?->can('reports.profit') ?? false,
                     'deleteCatalog' => $request->user()?->can('catalog.delete') ?? false,
                     'manageSuppliers' => $request->user()?->can('suppliers.manage') ?? false,
+                    'manageBranches' => $request->user()?->can('branches.manage') ?? false,
                     'manageUsers' => $request->user()?->can('users.manage') ?? false,
                     'viewCustomers' => $request->user()?->can('customers.view') ?? false,
                     'viewInventory' => $request->user()?->can('inventory.view') ?? false,

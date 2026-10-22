@@ -217,18 +217,37 @@ defineOptions({
                     </div>
                 </div>
                 <div class="flex flex-wrap gap-2">
-                <Button v-if="canDeleteProduct" variant="outline" as-child class="shrink-0">
-                    <Link :href="ProductController.index({ query: { deleted: deleted ? undefined : 1 } })">
-                        <RotateCcw />
-                        {{ deleted ? 'Back to Catalog products' : 'Restore deleted products' }}
-                    </Link>
-                </Button>
-                <Button v-if="canCreateProduct && !deleted" as-child class="shrink-0">
-                    <Link :href="ProductController.create()">
-                        <Plus />
-                        Add product
-                    </Link>
-                </Button>
+                    <Button
+                        v-if="canDeleteProduct"
+                        variant="outline"
+                        as-child
+                        class="shrink-0"
+                    >
+                        <Link
+                            :href="
+                                ProductController.index({
+                                    query: { deleted: deleted ? undefined : 1 },
+                                })
+                            "
+                        >
+                            <RotateCcw />
+                            {{
+                                deleted
+                                    ? 'Back to Catalog products'
+                                    : 'Restore archived products'
+                            }}
+                        </Link>
+                    </Button>
+                    <Button
+                        v-if="canCreateProduct && !deleted"
+                        as-child
+                        class="shrink-0"
+                    >
+                        <Link :href="ProductController.create()">
+                            <Plus />
+                            Add product
+                        </Link>
+                    </Button>
                 </div>
             </div>
             <CatalogNavigation />
@@ -380,13 +399,13 @@ defineOptions({
         <section
             v-else
             class="border-border bg-card border p-5"
-            aria-label="Search deleted products"
+            aria-label="Search archived products"
         >
             <SearchField
                 id="deleted-product-search"
                 v-model="search"
                 class="max-w-xl"
-                label="Search deleted products"
+                label="Search archived products"
                 placeholder="Code, name, brand, or description"
                 :is-searching="isSearching"
                 @clear="clearSearch"
@@ -396,10 +415,11 @@ defineOptions({
         <section aria-labelledby="product-list-heading">
             <div class="mb-4">
                 <p class="text-muted-foreground text-sm">
-                    {{ products.total }} {{ deleted ? 'deleted products' : 'products' }}
+                    {{ products.total }}
+                    {{ deleted ? 'archived products' : 'products' }}
                 </p>
                 <h2 id="product-list-heading" class="text-xl font-semibold">
-                    {{ deleted ? 'Deleted products' : 'Catalog products' }}
+                    {{ deleted ? 'Archived products' : 'Catalog products' }}
                 </h2>
             </div>
 
@@ -415,7 +435,9 @@ defineOptions({
                         {{
                             hasActiveQuery
                                 ? 'No products match this query'
-                                : deleted ? 'No deleted products' : 'No products available'
+                                : deleted
+                                  ? 'No archived products'
+                                  : 'No products available'
                         }}
                     </p>
                     <p class="text-muted-foreground mt-1 text-sm">
@@ -465,13 +487,21 @@ defineOptions({
                     <div class="min-w-0">
                         <div class="flex flex-wrap items-center gap-2">
                             <h3 class="font-semibold">{{ product.name }}</h3>
-                            <Badge v-if="!deleted" variant="outline">{{ product.shipping_handling.label }}</Badge>
+                            <Badge v-if="!deleted" variant="outline">{{
+                                product.shipping_handling.label
+                            }}</Badge>
                             <Badge
                                 :variant="
                                     product.is_active ? 'secondary' : 'outline'
                                 "
                             >
-                                {{ deleted ? 'Deleted' : product.is_active ? 'Active' : 'Inactive' }}
+                                {{
+                                    deleted
+                                        ? 'Archived'
+                                        : product.is_active
+                                          ? 'Active'
+                                          : 'Inactive'
+                                }}
                             </Badge>
                             <Badge v-if="product.is_featured" variant="outline">
                                 <Star />
@@ -489,11 +519,19 @@ defineOptions({
                                 (Inactive category)
                             </span>
                         </p>
-                        <p v-if="deleted && product.category.is_deleted" class="text-destructive mt-2 text-xs">
-                            Restore this product's category before restoring the product.
+                        <p
+                            v-if="deleted && product.category.is_deleted"
+                            class="text-destructive mt-2 text-xs"
+                        >
+                            Restore this product's category before restoring the
+                            product.
                         </p>
-                        <p v-if="deleted" class="text-muted-foreground mt-2 text-xs">
-                            Deleted {{ product.deleted_at }} by {{ product.deleted_by || 'an administrator' }}
+                        <p
+                            v-if="deleted"
+                            class="text-muted-foreground mt-2 text-xs"
+                        >
+                            Archived {{ product.deleted_at }} by
+                            {{ product.deleted_by || 'an administrator' }}
                         </p>
                         <p v-else class="text-muted-foreground mt-2 text-xs">
                             {{
@@ -569,15 +607,24 @@ defineOptions({
                         >
                             {{ formatPrice(product.price) }}
                         </p>
-                        <p v-if="product.acquisition_cost !== undefined" class="text-muted-foreground mt-2 text-xs">
-                            Acquisition cost · {{ formatPrice(product.acquisition_cost) }}
+                        <p
+                            v-if="product.acquisition_cost !== undefined"
+                            class="text-muted-foreground mt-2 text-xs"
+                        >
+                            Acquisition cost ·
+                            {{ formatPrice(product.acquisition_cost) }}
                         </p>
                     </div>
 
                     <div
                         class="flex flex-wrap items-center gap-2 lg:justify-end"
                     >
-                        <Button v-if="!deleted" variant="outline" size="sm" as-child>
+                        <Button
+                            v-if="!deleted"
+                            variant="outline"
+                            size="sm"
+                            as-child
+                        >
                             <Link :href="ProductController.show(product.id)">
                                 <Eye />
                                 View
@@ -596,7 +643,11 @@ defineOptions({
                             </Link>
                         </Button>
                         <DeactivationDialog
-                            v-if="!deleted && canManageProducts && product.is_active"
+                            v-if="
+                                !deleted &&
+                                canManageProducts &&
+                                product.is_active
+                            "
                             :name="product.name"
                             :form="ProductActivationController.form(product.id)"
                             description="This temporarily hides the product from customer browsing and recommendations. It remains in Catalog products and its inventory and history are preserved. Existing cart lines stay visible as unavailable."
@@ -621,11 +672,20 @@ defineOptions({
                                 Reactivate
                             </Button>
                         </Form>
-                        <Form v-if="deleted" v-bind="ProductController.restore.form(product.id)" :options="{ preserveScroll: true }" v-slot="{ processing, errors }">
-                            <Button variant="outline" size="sm" :disabled="processing">
+                        <Form
+                            v-if="deleted"
+                            v-bind="ProductController.restore.form(product.id)"
+                            :options="{ preserveScroll: true }"
+                            v-slot="{ processing, errors }"
+                        >
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                :disabled="processing"
+                            >
                                 <Spinner v-if="processing" />
                                 <RotateCcw v-else />
-                                Restore deleted product
+                                Restore archived product
                             </Button>
                             <InputError :message="errors.restore" />
                         </Form>
@@ -633,7 +693,7 @@ defineOptions({
                             v-if="canDeleteProduct && !deleted"
                             :name="product.name"
                             resource-name="product"
-                            collection-name="Deleted products"
+                            collection-name="Archived products"
                             :form="ProductController.destroy.form(product.id)"
                             :error-bag="`deleteProduct${product.id}`"
                         />
