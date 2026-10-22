@@ -69,7 +69,8 @@ class HandleInertiaRequests extends Middleware
                     'reconcileReturns' => $request->user()?->can('returns.reconcile') ?? false,
                     'assignOrders' => $request->user()?->can('orders.assign') ?? false,
                     'viewReports' => $request->user()?->can('reports.view') ?? false,
-                    'viewStaffReports' => $request->user()?->can('staff_reports.view') ?? false,
+                    'viewStaffReports' => in_array($request->user()?->administrationRoleCode(), ['manager', 'owner'], true)
+                        && ($request->user()?->can('staff_reports.view') ?? false),
                     'viewAudit' => $request->user()?->can('audit.view') ?? false,
                     'exportAudit' => $request->user()?->can('audit.export') ?? false,
                     'browseProductCatalog' => $canBrowseProductCatalog,

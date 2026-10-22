@@ -152,7 +152,7 @@ export function useAppNavigation() {
             if (page.props.auth?.can?.viewOrders)
                 items.push({
                     title: page.props.auth?.can?.viewStaffReports
-                        ? 'Staff sales'
+                        ? 'Sales by handler'
                         : 'My sales',
                     href: StaffPerformanceController.index(),
                     icon: ChartColumnIncreasing,

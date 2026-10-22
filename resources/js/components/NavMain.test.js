@@ -411,7 +411,7 @@ test('administration tasks have distinct icons and clear labels without granting
         'Supplier returns': icons.Truck,
         'Customer returns': icons.Undo2,
         Suppliers: icons.Handshake,
-        'Staff sales': icons.ChartColumnIncreasing,
+        'Sales by handler': icons.ChartColumnIncreasing,
         'Activity log': icons.Logs,
         Team: icons.UserRoundCog,
     };

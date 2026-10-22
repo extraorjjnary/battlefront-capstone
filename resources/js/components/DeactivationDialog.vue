@@ -1,8 +1,8 @@
 <script setup>
-import { Form } from '@inertiajs/vue3';
-import { Power } from '@lucide/vue';
-import { ref } from 'vue';
-import { Button } from '@/components/ui/button';
+import { Form } from "@inertiajs/vue3";
+import { Power } from "@lucide/vue";
+import { ref } from "vue";
+import { Button } from "@/components/ui/button";
 import {
     Dialog,
     DialogClose,
@@ -12,8 +12,8 @@ import {
     DialogHeader,
     DialogTitle,
     DialogTrigger,
-} from '@/components/ui/dialog';
-import { Spinner } from '@/components/ui/spinner';
+} from "@/components/ui/dialog";
+import { Spinner } from "@/components/ui/spinner";
 
 defineProps({
     name: { type: String, required: true },
@@ -43,8 +43,8 @@ const open = ref(false);
                 <DialogHeader>
                     <DialogTitle>Deactivate {{ name }}?</DialogTitle>
                     <DialogDescription
-                        >{{ description }} You can reactivate it later from
-                        Catalog products.</DialogDescription
+                        >{{ description }} You can reactivate it the
+                        corresponding management page.</DialogDescription
                     >
                 </DialogHeader>
                 <DialogFooter class="mt-6 gap-2">

@@ -12,9 +12,9 @@ const props = defineProps({
     staff: { type: Array, required: true },
     unattributed_count: { type: Number, required: true },
     can_view_all: { type: Boolean, required: true },
-    selected_handler_id: { type: Number, required: true },
-    selected_handler_name: { type: String, required: true },
-    transactions: { type: Object, required: true },
+    selected_handler_id: { type: Number, default: null },
+    selected_handler_name: { type: String, default: null },
+    transactions: { type: Object, default: null },
 });
 const from = ref(props.filters.from);
 const to = ref(props.filters.to);
@@ -22,30 +22,33 @@ function applyFilters() {
     router.get(
         StaffPerformanceController.index(),
         {
-            from: from.value || undefined,
-            to: to.value || undefined,
+            from: from.value || '',
+            to: to.value || '',
             handler_id: props.can_view_all
-                ? props.selected_handler_id
+                ? (props.selected_handler_id ?? undefined)
                 : undefined,
         },
         { preserveState: true },
     );
 }
-function staffUrl(handlerId) {
+function handlerUrl(handlerId) {
     return StaffPerformanceController.index({
         query: {
-            handler_id: handlerId,
-            from: from.value || undefined,
-            to: to.value || undefined,
+            handler_id: handlerId ?? undefined,
+            from: from.value || '',
+            to: to.value || '',
         },
     });
 }
 defineOptions({
-    layout: {
+    layout: (props) => ({
         breadcrumbs: [
-            { title: 'Staff sales', href: StaffPerformanceController.index() },
+            {
+                title: props.can_view_all ? 'Sales by handler' : 'My sales',
+                href: StaffPerformanceController.index(),
+            },
         ],
-    },
+    }),
 });
 </script>
 
@@ -53,8 +56,8 @@ defineOptions({
     <main
         class="mx-auto flex w-full max-w-6xl min-w-0 flex-col gap-6 p-4 wrap-anywhere sm:p-6 lg:p-8"
     >
-        <Head :title="can_view_all ? 'Staff sales' : 'My sales'" />
-        <PageHeader :title="can_view_all ? 'Staff sales' : 'My sales'" />
+        <Head :title="can_view_all ? 'Sales by handler' : 'My sales'" />
+        <PageHeader :title="can_view_all ? 'Sales by handler' : 'My sales'" />
         <form
             class="flex flex-wrap items-end gap-3"
             @submit.prevent="applyFilters"
@@ -75,9 +78,13 @@ defineOptions({
             <Link
                 :href="
                     StaffPerformanceController.index({
-                        query: can_view_all
-                            ? { handler_id: selected_handler_id }
-                            : {},
+                        query: {
+                            handler_id: can_view_all
+                                ? (selected_handler_id ?? undefined)
+                                : undefined,
+                            from: '',
+                            to: '',
+                        },
                     })
                 "
                 class="text-primary px-2 py-2 text-sm underline"
@@ -86,17 +93,17 @@ defineOptions({
         </form>
         <p class="text-muted-foreground text-sm">
             Sales use the completion date. Verified refunds use the payment date
-            and the original staff member.
+            and the original order handler.
             <template v-if="can_view_all"
-                >{{ unattributed_count }} older sales have no assigned staff
-                member.</template
+                >{{ unattributed_count }} older sales have no assigned order
+                handler.</template
             >
         </p>
         <div class="border-border bg-card overflow-x-auto border">
             <table class="w-full min-w-[36rem] text-left text-sm">
                 <thead class="bg-secondary text-muted-foreground">
                     <tr>
-                        <th class="p-3">Staff</th>
+                        <th class="p-3">Order handler</th>
                         <th class="p-3">Orders</th>
                         <th class="p-3">Product sales</th>
                         <th class="p-3">Verified refunds</th>
@@ -112,7 +119,7 @@ defineOptions({
                         <td class="p-3 font-medium">
                             <Link
                                 v-if="can_view_all"
-                                :href="staffUrl(person.id)"
+                                :href="handlerUrl(person.id)"
                                 class="text-primary underline"
                                 >{{ person.name }}</Link
                             ><template v-else>{{ person.name }}</template>
@@ -134,10 +141,26 @@ defineOptions({
                 v-if="staff.length === 0"
                 class="text-muted-foreground p-6 text-sm"
             >
-                No staff sales in this period.
+                No handler sales in this period.
             </p>
         </div>
-        <section class="space-y-3" aria-label="Attributed sales">
+        <p
+            v-if="can_view_all && !transactions"
+            class="text-muted-foreground text-sm"
+        >
+            Select an order handler to view individual sales transactions.
+        </p>
+        <section
+            v-if="transactions"
+            class="space-y-3"
+            aria-label="Attributed sales"
+        >
+            <Link
+                v-if="can_view_all"
+                :href="handlerUrl(null)"
+                class="text-primary text-sm underline"
+                >Back to team summary</Link
+            >
             <div>
                 <h2 class="text-lg font-semibold">
                     {{
@@ -151,7 +174,8 @@ defineOptions({
                         filters.from || filters.to
                             ? ' in the selected dates'
                             : ' across all dates'
-                    }}. Older sales without assigned staff remain unassigned.
+                    }}. Older sales without an assigned handler remain
+                    unassigned.
                 </p>
             </div>
             <div class="border-border bg-card overflow-x-auto border">
