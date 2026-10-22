@@ -506,7 +506,7 @@
                             "host": ["{{base_url}}"],
                             "path": ["profile"]
                         },
-                        "description": "Name and email required. Optional contact number accepts Philippine mobile formats and saves as +639XXXXXXXXX; omit it to preserve or send null to clear. Address nullable/max 255; omit to preserve it. Duplicate email: 422. No password or role update.",
+                        "description": "Name required (max 255). Email is optional and read-only: omit it or send the exact current email. Changed, blank, null, or non-string email returns 422 with errors.email; no profile changes are saved. Email and its verification timestamp remain unchanged. Optional contact number accepts Philippine mobile formats and saves as +639XXXXXXXXX; omit it to preserve or send null to clear. Address nullable/max 255; omit to preserve it. No password or role update.",
                         "body": {
                             "mode": "raw",
                             "raw": "{\n  \"name\": \"{{name}}\",\n  \"email\": \"{{email}}\",\n  \"default_delivery_address\": \"{{delivery_address}}\",\n  \"default_delivery_contact_number\": \"{{default_delivery_contact_number}}\"\n}",
@@ -569,7 +569,7 @@
                                     "host": ["{{base_url}}"],
                                     "path": ["profile"]
                                 },
-                                "description": "Name and email required even for PATCH; each max 255. Address nullable/max 255; blank becomes null. Omit address to preserve it. Duplicate email: 422. No password or role update.",
+                                "description": "Name required even for PATCH (max 255). Email is optional and read-only: omit it or send the exact current email. Changed, blank, null, or non-string email returns 422 with errors.email; no profile changes are saved. Email and its verification timestamp remain unchanged. Address nullable/max 255; blank becomes null. Omit address to preserve it. No password or role update.",
                                 "body": {
                                     "mode": "raw",
                                     "raw": "{\n  \"name\": \"{{name}}\",\n  \"email\": \"{{email}}\",\n  \"default_delivery_address\": \"{{delivery_address}}\"\n}",

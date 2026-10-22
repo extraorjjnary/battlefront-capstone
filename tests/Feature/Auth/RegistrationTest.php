@@ -85,3 +85,39 @@ test('registration cannot create an administrator', function () {
     expect(User::where('email', 'customer@example.com')->firstOrFail()->role)
         ->toBe(UserRole::Customer);
 });
+
+test('customer registration still requires a valid unique email', function (array $emailInput) {
+    User::factory()->customer()->create(['email' => 'taken@example.test']);
+
+    $this->post(route('register.store'), [
+        'name' => 'New Customer',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+        ...$emailInput,
+    ])->assertSessionHasErrors('email');
+
+    $this->assertGuest();
+    $this->assertDatabaseCount('users', 1);
+})->with([
+    'missing' => [[]],
+    'invalid' => [['email' => 'invalid']],
+    'duplicate' => [['email' => 'taken@example.test']],
+]);
+
+test('administrator account creation still requires a valid unique email', function (array $emailInput) {
+    $owner = User::factory()->administrator()->create(['email' => 'owner@example.test']);
+
+    $this->actingAs($owner)->post(route('administration.team.store'), [
+        'name' => 'New Staff',
+        'role' => 'staff',
+        'password' => 'CorrectHorseBatteryStaple!1',
+        'password_confirmation' => 'CorrectHorseBatteryStaple!1',
+        ...$emailInput,
+    ])->assertSessionHasErrors('email');
+
+    $this->assertDatabaseCount('users', 1);
+})->with([
+    'missing' => [[]],
+    'invalid' => [['email' => 'invalid']],
+    'duplicate' => [['email' => 'owner@example.test']],
+]);

@@ -31,6 +31,14 @@ class ProfileUpdateRequest extends FormRequest
     public function rules(): array
     {
         $rules = $this->profileRules($this->user()->id);
+        $rules['email'] = [
+            'bail', 'sometimes', 'required', 'string',
+            function (string $attribute, mixed $value, \Closure $fail): void {
+                if ($value !== $this->user()->email) {
+                    $fail('Your account email address cannot be changed.');
+                }
+            },
+        ];
         $canManageAddress = $this->user()->can('use-customer-cart');
         $addressAction = $this->addressAction();
         $rules['default_delivery_address'][] = Rule::excludeIf(
@@ -152,6 +160,8 @@ class ProfileUpdateRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'email.required' => 'Your account email address cannot be changed.',
+            'email.string' => 'Your account email address cannot be changed.',
             'default_delivery_address_action.*' => 'Choose whether to keep, replace, or clear the saved delivery address.',
             'default_delivery_destination.required' => 'Select a supported delivery destination.',
             'default_delivery_destination.string' => 'Select one supported delivery destination.',
