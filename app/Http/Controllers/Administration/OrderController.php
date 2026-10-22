@@ -132,7 +132,8 @@ class OrderController extends Controller
     public function show(Request $request, Order $order, OrderProcessingService $processing, ShipmentPresenter $shipments, DeliveryQuotePresenter $quotes): Response
     {
         $order = $this->orderRepository->loadDetails($order);
-        $nextShipmentStatus = $processing->nextShipmentStatus($order);
+        $canProcess = $processing->canProcess($order, $request->user());
+        $nextShipmentStatus = $canProcess ? $processing->nextShipmentStatus($order) : null;
         $canViewProfitability = $request->user()->can('reports.profit');
         $orderHasSale = DB::table('sales')->where('order_id', $order->id)->exists();
         $salesReturns = (string) DB::table('customer_return_items as return_items')
@@ -178,6 +179,7 @@ class OrderController extends Controller
                 'id' => $order->id,
                 'reference' => $order->reference,
                 'handler_required' => $order->handler_required,
+                'can_process' => $canProcess,
                 'assigned_handler_id' => $order->assigned_handler_id,
                 'assigned_handler_name' => $order->assigned_handler_id === null ? null : User::query()->whereKey($order->assigned_handler_id)->value('name'),
                 'created_at' => $order->created_at->toIso8601String(),
@@ -199,15 +201,15 @@ class OrderController extends Controller
                 'status' => $this->statusData($order->status),
                 'delivery_quote' => $quotes->stored($order),
                 'shipment' => $shipments->detail($order),
-                'can_create_manual_shipment' => $processing->canCreateManualShipment($order),
+                'can_create_manual_shipment' => $canProcess && $processing->canCreateManualShipment($order),
                 'shipment_actions' => $order->shipment === null ? null : [
                     'next_status' => $nextShipmentStatus === null ? null : [
                         'value' => $nextShipmentStatus->value,
                         'label' => $nextShipmentStatus->label(),
                     ],
-                    'can_update_reference' => $processing->canUpdateShipmentReference($order),
+                    'can_update_reference' => $canProcess && $processing->canUpdateShipmentReference($order),
                 ],
-                'allowed_status_transitions' => collect($processing->allowedOrderTransitions($order))
+                'allowed_status_transitions' => collect($canProcess ? $processing->allowedOrderTransitions($order) : [])
                     ->map(fn (OrderStatus $status): array => $this->statusData($status))
                     ->all(),
                 'cancellation_blocked_reason' => $processing->shipmentCancellationBlockedReason($order->shipment),
@@ -222,9 +224,9 @@ class OrderController extends Controller
                         'value' => $order->payment_status->value,
                         'label' => $order->paymentStatusLabel(),
                     ],
-                    'can_confirm_cod_collection' => $processing->canConfirmCodCollection($order),
+                    'can_confirm_cod_collection' => $canProcess && $processing->canConfirmCodCollection($order),
                     'pay_at_pickup' => $order->payment_method->isPayAtPickup(),
-                    'can_confirm_pickup' => $processing->canConfirmPickup($order),
+                    'can_confirm_pickup' => $canProcess && $processing->canConfirmPickup($order),
                     'proof_submitted' => $order->payment_proof_path !== null,
                     'proof_available' => $this->paymentProofIsAvailable($order),
                     'rejection' => $order->payment_status === PaymentStatus::Rejected

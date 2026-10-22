@@ -16,6 +16,7 @@ class OrderShipmentReferenceController extends Controller
         $processing->updateShipmentReference(
             $order,
             $request->validated('tracking_reference'),
+            actor: $request->user(),
         );
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Shipment reference updated.']);

@@ -14,15 +14,13 @@ class AssignOrderHandler
     public function execute(Order $order, User $actor, int $handlerId, bool $claimOnly = false): void
     {
         DB::transaction(function () use ($order, $actor, $handlerId, $claimOnly): void {
+            abort_unless($actor->hasAdministrationPermission($claimOnly ? 'orders.process' : 'orders.assign'), 403);
             $locked = Order::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
             if (in_array($locked->status, [OrderStatus::Completed, OrderStatus::Cancelled], true)) {
                 throw ValidationException::withMessages(['handler' => 'Completed or cancelled orders cannot be reassigned.']);
             }
             if ($claimOnly && ($locked->assigned_handler_id !== null || $handlerId !== $actor->id)) {
                 throw ValidationException::withMessages(['handler' => 'Only an unassigned order may be claimed for yourself.']);
-            }
-            if (! $claimOnly && ! $actor->hasAdministrationPermission('orders.assign')) {
-                abort(403);
             }
             $handler = User::query()->whereKey($handlerId)->where('role', UserRole::Administrator->value)
                 ->where('is_active', true)->whereNotNull('administration_role_id')->first();

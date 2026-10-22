@@ -24,6 +24,7 @@ class OrderManualShipmentController extends Controller
             isset($data['eta_min_days']) ? (int) $data['eta_min_days'] : null,
             isset($data['eta_max_days']) ? (int) $data['eta_max_days'] : null,
             $request->boolean('arrangement_confirmed'),
+            actor: $request->user(),
         );
 
         Inertia::flash('toast', [

@@ -27,7 +27,7 @@ test('only completion records a sale for the final assigned handler and subseque
     app(AssignOrderHandler::class)->execute($order, $manager, $final->id);
     $this->assertDatabaseCount('sales', 0);
 
-    app(OrderProcessingService::class)->updateStatus($order, OrderStatus::Completed);
+    app(OrderProcessingService::class)->updateStatus($order, OrderStatus::Completed, actor: $final);
     $this->actingAs($manager)->patch(route('administration.orders.handler.update', $order), ['handler_id' => $first->id])->assertSessionHasErrors('handler');
     expect($order->sale()->sole()->handler_id)->toBe($final->id);
     expect(fn () => app(OrderProcessingService::class)->updateStatus($order->fresh(), OrderStatus::Completed))->toThrow(ValidationException::class);

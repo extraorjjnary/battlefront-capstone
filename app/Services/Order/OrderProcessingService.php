@@ -71,14 +71,15 @@ class OrderProcessingService
     /**
      * Move an order through an approved administrator transition.
      */
-    public function updateStatus(Order $order, OrderStatus $status): Order
+    public function updateStatus(Order $order, OrderStatus $status, ?User $actor = null): Order
     {
-        return DB::transaction(function () use ($order, $status): Order {
+        return DB::transaction(function () use ($order, $status, $actor): Order {
             $lockedOrder = Order::query()
                 ->whereKey($order->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            $this->authorizeHandler($lockedOrder, $actor);
             $shipment = $lockedOrder->shipment()->lockForUpdate()->first();
             $lockedOrder->setRelation('shipment', $shipment);
             if ($status === OrderStatus::Completed && $lockedOrder->payment_method->isPayAtPickup()) {
@@ -89,7 +90,7 @@ class OrderProcessingService
                     ? 'Complete COD delivery through Confirm COD Collection after the Delivered milestone.'
                     : 'Complete delivery through the shipment Delivered milestone.']);
             }
-            $this->transitionLockedOrder($lockedOrder, $status, $shipment);
+            $this->transitionLockedOrder($lockedOrder, $status, $shipment, actor: $actor);
 
             return $lockedOrder->refresh();
         }, attempts: 3);
@@ -143,6 +144,7 @@ class OrderProcessingService
         ?int $etaMinimumDays,
         ?int $etaMaximumDays,
         bool $arrangementConfirmed,
+        ?User $actor = null,
     ): Shipment {
         return DB::transaction(function () use (
             $order,
@@ -151,11 +153,13 @@ class OrderProcessingService
             $etaMinimumDays,
             $etaMaximumDays,
             $arrangementConfirmed,
+            $actor,
         ): Shipment {
             $lockedOrder = Order::query()
                 ->whereKey($order->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
+            $this->authorizeHandler($lockedOrder, $actor);
             $shipment = $lockedOrder->shipment()->lockForUpdate()->first();
             $lockedOrder->setRelation('shipment', $shipment);
 
@@ -199,7 +203,7 @@ class OrderProcessingService
                 'tracking_reference' => $this->normalizeTrackingReference($trackingReference),
             ]);
 
-            $this->auditOrderChange($lockedOrder, 'shipment.manual_created', ['shipment_id' => $shipment->id]);
+            $this->auditOrderChange($lockedOrder, 'shipment.manual_created', ['shipment_id' => $shipment->id], $actor);
 
             $this->notifications->afterCommit($lockedOrder, 'shipment.manual_created');
 
@@ -219,10 +223,11 @@ class OrderProcessingService
                 || ($order->status === OrderStatus::Completed && $shipment->status === ShipmentStatus::Delivered));
     }
 
-    public function updateShipmentStatus(Order $order, ShipmentStatus $status, ?string $trackingReference = null): Order
+    public function updateShipmentStatus(Order $order, ShipmentStatus $status, ?string $trackingReference = null, ?User $actor = null): Order
     {
-        return DB::transaction(function () use ($order, $status, $trackingReference): Order {
+        return DB::transaction(function () use ($order, $status, $trackingReference, $actor): Order {
             $lockedOrder = Order::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
+            $this->authorizeHandler($lockedOrder, $actor);
             $shipment = $lockedOrder->shipment()->lockForUpdate()->first();
             $lockedOrder->setRelation('shipment', $shipment);
 
@@ -259,10 +264,10 @@ class OrderProcessingService
             }
 
             $shipment->update($changes);
-            $this->auditOrderChange($lockedOrder, 'shipment.status.updated', ['status' => $status->value]);
+            $this->auditOrderChange($lockedOrder, 'shipment.status.updated', ['status' => $status->value], $actor);
 
             if ($status === ShipmentStatus::Delivered && $lockedOrder->payment_method !== PaymentMethod::Cod) {
-                $this->transitionLockedOrder($lockedOrder, OrderStatus::Completed, $shipment);
+                $this->transitionLockedOrder($lockedOrder, OrderStatus::Completed, $shipment, actor: $actor);
             }
 
             $this->notifications->afterCommit($lockedOrder, 'shipment.'.$status->value);
@@ -271,10 +276,11 @@ class OrderProcessingService
         }, attempts: 3);
     }
 
-    public function updateShipmentReference(Order $order, ?string $trackingReference): Order
+    public function updateShipmentReference(Order $order, ?string $trackingReference, ?User $actor = null): Order
     {
-        return DB::transaction(function () use ($order, $trackingReference): Order {
+        return DB::transaction(function () use ($order, $trackingReference, $actor): Order {
             $lockedOrder = Order::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
+            $this->authorizeHandler($lockedOrder, $actor);
             $shipment = $lockedOrder->shipment()->lockForUpdate()->first();
             $lockedOrder->setRelation('shipment', $shipment);
 
@@ -283,7 +289,7 @@ class OrderProcessingService
             }
 
             $shipment->update(['tracking_reference' => $this->normalizeTrackingReference($trackingReference)]);
-            $this->auditOrderChange($lockedOrder, 'shipment.reference.updated', ['tracking_reference' => $shipment->tracking_reference]);
+            $this->auditOrderChange($lockedOrder, 'shipment.reference.updated', ['tracking_reference' => $shipment->tracking_reference], $actor);
 
             return $lockedOrder->refresh();
         }, attempts: 3);
@@ -304,6 +310,7 @@ class OrderProcessingService
         OrderStatus $status,
         ?Shipment $shipment,
         UserRole $cancellationInitiator = UserRole::Administrator,
+        ?User $actor = null,
     ): void {
         if ($status === OrderStatus::Cancelled) {
             $blockedReason = $this->shipmentCancellationBlockedReason($shipment);
@@ -336,7 +343,7 @@ class OrderProcessingService
 
         $previousStatus = $order->status->value;
         $order->update(['status' => $status]);
-        $this->auditOrderChange($order, 'order.status.updated', ['before' => $previousStatus, 'after' => $status->value]);
+        $this->auditOrderChange($order, 'order.status.updated', ['before' => $previousStatus, 'after' => $status->value], $actor);
         if ($status === OrderStatus::Cancelled) {
             $this->notifications->afterCommit($order, 'order.cancelled', $cancellationInitiator);
         }
@@ -353,13 +360,15 @@ class OrderProcessingService
         PaymentStatus $paymentStatus,
         ?PaymentRejectionReason $rejectionReason = null,
         ?string $rejectionNote = null,
+        ?User $actor = null,
     ): Order {
-        return DB::transaction(function () use ($order, $paymentStatus, $rejectionReason, $rejectionNote): Order {
+        return DB::transaction(function () use ($order, $paymentStatus, $rejectionReason, $rejectionNote, $actor): Order {
             $lockedOrder = Order::query()
                 ->whereKey($order->getKey())
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            $this->authorizeHandler($lockedOrder, $actor);
             if ($lockedOrder->payment_method === PaymentMethod::Cod) {
                 throw ValidationException::withMessages([
                     'payment_status' => 'Use Confirm COD Collection after delivery. COD does not accept ordinary payment verification or proof rejection.',
@@ -437,7 +446,7 @@ class OrderProcessingService
                 'payment_rejection_note' => $rejectingWalletPayment ? $normalizedRejectionNote : null,
             ]);
 
-            $this->auditOrderChange($lockedOrder, 'order.payment_status.updated', ['after' => $paymentStatus->value]);
+            $this->auditOrderChange($lockedOrder, 'order.payment_status.updated', ['after' => $paymentStatus->value], $actor);
 
             $this->notifications->afterCommit($lockedOrder, 'payment.'.$paymentStatus->value);
 
@@ -485,10 +494,11 @@ class OrderProcessingService
             && in_array($order->payment_status, [PaymentStatus::Pending, PaymentStatus::Verified], strict: true);
     }
 
-    public function confirmPickup(Order $order, bool $paymentReceived, bool $productsHandedOver): Order
+    public function confirmPickup(Order $order, bool $paymentReceived, bool $productsHandedOver, ?User $actor = null): Order
     {
-        return DB::transaction(function () use ($order, $paymentReceived, $productsHandedOver): Order {
+        return DB::transaction(function () use ($order, $paymentReceived, $productsHandedOver, $actor): Order {
             $lockedOrder = Order::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
+            $this->authorizeHandler($lockedOrder, $actor);
             $shipment = $lockedOrder->shipment()->lockForUpdate()->first();
             $lockedOrder->setRelation('shipment', $shipment);
 
@@ -504,8 +514,8 @@ class OrderProcessingService
                 'payment_rejection_reason' => null,
                 'payment_rejection_note' => null,
             ]);
-            $this->auditOrderChange($lockedOrder, 'order.payment_status.updated', ['after' => PaymentStatus::Verified->value]);
-            $this->transitionLockedOrder($lockedOrder, OrderStatus::Completed, $shipment);
+            $this->auditOrderChange($lockedOrder, 'order.payment_status.updated', ['after' => PaymentStatus::Verified->value], $actor);
+            $this->transitionLockedOrder($lockedOrder, OrderStatus::Completed, $shipment, actor: $actor);
             if ($paymentWasPending) {
                 $this->notifications->afterCommit($lockedOrder, 'payment.verified');
             }
@@ -522,10 +532,11 @@ class OrderProcessingService
             && $order->shipment?->status === ShipmentStatus::Delivered;
     }
 
-    public function confirmCodCollection(Order $order, bool $collectionConfirmed): Order
+    public function confirmCodCollection(Order $order, bool $collectionConfirmed, ?User $actor = null): Order
     {
-        return DB::transaction(function () use ($order, $collectionConfirmed): Order {
+        return DB::transaction(function () use ($order, $collectionConfirmed, $actor): Order {
             $lockedOrder = Order::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
+            $this->authorizeHandler($lockedOrder, $actor);
             $shipment = $lockedOrder->shipment()->lockForUpdate()->first();
             $lockedOrder->setRelation('shipment', $shipment);
 
@@ -540,19 +551,36 @@ class OrderProcessingService
                 'payment_rejection_reason' => null,
                 'payment_rejection_note' => null,
             ]);
-            $this->auditOrderChange($lockedOrder, 'order.payment_status.updated', ['after' => PaymentStatus::Verified->value]);
-            $this->transitionLockedOrder($lockedOrder, OrderStatus::Completed, $shipment);
+            $this->auditOrderChange($lockedOrder, 'order.payment_status.updated', ['after' => PaymentStatus::Verified->value], $actor);
+            $this->transitionLockedOrder($lockedOrder, OrderStatus::Completed, $shipment, actor: $actor);
             $this->notifications->afterCommit($lockedOrder, 'payment.verified');
 
             return $lockedOrder->refresh();
         }, attempts: 3);
     }
 
+    public function canProcess(Order $order, User $actor): bool
+    {
+        return $actor->hasAdministrationPermission('orders.process')
+            && $order->assigned_handler_id === $actor->id;
+    }
+
+    /**
+     * Administrator entry points supply an actor; trusted internal transitions may omit it.
+     * Call only after acquiring the order lock so reassignment cannot invalidate this check.
+     */
+    private function authorizeHandler(Order $order, ?User $actor): void
+    {
+        if ($actor !== null) {
+            abort_unless($this->canProcess($order, $actor), 403, 'Only the assigned handler may process this order. Refresh the order to review its current handler.');
+        }
+    }
+
     /** @param array<string, mixed> $changes */
-    private function auditOrderChange(Order $order, string $action, array $changes): void
+    private function auditOrderChange(Order $order, string $action, array $changes, ?User $actor = null): void
     {
         DB::table('audit_logs')->insert([
-            'actor_id' => auth()->id(),
+            'actor_id' => $actor->id ?? auth()->id(),
             'action' => $action,
             'subject_type' => 'order',
             'subject_id' => $order->id,

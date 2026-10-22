@@ -13,7 +13,7 @@ class OrderPickupConfirmationController extends Controller
 {
     public function store(ConfirmOrderPickupRequest $request, Order $order, OrderProcessingService $processing): RedirectResponse
     {
-        $processing->confirmPickup($order, $request->boolean('payment_received_confirmed'), $request->boolean('products_handed_over_confirmed'));
+        $processing->confirmPickup($order, $request->boolean('payment_received_confirmed'), $request->boolean('products_handed_over_confirmed'), actor: $request->user());
 
         Inertia::flash('toast', [
             'type' => 'success',

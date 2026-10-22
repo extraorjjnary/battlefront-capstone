@@ -29,7 +29,11 @@ function pickupPaymentOrder(PaymentMethod $method, OrderStatus $status = OrderSt
 test('Cash and Card pickup can be processed unpaid and confirmed exactly once without changing stock', function (PaymentMethod $method) {
     $this->travelTo('2026-10-13 09:00:00');
     $order = pickupPaymentOrder($method);
-    $this->actingAs(User::factory()->administrator()->create());
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator);
     $this->get(route('administration.orders.show', $order))->assertInertia(fn (Assert $page) => $page
         ->where('order.payment.pay_at_pickup', true)
         ->where('order.payment.can_confirm_pickup', false)
@@ -67,7 +71,11 @@ test('Cash and Card pickup can be processed unpaid and confirmed exactly once wi
 
 test('pickup confirmation requires both payment receipt and product handover', function (array $payload, array $fields) {
     $order = pickupPaymentOrder(PaymentMethod::CardAtStore, OrderStatus::Processing);
-    $this->actingAs(User::factory()->administrator()->create())
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)
         ->post(route('administration.orders.pickup-confirmation.store', $order), $payload)->assertSessionHasErrors($fields);
     expect($order->refresh())->status->toBe(OrderStatus::Processing)->payment_status->toBe(PaymentStatus::Pending);
     expect(Inventory::sole()->quantity)->toBe(8);
@@ -85,8 +93,12 @@ test('pickup confirmation requires both payment receipt and product handover', f
 test('pickup confirmation rejects premature terminal rejected prepaid delivery and COD orders', function (array $attributes) {
     $order = pickupPaymentOrder(PaymentMethod::Cash, OrderStatus::Processing);
     $order->update($attributes);
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
     $before = $order->refresh()->getAttributes();
-    $this->actingAs(User::factory()->administrator()->create())->post(route('administration.orders.pickup-confirmation.store', $order), [
+
+    $this->actingAs($administrator)->post(route('administration.orders.pickup-confirmation.store', $order), [
         'payment_received_confirmed' => true, 'products_handed_over_confirmed' => true,
     ])->assertSessionHasErrors('payment_received_confirmed');
     expect($order->refresh()->getAttributes())->toBe($before);
@@ -107,7 +119,11 @@ test('pickup confirmation rejects premature terminal rejected prepaid delivery a
 
 test('pickup payment and completion cannot bypass the combined administrator confirmation', function (PaymentMethod $method, string $operation) {
     $order = pickupPaymentOrder($method, OrderStatus::Processing);
-    $this->actingAs(User::factory()->administrator()->create());
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator);
     if ($operation === 'completed') {
         $this->patch(route('administration.orders.status.update', $order), ['status' => $operation])->assertSessionHasErrors('status');
     } else {

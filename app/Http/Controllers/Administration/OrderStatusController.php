@@ -23,6 +23,7 @@ class OrderStatusController extends Controller
         $orderProcessingService->updateStatus(
             $order,
             OrderStatus::from($request->validated('status')),
+            actor: $request->user(),
         );
 
         Inertia::flash('toast', [
