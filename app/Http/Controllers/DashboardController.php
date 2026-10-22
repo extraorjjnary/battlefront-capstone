@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Actions\Recommendation\BuildRecommendationViewData;
 use App\Models\User;
 use App\Services\Dashboard\DashboardService;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -19,32 +19,28 @@ class DashboardController extends Controller
         Request $request,
         DashboardService $dashboardService,
         BuildRecommendationViewData $buildRecommendationViewData,
-    ): Response|RedirectResponse {
+    ): Response {
         /** @var User $user */
         $user = $request->user();
 
         if ($user->isAdministrator()) {
-            if (! $user->is_active || $user->administration_role_id === null) {
-                abort(403);
-            }
+            Gate::authorize('access-administration');
+
+            $component = match ($user->administrationRoleCode()) {
+                'staff' => 'Dashboard/Staff',
+                'it' => 'Dashboard/It',
+                'manager', 'owner' => 'Dashboard/Administration',
+                default => abort(403),
+            };
+
             if ($user->administrationRoleCode() === 'it') {
-                return to_route('administration.team.index');
-            }
-            if (! $user->hasAdministrationPermission('reports.view')) {
-                $route = match (true) {
-                    $user->can('orders.view') => 'administration.orders.index',
-                    $user->can('inventory.view') => 'administration.inventory.index',
-                    $user->can('products.manage') => 'administration.products.index',
-                    $user->can('customers.view') => 'administration.customers.index',
-                    $user->can('suppliers.manage') => 'administration.suppliers.index',
-                    default => 'administration.work-queue.index',
-                };
-
-                return to_route($route);
+                return Inertia::render($component);
             }
 
-            return Inertia::render('Dashboard/Administration', [
-                'dashboard' => Inertia::defer(fn (): array => $dashboardService->administration($user), 'dashboard', rescue: true),
+            return Inertia::render($component, [
+                'dashboard' => Inertia::defer(fn (): array => $user->administrationRoleCode() === 'staff'
+                    ? $dashboardService->staff($user)
+                    : $dashboardService->administration($user), 'dashboard', rescue: true),
             ]);
         }
 

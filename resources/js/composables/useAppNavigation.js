@@ -67,14 +67,17 @@ export function useAppNavigation() {
                 href: dashboard(),
                 icon: LayoutDashboard,
             },
-            {
+        ];
+
+        if (!isAdministrator.value || page.props.auth?.can?.manageBranches) {
+            items.push({
                 title: isAdministrator.value ? 'Stores' : 'Our stores',
-                href: page.props.auth?.can?.manageBranches
+                href: isAdministrator.value
                     ? administrationBranchIndex()
                     : branchIndex(),
                 icon: MapPin,
-            },
-        ];
+            });
+        }
 
         if (isAdministrator.value) {
             items.push({
@@ -82,12 +85,6 @@ export function useAppNavigation() {
                 href: WorkQueueController.index(),
                 icon: ListTodo,
             });
-            if (page.props.auth?.can?.browseProductCatalog)
-                items.push({
-                    title: 'Products',
-                    href: productIndex(),
-                    icon: PackageSearch,
-                });
             if (page.props.auth?.can?.manageProducts)
                 items.push({
                     title: 'Manage products',

@@ -4,6 +4,8 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 test('IT administrators can manage staff accounts and review audits without business access', function () {
+    $this->withoutVite();
+
     $it = User::factory()->administrator()->create([
         'administration_role_id' => DB::table('administration_roles')->where('code', 'it')->value('id'),
     ]);
@@ -18,7 +20,8 @@ test('IT administrators can manage staff accounts and review audits without busi
         ->and($it->can('inventory.approve'))->toBeFalse()
         ->and($it->can('audit.export'))->toBeFalse();
 
-    $this->actingAs($it)->get(route('dashboard'))->assertRedirect(route('administration.team.index'));
+    $this->actingAs($it)->get(route('dashboard'))->assertOk()
+        ->assertInertia(fn ($page) => $page->component('Dashboard/It')->missing('dashboard'));
     $this->actingAs($it)->get(route('administration.team.index'))
         ->assertOk()->assertInertia(fn ($page) => $page
         ->where('availableRoles', ['staff', 'manager'])

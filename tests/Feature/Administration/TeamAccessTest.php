@@ -1,10 +1,12 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Models\Inventory;
 use App\Models\User;
 use App\Notifications\TeamAccessChanged;
 use App\Services\Notifications\NotificationHistory;
 use Illuminate\Support\Facades\DB;
+use Inertia\Testing\AssertableInertia as Assert;
 
 test('team access notifications contain the audit event for owners', function () {
     $owner = User::factory()->administrator()->create();
@@ -107,7 +109,9 @@ test('inactive administrator sessions are rejected', function () {
     expect($inactiveResponse->status())->toBe(403);
 });
 
-test('administrators without report access land on a page their role can open', function () {
+test('inventory-only managers stay on their dashboard with only authorized data', function () {
+    $this->withoutVite();
+
     $roleId = DB::table('administration_roles')->where('code', 'manager')->value('id');
     $administrator = User::factory()->administrator()->create(['administration_role_id' => $roleId]);
     DB::table('administration_role_permissions')->where('administration_role_id', $roleId)->delete();
@@ -116,7 +120,23 @@ test('administrators without report access land on a page their role can open', 
         'administration_role_id' => $roleId,
         'administration_permission_id' => $permissionId,
     ]);
+    Inventory::factory()->create(['quantity' => 1, 'reorder_level' => 5]);
 
     $this->actingAs($administrator)->get(route('dashboard'))
-        ->assertRedirect(route('administration.inventory.index'));
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Dashboard/Administration')
+            ->where('auth.can.viewInventory', true)
+            ->where('auth.can.viewOrders', false)
+            ->where('auth.can.viewReports', false)
+            ->loadDeferredProps('dashboard', fn (Assert $page) => $page
+                ->where('dashboard.kpis.low_stock_products', 1)
+                ->where('dashboard.kpis.recorded_revenue', null)
+                ->where('dashboard.kpis.recorded_sales', null)
+                ->where('dashboard.kpis.recorded_gross_profit', null)
+                ->where('dashboard.kpis.pending_orders', null)
+                ->where('dashboard.kpis.processing_orders', null)
+                ->where('dashboard.needs_attention.pending_payment_reviews', null)
+                ->has('dashboard.needs_attention.low_stock_products', 1)
+                ->has('dashboard.needs_attention.payment_orders', 0)
+                ->has('dashboard.recent_orders', 0)));
 });

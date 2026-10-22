@@ -38,6 +38,26 @@ const props = defineProps({
 const page = usePage();
 const user = computed(() => page.props.auth.user);
 const permissions = computed(() => page.props.auth.can ?? {});
+const summaryCount = computed(
+    () =>
+        (permissions.value.viewReports ? 1 : 0) +
+        (permissions.value.viewReports && permissions.value.viewProfitReports
+            ? 1
+            : 0) +
+        (permissions.value.viewOrders ? 2 : 0) +
+        (permissions.value.viewInventory ? 2 : 0),
+);
+const summaryGridClass = computed(
+    () =>
+        ({
+            1: 'xl:grid-cols-1',
+            2: 'xl:grid-cols-2',
+            3: 'xl:grid-cols-3',
+            4: 'xl:grid-cols-4',
+            5: 'xl:grid-cols-5',
+            6: 'xl:grid-cols-6',
+        })[summaryCount.value],
+);
 const quickLinks = computed(() => [
     {
         title: 'Tasks',
@@ -133,24 +153,16 @@ defineOptions({
                 >
                     <template #fallback>
                         <div
-                            v-if="permissions.viewReports"
                             aria-hidden="true"
                             class="border-border bg-card grid border sm:grid-cols-2"
-                            :class="
-                                permissions.viewProfitReports
-                                    ? 'xl:grid-cols-6'
-                                    : 'xl:grid-cols-5'
-                            "
+                            :class="summaryGridClass"
                         >
                             <StatSkeleton
-                                v-for="stat in permissions.viewProfitReports
-                                    ? 6
-                                    : 5"
+                                v-for="stat in summaryCount"
                                 :key="stat"
                                 class="border-border border-b sm:border-r xl:border-b-0"
                                 :class="
-                                    stat ===
-                                    (permissions.viewProfitReports ? 6 : 5)
+                                    stat === summaryCount
                                         ? 'sm:col-span-2 xl:col-span-1'
                                         : ''
                                 "
@@ -159,13 +171,10 @@ defineOptions({
                     </template>
                     <dl
                         class="border-border bg-card grid border sm:grid-cols-2"
-                        :class="
-                            permissions.viewProfitReports
-                                ? 'xl:grid-cols-6'
-                                : 'xl:grid-cols-5'
-                        "
+                        :class="summaryGridClass"
                     >
                         <div
+                            v-if="permissions.viewReports"
                             class="border-border border-b p-5 sm:border-r xl:border-b-0"
                         >
                             <dt class="text-muted-foreground text-sm">
@@ -191,7 +200,10 @@ defineOptions({
                             </p>
                         </div>
                         <div
-                            v-if="permissions.viewProfitReports"
+                            v-if="
+                                permissions.viewReports &&
+                                permissions.viewProfitReports
+                            "
                             class="border-border border-b p-5 sm:border-r xl:border-b-0"
                         >
                             <dt class="text-muted-foreground text-sm">

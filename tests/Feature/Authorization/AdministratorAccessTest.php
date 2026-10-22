@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 beforeEach(function () {
+    $this->withoutVite();
+
     Route::get('/test/administrator-only', fn () => response()->noContent())
         ->middleware(['web', 'auth', 'can:access-administration']);
 });
@@ -54,11 +56,6 @@ test('staff manager and owner reach their permitted features immediately after s
         ]);
 
         $this->actingAs($user)->get(route($route))->assertOk();
-        $dashboard = $this->actingAs($user)->get(route('dashboard'));
-        if ($role === 'staff') {
-            $dashboard->assertRedirect(route('administration.orders.index'));
-        } else {
-            $dashboard->assertOk();
-        }
+        $this->actingAs($user)->get(route('dashboard'))->assertOk();
     }
 });

@@ -15,9 +15,12 @@ use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DevelopmentCustomerSeeder;
 use Database\Seeders\DevelopmentHistoricalSalesSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\HistoricalSalesCatalogFixtures;
+
+beforeEach(fn () => $this->withoutVite());
 
 test('guests are redirected to the login page', function () {
     $response = $this->get(route('dashboard'));
@@ -363,3 +366,165 @@ test('administrator dashboard hides metrics and data from ungranted business are
                 ->has('dashboard.needs_attention.payment_orders', 0)
                 ->has('dashboard.needs_attention.low_stock_products', 0)));
 });
+
+test('active administration roles receive their own dashboard without redirects', function (string $role, string $component) {
+    $user = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', $role)->value('id'),
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard'));
+
+    $response->assertInertia(fn (Assert $page) => $page
+        ->component($component)
+        ->missing('dashboard')
+        ->missing('recommendations')
+        ->missing('is_first_visit'));
+    $this->assertDatabaseHas('users', ['id' => $user->id, 'has_visited_dashboard' => false]);
+})->with([
+    'Staff' => ['staff', 'Dashboard/Staff'],
+    'IT' => ['it', 'Dashboard/It'],
+    'Manager' => ['manager', 'Dashboard/Administration'],
+    'Owner' => ['owner', 'Dashboard/Administration'],
+]);
+
+test('staff receive only operational counts even when report permissions are granted', function () {
+    $staff = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
+    foreach (['reports.view', 'reports.profit'] as $permission) {
+        DB::table('administration_role_permissions')->insert([
+            'administration_role_id' => $staff->administration_role_id,
+            'administration_permission_id' => DB::table('administration_permissions')->where('code', $permission)->value('id'),
+        ]);
+    }
+    Order::factory()->paidWithGCash()->create([
+        'status' => OrderStatus::Pending,
+        'payment_status' => PaymentStatus::Pending,
+    ]);
+    Order::factory()->paidWithGCash()->create([
+        'status' => OrderStatus::Cancelled,
+        'payment_status' => PaymentStatus::Pending,
+    ]);
+    Order::factory()->paidWithGCash()->create([
+        'status' => OrderStatus::Processing,
+        'payment_status' => PaymentStatus::Verified,
+    ]);
+    Inventory::factory()->create(['quantity' => 5, 'reorder_level' => 5]);
+    Inventory::factory()->create(['quantity' => 0, 'reorder_level' => 5]);
+    Inventory::factory()->create(['quantity' => 10, 'reorder_level' => 5]);
+    Inventory::factory()->for(Product::factory()->inactive())->create(['quantity' => 0]);
+    Inventory::factory()->for(Product::factory()->for(Category::factory()->inactive()))
+        ->create(['quantity' => 1, 'reorder_level' => 5]);
+
+    $this->actingAs($staff)->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
+        ->component('Dashboard/Staff')
+        ->loadDeferredProps('dashboard', fn (Assert $page) => $page
+            ->where('dashboard', [
+                'pending_orders' => 1,
+                'pending_payment_reviews' => 1,
+                'low_stock_products' => 1,
+                'out_of_stock_products' => 1,
+            ])));
+});
+
+test('staff dashboard omits operational counts when their permissions are removed', function (string $permission) {
+    $staff = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
+    DB::table('administration_role_permissions')
+        ->where('administration_role_id', $staff->administration_role_id)
+        ->where('administration_permission_id', DB::table('administration_permissions')->where('code', $permission)->value('id'))
+        ->delete();
+    Order::factory()->paidWithGCash()->create(['status' => OrderStatus::Pending, 'payment_status' => PaymentStatus::Pending]);
+    Inventory::factory()->create(['quantity' => 1, 'reorder_level' => 5]);
+
+    $this->actingAs($staff)->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
+        ->component('Dashboard/Staff')
+        ->loadDeferredProps('dashboard', fn (Assert $page) => $page
+            ->where('dashboard', [
+                'pending_orders' => $permission === 'orders.view' ? null : 1,
+                'pending_payment_reviews' => $permission === 'orders.view' ? null : 1,
+                'low_stock_products' => $permission === 'inventory.view' ? null : 1,
+                'out_of_stock_products' => $permission === 'inventory.view' ? null : 0,
+            ])));
+})->with(['orders.view', 'inventory.view']);
+
+test('managers without report access keep their dashboard and authorized operational data', function () {
+    $manager = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'manager')->value('id'),
+    ]);
+    DB::table('administration_role_permissions')
+        ->where('administration_role_id', $manager->administration_role_id)
+        ->where('administration_permission_id', DB::table('administration_permissions')->where('code', 'reports.view')->value('id'))
+        ->delete();
+    Order::factory()->paidWithGCash()->create(['status' => OrderStatus::Pending, 'payment_status' => PaymentStatus::Pending]);
+    Inventory::factory()->create(['quantity' => 1, 'reorder_level' => 5]);
+
+    $this->actingAs($manager)->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
+        ->component('Dashboard/Administration')
+        ->where('auth.can.viewReports', false)
+        ->where('auth.can.viewProfitReports', true)
+        ->loadDeferredProps('dashboard', fn (Assert $page) => $page
+            ->where('dashboard.kpis.recorded_revenue', null)
+            ->where('dashboard.kpis.recorded_sales', null)
+            ->where('dashboard.kpis.recorded_gross_profit', null)
+            ->where('dashboard.kpis.profit_data_complete', null)
+            ->where('dashboard.kpis.pending_orders', 1)
+            ->where('dashboard.kpis.low_stock_products', 1)
+            ->has('dashboard.recent_orders', 1)));
+});
+
+test('administrators with no module permissions can still open their assigned dashboard', function (string $role, string $component) {
+    $user = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', $role)->value('id'),
+    ]);
+    DB::table('administration_role_permissions')->where('administration_role_id', $user->administration_role_id)->delete();
+
+    $this->actingAs($user)->get(route('dashboard'))->assertInertia(fn (Assert $page) => $page
+        ->component($component)
+        ->loadDeferredProps('dashboard', fn (Assert $page) => $page
+            ->where('dashboard', fn ($data): bool => collect($data)->flatten()->every(fn ($value): bool => $value === null))));
+})->with([
+    'Staff' => ['staff', 'Dashboard/Staff'],
+    'Manager' => ['manager', 'Dashboard/Administration'],
+]);
+
+test('IT dashboard never supplies business data even when explicitly requested', function () {
+    $it = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'it')->value('id'),
+    ]);
+    Order::factory()->create();
+    Inventory::factory()->create();
+    Sale::factory()->create();
+
+    $initial = $this->actingAs($it)->get(route('dashboard'));
+    $initial->assertInertia(fn (Assert $page) => $page
+        ->component('Dashboard/It')
+        ->where('auth.can.manageUsers', true)
+        ->where('auth.can.viewAudit', true)
+        ->where('auth.can.viewReports', false)
+        ->where('auth.can.viewOrders', false)
+        ->where('auth.can.viewInventory', false)
+        ->missing('dashboard')
+        ->missing('recommendations')
+        ->missing('cartQuantity'));
+    expect($initial->viewData('page'))->not->toHaveKey('deferredProps');
+
+    $this->get(route('dashboard'), [
+        'X-Inertia' => 'true',
+        'X-Inertia-Version' => $initial->viewData('page')['version'],
+        'X-Inertia-Partial-Component' => 'Dashboard/Administration',
+        'X-Inertia-Partial-Data' => 'dashboard,recommendations',
+    ])->assertJsonPath('component', 'Dashboard/It')
+        ->assertJsonMissingPath('props.dashboard')
+        ->assertJsonMissingPath('props.recommendations');
+});
+
+test('inactive and unassigned administrators cannot load dashboard data', function (array $attributes) {
+    $user = User::factory()->administrator()->create($attributes);
+
+    $this->actingAs($user)->get(route('dashboard'))->assertForbidden();
+})->with([
+    'inactive' => [['is_active' => false]],
+    'unassigned' => [['administration_role_id' => null]],
+]);
