@@ -19,8 +19,8 @@ use Illuminate\Support\Facades\Storage;
 use Tests\HistoricalSalesCatalogFixtures;
 
 test('legacy archived imported catalog records preserve sources and images for explicit restoration', function (bool $adminImage) {
-    Storage::fake('public');
-    Storage::fake('local');
+    $this->fakeIsolatedStorage('public');
+    $this->fakeIsolatedStorage('local');
     $manifest = realCatalogManifest();
     $mapping = realCatalogMapping();
 
@@ -79,7 +79,7 @@ test('legacy archived imported catalog records preserve sources and images for e
 })->with(['imported image' => false, 'admin replacement' => true]);
 
 test('import name conflicts fail before database writes and source changes', function () {
-    Storage::fake('public');
+    $this->fakeIsolatedStorage('public');
     $manifest = realCatalogManifest();
     $mapping = realCatalogMapping();
     $existing = Product::factory()->create(['name' => ' exact  PRODUCT™ ', 'is_active' => false]);
@@ -102,7 +102,7 @@ test('import name conflicts fail before database writes and source changes', fun
 });
 
 test('imports reuse a category with the same normalized name and preserve exact source names', function () {
-    Storage::fake('public');
+    $this->fakeIsolatedStorage('public');
     $manifest = realCatalogManifest(['name' => ' Exact  Product™ ']);
     $mapping = realCatalogMapping([['00123', ' Exact  Product™ ', 'Graphics Card', 'Biostar', '', '3']]);
     $category = Category::factory()->inactive()->create(['name' => ' graphics   card ']);
@@ -123,7 +123,7 @@ test('imports reuse a category with the same normalized name and preserve exact 
 });
 
 test('duplicate source names across verified product codes block import without changing sources', function () {
-    Storage::fake('public');
+    $this->fakeIsolatedStorage('public');
     $manifest = realCatalogManifest();
     $secondManifest = realCatalogManifest([
         'product_code' => '00456', 'name' => ' exact   PRODUCT™ ',
@@ -209,9 +209,9 @@ function realCatalogMapping(array $rows = [['00123', 'Exact Product™', 'Graphi
 }
 
 test('historical transactions preserve imported products across reseeding and reimport', function () {
-    Storage::fake('local');
+    $this->fakeIsolatedStorage('local');
     $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00'));
-    Storage::fake('public');
+    $this->fakeIsolatedStorage('public');
     HistoricalSalesCatalogFixtures::createProducts();
     $manifest = realCatalogManifest();
     $mapping = realCatalogMapping();
@@ -243,7 +243,7 @@ test('historical transactions preserve imported products across reseeding and re
 });
 
 test('details template lists exact product codes without inventing missing fields or overwriting a review', function () {
-    Storage::fake('public');
+    $this->fakeIsolatedStorage('public');
     $manifest = realCatalogManifest(['status' => 'pending']);
     $template = sys_get_temp_dir().'/verified-details-'.bin2hex(random_bytes(8)).'.csv';
 
@@ -267,7 +267,7 @@ test('details template lists exact product codes without inventing missing field
 });
 
 test('dry run validates complete images and verified details without changing product data', function () {
-    Storage::fake('public');
+    $this->fakeIsolatedStorage('public');
     $manifest = realCatalogManifest();
     $mapping = realCatalogMapping();
 
@@ -286,7 +286,7 @@ test('dry run validates complete images and verified details without changing pr
 });
 
 test('reimport updates the verified reorder level without resetting quantity or shipping profile', function () {
-    Storage::fake('public');
+    $this->fakeIsolatedStorage('public');
     $manifest = realCatalogManifest();
     $mapping = realCatalogMapping();
 
@@ -326,7 +326,7 @@ test('reimport updates the verified reorder level without resetting quantity or 
 });
 
 test('blank verified brands import as null and later admin-entered brands survive blank reimports', function () {
-    Storage::fake('public');
+    $this->fakeIsolatedStorage('public');
     $manifest = realCatalogManifest();
     $mapping = realCatalogMapping([['00123', 'Exact Product™', 'Graphics Card', '', '', '3']]);
 
@@ -352,7 +352,7 @@ test('blank verified brands import as null and later admin-entered brands surviv
 });
 
 test('missing verified quantity blocks an import before any product is created', function () {
-    Storage::fake('public');
+    $this->fakeIsolatedStorage('public');
     $manifest = realCatalogManifest(['quantity' => null]);
     $mapping = realCatalogMapping();
 
@@ -367,7 +367,7 @@ test('missing verified quantity blocks an import before any product is created',
 });
 
 test('verified details cannot replace the exact spreadsheet product name', function () {
-    Storage::fake('public');
+    $this->fakeIsolatedStorage('public');
     $manifest = realCatalogManifest();
     $mapping = realCatalogMapping([['00123', 'Changed Product Name', 'Graphics Card', 'Biostar', '', '3']]);
 
@@ -382,7 +382,7 @@ test('verified details cannot replace the exact spreadsheet product name', funct
 });
 
 test('verified quantity fills a blank spreadsheet cell without changing the source name', function () {
-    Storage::fake('public');
+    $this->fakeIsolatedStorage('public');
     $manifest = realCatalogManifest(['quantity' => null]);
     $mapping = realCatalogMapping([['00123', 'Exact Product™', 'Graphics Card', 'Biostar', '7', '3']]);
 
@@ -399,7 +399,7 @@ test('verified quantity fills a blank spreadsheet cell without changing the sour
 });
 
 test('an admin replacement preserves its manifest image and survives future imports', function () {
-    Storage::fake('public');
+    $this->fakeIsolatedStorage('public');
     $manifest = realCatalogManifest();
     $mapping = realCatalogMapping();
     $administrator = User::factory()->administrator()->create();
@@ -442,7 +442,7 @@ test('an admin replacement preserves its manifest image and survives future impo
 });
 
 test('import preserves existing products and their order and cart history', function () {
-    Storage::fake('public');
+    $this->fakeIsolatedStorage('public');
     $category = Category::factory()->create(['name' => 'Storage']);
     $orderedProduct = Product::factory()->for($category)->create([
         'name' => 'Samsung Sprint NVMe SSD',
@@ -481,7 +481,7 @@ test('import preserves existing products and their order and cart history', func
 });
 
 test('incomplete reorder levels leave existing products and all catalog tables untouched', function () {
-    Storage::fake('public');
+    $this->fakeIsolatedStorage('public');
     $existingProduct = Product::factory()->create(['name' => 'Existing Admin Product']);
     Inventory::factory()->for($existingProduct)->create();
     $manifest = realCatalogManifest();
@@ -502,7 +502,7 @@ test('incomplete reorder levels leave existing products and all catalog tables u
 });
 
 test('an import code cannot silently take over an administrator product', function () {
-    Storage::fake('public');
+    $this->fakeIsolatedStorage('public');
     $product = Product::factory()->create(['product_code' => '00123']);
     $original = $product->refresh()->getAttributes();
     $manifest = realCatalogManifest();
@@ -521,7 +521,7 @@ test('an import code cannot silently take over an administrator product', functi
 });
 
 test('a database failure rolls back imported catalog changes', function () {
-    Storage::fake('public');
+    $this->fakeIsolatedStorage('public');
     $manifest = realCatalogManifest();
     $mapping = realCatalogMapping();
 
@@ -588,7 +588,7 @@ test('the private mapping and manifest agree on approved demo inventory while re
 });
 
 test('the real package name and approved temporary stock import exactly with test-only supplemental brand data', function () {
-    Storage::fake('public');
+    $this->fakeIsolatedStorage('public');
     $name = 'BRAND NEW COMPUTER PACKAGE AMD RYZEN 5 5600G 16GB RAM/256GB SSD , 19\\ MONITOR';
     $manifest = realCatalogManifest([
         'product_code' => '80520996', 'name' => $name, 'category' => 'Bundles & Packages',
@@ -613,7 +613,7 @@ test('the real package name and approved temporary stock import exactly with tes
 });
 
 test('demo inventory imports are restricted to development while genuine sources remain importable', function (string $environment, bool $demo) {
-    Storage::fake('public');
+    $this->fakeIsolatedStorage('public');
     $manifest = realCatalogManifest($demo ? ['quantity_source' => 'development_demo', 'source_quantity' => '5'] : []);
     $mapping = realCatalogMapping();
     $this->app->instance('env', $environment);
@@ -635,7 +635,7 @@ test('demo inventory imports are restricted to development while genuine sources
 })->with(['local', 'testing', 'production', 'staging'])->with([false, true]);
 
 test('a CSV override cannot replace a populated manifest quantity', function () {
-    Storage::fake('public');
+    $this->fakeIsolatedStorage('public');
     $manifest = realCatalogManifest(['quantity_source' => 'development_demo', 'source_quantity' => '5']);
     $mapping = realCatalogMapping([['00123', 'Exact Product™', 'Graphics Card', 'Biostar', '8', '3']]);
 

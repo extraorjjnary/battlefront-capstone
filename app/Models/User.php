@@ -123,6 +123,9 @@ class User extends Authenticatable
 
         $this->cacheAdministrationRole();
         $roleCode = $this->administrationRoleCode();
+        if ($roleCode === 'staff' && ! in_array($permission, config('administration.staff_allowed_permissions', []), true)) {
+            return false;
+        }
         if ($roleCode === 'it' && ! in_array($permission, ['users.manage', 'audit.view'], true)) {
             return false;
         }

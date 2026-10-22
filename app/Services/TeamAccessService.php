@@ -136,6 +136,7 @@ class TeamAccessService
             }
             $permissions = DB::table('administration_permissions')->whereIn('code', $codes)->pluck('id', 'code');
             if ($permissions->count() !== count(array_unique($codes))
+                || ($role === 'staff' && array_diff($codes, config('administration.staff_allowed_permissions', [])) !== [])
                 || array_intersect($codes, ['users.manage', 'permissions.manage', 'audit.export']) !== []) {
                 throw ValidationException::withMessages(['permissions' => 'The selected permissions are invalid for this role.']);
             }

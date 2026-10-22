@@ -70,7 +70,7 @@ class HandleInertiaRequests extends Middleware
                     'assignOrders' => $request->user()?->can('orders.assign') ?? false,
                     'viewReports' => $request->user()?->can('reports.view') ?? false,
                     'viewStaffReports' => in_array($request->user()?->administrationRoleCode(), ['manager', 'owner'], true)
-                        && ($request->user()?->can('staff_reports.view') ?? false),
+                        && $request->user()->can('staff_reports.view'),
                     'viewAudit' => $request->user()?->can('audit.view') ?? false,
                     'exportAudit' => $request->user()?->can('audit.export') ?? false,
                     'browseProductCatalog' => $canBrowseProductCatalog,

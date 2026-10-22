@@ -2,8 +2,10 @@
 
 namespace Tests;
 
+use Illuminate\Filesystem\LocalFilesystemAdapter;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\ParallelTesting;
 use Laravel\Fortify\Features;
 
@@ -19,6 +21,20 @@ abstract class TestCase extends BaseTestCase
         }
 
         return $app;
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    public function fakeIsolatedStorage(string $disk, array $config = []): LocalFilesystemAdapter
+    {
+        $fake = Storage::fake($disk.'-process-'.getmypid().'-'.bin2hex(random_bytes(8)), array_replace(
+            (array) config('filesystems.disks.'.$disk, []),
+            $config,
+        ));
+        Storage::set($disk, $fake);
+
+        return $fake;
     }
 
     protected function tearDown(): void
