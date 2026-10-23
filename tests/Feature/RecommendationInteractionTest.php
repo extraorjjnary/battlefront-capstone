@@ -173,12 +173,16 @@ test('inactive products are rejected without recording recommendation interactio
 });
 
 test('expired recommendation interaction events are pruned while active events are retained', function () {
+    $this->freezeSecond();
+
     $expired = RecommendationInteraction::factory()->create(['expires_at' => now()->subSecond()]);
+    $expiringNow = RecommendationInteraction::factory()->create(['expires_at' => now()]);
     $current = RecommendationInteraction::factory()->create(['expires_at' => now()->addSecond()]);
 
     $this->artisan('app:prune-expired-recommendation-interactions')->assertSuccessful();
 
     $this->assertDatabaseMissing('recommendation_interactions', ['id' => $expired->id]);
+    $this->assertDatabaseMissing('recommendation_interactions', ['id' => $expiringNow->id]);
     $this->assertDatabaseHas('recommendation_interactions', ['id' => $current->id]);
 });
 

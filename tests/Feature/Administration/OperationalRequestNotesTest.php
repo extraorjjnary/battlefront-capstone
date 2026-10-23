@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Inventory\RequestInventoryAdjustment;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Order;
@@ -9,6 +10,85 @@ use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
+
+test('stock request entry points enforce reason direction and damage routing without side effects', function (string $kind, string $code, int $quantity, string $field, string $message) {
+    $actor = User::factory()->administrator()->create();
+    $case = operationalNotesRequest($kind, $actor);
+    $beforeRequests = DB::table('inventory_adjustment_requests')->count();
+    $beforeAudit = DB::table('audit_logs')->count();
+    $beforeInventory = $case['product']->inventory?->getAttributes();
+
+    $this->actingAs($actor)->{$case['method']}($case['url'], [
+        ...$case['payload'], 'reason_code' => $code, 'quantity' => $quantity, 'reason' => 'Checked by staff on site',
+    ])->assertSessionHasErrors([$field => $message]);
+
+    $this->assertDatabaseCount('inventory_adjustment_requests', $beforeRequests);
+    $this->assertDatabaseCount('audit_logs', $beforeAudit);
+    $this->assertDatabaseCount('inventory_movements', 0);
+    expect($case['product']->fresh()->inventory?->getAttributes())->toBe($beforeInventory);
+})->with(['stock', 'count', 'replacement'])->with([
+    'found stock decrease' => ['found_stock', 8, 'quantity', 'Found stock must increase the quantity.'],
+    'found stock unchanged' => ['found_stock', 10, 'quantity', 'Found stock must increase the quantity.'],
+    'loss increase' => ['theft_loss', 12, 'quantity', 'Theft or loss must decrease the quantity.'],
+    'loss unchanged' => ['theft_loss', 10, 'quantity', 'Theft or loss must decrease the quantity.'],
+    'damage' => ['damage', 8, 'reason_code', 'Use Damage Reports for damaged stock so it can be quarantined and inspected.'],
+]);
+
+test('stock requests accept blank notes and audit the selected reason', function (string $kind, string $code, string $label, array $notes) {
+    $actor = User::factory()->administrator()->create();
+    $case = operationalNotesRequest($kind, $actor);
+    $beforeStock = $case['product']->inventory?->getAttributes();
+
+    $this->actingAs($actor)->{$case['method']}($case['url'], [
+        ...$case['payload'], 'quantity' => $code === 'theft_loss' ? 8 : 12, 'reason_code' => $code, ...$notes,
+    ])->assertSessionHasNoErrors();
+
+    $record = DB::table('inventory_adjustment_requests')->orderByDesc('id')->first();
+    $explanation = ($kind === 'count' ? 'Physical sellable stock count: ' : '').$label;
+    $this->assertDatabaseHas('inventory_adjustment_requests', ['id' => $record->id, 'status' => 'pending', 'reason_code' => $code, 'reason' => $explanation]);
+    $this->assertDatabaseHas('audit_logs', ['subject_id' => $record->id, 'action' => 'inventory.adjustment.requested', 'reason' => $explanation]);
+    expect($case['product']->fresh()->inventory?->getAttributes())->toBe($beforeStock);
+    $this->assertDatabaseCount('inventory_movements', 0);
+})->with([
+    ['stock', 'theft_loss', 'Theft or loss'],
+    ['count', 'theft_loss', 'Theft or loss'],
+    ['replacement', 'theft_loss', 'Theft or loss'],
+    ['stock', 'other', 'Other'],
+    ['count', 'other', 'Other'],
+    ['replacement', 'other', 'Other'],
+    ['opening', 'other', 'Other'],
+    ['opening replacement', 'other', 'Other'],
+])->with([
+    'omitted' => [[]], 'null' => [['reason' => null]], 'empty' => [['reason' => '']], 'whitespace' => [['reason' => '   ']],
+]);
+
+test('opening stock cannot use loss or damage reasons', function (string $kind, string $code, string $field) {
+    $actor = User::factory()->administrator()->create();
+    $case = operationalNotesRequest($kind, $actor);
+    $beforeRequests = DB::table('inventory_adjustment_requests')->count();
+
+    $this->actingAs($actor)->{$case['method']}($case['url'], [
+        ...$case['payload'], 'reason_code' => $code, 'reason' => 'Checked by staff on site',
+    ])->assertSessionHasErrors($field);
+
+    $this->assertDatabaseCount('inventory_adjustment_requests', $beforeRequests);
+    $this->assertDatabaseMissing('inventories', ['product_id' => $case['product']->id]);
+})->with(['opening', 'opening replacement'])->with([
+    ['theft_loss', 'quantity'], ['damage', 'reason_code'],
+]);
+
+test('shared stock request action rejects reason direction violations', function () {
+    $actor = User::factory()->administrator()->create();
+    $product = Product::factory()->available()->create();
+
+    expect(fn () => app(RequestInventoryAdjustment::class)->execute(
+        $product, $actor, $product->inventory->quantity - 1, 'Shelf checked on site', reasonCode: 'found_stock',
+    ))->toThrow(ValidationException::class, 'Found stock must increase the quantity.');
+
+    $this->assertDatabaseCount('inventory_adjustment_requests', 0);
+    $this->assertDatabaseCount('inventory_movements', 0);
+});
 
 /**
  * @return array{method: string, url: string, payload: array<string, mixed>, table: string, subject: string, action: string, explanation: string, product: Product}
@@ -158,7 +238,15 @@ test('invalid request reasons and notes cannot persist requests or stock changes
     $beforeMovements = DB::table('inventory_movements')->count();
     $beforeStock = DB::table('inventories')->where('product_id', $case['product']->id)->first();
 
-    $this->actingAs($actor)->{$case['method']}($case['url'], [...$case['payload'], ...$override])->assertSessionHasErrors($field);
+    $response = $this->actingAs($actor)->{$case['method']}($case['url'], [...$case['payload'], ...$override]);
+    if (in_array($kind, ['stock', 'count', 'opening', 'replacement', 'opening replacement'], true)
+        && ($override['reason_code'] ?? null) === 'other' && empty(trim($override['reason'] ?? ''))) {
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas($case['table'], ['product_id' => $case['product']->id, 'reason_code' => 'other', 'reason' => $kind === 'count' ? 'Physical sellable stock count: Other' : 'Other']);
+
+        return;
+    }
+    $response->assertSessionHasErrors($field);
 
     $this->assertDatabaseCount($case['table'], $beforeRequests);
     $this->assertDatabaseCount('audit_logs', $beforeAudit);

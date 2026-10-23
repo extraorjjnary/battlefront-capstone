@@ -6,6 +6,7 @@ use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\ApprovalMonitor;
+use App\Support\OperationalRequestReason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -40,6 +41,7 @@ class DecideInventoryAdjustment
                 if ($current !== (int) $request->observed_quantity) {
                     throw ValidationException::withMessages(['decision' => 'Stock changed after this request. Submit a new request.']);
                 }
+                OperationalRequestReason::validateStockAdjustment($request->reason_code ?? 'other', $current, (int) $request->target_quantity, 'decision');
                 if ($inventory === null) {
                     $inventory = Inventory::query()->create(['product_id' => $product->id, 'quantity' => 0, 'reorder_level' => $request->initial_reorder_level ?? 0]);
                 }

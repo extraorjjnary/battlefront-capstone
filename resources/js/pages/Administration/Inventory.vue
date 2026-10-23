@@ -1,6 +1,8 @@
 <script setup>
 import PageHeader from '@/components/PageHeader.vue';
 import InlineEditor from '@/components/administration/InlineEditor.vue';
+import StockAdjustmentSummary from '@/components/administration/StockAdjustmentSummary.vue';
+import DamageReportController from '@/actions/App/Http/Controllers/Administration/DamageReportController';
 import { Form, Head, Link, router } from '@inertiajs/vue3';
 import {
     Boxes,
@@ -30,6 +32,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { formatDateTime } from '@/lib/dateTime';
 
 const requestReasonCodes = ref({});
+const requestedQuantities = ref({});
 
 const props = defineProps({
     products: { type: Object, required: true },
@@ -419,6 +422,17 @@ defineOptions({
                                 class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-start"
                                 v-slot="{ errors, processing }"
                             >
+                                <div class="sm:col-span-3">
+                                    <StockAdjustmentSummary
+                                        :current-quantity="
+                                            product.inventory.quantity
+                                        "
+                                        :requested-quantity="
+                                            requestedQuantities[product.id] ??
+                                            product.inventory.quantity
+                                        "
+                                    />
+                                </div>
                                 <div class="grid gap-2">
                                     <Label
                                         :for="`quantity-${product.inventory.id}`"
@@ -436,6 +450,10 @@ defineOptions({
                                         inputmode="numeric"
                                         :default-value="
                                             product.inventory.quantity
+                                        "
+                                        @update:model-value="
+                                            requestedQuantities[product.id] =
+                                                $event
                                         "
                                         :aria-invalid="Boolean(errors.quantity)"
                                         required
@@ -483,7 +501,6 @@ defineOptions({
                                         <option value="">
                                             Select a reason
                                         </option>
-                                        <option value="damage">Damage</option>
                                         <option value="theft_loss">
                                             Theft or loss
                                         </option>
@@ -504,25 +521,26 @@ defineOptions({
                                     <InputError :message="errors.reason_code" />
                                     <Label
                                         :for="`reason-${product.inventory.id}`"
-                                        >{{
-                                            requestReasonCodes[product.id] ===
-                                            'other'
-                                                ? 'Additional notes (required)'
-                                                : 'Additional notes (optional)'
-                                        }}</Label
+                                        >Notes (Optional)</Label
                                     >
                                     <Input
                                         class="min-h-11"
                                         :id="`reason-${product.inventory.id}`"
                                         name="reason"
-                                        :required="
-                                            requestReasonCodes[product.id] ===
-                                            'other'
-                                        "
                                         minlength="5"
                                         maxlength="2000"
                                     />
                                     <InputError :message="errors.reason" />
+                                    <p class="text-muted-foreground text-sm">
+                                        For damaged stock, use
+                                        <Link
+                                            :href="
+                                                DamageReportController.index()
+                                            "
+                                            class="text-primary-ink underline"
+                                            >Damage Reports</Link
+                                        >.
+                                    </p>
                                 </div>
 
                                 <Button
@@ -647,6 +665,10 @@ defineOptions({
                                     <Input
                                         class="min-h-11"
                                         :id="`initial-quantity-${product.id}`"
+                                        @update:model-value="
+                                            requestedQuantities[product.id] =
+                                                $event
+                                        "
                                         name="quantity"
                                         type="number"
                                         min="0"
@@ -714,28 +736,26 @@ defineOptions({
                                         <option value="other">Other</option>
                                     </select>
                                     <InputError :message="errors.reason_code" />
-                                    <Label
-                                        :for="`opening-reason-${product.id}`"
-                                        >{{
-                                            requestReasonCodes[product.id] ===
-                                            'other'
-                                                ? 'Additional notes (required)'
-                                                : 'Additional notes (optional)'
-                                        }}</Label
+                                    <Label :for="`opening-reason-${product.id}`"
+                                        >Notes</Label
                                     >
                                     <Input
                                         class="min-h-11"
                                         :id="`opening-reason-${product.id}`"
                                         name="reason"
-                                        :required="
-                                            requestReasonCodes[product.id] ===
-                                            'other'
-                                        "
                                         minlength="5"
                                         maxlength="2000"
                                     />
                                     <InputError :message="errors.reason" />
                                 </div>
+
+                                <StockAdjustmentSummary
+                                    class="sm:col-span-3"
+                                    :current-quantity="0"
+                                    :requested-quantity="
+                                        requestedQuantities[product.id] ?? ''
+                                    "
+                                />
 
                                 <Button
                                     class="min-h-11 sm:justify-self-start"

@@ -6,6 +6,21 @@ use Illuminate\Validation\ValidationException;
 
 class OperationalRequestReason
 {
+    public static function validateStockAdjustment(string $reasonCode, int $current, int $target, string $quantityField = 'quantity'): void
+    {
+        if ($reasonCode === 'damage') {
+            throw ValidationException::withMessages(['reason_code' => 'Use Damage Reports for damaged stock so it can be quarantined and inspected.']);
+        }
+        if ($reasonCode === 'found_stock' && $target <= $current) {
+            throw ValidationException::withMessages([$quantityField => 'Found stock must increase the quantity.']);
+        }
+        if ($reasonCode === 'theft_loss') {
+            if ($target >= $current) {
+                throw ValidationException::withMessages([$quantityField => 'Theft or loss must decrease the quantity.']);
+            }
+        }
+    }
+
     /** @return array<string, string> */
     public static function customerReturnOptions(): array
     {
@@ -15,7 +30,7 @@ class OperationalRequestReason
         ];
     }
 
-    public static function resolve(string $reasonCode, ?string $notes, bool $openingStock = false): string
+    public static function resolve(string $reasonCode, ?string $notes, bool $openingStock = false, bool $notesOptional = false): string
     {
         if ($notes !== null && trim($notes) !== '') {
             return $notes;
@@ -38,6 +53,7 @@ class OperationalRequestReason
             'transit_damage' => 'Damaged in transit',
             'not_as_described' => 'Not as described',
             'changed_mind' => 'Changed mind',
+            'other' => $notesOptional ? 'Other' : null,
             default => null,
         };
 
