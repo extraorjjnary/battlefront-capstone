@@ -52,7 +52,7 @@ class StartHostedCheckout
             'reference_number' => $order->reference,
             'metadata' => ['order_id' => (string) $order->id],
         ];
-        if (filter_var($order->user?->email, FILTER_VALIDATE_EMAIL)) {
+        if (filter_var($order->user->email, FILTER_VALIDATE_EMAIL)) {
             $attributes['send_email_receipt'] = true;
         }
 
@@ -69,7 +69,7 @@ class StartHostedCheckout
             if ($flow->status === 'reconciliation_required' && $flow->checkout_session_id !== null) {
                 return $this->recoverKnownSession($flow);
             }
-            if ($flow->status !== 'reconciliation_required' || $flow->checkout_session_id !== null) {
+            if ($flow->status !== 'reconciliation_required') {
                 throw new RuntimeException('The payment is being prepared or requires reconciliation.');
             }
 
@@ -167,8 +167,11 @@ class StartHostedCheckout
             throw new RuntimeException('PayMongo checkout state could not be verified.');
         }
 
-        $paid = collect(data_get($session, 'attributes.payments', []))
-            ->first(static fn (array $payment): bool => data_get($payment, 'attributes.status') === 'paid');
+        $payments = data_get($session, 'attributes.payments', []);
+        $payments = is_array($payments) ? $payments : [];
+        $paid = collect($payments)
+            ->first(static fn (mixed $payment): bool => is_array($payment)
+                && data_get($payment, 'attributes.status') === 'paid');
         if (is_array($paid)) {
             $attributes = data_get($paid, 'attributes', []);
             $payment = [

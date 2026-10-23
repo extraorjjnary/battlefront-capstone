@@ -119,7 +119,7 @@ class CustomerOrderPresenter
                     && $order->status === OrderStatus::Pending
                     && $order->payment_status === PaymentStatus::Pending,
                 'bank_code' => $paymongoFlow?->bank_code,
-                'hosted_payment_method' => $paymongoFlow?->hosted_payment_method ?? $order->hosted_payment_method,
+                'hosted_payment_method' => data_get($paymongoFlow, 'hosted_payment_method') ?? $order->hosted_payment_method,
                 'can_retry_hosted' => $paymongoFlow?->channel === 'hosted_checkout'
                     && $paymongoFlow->status === 'reconciliation_required'
                     && $paymongoFlow->merchant_cutoff_at->isFuture()

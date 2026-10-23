@@ -32,7 +32,8 @@ use InvalidArgumentException;
  *     cart_item_ids: list<int>,
  *     recipient_name: string, contact_number: string, fulfillment_method: FulfillmentMethod,
  *     delivery_address: string|null, payment_method: PaymentMethod, payment_proof_path: string|null,
- *     hosted_payment_method?: string|null, delivery_address_components?: array<string, mixed>|null
+ *     hosted_payment_method?: string|null, delivery_address_components?: array<string, mixed>|null,
+ *     checkout_submission_key?: string|null, checkout_request_fingerprint?: string|null
  * }
  */
 class OrderPlacementService
@@ -54,7 +55,9 @@ class OrderPlacementService
      *     fulfillment_method: FulfillmentMethod,
      *     delivery_address: string|null,
      *     payment_method: PaymentMethod,
-     *     payment_proof_path: string|null, hosted_payment_method?: string|null
+     *     payment_proof_path: string|null, hosted_payment_method?: string|null,
+     *     delivery_address_components?: array<string, mixed>|null,
+     *     checkout_submission_key?: string|null, checkout_request_fingerprint?: string|null
      * }  $checkout
      */
     public function execute(User $customer, array $checkout): Order

@@ -66,8 +66,11 @@ class ReconcilePayMongoReturn
                 throw new RuntimeException('PayMongo returned an unverifiable payment status.');
             }
 
-            $paidPayments = collect(data_get($resource, 'attributes.payments', []))
-                ->filter(static fn (array $payment): bool => data_get($payment, 'attributes.status') === 'paid');
+            $payments = data_get($resource, 'attributes.payments', []);
+            $payments = is_array($payments) ? $payments : [];
+            $paidPayments = collect($payments)
+                ->filter(static fn (mixed $payment): bool => is_array($payment)
+                    && data_get($payment, 'attributes.status') === 'paid');
 
             if ($paidPayments->isEmpty()) {
                 $operation->update([

@@ -16,14 +16,13 @@ use App\Models\User;
 use App\Services\Order\OrderProcessingService;
 use Database\Seeders\BranchSeeder;
 use Illuminate\Http\Client\Request;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
-test('wallet consumer journey purchases selected catalog items and preserves its delivery snapshot and remaining cart', function (string $method) {
+test('hosted payment consumer journey purchases selected catalog items and preserves its delivery snapshot and remaining cart', function (string $method) {
     Storage::fake('local');
     $coveragePath = config('forecasting.development_manifest');
     $coverageContents = '{"version":2,"products":{}}';
@@ -63,20 +62,23 @@ test('wallet consumer journey purchases selected catalog items and preserves its
         'cart_item_ids' => [(string) $ids[0], (string) $ids[1]],
         'recipient_name' => 'Consumer Recipient', 'contact_number' => '09171234567',
         'fulfillment_method' => 'delivery', 'delivery_destination' => 'Sagay City',
-        'delivery_address' => 'Submitted street and barangay', 'payment_method' => $method,
-        'payment_proof' => UploadedFile::fake()->image('proof.png'),
+        'delivery_address' => 'Submitted street and barangay', 'payment_method' => 'online',
+        'payment_channel' => 'hosted_checkout',
+        'hosted_payment_method' => $method === 'maya' ? 'paymaya' : 'gcash',
+        'checkout_submission_key' => (string) Str::uuid(),
         'total' => '0.01', 'delivery_fee' => '0.00', 'shipping_profile' => 'bulky',
     ];
-    $placed = $this->post('/api/v1/orders', $payload)->assertCreated()
+    $placed = $this->post('/api/v1/orders', $payload)->assertSuccessful()
         ->assertJsonPath('data.product_subtotal', '38.66')->assertJsonPath('data.delivery_fee', '130.00')
         ->assertJsonPath('data.total', '168.66')->assertJsonPath('data.fulfillment.delivery_destination', 'Sagay City')
         ->assertJsonPath('data.fulfillment.delivery_address', 'Submitted street and barangay')
-        ->assertJsonPath('data.payment.proof_submitted', true)->assertJsonPath('data.payment.status.value', 'pending')
+        ->assertJsonPath('data.payment.method.value', 'online')->assertJsonPath('data.payment.proof_submitted', false)
+        ->assertJsonPath('data.payment.status.value', 'pending')
         ->assertJsonPath('data.delivery_quote.shipping_profile', 'fragile')->assertJsonPath('data.shipment.status.value', 'awaiting_preparation')
         ->assertJsonPath('data.shipment.eta.anchor_date', null)->assertJsonCount(2, 'data.items')
         ->assertJsonMissingPath('data.payment_proof_path');
     $order = Order::sole();
-    Storage::disk('local')->assertExists($order->payment_proof_path);
+    expect($order->payment_proof_path)->toBeNull();
     expect($order)->product_subtotal->toBe('38.66')->delivery_fee->toBe('130.00')->total_amount->toBe('168.66');
     expect($order->shipment)->preparation_days->toBe(2)->eta_min_days->toBe(2)->eta_max_days->toBe(3);
     expect($order->items->pluck('product_id')->all())->toBe([$products[0]->id, $products[1]->id]);
@@ -84,21 +86,27 @@ test('wallet consumer journey purchases selected catalog items and preserves its
     expect($products[1]->inventory->refresh()->quantity)->toBe(4);
     $this->getJson('/api/v1/cart')->assertOk()->assertJsonCount(1, 'data.items')
         ->assertJsonPath('data.items.0.id', $ids[2])->assertJsonPath('data.items.0.quantity', 1);
-    $this->getJson('/api/v1/orders/'.$order->id)->assertExactJson($placed->json());
+    $this->getJson('/api/v1/orders/'.$order->id)->assertOk()
+        ->assertJsonPath('data.id', $order->id)
+        ->assertJsonPath('data.total', '168.66')
+        ->assertJsonPath('data.payment.status.value', 'pending');
     $this->getJson('/api/v1/orders')->assertOk()->assertJsonPath('data.0.id', $order->id)
         ->assertJsonPath('data.0.total', '168.66')->assertJsonPath('meta.per_page', 10);
 
-    $this->post('/api/v1/orders', [...$payload, 'payment_proof' => UploadedFile::fake()->image('retry.png')])
+    $this->post('/api/v1/orders', $payload)
         ->assertUnprocessable()->assertJsonValidationErrors('cart');
     $this->assertDatabaseCount('orders', 1);
     $this->assertDatabaseCount('shipments', 1);
-    expect(Storage::disk('local')->allFiles('payment-proofs'))->toBe([$order->payment_proof_path]);
+    expect(Storage::disk('local')->allFiles('payment-proofs'))->toBe([]);
     expect(Storage::disk('local')->get($coveragePath))->toBe($coverageContents);
     expect($customer->refresh()->default_delivery_address)->toBe('Saved address');
     $products[0]->update(['price' => '999.00', 'discount_price' => null, 'shipping_profile' => ShippingProfile::Bulky]);
     config(['battlefront.delivery.destinations' => [], 'battlefront.delivery.carrier' => 'changed']);
     $this->travel(1)->days();
-    $this->getJson('/api/v1/orders/'.$order->id)->assertExactJson($placed->json());
+    $this->getJson('/api/v1/orders/'.$order->id)->assertOk()
+        ->assertJsonPath('data.id', $order->id)
+        ->assertJsonPath('data.total', '168.66')
+        ->assertJsonPath('data.payment.can_retry_hosted', false);
 })->with(['gcash', 'maya']);
 
 test('pickup consumer journey uses cart mutations and buys only the selected line with no shipment', function (string $method) {
@@ -163,9 +171,17 @@ test('placed delivery milestones share read state and owned deep links while log
     $this->post('/api/v1/orders', [
         'cart_item_ids' => [(string) $itemId], 'recipient_name' => 'Consumer Recipient', 'contact_number' => '09171234567',
         'fulfillment_method' => 'delivery', 'delivery_destination' => 'Sagay City', 'delivery_address' => 'Synthetic address',
-        'payment_method' => 'gcash', 'payment_proof' => UploadedFile::fake()->image('proof.png'),
-    ])->assertCreated();
+        'payment_method' => 'online', 'payment_channel' => 'hosted_checkout',
+        'hosted_payment_method' => 'gcash', 'checkout_submission_key' => (string) Str::uuid(),
+    ])->assertSuccessful();
     $order = Order::sole();
+    Storage::disk('local')->put('payment-proofs/synthetic.jpg', 'synthetic payment proof');
+    Order::withoutEvents(fn () => $order->forceFill([
+        'payment_origin' => 'manual',
+        'payment_method' => 'gcash',
+        'hosted_payment_method' => null,
+        'payment_proof_path' => 'payment-proofs/synthetic.jpg',
+    ])->save());
     $handler = User::factory()->administrator()->create();
     app(AssignOrderHandler::class)->execute($order, $handler, $handler->id, claimOnly: true);
     $processing = app(OrderProcessingService::class);

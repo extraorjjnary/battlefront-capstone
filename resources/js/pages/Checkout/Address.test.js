@@ -75,6 +75,7 @@ function checkoutProps(prefill = {}) {
                 payment_account: null,
             },
         ],
+        paymongoHostedMethods: ['card', 'gcash', 'paymaya', 'qrph'],
         pickupQuote: {
             product_subtotal: '100.00',
             delivery_fee: '0.00',

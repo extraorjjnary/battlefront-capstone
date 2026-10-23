@@ -12,10 +12,10 @@ use App\Services\Cart\CartService;
 use App\Services\Order\PsgcDeliveryLocations;
 use Carbon\Carbon;
 use Database\Seeders\BranchSeeder;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -35,7 +35,7 @@ function deliveryCheckoutCart(ShippingProfile $profile = ShippingProfile::Standa
 /** @return array<string, mixed> */
 function deliveryCheckoutSubmission(array $cartItemIds, array $overrides = []): array
 {
-    return array_replace([
+    $submission = array_replace([
         'cart_item_ids' => $cartItemIds,
         'recipient_name' => 'Delivery Customer',
         'contact_number' => '09171234567',
@@ -43,9 +43,17 @@ function deliveryCheckoutSubmission(array $cartItemIds, array $overrides = []): 
         'delivery_destination' => 'Sagay City',
         'delivery_barangay_code' => '1804523018',
         'delivery_address_details' => '12 Example Street',
-        'payment_method' => 'gcash',
-        'payment_proof' => UploadedFile::fake()->image('proof.png'),
+        'payment_method' => 'online',
+        'payment_channel' => 'hosted_checkout',
+        'hosted_payment_method' => 'qrph',
+        'checkout_submission_key' => (string) Str::uuid(),
     ], $overrides);
+
+    if ($submission['payment_method'] !== 'online') {
+        unset($submission['payment_channel'], $submission['hosted_payment_method'], $submission['checkout_submission_key']);
+    }
+
+    return $submission;
 }
 
 test('web and mobile checkout expose equivalent quotes for all destination fees and profiles', function (ShippingProfile $profile, int $surcharge, int $preparation) {
@@ -159,7 +167,7 @@ test('new Negros delivery estimate is shared by web and mobile quotes and order 
     if ($channel === 'web') {
         $response->assertRedirectToRoute('orders.show', $order)->assertSessionHasNoErrors();
     } else {
-        $response->assertCreated()
+        $response->assertSuccessful()
             ->assertJsonPath('data.delivery_quote.base_fee', '280.00')
             ->assertJsonPath('data.delivery_quote.transit_min_days', 2);
     }
@@ -194,13 +202,13 @@ test('delivery placement snapshots each profile through the shared web and mobil
     ['customer' => $customer, 'stock' => $stock] = deliveryCheckoutCart($profile);
     $this->actingAs($customer)->withToken($customer->createToken('Phone')->plainTextToken);
 
-    $response = $this->post($channel === 'web' ? route('orders.store') : '/api/v1/orders', deliveryCheckoutSubmission($customer->cart->items->modelKeys(), ['payment_method' => 'maya']));
+    $response = $this->post($channel === 'web' ? route('orders.store') : '/api/v1/orders', deliveryCheckoutSubmission($customer->cart->items->modelKeys(), ['hosted_payment_method' => 'paymaya']));
     $order = Order::sole();
 
     if ($channel === 'web') {
         $response->assertRedirectToRoute('orders.show', $order)->assertSessionHasNoErrors();
     } else {
-        $response->assertCreated()->assertJsonPath('data.product_subtotal', '18.66')
+        $response->assertSuccessful()->assertJsonPath('data.product_subtotal', '18.66')
             ->assertJsonPath('data.delivery_fee', $fee)->assertJsonPath('data.total', $total)
             ->assertJsonPath('data.delivery_quote.shipping_profile', $profile->value)
             ->assertJsonPath('data.delivery_quote.carrier', 'lbc');
@@ -211,7 +219,7 @@ test('delivery placement snapshots each profile through the shared web and mobil
     expect($stock->refresh()->quantity)->toBe(8);
     expect($customer->refresh()->cart)->toBeNull();
     $this->assertDatabaseCount('shipments', 1);
-    Storage::disk('local')->assertExists($order->payment_proof_path);
+    expect($order->payment_proof_path)->toBeNull();
 })->with(['web', 'api'])->with([
     'standard' => [ShippingProfile::Standard, '80.00', '98.66', 1],
     'fragile' => [ShippingProfile::Fragile, '130.00', '148.66', 2],
@@ -236,7 +244,7 @@ test('mixed cart preview and placement charge the highest handling profile only 
 
     $response = $this->post($channel === 'web' ? route('orders.store') : '/api/v1/orders', deliveryCheckoutSubmission($customer->cart->items->modelKeys()));
 
-    $channel === 'web' ? $response->assertSessionHasNoErrors() : $response->assertCreated();
+    $channel === 'web' ? $response->assertSessionHasNoErrors() : $response->assertSuccessful();
     expect(Order::sole())->product_subtotal->toBe('120.00')->handling_surcharge->toBe('100.00')
         ->delivery_fee->toBe('180.00')->total_amount->toBe('300.00')->shipping_profile->toBe(ShippingProfile::Bulky);
     expect(Inventory::pluck('quantity')->all())->toBe([7, 7, 7, 7]);
@@ -265,7 +273,7 @@ test('placement ignores forged quote values and recalculates changed prices prof
 
     $response = $this->post($channel === 'web' ? route('orders.store') : '/api/v1/orders', $payload);
 
-    $channel === 'web' ? $response->assertSessionHasNoErrors() : $response->assertCreated();
+    $channel === 'web' ? $response->assertSessionHasNoErrors() : $response->assertSuccessful();
     $order = Order::sole();
     expect($order)->product_subtotal->toBe('20.30')->delivery_base_fee->toBe('80.15')->handling_surcharge->toBe('100.25')
         ->delivery_fee->toBe('180.40')->total_amount->toBe('200.70')->shipping_profile->toBe(ShippingProfile::Bulky);
@@ -326,7 +334,7 @@ test('pickup prohibits a destination and preserves zero fee placement', function
     $this->assertDatabaseCount('orders', 0);
     expect($stock->refresh()->quantity)->toBe(10);
     $response = $this->post($url, [...$payload, 'delivery_fee' => '999.99', 'total' => '999.99']);
-    $channel === 'web' ? $response->assertSessionHasNoErrors() : $response->assertCreated();
+    $channel === 'web' ? $response->assertSessionHasNoErrors() : $response->assertSuccessful();
 
     expect(Order::sole())->product_subtotal->toBe('18.66')->delivery_fee->toBe('0.00')->total_amount->toBe('18.66')
         ->delivery_address->toBeNull()->delivery_destination->toBeNull()->shipment->toBeNull();
@@ -362,7 +370,7 @@ test('a destination removed before internal placement becomes a validation error
     config(['battlefront.delivery.destinations' => []]);
 
     try {
-        app(PlaceCustomerOrder::class)->execute($customer, $payload, $payload['payment_proof']);
+        app(PlaceCustomerOrder::class)->execute($customer, $payload, $payload['payment_proof'] ?? null);
         $this->fail('Unsupported destination placement must fail.');
     } catch (ValidationException $exception) {
         expect($exception->errors())->toBe(['delivery_destination' => ['Select a supported delivery destination.']]);

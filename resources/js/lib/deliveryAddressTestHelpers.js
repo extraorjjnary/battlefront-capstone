@@ -73,6 +73,7 @@ export function loadAddressComponent(
                 usePage: () => ({ props: { auth: { user } } }),
             },
             '@/lib/currency': { formatCurrency },
+            '@/lib/uuid': { createUuid: () => 'test-checkout-submission' },
             '@/components/ui/skeleton': {
                 Skeleton: loadSkeletonComponent('ui/skeleton/Skeleton.vue'),
             },

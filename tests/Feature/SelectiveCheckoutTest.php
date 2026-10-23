@@ -8,17 +8,19 @@ use App\Enums\ShippingProfile;
 use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\PayMongoFlow;
 use App\Models\Product;
 use App\Models\Shipment;
 use App\Models\User;
 use App\Services\Cart\CartService;
 use App\Services\Order\OrderPlacementService;
 use App\Services\Order\OrderProcessingService;
+use App\Services\PayMongo\CloseHostedCheckout;
 use Carbon\Carbon;
 use Database\Seeders\BranchSeeder;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 function selectiveCheckoutCart(): array
 {
@@ -45,12 +47,16 @@ function selectiveCheckoutPayload(array $ids, string $fulfillment = 'pickup'): a
         'recipient_name' => 'Selected Customer',
         'contact_number' => '09171234567',
         'fulfillment_method' => $fulfillment,
-        'payment_method' => $fulfillment === 'pickup' ? 'cash' : 'maya',
+        'payment_method' => $fulfillment === 'pickup' ? 'cash' : 'online',
+        ...($fulfillment === 'delivery' ? [
+            'payment_channel' => 'hosted_checkout',
+            'hosted_payment_method' => 'paymaya',
+            'checkout_submission_key' => (string) Str::uuid(),
+        ] : []),
         ...($fulfillment === 'delivery' ? [
             'delivery_destination' => 'Sagay City',
             'delivery_barangay_code' => '1804523018',
             'delivery_address_details' => 'Selected delivery address',
-            'payment_proof' => UploadedFile::fake()->image('proof.png'),
         ] : []),
     ];
 }
@@ -86,7 +92,7 @@ test('selected checkout previews and purchases exactly one multiple or all owned
         'items' => [['product_id' => $items[2]->product_id, 'quantity' => 999, 'price' => '0.01']],
     ]);
     $order = Order::sole();
-    $channel === 'web' ? $response->assertRedirectToRoute('orders.show', $order)->assertSessionHasNoErrors() : $response->assertCreated();
+    $channel === 'web' ? $response->assertRedirectToRoute('orders.show', $order)->assertSessionHasNoErrors() : $response->assertSuccessful();
 
     expect($order->items->pluck('product_id')->all())->toBe(array_map(fn ($item) => $item->product_id, $selectedItems));
     expect($order)->product_subtotal->toBe($subtotal)->delivery_fee->toBe($fulfillment === 'pickup' ? '0.00' : $fee)
@@ -104,7 +110,7 @@ test('selected checkout previews and purchases exactly one multiple or all owned
     if ($fulfillment === 'delivery') {
         expect($order->shipping_profile->value)->toBe($profile);
         expect($order->shipment)->preparation_days->toBe($preparation)->eta_min_days->toBe($preparation)->eta_max_days->toBe($preparation + 1);
-        Storage::disk('local')->assertExists($order->payment_proof_path);
+        expect($order->payment_proof_path)->toBeNull();
     } else {
         expect($order->shipment)->toBeNull();
     }
@@ -188,7 +194,7 @@ test('unselected unavailable bulky products do not block selected preview or pla
     $preview->assertOk();
     $response = $this->post($channel === 'web' ? route('orders.store') : '/api/v1/orders', selectiveCheckoutPayload([$items[0]->id], 'delivery'));
 
-    $channel === 'web' ? $response->assertSessionHasNoErrors() : $response->assertCreated();
+    $channel === 'web' ? $response->assertSessionHasNoErrors() : $response->assertSuccessful();
     expect(Order::sole()->shipping_profile)->toBe(ShippingProfile::Standard);
     $this->assertModelExists($items[2]);
 })->with(['web', 'api']);
@@ -201,11 +207,15 @@ test('partial placement retries never purchase the remaining cart and cancellati
     $payload = selectiveCheckoutPayload([$items[0]->id], $fulfillment);
 
     $response = $this->post($url, $payload);
-    $channel === 'web' ? $response->assertSessionHasNoErrors() : $response->assertCreated();
+    $channel === 'web' ? $response->assertSessionHasNoErrors() : $response->assertSuccessful();
     $retry = $this->post($url, $payload);
     $channel === 'web' ? $retry->assertSessionHasErrors('cart') : $retry->assertUnprocessable()->assertJsonValidationErrors('cart');
 
     $order = Order::sole();
+    if ($fulfillment === 'delivery') {
+        PayMongoFlow::query()->where('order_id', $order->id)->update(['status' => 'closed', 'active_slot' => null, 'closed_at' => now()]);
+        $this->mock(CloseHostedCheckout::class)->shouldReceive('execute')->once()->andReturn(true);
+    }
     app(OrderProcessingService::class)->updateStatus($order, OrderStatus::Cancelled);
 
     expect(array_map(fn ($stock) => $stock->refresh()->quantity, $stocks))->toBe([5, 5, 5]);
@@ -248,7 +258,7 @@ test('selected placement reloads current quantity price and shipping profile aft
 
     $response = $this->post($channel === 'web' ? route('orders.store') : '/api/v1/orders', selectiveCheckoutPayload($ids, 'delivery'));
 
-    $channel === 'web' ? $response->assertSessionHasNoErrors() : $response->assertCreated();
+    $channel === 'web' ? $response->assertSessionHasNoErrors() : $response->assertSuccessful();
     $order = Order::sole();
     expect($order)->product_subtotal->toBe('21.75')->delivery_fee->toBe('130.00')->total_amount->toBe('151.75')->shipping_profile->toBe(ShippingProfile::Fragile);
     expect($order->items->sole())->quantity->toBe(3)->price_at_time->toBe('7.25');

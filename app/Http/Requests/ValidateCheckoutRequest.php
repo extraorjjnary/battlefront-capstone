@@ -28,7 +28,7 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
     /**
      * Return the validated checkout fields shared by web and API placement.
      *
-     * @return array{cart_item_ids: list<int>, recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address: string|null, delivery_destination: string|null, payment_method: string, payment_channel: string|null, payment_bank: string|null, hosted_payment_method: string|null, delivery_address_components: array<string, mixed>|null}
+     * @return array{cart_item_ids: list<int>, recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address: string|null, delivery_address_components: array<string, mixed>|null, delivery_destination: string|null, payment_method: string, payment_channel: string|null, payment_bank: string|null, hosted_payment_method: string|null, checkout_submission_key: string|null}
      */
     public function checkoutData(): array
     {
@@ -166,6 +166,9 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
                 if ($this->input('fulfillment_method') !== 'delivery') {
                     return;
                 }
+                if (! is_string($this->input('delivery_destination'))) {
+                    return;
+                }
                 $this->checkGeography($validator, 'delivery');
                 if ($validator->errors()->hasAny(['delivery_destination', 'delivery_city_code', 'delivery_region_code', 'delivery_province_code'])) {
                     return;
@@ -234,10 +237,26 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
                     return;
                 }
 
+                $onlineMethodAvailableForDestination = true;
+
+                if ($paymentMethod === PaymentMethod::Online && $fulfillmentMethod === FulfillmentMethod::Delivery) {
+                    if (! is_string($this->input('delivery_destination')) || $validator->errors()->has('delivery_destination')) {
+                        return;
+                    }
+
+                    try {
+                        $onlineMethodAvailableForDestination = (bool) array_intersect(
+                            ['gcash', 'maya'],
+                            app(DeliveryRules::class)->zone($this->string('delivery_destination')->toString())['payment_methods'],
+                        );
+                    } catch (DomainException $exception) {
+                        $validator->errors()->add('delivery_destination', $exception->getMessage());
+                        $onlineMethodAvailableForDestination = false;
+                    }
+                }
+
                 if (! $paymentMethod->isAvailableFor($fulfillmentMethod)
-                    || ($paymentMethod === PaymentMethod::Online && (! config('services.paymongo.enabled')
-                        || ($fulfillmentMethod === FulfillmentMethod::Delivery
-                            && ! array_intersect(['gcash', 'maya'], app(DeliveryRules::class)->zone($this->string('delivery_destination')->toString())['payment_methods']))))) {
+                    || ($paymentMethod === PaymentMethod::Online && (! config('services.paymongo.enabled') || ! $onlineMethodAvailableForDestination))) {
                     $validator->errors()->add(
                         'payment_method',
                         $fulfillmentMethod === FulfillmentMethod::Pickup

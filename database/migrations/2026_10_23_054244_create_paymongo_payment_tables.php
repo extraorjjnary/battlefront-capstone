@@ -31,13 +31,14 @@ return new class extends Migration
                     OR NEW.payment_method NOT IN ('cash', 'card_at_store', 'gcash', 'maya', 'cod', 'online')
                     OR NEW.payment_origin NOT IN ('manual', 'paymongo')
                     OR (NEW.fulfillment_method = 'pickup' AND NEW.delivery_address IS NOT NULL)
+                    OR (NEW.payment_method = 'cod' AND (NEW.fulfillment_method <> 'delivery' OR NEW.payment_proof_path IS NOT NULL))
                 BEGIN
                     SELECT RAISE(ABORT, 'Invalid order values.');
                 END
             SQL);
             DB::statement(<<<'SQL'
                 CREATE TRIGGER orders_values_update_check
-                BEFORE UPDATE OF total_amount, fulfillment_method, delivery_address, status, payment_status, payment_method, payment_origin ON orders
+                BEFORE UPDATE OF total_amount, fulfillment_method, delivery_address, status, payment_status, payment_method, payment_proof_path, payment_origin ON orders
                 WHEN NEW.total_amount < 0
                     OR NEW.fulfillment_method NOT IN ('pickup', 'delivery')
                     OR NEW.status NOT IN ('pending', 'processing', 'completed', 'cancelled')
@@ -45,6 +46,7 @@ return new class extends Migration
                     OR NEW.payment_method NOT IN ('cash', 'card_at_store', 'gcash', 'maya', 'cod', 'online')
                     OR NEW.payment_origin NOT IN ('manual', 'paymongo')
                     OR (NEW.fulfillment_method = 'pickup' AND NEW.delivery_address IS NOT NULL)
+                    OR (NEW.payment_method = 'cod' AND (NEW.fulfillment_method <> 'delivery' OR NEW.payment_proof_path IS NOT NULL))
                 BEGIN
                     SELECT RAISE(ABORT, 'Invalid order values.');
                 END
@@ -136,19 +138,21 @@ return new class extends Migration
                     OR NEW.payment_status NOT IN ('pending', 'verified', 'rejected')
                     OR NEW.payment_method NOT IN ('cash', 'card_at_store', 'gcash', 'maya', 'cod')
                     OR (NEW.fulfillment_method = 'pickup' AND NEW.delivery_address IS NOT NULL)
+                    OR (NEW.payment_method = 'cod' AND (NEW.fulfillment_method <> 'delivery' OR NEW.payment_proof_path IS NOT NULL))
                 BEGIN
                     SELECT RAISE(ABORT, 'Invalid order values.');
                 END
             SQL);
             DB::statement(<<<'SQL'
                 CREATE TRIGGER orders_values_update_check
-                BEFORE UPDATE OF total_amount, fulfillment_method, delivery_address, status, payment_status, payment_method ON orders
+                BEFORE UPDATE OF total_amount, fulfillment_method, delivery_address, status, payment_status, payment_method, payment_proof_path ON orders
                 WHEN NEW.total_amount < 0
                     OR NEW.fulfillment_method NOT IN ('pickup', 'delivery')
                     OR NEW.status NOT IN ('pending', 'processing', 'completed', 'cancelled')
                     OR NEW.payment_status NOT IN ('pending', 'verified', 'rejected')
                     OR NEW.payment_method NOT IN ('cash', 'card_at_store', 'gcash', 'maya', 'cod')
                     OR (NEW.fulfillment_method = 'pickup' AND NEW.delivery_address IS NOT NULL)
+                    OR (NEW.payment_method = 'cod' AND (NEW.fulfillment_method <> 'delivery' OR NEW.payment_proof_path IS NOT NULL))
                 BEGIN
                     SELECT RAISE(ABORT, 'Invalid order values.');
                 END

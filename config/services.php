@@ -7,7 +7,7 @@ return [
         'secret_key' => env('PAYMONGO_SECRET_KEY'),
         'public_key' => env('PAYMONGO_PUBLIC_KEY'),
         'webhook_secret' => env('PAYMONGO_WEBHOOK_SECRET'),
-        'hosted_methods' => array_values(array_filter(array_map('trim', explode(',', env('PAYMONGO_HOSTED_METHODS', 'card,gcash,paymaya,qrph'))))),
+        'hosted_methods' => array_values(array_filter(array_map('trim', explode(',', (string) env('PAYMONGO_HOSTED_METHODS', 'card,gcash,paymaya,qrph'))))),
         'direct_banking_enabled' => env('PAYMONGO_DIRECT_BANKING_ENABLED', false),
         'direct_banking_banks' => ['bpi' => 'BPI', 'ubp' => 'UnionBank', 'landbank' => 'LandBank'],
     ],

@@ -330,8 +330,11 @@ class CloseHostedCheckout
     /** @param array<string, mixed> $intent */
     private function applyPaidIntentPayment(PayMongoFlow $flow, array $intent): bool
     {
-        $paid = collect(data_get($intent, 'attributes.payments', []))
-            ->first(static fn (array $payment): bool => data_get($payment, 'attributes.status') === 'paid');
+        $payments = data_get($intent, 'attributes.payments', []);
+        $payments = is_array($payments) ? $payments : [];
+        $paid = collect($payments)
+            ->first(static fn (mixed $payment): bool => is_array($payment)
+                && data_get($payment, 'attributes.status') === 'paid');
 
         if (! is_array($paid)) {
             return false;
@@ -358,8 +361,8 @@ class CloseHostedCheckout
         return true;
     }
 
-    /** @return array<string, mixed>|null */
-    private function retrieve(string $sessionId): ?array
+    /** @return array<string, mixed> */
+    private function retrieve(string $sessionId): array
     {
         $session = $this->client->request()
             ->get('/v1/checkout_sessions/'.$sessionId)
@@ -376,8 +379,11 @@ class CloseHostedCheckout
     /** @param array<string, mixed>|null $session */
     private function applyPaidPayment(PayMongoFlow $flow, ?array $session): bool
     {
-        $paid = collect(data_get($session, 'attributes.payments', []))
-            ->first(static fn (array $payment): bool => data_get($payment, 'attributes.status') === 'paid');
+        $payments = data_get($session, 'attributes.payments', []);
+        $payments = is_array($payments) ? $payments : [];
+        $paid = collect($payments)
+            ->first(static fn (mixed $payment): bool => is_array($payment)
+                && data_get($payment, 'attributes.status') === 'paid');
 
         if (! is_array($paid)) {
             return false;

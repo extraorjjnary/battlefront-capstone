@@ -11,6 +11,7 @@ use Database\Seeders\BranchSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /** @return array<string, mixed> */
 function mobileCheckoutData(array $cartItemIds, array $overrides = []): array
@@ -36,7 +37,7 @@ beforeEach(function () {
     $this->withToken($this->customer->createToken('Phone')->plainTextToken);
 });
 
-test('mobile checkout returns shared preparation and manual payment options', function () {
+test('mobile checkout returns shared preparation and hosted payment options', function () {
     $this->seed(BranchSeeder::class);
     $prepared = app(PrepareCheckout::class)->execute($this->customer, [$this->cartItem->id]);
 
@@ -60,30 +61,35 @@ test('mobile checkout returns shared preparation and manual payment options', fu
 });
 
 test('mobile checkout places all approved payment and fulfillment combinations', function (string $fulfillment, string $payment) {
-    $wallet = in_array($payment, ['gcash', 'maya'], true);
+    $hostedMethod = match ($payment) {
+        'gcash' => 'gcash',
+        'maya' => 'paymaya',
+        default => null,
+    };
     $payload = mobileCheckoutData([$this->cartItem->id], [
         'fulfillment_method' => $fulfillment,
-        'payment_method' => $payment,
+        'payment_method' => $hostedMethod === null ? $payment : 'online',
         'user_id' => User::factory()->customer()->create()->id,
         'total_amount' => '0.01',
         'status' => 'completed',
         'payment_status' => 'verified',
         'items' => [['quantity' => 99]],
     ]);
+    if ($hostedMethod !== null) {
+        $payload['payment_channel'] = 'hosted_checkout';
+        $payload['hosted_payment_method'] = $hostedMethod;
+        $payload['checkout_submission_key'] = (string) Str::uuid();
+    }
     if ($fulfillment === 'delivery') {
         $payload['delivery_address'] = 'Checkout address';
         $payload['delivery_destination'] = 'Sagay City';
     }
-    if ($wallet) {
-        $payload['payment_proof'] = UploadedFile::fake()->image('proof.png');
-    }
-
-    $response = $this->post('/api/v1/orders', $payload)->assertCreated()
+    $response = $this->post('/api/v1/orders', $payload)->assertSuccessful()
         ->assertJsonPath('data.total', $fulfillment === 'delivery' ? '98.66' : '18.66')
         ->assertJsonPath('data.status.value', 'pending')
         ->assertJsonPath('data.payment.status.value', 'pending')
-        ->assertJsonPath('data.payment.method.value', $payment)
-        ->assertJsonPath('data.payment.proof_submitted', $wallet)
+        ->assertJsonPath('data.payment.method.value', $hostedMethod === null ? $payment : 'online')
+        ->assertJsonPath('data.payment.proof_submitted', false)
         ->assertJsonPath('data.items.0.unit_price', '9.33')
         ->assertJsonPath('data.items.0.quantity', 2)
         ->assertJsonMissingPath('data.user_id')
@@ -101,12 +107,7 @@ test('mobile checkout places all approved payment and fulfillment combinations',
     $this->assertDatabaseCount('cart_items', 0);
     $this->assertDatabaseCount('order_items', 1);
 
-    if ($wallet) {
-        Storage::disk('local')->assertExists($order->payment_proof_path);
-        expect($response->getContent())->not->toContain($order->payment_proof_path);
-    } else {
-        expect($order->payment_proof_path)->toBeNull();
-    }
+    expect($order->payment_proof_path)->toBeNull();
 })->with([
     ['pickup', 'cash'], ['pickup', 'card_at_store'], ['pickup', 'gcash'],
     ['pickup', 'maya'], ['delivery', 'gcash'], ['delivery', 'maya'],
@@ -134,15 +135,15 @@ test('mobile checkout applies shared fulfillment payment and upload validation',
         ->and(Storage::disk('local')->allFiles('payment-proofs'))->toBe([]);
     expect(Storage::disk('local')->get($coveragePath))->toBe($coverageContents);
 })->with([
-    'delivery address' => [fn () => ['fulfillment_method' => 'delivery', 'delivery_destination' => 'Sagay City', 'payment_method' => 'gcash', 'payment_proof' => UploadedFile::fake()->image('proof.png')], 'delivery_address'],
+    'delivery address' => [fn () => ['fulfillment_method' => 'delivery', 'delivery_destination' => 'Sagay City', 'payment_method' => 'online', 'payment_channel' => 'hosted_checkout', 'hosted_payment_method' => 'gcash', 'checkout_submission_key' => (string) Str::uuid()], 'delivery_address'],
     'pickup address' => [fn () => ['delivery_address' => 'Unexpected address'], 'delivery_address'],
     'delivery cash' => [fn () => ['fulfillment_method' => 'delivery', 'delivery_destination' => 'Sagay City', 'delivery_address' => 'Address'], 'payment_method'],
     'delivery card' => [fn () => ['fulfillment_method' => 'delivery', 'delivery_destination' => 'Sagay City', 'delivery_address' => 'Address', 'payment_method' => 'card_at_store'], 'payment_method'],
     'unknown payment' => [fn () => ['payment_method' => 'paypal'], 'payment_method'],
-    'missing wallet proof' => [fn () => ['payment_method' => 'gcash'], 'payment_proof'],
+    'legacy wallet method' => [fn () => ['payment_method' => 'gcash'], 'payment_method'],
     'cash proof' => [fn () => ['payment_proof' => UploadedFile::fake()->image('proof.png')], 'payment_proof'],
-    'invalid proof' => [fn () => ['payment_method' => 'maya', 'payment_proof' => UploadedFile::fake()->create('proof.pdf', 10, 'application/pdf')], 'payment_proof'],
-    'large proof' => [fn () => ['payment_method' => 'maya', 'payment_proof' => UploadedFile::fake()->image('proof.png')->size(5121)], 'payment_proof'],
+    'invalid proof' => [fn () => ['payment_method' => 'cash', 'payment_proof' => UploadedFile::fake()->create('proof.pdf', 10, 'application/pdf')], 'payment_proof'],
+    'large proof' => [fn () => ['payment_method' => 'cash', 'payment_proof' => UploadedFile::fake()->image('proof.png')->size(5121)], 'payment_proof'],
     'invalid mobile contact number' => [fn () => ['contact_number' => '0347222222'], 'contact_number'],
 ]);
 
@@ -157,8 +158,10 @@ test('mobile checkout rejects unavailable stock without orders deductions or orp
     $this->get('/api/v1/checkout?'.http_build_query(['cart_item_ids' => [$this->cartItem->id]]))->assertUnprocessable()->assertJsonValidationErrors('cart');
 
     $this->post('/api/v1/orders', mobileCheckoutData([$this->cartItem->id], [
-        'payment_method' => 'gcash',
-        'payment_proof' => UploadedFile::fake()->image('proof.png'),
+        'payment_method' => 'online',
+        'payment_channel' => 'hosted_checkout',
+        'hosted_payment_method' => 'gcash',
+        'checkout_submission_key' => (string) Str::uuid(),
     ]))->assertUnprocessable()->assertExactJson([
         'message' => 'Review unavailable products or quantities in your cart before placing an order.',
         'errors' => ['cart' => ['Review unavailable products or quantities in your cart before placing an order.']],
@@ -197,8 +200,10 @@ test('mobile placement rolls back stock order and cart on a later line failure a
 
     try {
         $this->post('/api/v1/orders', mobileCheckoutData([$this->cartItem->id, $secondItem->id], [
-            'payment_method' => 'gcash',
-            'payment_proof' => UploadedFile::fake()->image('proof.png'),
+            'payment_method' => 'online',
+            'payment_channel' => 'hosted_checkout',
+            'hosted_payment_method' => 'gcash',
+            'checkout_submission_key' => (string) Str::uuid(),
         ]))->assertInternalServerError()->assertExactJson(['message' => 'Server Error']);
     } finally {
         Event::forget('eloquent.creating: '.OrderItem::class);

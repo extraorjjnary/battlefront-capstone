@@ -6,8 +6,8 @@ use App\Models\Product;
 use App\Models\User;
 use App\Services\Cart\CartService;
 use Database\Seeders\BranchSeeder;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /** @return array<string, mixed> */
 function structuredProfileData(User $user, array $overrides = []): array
@@ -200,10 +200,11 @@ test('structured defaults directly prefill checkout and checkout edits stay spec
     $this->post(route('orders.store'), [
         'cart_item_ids' => [$item->id],
         'recipient_name' => $customer->name, 'contact_number' => '09171234567',
-        'fulfillment_method' => 'delivery', 'payment_method' => 'gcash',
+        'fulfillment_method' => 'delivery', 'payment_method' => 'online',
+        'payment_channel' => 'hosted_checkout', 'hosted_payment_method' => 'qrph',
+        'checkout_submission_key' => (string) Str::uuid(),
         'delivery_destination' => 'Bacolod City', 'delivery_barangay_code' => '1830200008',
         'delivery_address_details' => '99 Lizares Street',
-        'payment_proof' => UploadedFile::fake()->image('proof.png'),
     ])->assertSessionHasNoErrors();
 
     expect(Order::sole()->delivery_address)->toBe('99 Lizares Street, Barangay 13, Bacolod City');

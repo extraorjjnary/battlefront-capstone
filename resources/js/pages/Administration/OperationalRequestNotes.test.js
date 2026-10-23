@@ -131,6 +131,16 @@ function harness(t, pageName) {
                 Head: primitive,
                 Link: primitive,
                 usePage: () => page,
+                useForm(initial) {
+                    return Vue.reactive({
+                        ...initial,
+                        errors: {},
+                        processing: false,
+                        reset() {},
+                        clearErrors() {},
+                        submit() {},
+                    });
+                },
                 router: {},
             },
             '@/components/ui/input': { Input: input },

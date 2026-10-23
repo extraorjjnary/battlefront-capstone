@@ -59,7 +59,8 @@ class ProcessPayMongoWebhook implements ShouldQueue
 
             $flow = PayMongoFlow::query()->lockForUpdate()->findOrFail($flow->id);
 
-            $providerPayment = collect(data_get($inbox->verified_data, 'attributes.payments', []))->first();
+            $providerPayments = $this->providerPayments($inbox);
+            $providerPayment = $providerPayments[0] ?? null;
 
             if ($inbox->event_type === 'qrph.expired') {
                 if ($flow->channel === 'direct_qrph' && $flow->status !== 'paid') {
@@ -75,7 +76,9 @@ class ProcessPayMongoWebhook implements ShouldQueue
             }
 
             if ($inbox->event_type === 'payment.failed') {
-                if (in_array($flow->channel, ['direct_online_banking', 'direct_qrph'], strict: true) && $providerPayment !== null && $flow->status !== 'paid') {
+                if (in_array($flow->channel, ['direct_online_banking', 'direct_qrph'], strict: true)
+                    && is_string($providerPayment['id'] ?? null)
+                    && $flow->status !== 'paid') {
                     $attempt = $flow->attempts()->where('payment_id', $providerPayment['id'])->first()
                         ?? $flow->attempts()->where('payment_intent_id', $intentId)->whereNull('payment_id')->latest('id')->first();
                     if ($attempt === null) {
@@ -96,9 +99,7 @@ class ProcessPayMongoWebhook implements ShouldQueue
                 return;
             }
 
-            $paid = collect(data_get($inbox->verified_data, 'attributes.payments', []))->first(fn (array $payment): bool => $payment['status'] === 'paid'
-                && $payment['currency'] === $flow->currency
-                && is_string($payment['id'] ?? null));
+            $paid = collect($providerPayments)->first(fn (array $payment): bool => ($payment['status'] ?? null) === 'paid');
 
             if ($paid === null) {
                 $flow->update(['status' => 'reconciliation_required']);
@@ -107,7 +108,33 @@ class ProcessPayMongoWebhook implements ShouldQueue
                 return;
             }
 
-            if (! $recordPayment->execute($flow, $paid, $notifications)) {
+            $paymentId = $paid['id'] ?? null;
+            $amount = $paid['amount'] ?? null;
+            $currency = $paid['currency'] ?? null;
+            $netAmount = $paid['net_amount'] ?? null;
+            $paymentMethod = $paid['method'] ?? null;
+
+            if (! is_string($paymentId)
+                || ! is_int($amount)
+                || ! is_string($currency)
+                || ($netAmount !== null && ! is_int($netAmount))
+                || ($paymentMethod !== null && ! is_string($paymentMethod))) {
+                $flow->update(['status' => 'reconciliation_required']);
+                $inbox->update(['status' => 'quarantined', 'processed_at' => now()]);
+
+                return;
+            }
+
+            $payment = [
+                'id' => $paymentId,
+                'status' => 'paid',
+                'amount' => $amount,
+                'net_amount' => $netAmount,
+                'currency' => $currency,
+                'method' => $paymentMethod,
+            ];
+
+            if (! $recordPayment->execute($flow, $payment, $notifications)) {
                 $flow->update(['status' => 'reconciliation_required']);
                 $inbox->update(['status' => 'quarantined', 'processed_at' => now()]);
 
@@ -116,5 +143,37 @@ class ProcessPayMongoWebhook implements ShouldQueue
 
             $inbox->update(['status' => 'processed', 'processed_at' => now()]);
         }, attempts: 3);
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function providerPayments(PayMongoWebhookInbox $inbox): array
+    {
+        $payments = data_get($inbox->verified_data, 'attributes.payments', []);
+
+        if (! is_array($payments)) {
+            return [];
+        }
+
+        $normalizedPayments = [];
+
+        foreach ($payments as $payment) {
+            if (! is_array($payment)) {
+                continue;
+            }
+
+            $normalizedPayment = [];
+
+            foreach ($payment as $key => $value) {
+                if (is_string($key)) {
+                    $normalizedPayment[$key] = $value;
+                }
+            }
+
+            $normalizedPayments[] = $normalizedPayment;
+        }
+
+        return $normalizedPayments;
     }
 }

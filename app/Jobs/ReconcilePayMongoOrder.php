@@ -40,11 +40,17 @@ class ReconcilePayMongoOrder implements ShouldQueue
             return;
         }
 
+        $order = $flow->order;
+
+        if ($order === null) {
+            return;
+        }
+
         if ($flow->channel === 'hosted_checkout'
             && $flow->status === 'reconciliation_required'
             && $flow->merchant_cutoff_at->isFuture()) {
             try {
-                $startHostedCheckout->execute($flow->order);
+                $startHostedCheckout->execute($order);
             } catch (\RuntimeException) {
                 // Keep the order pending; the next due operation sweep will retry reconciliation.
             }

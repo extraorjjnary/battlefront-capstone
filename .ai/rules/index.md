@@ -3,6 +3,7 @@
 
 
 | Applies to | Rule file |
+| --- | --- |
 | app/Actions/Product/** | .ai/rules/actions-product.md |
 | app/Actions/{Inventory,Order}/**,app/Services/Order/**,app/Http/Controllers/Administration/Order*,resources/js/pages/Administration/Orders/** | .ai/rules/administration-orders.md |
 | app/Http/{Requests,Controllers}/Administration/SalesReport*,resources/js/pages/Administration/Reports/** | .ai/rules/administration-reports.md |

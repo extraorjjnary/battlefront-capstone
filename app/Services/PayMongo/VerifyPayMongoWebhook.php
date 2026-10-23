@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 
 class VerifyPayMongoWebhook
 {
+    /** @return array<string, mixed>|null */
     public function handle(Request $request): ?array
     {
         $mode = config('services.paymongo.mode');
@@ -22,7 +23,7 @@ class VerifyPayMongoWebhook
         $rawBody = $request->getContent();
 
         if (! is_string($secret) || $secret === '' || ! ctype_digit($timestamp) || $signature === ''
-            || abs(now()->timestamp - (int) $timestamp) > 300
+            || abs(time() - (int) $timestamp) > 300
             || ! hash_equals(hash_hmac('sha256', $timestamp.'.'.$rawBody, $secret), $signature)) {
             return null;
         }
@@ -46,14 +47,23 @@ class VerifyPayMongoWebhook
         $paymentResources = $resourceType === 'payment'
             ? [$resource]
             : data_get($attributes, 'payments', []);
-        $payments = collect($paymentResources)->map(static fn (array $payment): array => [
-            'id' => data_get($payment, 'id'),
-            'status' => data_get($payment, 'attributes.status'),
-            'amount' => data_get($payment, 'attributes.amount'),
-            'net_amount' => data_get($payment, 'attributes.net_amount'),
-            'currency' => data_get($payment, 'attributes.currency'),
-            'method' => data_get($payment, 'attributes.source.type'),
-        ])->all();
+        $paymentResources = is_array($paymentResources) ? $paymentResources : [];
+        $payments = [];
+
+        foreach ($paymentResources as $payment) {
+            if (! is_array($payment)) {
+                continue;
+            }
+
+            $payments[] = [
+                'id' => data_get($payment, 'id'),
+                'status' => data_get($payment, 'attributes.status'),
+                'amount' => data_get($payment, 'attributes.amount'),
+                'net_amount' => data_get($payment, 'attributes.net_amount'),
+                'currency' => data_get($payment, 'attributes.currency'),
+                'method' => data_get($payment, 'attributes.source.type'),
+            ];
+        }
 
         if (! in_array($eventType, ['checkout_session.payment.paid', 'payment.paid', 'payment.failed', 'qrph.expired'], strict: true)) {
             return [

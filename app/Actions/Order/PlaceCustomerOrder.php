@@ -22,7 +22,7 @@ class PlaceCustomerOrder
     ) {}
 
     /**
-     * @param  array{cart_item_ids: list<int>, recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address?: string|null, delivery_destination: string|null, payment_method: string, payment_channel?: string|null, payment_bank?: string|null, hosted_payment_method?: string|null, delivery_address_components?: array<string, mixed>|null}  $validated
+     * @param  array{cart_item_ids: list<int>, recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address: string|null, delivery_address_components: array<string, mixed>|null, delivery_destination: string|null, payment_method: string, payment_channel: string|null, payment_bank: string|null, hosted_payment_method: string|null, checkout_submission_key: string|null}  $validated
      */
     public function execute(User $customer, array $validated, ?UploadedFile $paymentProof): Order
     {
@@ -31,6 +31,8 @@ class PlaceCustomerOrder
             $paymentProof,
             $paymentMethod,
         );
+
+        $checkout = null;
 
         try {
             $checkout = [
@@ -66,7 +68,8 @@ class PlaceCustomerOrder
                 ? $this->orderPlacementService->executeWithDeliveryQuote($customer, $checkout, $validated['delivery_destination'] ?? '')
                 : $this->orderPlacementService->execute($customer, $checkout);
         } catch (QueryException $exception) {
-            if (($validated['checkout_submission_key'] ?? null) !== null
+            if ($checkout !== null
+                && ($validated['checkout_submission_key'] ?? null) !== null
                 && str_contains($exception->getMessage(), 'checkout_submission_key')) {
                 $existing = $customer->orders()->where('checkout_submission_key', $validated['checkout_submission_key'])->first();
                 if ($existing !== null && hash_equals((string) $existing->checkout_request_fingerprint, (string) $checkout['checkout_request_fingerprint'])) {

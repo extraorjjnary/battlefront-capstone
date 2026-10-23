@@ -67,6 +67,7 @@ function loadPage(path, inlineTemplate = false) {
             },
             '@/components/ui/button': { Button: button },
             '@/lib/currency': { formatCurrency },
+            '@/lib/uuid': { createUuid: () => 'test-checkout-submission' },
         },
         { get: (target, key) => target[key] ?? generic },
     );
@@ -205,6 +206,7 @@ test('checkout renders only server-reviewed IDs as hidden placement fields', asy
                     requires_proof: false,
                 },
             ],
+            paymongoHostedMethods: ['card', 'gcash', 'paymaya', 'qrph'],
             pickupQuote: {
                 product_subtotal: '18.66',
                 delivery_fee: '0.00',

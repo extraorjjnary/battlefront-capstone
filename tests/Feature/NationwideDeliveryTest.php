@@ -11,10 +11,10 @@ use App\Services\Cart\CartService;
 use App\Services\CatalogShippingClassification;
 use App\Services\Order\DeliveryRules;
 use App\Services\Order\PsgcDeliveryLocations;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /** @return array{User, array<string, mixed>, Inventory} */
 function nationwideCheckout(string $profile = 'fragile'): array
@@ -30,6 +30,22 @@ function nationwideCheckout(string $profile = 'fragile'): array
         'delivery_province_code' => '1804500000', 'delivery_city_code' => '1804523000',
         'delivery_barangay_code' => '1804523018', 'delivery_address_details' => '12 Mabini Street',
     ], $inventory];
+}
+
+/** @param array<string, mixed> $data
+ * @return array<string, mixed>
+ */
+function nationwidePaymentPayload(array $data, string $method): array
+{
+    if (in_array($method, ['gcash', 'maya'], true)) {
+        $data['payment_method'] = 'online';
+        $data['payment_channel'] = 'hosted_checkout';
+        $data['hosted_payment_method'] = $method === 'maya' ? 'paymaya' : 'gcash';
+        $data['checkout_submission_key'] = (string) Str::uuid();
+        unset($data['payment_proof']);
+    }
+
+    return $data;
 }
 
 test('nationwide geography has complete unique parent chains without external requests', function () {
@@ -158,9 +174,7 @@ test('unconfigured nationwide destinations allow subtotal-only orders without au
         'delivery_city_code' => '1380300000', 'delivery_barangay_code' => $barangay,
         'payment_method' => $paymentMethod,
     ];
-    if ($paymentMethod !== 'cod') {
-        $data['payment_proof'] = UploadedFile::fake()->image('proof.png');
-    }
+    $data = nationwidePaymentPayload($data, $paymentMethod);
     $this->actingAs($customer)->withToken($customer->createToken('Phone')->plainTextToken);
 
     $response = $this->post($channel === 'web' ? route('orders.store') : '/api/v1/orders', $data);
@@ -168,7 +182,7 @@ test('unconfigured nationwide destinations allow subtotal-only orders without au
     if ($channel === 'web') {
         $response->assertSessionHasNoErrors();
     } else {
-        $response->assertCreated()
+        $response->assertSuccessful()
             ->assertJsonPath('data.product_subtotal', '200.00')
             ->assertJsonPath('data.delivery_fee', '0.00')
             ->assertJsonPath('data.total', '200.00');
@@ -180,7 +194,9 @@ test('unconfigured nationwide destinations allow subtotal-only orders without au
 
     expect($order->delivery_quote_metadata['pricing_status'])->toBe('not_configured')
         ->and($order->delivery_quote_metadata['payment_methods'])->toBe(['gcash', 'maya', 'cod'])
-        ->and($order->delivery_quote_metadata['payment_assumption'])->toBe(config("battlefront.delivery.unconfigured_route.payment_assumptions.{$paymentMethod}"));
+        ->and($order->delivery_quote_metadata['payment_assumption'])->toBe($paymentMethod === 'cod'
+            ? config("battlefront.delivery.unconfigured_route.payment_assumptions.{$paymentMethod}")
+            : 'Online payment through PayMongo Hosted Checkout. Provider fees are absorbed by Battlefront.');
     expect($order)->delivery_destination->toBe('City of Makati')
         ->product_subtotal->toBe('200.00')
         ->delivery_fee->toBe('0.00')
@@ -194,30 +210,27 @@ test('unconfigured nationwide destinations allow subtotal-only orders without au
     expect($inventory->refresh()->quantity)->toBe(8)
         ->and($customer->refresh()->cart)->toBeNull();
     $this->assertDatabaseCount('shipments', 0);
-    if ($paymentMethod === 'cod') {
-        expect(Storage::disk('local')->allFiles())->toBe([]);
-    } else {
-        Storage::disk('local')->assertExists($order->payment_proof_path);
-    }
+    expect($order->payment_proof_path)->toBeNull();
+    expect(Storage::disk('local')->allFiles())->toBe([]);
 })->with(['web', 'api'])->with(['gcash', 'maya', 'cod']);
 
 test('wallets and COD snapshot accepted fees and assumptions without trusting client prices', function (string $method, string $channel) {
     Storage::fake('local');
     [$customer, $data, $inventory] = nationwideCheckout();
     $data = [...$data, 'payment_method' => $method, 'delivery_fee' => '0.00', 'total_amount' => '1.00', 'shipping_profile' => 'standard'];
-    if ($method !== 'cod') {
-        $data['payment_proof'] = UploadedFile::fake()->image('proof.png');
-    }
+    $data = nationwidePaymentPayload($data, $method);
     $this->actingAs($customer)->withToken($customer->createToken('Phone')->plainTextToken);
     $response = $this->post($channel === 'web' ? route('orders.store') : '/api/v1/orders', $data);
-    $channel === 'web' ? $response->assertSessionHasNoErrors()->assertRedirect() : $response->assertCreated();
+    $channel === 'web' ? $response->assertSessionHasNoErrors()->assertRedirect() : $response->assertSuccessful();
     $order = Order::sole();
     expect($order->delivery_fee)->toBe('130.00');
     expect($order->product_subtotal)->toBe('200.00');
     expect($order->total_amount)->toBe('330.00');
     expect($order->delivery_destination)->toBe('Sagay City');
     expect($order->delivery_quote_metadata['city_code'])->toBe('1804523000');
-    expect($order->delivery_quote_metadata['payment_assumption'])->toBe(config('battlefront.delivery.payment_assumptions.'.$method));
+    expect($order->delivery_quote_metadata['payment_assumption'])->toBe($method === 'cod'
+        ? config('battlefront.delivery.payment_assumptions.'.$method)
+        : 'Online payment through PayMongo Hosted Checkout. Provider fees are absorbed by Battlefront.');
     expect($inventory->refresh()->quantity)->toBe(8);
     config(['battlefront.delivery.zones.cities' => [], 'battlefront.delivery.profiles.fragile.surcharge' => '999.00']);
     expect($order->fresh()->delivery_fee)->toBe('130.00');

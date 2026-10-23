@@ -66,7 +66,7 @@ class StartDirectOnlineBanking
             if ($flow->status === 'reconciliation_required' && $flow->payment_intent_id !== null) {
                 return $this->recoverKnownIntent($order, $flow);
             }
-            if ($flow->status === 'reconciliation_required' && $flow->payment_intent_id === null) {
+            if ($flow->status === 'reconciliation_required') {
                 $intentOperation = $flow->operations()->where('kind', 'create_payment_intent')->latest('id')->first();
                 if ($intentOperation === null
                     || ! in_array($intentOperation->status, ['unknown', 'dispatched'], strict: true)

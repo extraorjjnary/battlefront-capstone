@@ -119,6 +119,7 @@ class StartDirectQrPh
         }
     }
 
+    /** @param array<string, mixed> $intentAttributes */
     private function prepareFlow(Order $order, int $amountMinor, array $intentAttributes): PayMongoFlow
     {
         return DB::transaction(function () use ($order, $amountMinor, $intentAttributes): PayMongoFlow {
@@ -308,6 +309,7 @@ class StartDirectQrPh
         }
     }
 
+    /** @param array<string, mixed> $attributes */
     private function flowOperation(PayMongoFlow $flow, string $kind, array $attributes): PayMongoOperation
     {
         $fingerprint = hash('sha256', json_encode($attributes, JSON_THROW_ON_ERROR));
@@ -339,8 +341,11 @@ class StartDirectQrPh
     /** @param array<string, mixed> $intent */
     private function recordSucceededIntent(PayMongoFlow $flow, array $intent): void
     {
-        $payments = collect(data_get($intent, 'attributes.payments', []))
-            ->filter(static fn (array $payment): bool => data_get($payment, 'attributes.status') === 'paid');
+        $providerPayments = data_get($intent, 'attributes.payments', []);
+        $providerPayments = is_array($providerPayments) ? $providerPayments : [];
+        $payments = collect($providerPayments)
+            ->filter(static fn (mixed $payment): bool => is_array($payment)
+                && data_get($payment, 'attributes.status') === 'paid');
 
         if ($payments->count() !== 1) {
             $flow->update(['status' => 'reconciliation_required']);
