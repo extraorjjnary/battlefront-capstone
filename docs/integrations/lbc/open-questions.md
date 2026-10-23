@@ -1,0 +1,35 @@
+# LBC integration decisions and evidence register
+
+This register begins with LBC's publicly described flow and separates Battlefront choices from merchant/API facts. Public LBC flow does not establish an API contract. No recommendation below is an implementation approval.
+
+## Battlefront choices requiring developer review
+
+| Decision | Preparation recommendation | Why it must be resolved |
+| --- | --- | --- |
+| Which LBC product/channel is the target? | Target an authorized business/merchant API if LBC grants access and provides the relevant documented operations. Keep manual branch/LBC Online transactions as a separate operational fallback; do not automate the consumer website. | The public LBC Online flow is a consumer/seller workflow; portal catalog names do not prove Battlefront access or a supported corporate integration. |
+| Which sender handoff mode is in scope? | Evaluate rider pickup first for Battlefront's outbound online orders; keep branch drop-off as an explicit alternative, not an implicit equivalent. | LBC publicly treats pickup and branch drop-off as separate choices with different operational responsibilities and potentially different booking/payment steps. |
+| What is the shipping charge source and payer? | Use LBC's contracted rate/fee information for carrier cost once available. Decide separately whether customer checkout uses a live LBC quote, a disclosed estimate, or a Battlefront-absorbed cost. Never rewrite saved order totals after placement. | LBC's public rate flow includes service, route, product, dimensions/weight and declared value/valuation. Existing Battlefront fees are demonstration snapshots and may not cover LBC's actual charge. |
+| Does Battlefront use LBC COD or COP? | Keep carrier COD/COP out of any initial scope until collection, remittance, reconciliation, and accounting are explicitly designed. Preserve existing Battlefront payment methods meanwhile. | LBC COD/COP means LBC collects buyer money and remits to the seller. It differs from Battlefront COD's explicit administrator collection confirmation and from Battlefront store pickup. |
+| What parcel granularity is required? | Confirm single parcel per order versus multi-parcel booking before choosing persistence. | Existing Battlefront Shipment is one-per-order while LBC publicly advertises single and multiple booking. Package weight, dimensions, contents, declared value, and packing ownership also need a source. |
+| Which LBC lifecycle and identifiers map to Battlefront? | Keep booking reference, tracking number, waybill, scheduled pickup, physical acceptance, provider tracking, delivery, collection, and remittance distinct until the merchant contract defines them. | Public pages show channel-dependent identifier behavior and customer-facing statuses, not API state/event guarantees. |
+| What happens on retries/cancellation? | Require documented idempotency or lookup/reconciliation before retry; do not assume cancellation is available or final. | An uncertain booking response can create duplicate shipments; carrier cancellation does not cancel a Battlefront order, close PayMongo, restore stock, or refund. |
+
+These are product and architecture gates before implementation scope can be decision-complete. They should be resolved against the actual authorized LBC product and Battlefront business operations, not guessed from the current application or consumer marketing flow.
+
+## Facts requiring official merchant evidence
+
+The 2026-10-24 public audit verifies only advertised service flows and indexed catalog descriptions. It does not verify the following:
+
+- Merchant enrollment, available API products, entitlement, support contacts, authentication, permissions, credential lifecycle, or account limits.
+- Whether an API supports LBC Online's sender flow, rider pickup, branch drop-off, bulk bookings, LBC COD/COP, rate calculation, labels/waybills, tracking, cancellation, or status events.
+- Endpoint-specific hosts, methods, payloads, required sender/recipient/package fields, LBC location identifiers, serviceability rules, package restrictions, and data-retention requirements.
+- Quote/fee/valuation units, rounding, validity, final charge, payment responsibility, billing method, collection settlement schedule/fees, payout reports, and reconciliation references.
+- Booking, tracking, and waybill identifier lifecycle; booking confirmation semantics; physical acceptance signals; duplicate prevention; timeout lookup; and partial-success recovery.
+- Provider states, ordering, timestamps, polling/event mechanisms, webhook signatures and replay controls, errors, rate limits, retries, cancellation finality, and support escalation.
+- Sandbox availability, access process, host isolation, supported services, and assurance that test actions cannot create real shipments, pickup requests, labels, or charges.
+
+Resolve these only from authorized account documentation or direct LBC merchant evidence, with exact source/version/date recorded. The API portal's search-indexed catalog names are leads for authorized research, not contracts. An inaccessible or empty public page means unknown, not unsupported.
+
+## Scope exclusions pending separate approval
+
+Production credentials and operations, multi-carrier support, international shipping, warehousing, insurance, payment/checkout redesign, inventory/sales changes, automated refunds, and merchant remittance accounting are not approved by this preparation. Carrier COD/COP must not be enabled by interpreting Battlefront COD rules as carrier capability.

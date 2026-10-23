@@ -1,0 +1,19 @@
+---
+name: lbc-laravel-integration
+description: Implement explicitly assigned local mock LBC shipping features in Battlefront Laravel, reusing shipment, authorization, order, and notification conventions. Excludes real LBC adapter activation.
+---
+
+# Local Laravel shipping integration
+
+For every LBC task, first read the current `docs/integrations/lbc/README.md`, `api-sources.md`, `capability-matrix.md`, and `open-questions.md`; do not rely on prior conversation context alone. Then read `integration-scope.md`, `architecture.md`, `shipping-lifecycle.md`, `payment-coordination.md`, `security.md`, `mock-development.md`, and `sandbox-checklist.md` for implementation work, plus `docs/paymongo/10-readiness-audit.md` and `11-system-aligned-setup.md`. Re-read changed LBC guidance if it is updated during the task. Activate `laravel-best-practices` and relevant testing/frontend skills for changed paths. Follow AGENTS.md, graphify, and all applicable `.ai/rules` before edits. Current approved project rules and PayMongo decisions take precedence over older issue notes; flag contradictions instead of carrying them forward. Confirm installed package versions and use Boost documentation for affected Laravel APIs.
+
+- Implement only the assigned approved scope. Honor approvals already given in the current session; do not request them again. For major checkout, payment, or database changes not yet authorized, make the proposal reviewable before asking for approval.
+- Reuse an existing Shipment, shipping/order structures, and canonical destination validation. Do not create a Shipment or reinterpret an unconfigured zero-fee placeholder as free shipping within a mock-booking action. Keep the shipping provider boundary independent of undocumented LBC wire contracts.
+- Treat the LBC source audit and flow documents as required design inputs. Implement only behavior supported by the assigned scope and verified provider contract; never substitute the public consumer flow or mock schema for an undocumented merchant API contract.
+- The local mock must make no outbound LBC or PayMongo calls, need no credentials, issue conspicuously fake references, and fail closed outside explicitly permitted local/test environments or when disabled. Do not silently fall back from a real adapter to a mock. This skill does not implement or activate a real LBC adapter.
+- Apply authorization and payment checks at the business mutation boundary. Prepaid fulfillment requires persisted verified payment; preserve the approved COD exception and do not infer whether COD is eligible for a proposed mock booking until that open decision is resolved. Lock Order before Shipment; make booking and transitions idempotent without overwriting a manual or foreign-provider reference.
+- Preserve PayMongo processing and legacy/COD/pickup behavior. Order cancellation after `handed_to_lbc` is prohibited by current rules. Before any eligible PayMongo-origin order cancellation, require PayMongo latest-state reconciliation and confirmed applicable provider-flow closure before stock restoration; uncertain/unsupported closure retains stock for reconciliation. Mock-booking cancellation cannot satisfy that gate and is distinct from order cancellation. Preserve historical manual GCash/Maya proof/review. Do not mark payment verified, restore stock, or record sales from a mock provider response; cancellation is not a refund.
+- Reuse after-commit notification mechanisms when authorized; local simulations must not send external delivery messages. Use controlled failure simulation without persisting partial success.
+- Add narrowly relevant behavior tests and run Pint for changed PHP. Report exact commands, results, limitations, and files; do not commit or push.
+
+Future sandbox/production adapters require documented contracts and separate approval under `docs/integrations/lbc/sandbox-checklist.md`.
