@@ -40,7 +40,12 @@ test('customer return cases can be searched by product, requester, order, or rea
         ->where('filters.overdue', true)
         ->where('returns.total', 1)
         ->where('returns.data.0.product_name', 'Recorded return product name')
-        ->where('returns.data.0.id', $returnId));
+        ->where('returns.data.0.id', $returnId)
+        ->where('returns.data.0.held_quantity', 1)
+        ->where('returns.data.0.inspection_overdue', true)
+        ->where('returns.data.0.verified_paid_amount', '0.00')
+        ->where('returns.data.0.refund_balance', '0.00')
+        ->where('returns.data.0.payment_submission_key', null));
 
     $this->get(route('administration.customer-returns.index', ['q' => 'Recorded return product name']))
         ->assertInertia(fn (Assert $page) => $page->where('returns.total', 1));

@@ -7,6 +7,7 @@ use App\Actions\Inventory\RequestInventoryAdjustment;
 use App\Actions\Inventory\WithdrawInventoryAdjustment;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Repositories\Inventory\InventoryRepository;
 use App\Support\OperationalRequestReason;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,32 +18,11 @@ use Inertia\Response;
 
 class InventoryAdjustmentController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request, InventoryRepository $inventory): Response
     {
         $filters = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
         $case = $request->validate(['case' => ['nullable', 'integer', 'min:1']])['case'] ?? null;
-        $requests = DB::table('inventory_adjustment_requests as requests')
-            ->join('products', 'products.id', '=', 'requests.product_id')
-            ->join('users', 'users.id', '=', 'requests.requester_id')
-            ->leftJoin('inventories', 'inventories.product_id', '=', 'requests.product_id')
-            ->select('requests.id', 'requests.requester_id', 'requests.replaces_request_id', 'requests.observed_quantity', 'requests.target_quantity', 'requests.initial_reorder_level', 'requests.reason_code', 'requests.reason', 'requests.decision_reason', 'requests.status', 'requests.created_at', 'products.name as product_name', 'users.name as requester_name')
-            ->selectRaw('COALESCE(inventories.quantity, 0) as current_quantity')
-            ->when($case, fn ($query, $id) => $query->where('requests.id', $id))
-            ->when($filters['q'] ?? null, fn ($query, $search) => $query->where(fn ($query) => $query
-                ->where('products.name', 'like', '%'.$search.'%')
-                ->orWhere('users.name', 'like', '%'.$search.'%')
-                ->orWhere('requests.reason', 'like', '%'.$search.'%')))
-            ->orderByRaw("CASE WHEN requests.status = 'pending' THEN 0 ELSE 1 END")
-            ->orderByDesc('requests.created_at')
-            ->paginate(20)->withQueryString();
-        $replacementIds = DB::table('inventory_adjustment_requests')
-            ->whereIn('replaces_request_id', $requests->getCollection()->pluck('id'))
-            ->pluck('id', 'replaces_request_id');
-        $requests->getCollection()->transform(function ($entry) use ($replacementIds) {
-            $entry->replacement_id = $replacementIds->get($entry->id);
-
-            return $entry;
-        });
+        $requests = $inventory->paginateAdjustments($filters, $case);
 
         return Inertia::render('Administration/InventoryAdjustments', [
             'requests' => $requests,

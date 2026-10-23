@@ -29,7 +29,9 @@ test('supplier returns can be searched by product, supplier, requester, reason, 
             ->where('filters.q', 'SEARCH-REF')
             ->where('filters.overdue', true)
             ->where('returns.total', 1)
-            ->where('returns.data.0.id', $returnId));
+            ->where('returns.data.0.id', $returnId)
+            ->where('returns.data.0.held_quantity', 1)
+            ->where('returns.data.0.follow_up_overdue', true));
 });
 
 test('supplier returns search handoff references and omit resolved cases from overdue follow up', function () {

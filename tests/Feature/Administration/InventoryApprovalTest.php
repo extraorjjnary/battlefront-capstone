@@ -152,7 +152,8 @@ test('inventory adjustment requests can be searched by product, requester, or re
             ->where('requests.data.0.id', $requestId)
             ->where('requests.data.0.current_quantity', 0)
             ->where('requests.data.0.observed_quantity', 1)
-            ->where('requests.data.0.target_quantity', 2));
+            ->where('requests.data.0.target_quantity', 2)
+            ->where('requests.data.0.replacement_id', null));
 });
 
 test('a physical stock count creates a separate approved adjustment request', function () {
@@ -347,6 +348,13 @@ test('a requester can withdraw and replace a pending stock request without chang
     $this->assertDatabaseHas('inventory_adjustment_requests', ['id' => $firstId, 'status' => 'withdrawn']);
     $this->assertDatabaseHas('inventory_adjustment_requests', ['replaces_request_id' => $firstId, 'target_quantity' => $initial + 3, 'status' => 'pending']);
     expect($product->inventory->fresh()->quantity)->toBe($initial);
+
+    $replacementId = DB::table('inventory_adjustment_requests')->where('replaces_request_id', $firstId)->value('id');
+    $this->get(route('administration.inventory-adjustments.index', ['case' => $firstId]))
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('requests.total', 1)->where('requests.data.0.id', $firstId)
+            ->where('requests.data.0.replacement_id', $replacementId)
+            ->where('requests.data.0.current_quantity', $initial));
 });
 
 test('opening stock stays unavailable until a second person approves it', function () {

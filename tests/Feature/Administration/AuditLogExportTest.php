@@ -403,7 +403,10 @@ test('audit screen and export use the same date actor action and subject filters
 
     $this->actingAs($owner)->get(route('administration.reports.audit', $filters))
         ->assertInertia(fn (Assert $page) => $page->where('entries.total', 1)
-            ->where('entries.data.0.reason', 'Count verified'));
+            ->where('entries.data.0.reason', 'Count verified')
+            ->where('actors.0.id', $owner->id)
+            ->where('actions', ['stock.checked'])
+            ->where('subjectTypes', ['inventory']));
     $csv = $this->actingAs($owner)->get(route('administration.reports.audit.export', $filters))
         ->assertOk()->streamedContent();
     expect($csv)->toContain('Count verified')->not->toContain('Other item');
