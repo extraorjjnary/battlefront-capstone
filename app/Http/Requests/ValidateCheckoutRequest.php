@@ -28,7 +28,7 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
     /**
      * Return the validated checkout fields shared by web and API placement.
      *
-     * @return array{cart_item_ids: list<int>, recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address: string|null, delivery_destination: string|null, payment_method: string, payment_channel: string|null, payment_bank: string|null, delivery_address_components: array<string, mixed>|null}
+     * @return array{cart_item_ids: list<int>, recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address: string|null, delivery_destination: string|null, payment_method: string, payment_channel: string|null, payment_bank: string|null, hosted_payment_method: string|null, delivery_address_components: array<string, mixed>|null}
      */
     public function checkoutData(): array
     {
@@ -57,6 +57,7 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
             'payment_method' => $this->string('payment_method')->toString(),
             'payment_channel' => $this->input('payment_channel'),
             'payment_bank' => $this->input('payment_bank'),
+            'hosted_payment_method' => $this->input('hosted_payment_method'),
             'checkout_submission_key' => $this->input('checkout_submission_key'),
         ];
     }
@@ -138,6 +139,11 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
                 'nullable',
                 Rule::in(array_keys(config('services.paymongo.direct_banking_banks', []))),
             ],
+            'hosted_payment_method' => [
+                Rule::prohibitedIf($this->input('payment_method') !== PaymentMethod::Online->value || $this->input('payment_channel') !== 'hosted_checkout'),
+                'nullable',
+                Rule::in(['card', 'qrph']),
+            ],
             'payment_proof' => [
                 'bail',
                 Rule::requiredIf($requiresPaymentProof),
@@ -214,6 +220,25 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
                     && $this->input('payment_channel') === 'direct_online_banking'
                     && ! config('services.paymongo.direct_banking_enabled')) {
                     $validator->errors()->add('payment_channel', 'Direct online banking is not currently available.');
+
+                    return;
+                }
+
+                $hostedPaymentMethod = $this->input('hosted_payment_method');
+                if ($paymentMethod === PaymentMethod::Online
+                    && $this->input('payment_channel') === 'hosted_checkout'
+                    && ! is_string($hostedPaymentMethod)
+                    && config('services.paymongo.hosted_methods', []) === []) {
+                    $validator->errors()->add('payment_channel', 'Hosted online payment is not currently available.');
+
+                    return;
+                }
+
+                if ($paymentMethod === PaymentMethod::Online
+                    && $this->input('payment_channel') === 'hosted_checkout'
+                    && is_string($hostedPaymentMethod)
+                    && ! in_array($hostedPaymentMethod, config('services.paymongo.hosted_methods', []), true)) {
+                    $validator->errors()->add('hosted_payment_method', 'This online payment option is not currently available.');
 
                     return;
                 }

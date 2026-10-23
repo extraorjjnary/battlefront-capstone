@@ -32,7 +32,7 @@ use InvalidArgumentException;
  *     cart_item_ids: list<int>,
  *     recipient_name: string, contact_number: string, fulfillment_method: FulfillmentMethod,
  *     delivery_address: string|null, payment_method: PaymentMethod, payment_proof_path: string|null,
- *     delivery_address_components?: array<string, mixed>|null
+ *     hosted_payment_method?: string|null, delivery_address_components?: array<string, mixed>|null
  * }
  */
 class OrderPlacementService
@@ -54,7 +54,7 @@ class OrderPlacementService
      *     fulfillment_method: FulfillmentMethod,
      *     delivery_address: string|null,
      *     payment_method: PaymentMethod,
-     *     payment_proof_path: string|null
+     *     payment_proof_path: string|null, hosted_payment_method?: string|null
      * }  $checkout
      */
     public function execute(User $customer, array $checkout): Order
@@ -237,6 +237,7 @@ class OrderPlacementService
                 'status' => OrderStatus::Pending,
                 'payment_status' => PaymentStatus::Pending,
                 'payment_method' => $checkout['payment_method'],
+                'hosted_payment_method' => $checkout['hosted_payment_method'] ?? null,
                 'payment_proof_path' => $checkout['payment_proof_path'],
                 'payment_origin' => $checkout['payment_method'] === PaymentMethod::Online ? 'paymongo' : 'manual',
                 'checkout_submission_key' => $checkout['checkout_submission_key'] ?? null,

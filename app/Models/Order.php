@@ -76,6 +76,7 @@ use Illuminate\Support\Carbon;
     'status',
     'payment_status',
     'payment_method',
+    'hosted_payment_method',
     'payment_origin',
     'checkout_submission_key',
     'checkout_request_fingerprint',
@@ -187,7 +188,7 @@ class Order extends Model
     {
         static::updating(function (Order $order): void {
             if ($order->getRawOriginal('product_subtotal') !== null && $order->isDirty([
-                'user_id', 'fulfillment_method', 'delivery_address', 'delivery_quote_metadata',
+                'user_id', 'fulfillment_method', 'delivery_address', 'delivery_quote_metadata', 'hosted_payment_method',
                 'product_subtotal', 'total_amount', 'delivery_destination', 'delivery_base_fee',
                 'shipping_profile', 'handling_surcharge', 'delivery_fee',
                 'delivery_origin_city', 'delivery_is_demo', 'delivery_assumption_label',

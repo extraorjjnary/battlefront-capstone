@@ -98,6 +98,7 @@ class CustomerOrderPresenter
                 'can_resubmit_proof' => $this->canResubmitPaymentProof($order),
                 'checkout_url' => $paymongoFlow?->status === 'open' ? $paymongoFlow->checkout_url : null,
                 'bank_code' => $paymongoFlow?->bank_code,
+                'hosted_payment_method' => $order->hosted_payment_method,
                 'can_retry' => $paymongoFlow?->channel === 'direct_online_banking'
                     && $paymongoFlow->status === 'awaiting_payment_method'
                     && $paymongoFlow->merchant_cutoff_at->isFuture()

@@ -34,6 +34,7 @@ const props = defineProps({
     pickupLocation: { type: Object, required: true },
     fulfillmentMethods: { type: Array, required: true },
     paymentMethods: { type: Array, required: true },
+    paymongoHostedMethods: { type: Array, required: true },
     paymongoBanks: { type: Object, required: true },
     deliveryQuotes: { type: Array, required: true },
     deliveryLocations: { type: Array, required: true },
@@ -43,7 +44,16 @@ const props = defineProps({
 
 const fulfillmentMethod = ref('pickup');
 const paymentMethod = ref('cash');
-const paymentChannel = ref('hosted_checkout');
+const paymentChannel = ref(
+    props.paymongoHostedMethods.length > 0
+        ? 'hosted_checkout'
+        : 'direct_online_banking',
+);
+const hostedPaymentMethod = ref(
+    props.paymongoHostedMethods.includes('qrph')
+        ? 'qrph'
+        : (props.paymongoHostedMethods[0] ?? ''),
+);
 const paymentBank = ref(Object.keys(props.paymongoBanks)[0] ?? '');
 const checkoutSubmissionKey = createUuid();
 const paymentProofKey = ref(0);
@@ -209,6 +219,7 @@ defineOptions({
                 />
                 <input type="hidden" name="checkout_submission_key" :value="checkoutSubmissionKey" />
                 <input v-if="paymentMethod === 'online'" type="hidden" name="payment_channel" :value="paymentChannel" />
+                <input v-if="paymentMethod === 'online' && paymentChannel === 'hosted_checkout'" type="hidden" name="hosted_payment_method" :value="hostedPaymentMethod" />
                 <input v-if="paymentMethod === 'online' && paymentChannel === 'direct_online_banking'" type="hidden" name="payment_bank" :value="paymentBank" />
                 <div class="grid gap-6">
                     <Alert v-if="errors.cart" variant="destructive">
@@ -683,7 +694,7 @@ defineOptions({
                             <div class="grid gap-2">
                                 <Label for="payment-channel">Online payment option</Label>
                                 <select id="payment-channel" v-model="paymentChannel" class="border-input bg-background h-10 w-full border px-3 text-sm">
-                                    <option value="hosted_checkout">Card, GCash, Maya, or QR Ph</option>
+                                    <option v-if="paymongoHostedMethods.length" value="hosted_checkout">PayMongo hosted checkout</option>
                                     <option v-if="Object.keys(paymongoBanks).length" value="direct_online_banking">Direct online banking</option>
                                 </select>
                                 <InputError :message="errors.payment_channel" />
@@ -695,6 +706,16 @@ defineOptions({
                                 </select>
                                 <InputError :message="errors.payment_bank" />
                                 <p class="text-muted-foreground text-xs leading-5">Your bank will open on PayMongo. Battlefront never receives your bank password or OTP.</p>
+                            </div>
+                            <div v-else class="grid gap-2">
+                                <Label for="hosted-payment-method">Pay with</Label>
+                                <select id="hosted-payment-method" v-model="hostedPaymentMethod" class="border-input bg-background h-10 w-full border px-3 text-sm">
+                                    <option v-if="paymongoHostedMethods.includes('qrph')" value="qrph">QR Ph — GCash, Maya, and supported bank apps</option>
+                                    <option v-if="paymongoHostedMethods.includes('card')" value="card">Credit or debit card</option>
+                                </select>
+                                <InputError :message="errors.hosted_payment_method" />
+                                <p v-if="hostedPaymentMethod === 'qrph'" class="text-muted-foreground text-xs leading-5">PayMongo will create a QR code for this order. Scan it with GCash, Maya, or a supported banking app.</p>
+                                <p v-else-if="hostedPaymentMethod === 'card'" class="text-muted-foreground text-xs leading-5">Pay securely by card on PayMongo.</p>
                             </div>
                         </div>
 

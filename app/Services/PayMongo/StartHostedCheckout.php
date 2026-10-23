@@ -37,7 +37,9 @@ class StartHostedCheckout
                 'currency' => 'PHP',
                 'quantity' => 1,
             ]],
-            'payment_method_types' => config('services.paymongo.hosted_methods'),
+            'payment_method_types' => $order->hosted_payment_method !== null
+                ? [$order->hosted_payment_method]
+                : config('services.paymongo.hosted_methods'),
             'success_url' => route('orders.show', ['order' => $order, 'paymongo_return' => 1]),
             'cancel_url' => route('orders.show', ['order' => $order, 'paymongo_return' => 1]),
             'reference_number' => $order->reference,

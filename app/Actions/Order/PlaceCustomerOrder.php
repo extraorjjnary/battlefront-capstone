@@ -22,7 +22,7 @@ class PlaceCustomerOrder
     ) {}
 
     /**
-     * @param  array{cart_item_ids: list<int>, recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address?: string|null, delivery_destination: string|null, payment_method: string, payment_channel?: string|null, payment_bank?: string|null, delivery_address_components?: array<string, mixed>|null}  $validated
+     * @param  array{cart_item_ids: list<int>, recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address?: string|null, delivery_destination: string|null, payment_method: string, payment_channel?: string|null, payment_bank?: string|null, hosted_payment_method?: string|null, delivery_address_components?: array<string, mixed>|null}  $validated
      */
     public function execute(User $customer, array $validated, ?UploadedFile $paymentProof): Order
     {
@@ -43,6 +43,7 @@ class PlaceCustomerOrder
                 'payment_method' => $paymentMethod,
                 'payment_channel' => $validated['payment_channel'] ?? null,
                 'payment_bank' => $validated['payment_bank'] ?? null,
+                'hosted_payment_method' => $validated['hosted_payment_method'] ?? null,
                 'payment_proof_path' => $paymentProofPath,
                 'checkout_submission_key' => $validated['checkout_submission_key'] ?? null,
                 'checkout_request_fingerprint' => isset($validated['checkout_submission_key'])
@@ -56,6 +57,7 @@ class PlaceCustomerOrder
                         'payment_method' => $validated['payment_method'],
                         'payment_channel' => $validated['payment_channel'] ?? null,
                         'payment_bank' => $validated['payment_bank'] ?? null,
+                        'hosted_payment_method' => $validated['hosted_payment_method'] ?? null,
                     ], JSON_THROW_ON_ERROR))
                     : null,
             ];

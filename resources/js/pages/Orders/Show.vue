@@ -498,6 +498,12 @@ function retryDirectBankPayment() {
                                     <dd class="mt-1 font-semibold">
                                         {{ order.payment.method.label }}
                                     </dd>
+                                    <dd v-if="order.payment.hosted_payment_method === 'qrph'" class="text-muted-foreground mt-1 text-sm">
+                                        QR Ph — GCash, Maya, and supported bank apps
+                                    </dd>
+                                    <dd v-else-if="order.payment.hosted_payment_method === 'card'" class="text-muted-foreground mt-1 text-sm">
+                                        Credit or debit card
+                                    </dd>
                                     <dd class="mt-2">
                                         <Badge
                                             variant="outline"
@@ -517,7 +523,7 @@ function retryDirectBankPayment() {
                                     </dd>
                                     <dd v-if="order.payment.checkout_url" class="mt-3">
                                         <a :href="order.payment.checkout_url" class="text-primary-ink text-sm font-semibold underline underline-offset-4">
-                                            Continue to secure payment
+                                            {{ order.payment.hosted_payment_method === 'qrph' ? 'Continue to QR payment' : 'Continue to secure payment' }}
                                         </a>
                                     </dd>
                                     <dd v-if="order.payment.can_retry" class="mt-3 grid gap-2">
