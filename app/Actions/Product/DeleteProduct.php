@@ -41,6 +41,11 @@ class DeleteProduct
 
     private function hasOutstandingOperations(Product $product): bool
     {
+        if (DB::table('customer_return_requests as requests')
+            ->join('order_items', 'order_items.id', '=', 'requests.order_item_id')
+            ->where('order_items.product_id', $product->id)->whereNull('requests.customer_return_id')->whereNull('requests.withdrawn_at')->exists()) {
+            return true;
+        }
         if (DB::table('inventories')->where('product_id', $product->id)
             ->where(fn ($query) => $query->where('quantity', '>', 0)->orWhere('quarantined_quantity', '>', 0))->exists()) {
             return true;

@@ -67,27 +67,26 @@ export function useAppNavigation() {
                 href: dashboard(),
                 icon: LayoutDashboard,
             },
-            {
+        ];
+
+        if (!isAdministrator.value || page.props.auth?.can?.manageBranches) {
+            items.push({
                 title: isAdministrator.value ? 'Stores' : 'Our stores',
-                href: page.props.auth?.can?.manageBranches
+                href: isAdministrator.value
                     ? administrationBranchIndex()
                     : branchIndex(),
                 icon: MapPin,
-            },
-        ];
+            });
+        }
 
         if (isAdministrator.value) {
-            items.push({
-                title: 'Tasks',
-                href: WorkQueueController.index(),
-                icon: ListTodo,
-            });
-            if (page.props.auth?.can?.browseProductCatalog)
+            if (page.props.auth?.can?.browseProductCatalog) {
                 items.push({
-                    title: 'Products',
-                    href: productIndex(),
-                    icon: PackageSearch,
+                    title: 'Tasks',
+                    href: WorkQueueController.index(),
+                    icon: ListTodo,
                 });
+            }
             if (page.props.auth?.can?.manageProducts)
                 items.push({
                     title: 'Manage products',
@@ -155,7 +154,7 @@ export function useAppNavigation() {
             if (page.props.auth?.can?.viewOrders)
                 items.push({
                     title: page.props.auth?.can?.viewStaffReports
-                        ? 'Staff sales'
+                        ? 'Sales by handler'
                         : 'My sales',
                     href: StaffPerformanceController.index(),
                     icon: ChartColumnIncreasing,

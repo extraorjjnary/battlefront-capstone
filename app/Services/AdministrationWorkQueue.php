@@ -19,6 +19,12 @@ class AdministrationWorkQueue
     public function paginate(User $actor, array $filters = []): LengthAwarePaginator
     {
         $queries = [];
+        if ($actor->can('orders.view') && $actor->can('returns.request')) {
+            $queries[] = DB::table('customer_return_requests as work')
+                ->select('work.id', 'work.id as case_id', 'work.created_at')
+                ->selectRaw("null as responsible_name, null as responsible_active, 'submitted' as status, 'customer_request' as kind")
+                ->whereNull('work.customer_return_id')->whereNull('work.withdrawn_at');
+        }
 
         if ($actor->can('inventory.view') && $actor->can('inventory.approve')) {
             $queries[] = $this->entries('inventory_adjustment_requests as work', 'stock_adjustment', 'pending')
@@ -129,6 +135,7 @@ class AdministrationWorkQueue
                 default => ['Review supplier return', 'administration.supplier-returns.index'],
             },
             'customer_handover' => ['Hand goods back to customer', 'administration.customer-returns.index'],
+            'customer_request' => ['Confirm physical receipt of customer request', 'administration.customer-returns.index'],
             'refund' => ['Record outstanding refund payment', 'administration.customer-returns.index'],
             'refund_reconciliation' => ['Reconcile refund payment', 'administration.customer-returns.index'],
             'customer_return' => ['Review customer return', 'administration.customer-returns.index'],
@@ -147,7 +154,7 @@ class AdministrationWorkQueue
             'reference' => $entry->kind === 'order' ? sprintf('BF-%06d', $id) : strtoupper(str_replace('_', ' ', $entry->kind)).' #'.$id,
             'required_action' => $action,
             'href' => $route === 'administration.orders.show' ? route($route, $id) : route($route, [
-                'case' => $entry->case_id ?? $id,
+                ...($entry->kind === 'customer_request' ? ['request_id' => $id] : ['case' => $entry->case_id ?? $id]),
                 ...($entry->kind === 'refund_reconciliation' ? ['payment_id' => $id] : []),
             ]).($entry->kind === 'refund_reconciliation' ? '#refund-payment-'.$id : ''),
         ];

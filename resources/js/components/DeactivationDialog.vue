@@ -43,8 +43,8 @@ const open = ref(false);
                 <DialogHeader>
                     <DialogTitle>Deactivate {{ name }}?</DialogTitle>
                     <DialogDescription
-                        >{{ description }} You can reactivate it later from
-                        Catalog products.</DialogDescription
+                        >{{ description }} You can reactivate it the
+                        corresponding management page.</DialogDescription
                     >
                 </DialogHeader>
                 <DialogFooter class="mt-6 gap-2">

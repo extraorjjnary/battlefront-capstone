@@ -10,7 +10,9 @@ import InputError from '@/components/InputError.vue';
 import SearchableProductSelect from '@/components/administration/SearchableProductSelect.vue';
 import { Label } from '@/components/ui/label';
 import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
-import { watch } from 'vue';
+import { ref, watch } from 'vue';
+
+const requestReasonCode = ref('');
 
 const props = defineProps({
     returns: Object,
@@ -136,6 +138,7 @@ defineOptions({
                 <select
                     id="supplier-return-reason-code"
                     name="reason_code"
+                    v-model="requestReasonCode"
                     required
                     class="border-input bg-background focus-visible:ring-ring min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
                 >
@@ -148,12 +151,16 @@ defineOptions({
                 <InputError :message="errors.reason_code" />
             </div>
             <div class="space-y-2">
-                <Label for="return-reason">Notes</Label
+                <Label for="return-reason">{{
+                    requestReasonCode === 'other'
+                        ? 'Additional notes (required)'
+                        : 'Additional notes (optional)'
+                }}</Label
                 ><Input
                     class="min-h-11"
                     id="return-reason"
                     name="reason"
-                    required
+                    :required="requestReasonCode === 'other'"
                     minlength="5"
                     maxlength="2000"
                 /><InputError :message="errors.reason" />

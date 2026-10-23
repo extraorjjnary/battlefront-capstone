@@ -38,3 +38,7 @@ Choose the simplest design with clear responsibility boundaries. Do not automati
 Simple focused operation: `Controller -> Action`.
 
 Coordinated workflow: `Controller -> Service -> Repository` and/or `Service -> Actions`.
+
+## Separate IT audit detail visibility from permission management
+
+IT may inspect known account-management audit actions, including Owner role-permission changes and CLI/seeder account events, without permissions.manage or audit.export. Classify by action and subject type, never actor; user subjects also carry restricted business alerts. Reuse the explicit account-event allowlist for IT detail visibility and raw detail search. Preserve credential/path redaction and Owner/other-role behavior.

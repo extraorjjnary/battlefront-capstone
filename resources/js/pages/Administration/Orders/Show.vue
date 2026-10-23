@@ -65,6 +65,24 @@ const handlerForm = useForm({
 });
 const claimForm = useForm({});
 const page = usePage();
+const canProcess = computed(() => props.order.can_process === true);
+const unfinished = computed(
+    () => !['completed', 'cancelled'].includes(props.order.status.value),
+);
+const handlerNotice = computed(() => {
+    if (!unfinished.value) {
+        return '';
+    }
+    if (!props.order.assigned_handler_id) {
+        return 'Claim this order or assign a handler before processing it.';
+    }
+    if (canProcess.value) {
+        return 'You are responsible for processing this order.';
+    }
+    return page.props.auth.can?.assignOrders
+        ? 'Only the assigned handler can process this order. Reassign it explicitly to yourself or another eligible handler to change responsibility.'
+        : 'Only the assigned handler can process this order. You can view its details.';
+});
 
 const selectedOrderStatus = ref('');
 const orderConfirmationOpen = ref(false);
@@ -131,6 +149,9 @@ const rejectingWalletPayment = computed(
 );
 
 function requestCodConfirmation() {
+    if (!canProcess.value) {
+        return;
+    }
     if (
         !props.order.payment.can_confirm_cod_collection ||
         codCollectionForm.processing
@@ -143,6 +164,9 @@ function requestCodConfirmation() {
 }
 
 function submitCodCollection() {
+    if (!canProcess.value) {
+        return;
+    }
     if (
         !props.order.payment.can_confirm_cod_collection ||
         !codCollectionForm.cod_collection_confirmed ||
@@ -160,6 +184,9 @@ function submitCodCollection() {
 }
 
 function requestPickupConfirmation() {
+    if (!canProcess.value) {
+        return;
+    }
     if (
         !props.order.payment.can_confirm_pickup ||
         pickupConfirmationForm.processing
@@ -172,6 +199,9 @@ function requestPickupConfirmation() {
 }
 
 function submitPickupConfirmation() {
+    if (!canProcess.value) {
+        return;
+    }
     if (
         !props.order.payment.can_confirm_pickup ||
         !pickupConfirmationForm.payment_received_confirmed ||
@@ -190,11 +220,17 @@ function submitPickupConfirmation() {
 }
 
 function selectOrderStatus(status) {
+    if (!canProcess.value) {
+        return;
+    }
     selectedOrderStatus.value = status;
     orderStatusForm.clearErrors();
 }
 
 function requestOrderStatusUpdate() {
+    if (!canProcess.value) {
+        return;
+    }
     if (!selectedOrderTransition.value) {
         return;
     }
@@ -211,6 +247,9 @@ function requestOrderStatusUpdate() {
 }
 
 function submitOrderStatus() {
+    if (!canProcess.value) {
+        return;
+    }
     orderStatusForm.submit(OrderStatusController.update(props.order.id), {
         preserveScroll: true,
         onSuccess: () => {
@@ -225,6 +264,9 @@ function submitOrderStatus() {
 }
 
 function requestShipmentUpdate() {
+    if (!canProcess.value) {
+        return;
+    }
     const next = props.order.shipment_actions?.next_status;
     if (!next || shipmentStatusForm.processing) {
         return;
@@ -238,6 +280,9 @@ function requestShipmentUpdate() {
 }
 
 function submitShipmentStatus() {
+    if (!canProcess.value) {
+        return;
+    }
     shipmentStatusForm.submit(
         OrderShipmentStatusController.update(props.order.id),
         {
@@ -256,6 +301,9 @@ function submitShipmentStatus() {
 }
 
 function submitShipmentReference() {
+    if (!canProcess.value) {
+        return;
+    }
     shipmentReferenceForm.submit(
         OrderShipmentReferenceController.update(props.order.id),
         {
@@ -265,6 +313,9 @@ function submitShipmentReference() {
 }
 
 function requestManualShipment() {
+    if (!canProcess.value) {
+        return;
+    }
     if (
         !props.order.can_create_manual_shipment ||
         manualShipmentForm.processing
@@ -278,6 +329,9 @@ function requestManualShipment() {
 }
 
 function submitManualShipment() {
+    if (!canProcess.value) {
+        return;
+    }
     if (
         !props.order.can_create_manual_shipment ||
         !manualShipmentForm.arrangement_confirmed ||
@@ -300,6 +354,9 @@ function submitManualShipment() {
 }
 
 function selectPaymentStatus(status) {
+    if (!canProcess.value) {
+        return;
+    }
     paymentStatusForm.payment_status = status;
     paymentStatusForm.clearErrors();
 
@@ -314,6 +371,9 @@ function selectPaymentStatus(status) {
 }
 
 function requestPaymentStatusUpdate() {
+    if (!canProcess.value) {
+        return;
+    }
     if (!paymentStatusForm.payment_status) {
         return;
     }
@@ -322,6 +382,9 @@ function requestPaymentStatusUpdate() {
 }
 
 function submitPaymentStatus() {
+    if (!canProcess.value) {
+        return;
+    }
     paymentStatusForm.submit(
         OrderPaymentStatusController.update(props.order.id),
         {
@@ -410,15 +473,16 @@ defineOptions({
             class="border-border bg-card flex flex-wrap items-end gap-4 border p-5"
         >
             <div class="min-w-48 flex-1">
-                <p class="font-semibold">Assigned sales handler</p>
+                <p class="font-semibold">Assigned handler</p>
                 <p class="text-muted-foreground mt-1 text-sm">
                     {{ order.assigned_handler_name ?? 'Unassigned' }}
+                    <span v-if="canProcess"> (you)</span>
                 </p>
                 <p
-                    v-if="order.handler_required && !order.assigned_handler_id"
-                    class="text-destructive mt-1 text-xs"
+                    v-if="handlerNotice"
+                    class="text-muted-foreground mt-1 text-sm"
                 >
-                    Assign a handler before completing this order.
+                    {{ handlerNotice }}
                 </p>
             </div>
             <form
@@ -437,6 +501,7 @@ defineOptions({
                     :disabled="claimForm.processing"
                     >Claim order</Button
                 >
+                <InputError :message="claimForm.errors.handler" />
             </form>
             <form
                 v-if="
@@ -471,6 +536,12 @@ defineOptions({
                     "
                     >Assign</Button
                 >
+                <InputError
+                    :message="
+                        handlerForm.errors.handler_id ||
+                        handlerForm.errors.handler
+                    "
+                />
             </form>
             <Link
                 v-if="order.status.value === 'completed'"
@@ -489,7 +560,7 @@ defineOptions({
         >
             <div class="flex min-w-0 flex-col gap-8">
                 <ShipmentTracking
-                    v-if="order.shipment && page.props.auth.can?.processOrders"
+                    v-if="order.shipment"
                     :shipment="order.shipment"
                     :quote="order.delivery_quote"
                 />
@@ -511,12 +582,7 @@ defineOptions({
                     <p class="text-muted-foreground text-xs leading-5">
                         {{ order.delivery_quote.assumption_label }}
                     </p>
-                    <div
-                        v-if="
-                            order.can_create_manual_shipment &&
-                            page.props.auth.can?.processOrders
-                        "
-                    >
+                    <div v-if="order.can_create_manual_shipment && canProcess">
                         <Button type="button" @click="requestManualShipment">
                             <Truck />
                             Create Manual Shipment
@@ -946,7 +1012,17 @@ defineOptions({
                     aria-label="Shipment actions"
                 >
                     <h2 class="font-semibold">Manual shipment actions</h2>
-                    <template v-if="order.shipment_actions?.next_status">
+                    <p
+                        v-if="!canProcess && unfinished"
+                        class="text-muted-foreground text-sm"
+                    >
+                        {{ handlerNotice }}
+                    </p>
+                    <template
+                        v-else-if="
+                            canProcess && order.shipment_actions?.next_status
+                        "
+                    >
                         <div
                             v-if="
                                 order.shipment_actions.next_status.value ===
@@ -1007,7 +1083,10 @@ defineOptions({
                     <InputError :message="shipmentStatusForm.errors.status" />
 
                     <form
-                        v-if="order.shipment_actions?.can_update_reference"
+                        v-if="
+                            canProcess &&
+                            order.shipment_actions?.can_update_reference
+                        "
                         class="border-border grid gap-3 border-t pt-4"
                         @submit.prevent="submitShipmentReference"
                     >
@@ -1103,7 +1182,7 @@ defineOptions({
                     </p>
                     <div
                         v-if="
-                            page.props.auth.can?.processOrders &&
+                            canProcess &&
                             order.allowed_status_transitions.length
                         "
                         class="border-border mt-5 grid gap-4 border-t pt-5"
@@ -1184,6 +1263,9 @@ defineOptions({
                         >
                             This order is in a terminal state and cannot be
                             changed.
+                        </template>
+                        <template v-else-if="!canProcess">
+                            {{ handlerNotice }}
                         </template>
                         <template
                             v-else-if="order.payment.can_confirm_cod_collection"
@@ -1379,7 +1461,7 @@ defineOptions({
 
                     <div
                         v-if="
-                            page.props.auth.can?.processOrders &&
+                            canProcess &&
                             order.payment.pay_at_pickup &&
                             !['completed', 'cancelled'].includes(
                                 order.status.value,
@@ -1406,8 +1488,7 @@ defineOptions({
                         </p>
                         <Button
                             v-if="
-                                page.props.auth.can?.processOrders &&
-                                order.payment.can_confirm_pickup
+                                canProcess && order.payment.can_confirm_pickup
                             "
                             type="button"
                             class="w-full whitespace-normal"
@@ -1523,7 +1604,7 @@ defineOptions({
                     </div>
                     <div
                         v-else-if="
-                            page.props.auth.can?.processOrders &&
+                            canProcess &&
                             order.payment.method.value === 'cod' &&
                             order.payment.status.value === 'pending' &&
                             order.status.value !== 'cancelled'
@@ -1540,7 +1621,7 @@ defineOptions({
                         </p>
                         <Button
                             v-if="
-                                page.props.auth.can?.processOrders &&
+                                canProcess &&
                                 order.payment.can_confirm_cod_collection
                             "
                             type="button"
@@ -1620,7 +1701,7 @@ defineOptions({
                     </div>
                     <div
                         v-else-if="
-                            page.props.auth.can?.processOrders &&
+                            canProcess &&
                             !order.payment.pay_at_pickup &&
                             order.payment.status.value === 'pending' &&
                             order.status.value !== 'cancelled'

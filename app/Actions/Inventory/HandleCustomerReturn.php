@@ -8,27 +8,32 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;
 use App\Services\ApprovalMonitor;
+use App\Services\CustomerReturnEligibility;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class HandleCustomerReturn
 {
-    public function receive(User $actor, int $orderItemId, int $quantity, string $condition, string $reason, string $reasonCode): int
+    public function receive(User $actor, int $orderItemId, int $quantity, string $condition, string $reason, string $reasonCode, ?int $convertingRequest = null): int
     {
-        return DB::transaction(function () use ($actor, $orderItemId, $quantity, $condition, $reason, $reasonCode): int {
-            $item = OrderItem::query()->findOrFail($orderItemId);
-            $order = Order::query()->whereKey($item->order_id)->lockForUpdate()->firstOrFail();
+        $orderId = OrderItem::query()->findOrFail($orderItemId)->order_id;
+
+        return DB::transaction(function () use ($actor, $orderId, $orderItemId, $quantity, $condition, $reason, $reasonCode, $convertingRequest): int {
+            $order = Order::query()->whereKey($orderId)->lockForUpdate()->firstOrFail();
             if ($order->status !== OrderStatus::Completed || $order->sale()->doesntExist()) {
                 throw ValidationException::withMessages(['order_item_id' => 'Returns require a completed system purchase.']);
             }
-            $item = OrderItem::query()->whereKey($orderItemId)->lockForUpdate()->firstOrFail();
-            $alreadyReceived = (int) DB::table('customer_return_items as items')
-                ->join('customer_returns as returns', 'returns.id', '=', 'items.customer_return_id')
-                ->where('items.order_item_id', $orderItemId)
-                ->whereIn('returns.status', ['pending', 'accepted', 'rejected_pending_handover'])
-                ->sum('items.quantity');
-            if ($quantity > $item->quantity - $alreadyReceived) {
+            $item = OrderItem::query()->where('order_id', $orderId)->whereKey($orderItemId)->lockForUpdate()->firstOrFail();
+            if ($convertingRequest !== null) {
+                $source = DB::table('customer_return_requests')->where('id', $convertingRequest)->lockForUpdate()->first();
+                if ($source === null || (int) $source->order_id !== $order->id || (int) $source->user_id !== $order->user_id
+                    || (int) $source->order_item_id !== $item->id || (int) $source->quantity !== $quantity
+                    || $source->withdrawn_at !== null || $source->customer_return_id !== null) {
+                    throw ValidationException::withMessages(['return_request' => 'This request is no longer eligible for receipt.']);
+                }
+            }
+            if ($quantity < 1 || $quantity > app(CustomerReturnEligibility::class)->remaining($item, $convertingRequest)) {
                 throw ValidationException::withMessages(['quantity' => 'Returned units exceed the remaining purchased quantity.']);
             }
 

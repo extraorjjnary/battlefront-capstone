@@ -58,7 +58,7 @@ test('ambiguous defaults start in keep mode and address edits or clearing set ex
     assert.equal(page.hasAddress.value, false);
 });
 
-test('profile shows optional shared fields and keeps name email and recommendation controls', async () => {
+test('profile shows optional shared fields and keeps name and recommendation controls', async () => {
     const component = loadAddressComponent(
         '../pages/settings/Profile.vue',
         true,
@@ -80,6 +80,43 @@ test('profile shows optional shared fields and keeps name email and recommendati
     assert.match(html, /Clear saved address/);
     assert.ok(html.includes('&lt;script&gt;unsafe&lt;/script&gt;'));
 });
+
+for (const canManageDefaultDeliveryAddress of [true, false]) {
+    test(`profile email is read-only with an accessible explanation for ${canManageDefaultDeliveryAddress ? 'customers' : 'administrators'}`, async () => {
+        let form;
+        const html = await renderToString(
+            Vue.h(
+                loadAddressComponent('../pages/settings/Profile.vue', true, {
+                    user: {
+                        name: 'Profile User',
+                        email: 'profile@example.test',
+                    },
+                    captureForm: (node) => {
+                        form = node;
+                    },
+                }),
+                profileProps({ canManageDefaultDeliveryAddress }),
+            ),
+        );
+        const email = findAddressNode(
+            form,
+            (node) => node.props?.name === 'email',
+        );
+        const name = findAddressNode(
+            form,
+            (node) => node.props?.name === 'name',
+        );
+
+        assert.equal(email.props['default-value'], 'profile@example.test');
+        assert.ok(Object.hasOwn(email.props, 'readonly'));
+        assert.equal(email.props['aria-describedby'], 'email-description');
+        assert.equal(name.props['default-value'], 'Profile User');
+        assert.equal(Object.hasOwn(name.props, 'readonly'), false);
+        assert.equal(Object.hasOwn(name.props, 'disabled'), false);
+        assert.match(html, /id="email-description"/);
+        assert.match(html, /Your account email address cannot be changed\./);
+    });
+}
 
 test('editing a profile address requires details and clearing remains pending until Save succeeds', async () => {
     const scope = Vue.effectScope();

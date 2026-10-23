@@ -28,6 +28,7 @@ class OrderPaymentStatusController extends Controller
                 ? PaymentRejectionReason::from($request->validated('rejection_reason'))
                 : null,
             $request->validated('rejection_note'),
+            actor: $request->user(),
         );
 
         Inertia::flash('toast', [

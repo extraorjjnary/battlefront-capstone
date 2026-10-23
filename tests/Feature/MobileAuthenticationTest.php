@@ -63,6 +63,25 @@ test('registration returns 422 validation errors without creating a user', funct
     $this->assertDatabaseCount('personal_access_tokens', 0);
 });
 
+test('mobile registration still requires a valid unique email', function (array $emailInput) {
+    User::factory()->customer()->create(['email' => 'taken@example.test']);
+
+    $this->postJson('/api/v1/auth/register', [
+        'name' => 'New Customer',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+        'device_name' => 'Pixel 8',
+        ...$emailInput,
+    ])->assertUnprocessable()->assertJsonValidationErrors('email');
+
+    $this->assertDatabaseCount('users', 1);
+    $this->assertDatabaseCount('personal_access_tokens', 0);
+})->with([
+    'missing' => [[]],
+    'invalid' => [['email' => 'invalid']],
+    'duplicate' => [['email' => 'taken@example.test']],
+]);
+
 test('login returns a bearer token for a customer without a web session', function () {
     $user = User::factory()->customer()->unverified()->create([
         'email' => 'customer@example.com',

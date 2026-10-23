@@ -224,7 +224,11 @@ test('pickup processing and customer cancellation recheck the winning state', fu
 test('cancelled orders reject both manual payment decisions through administrator endpoints', function (string $decision) {
     $order = customerCancellationOrder();
     app(OrderProcessingService::class)->cancelForCustomer($order->user, $order->id);
-    $this->actingAs(User::factory()->administrator()->create())
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)
         ->patch(route('administration.orders.payment-status.update', $order), [
             'payment_status' => $decision, 'manual_verification_confirmed' => true,
         ])->assertSessionHasErrors(['payment_status' => 'Cancelled orders cannot accept payment decisions.']);

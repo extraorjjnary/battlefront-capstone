@@ -16,6 +16,18 @@ use stdClass;
 
 class AuditLogPresenter
 {
+    public const ACCOUNT_MANAGEMENT_ACTIONS = [
+        'team.created',
+        'team.updated',
+        'team.role.assigned_by_cli',
+        'team.owner.created_by_cli',
+        'team.created_by_seeder',
+        'team.owner.created_by_seeder',
+        'role.permissions.updated',
+    ];
+
+    public const ACCOUNT_MANAGEMENT_SUBJECTS = ['administrator_account', 'user'];
+
     /** @return array<string, mixed> */
     public function present(stdClass $entry, User $viewer): array
     {
@@ -52,8 +64,14 @@ class AuditLogPresenter
 
     private function canViewDetails(User $viewer, string $subjectType, string $action): bool
     {
+        if ($viewer->administrationRoleCode() === 'it') {
+            return $viewer->can('audit.view')
+                && in_array($subjectType, self::ACCOUNT_MANAGEMENT_SUBJECTS, true)
+                && in_array($action, self::ACCOUNT_MANAGEMENT_ACTIONS, true);
+        }
+
         $permission = match ($subjectType) {
-            'order', 'customer_return', 'customer_refund', 'refund_payment' => 'orders.view',
+            'order', 'customer_return', 'customer_return_request', 'customer_refund', 'refund_payment' => 'orders.view',
             'inventory', 'inventory_adjustment_request', 'damage_report', 'supplier_return' => 'inventory.view',
             'product', 'chatbot_knowledge' => 'products.manage',
             'supplier' => 'suppliers.manage',
@@ -78,6 +96,7 @@ class AuditLogPresenter
             'damage_report' => route('administration.damage-reports.index', ['case' => $subjectId]),
             'supplier_return' => route('administration.supplier-returns.index', ['case' => $subjectId]),
             'customer_return' => route('administration.customer-returns.index', ['case' => $subjectId]),
+            'customer_return_request' => route('administration.customer-returns.index', ['request_id' => $subjectId]),
             'refund_payment' => route('administration.customer-returns.index', ['payment_id' => $subjectId]),
             default => null,
         };

@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Api\V1\CartItemController;
 use App\Http\Controllers\Api\V1\ChatbotController;
 use App\Http\Controllers\Api\V1\CheckoutController;
+use App\Http\Controllers\Api\V1\CustomerReturnRequestController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\OrderCancellationController;
 use App\Http\Controllers\Api\V1\OrderController;
@@ -62,6 +63,14 @@ Route::prefix('v1')
 
         // auth customers endpoint
         Route::middleware(['auth:sanctum', 'can:use-customer-cart'])->group(function (): void {
+            Route::get('orders/{order}/return-requests', [CustomerReturnRequestController::class, 'index'])
+                ->whereNumber('order')->name('orders.return-requests.index');
+            Route::post('orders/{order}/return-requests', [CustomerReturnRequestController::class, 'store'])
+                ->whereNumber('order')->name('orders.return-requests.store');
+            Route::get('orders/{order}/return-requests/{returnRequest}', [CustomerReturnRequestController::class, 'show'])
+                ->whereNumber(['order', 'returnRequest'])->name('orders.return-requests.show');
+            Route::post('orders/{order}/return-requests/{returnRequest}/withdraw', [CustomerReturnRequestController::class, 'withdraw'])
+                ->whereNumber(['order', 'returnRequest'])->name('orders.return-requests.withdraw');
             Route::post('auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
 
             // personalized recommendations

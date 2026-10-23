@@ -54,6 +54,8 @@ class TeamController extends Controller
             'canAssignOrders' => $request->user()->can('orders.assign'),
             'availableRoles' => $isOwner ? ['staff', 'manager', 'owner', 'it'] : ['staff', 'manager'],
             'canManagePermissions' => $request->user()->can('permissions.manage'),
+            'defaultPermissions' => $request->user()->can('permissions.manage') ? config('administration.default_permissions') : [],
+            'staffAllowedPermissions' => $request->user()->can('permissions.manage') ? config('administration.staff_allowed_permissions') : [],
             'permissions' => $request->user()->can('permissions.manage') ? DB::table('administration_permissions')->orderBy('code')->get(['code', 'name']) : [],
             'grants' => $request->user()->can('permissions.manage') ? DB::table('administration_role_permissions as grants')
                 ->join('administration_roles as roles', 'roles.id', '=', 'grants.administration_role_id')

@@ -109,6 +109,9 @@ test('administrators can review authoritative order processing details', functio
         'price_at_time' => '1250.00',
     ]);
 
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
     $response = $this->actingAs($administrator)
         ->get(route('administration.orders.show', $order));
 
@@ -409,6 +412,9 @@ test('administrators can apply approved order status transitions', function (
         'payment_status' => $paymentStatus,
     ]);
 
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
     $response = $this->actingAs($administrator)
         ->from(route('administration.orders.show', $order))
         ->patch(route('administration.orders.status.update', $order), [
@@ -469,6 +475,9 @@ test('completing an eligible order records one authoritative sale without changi
         'price_at_time' => '400.00',
     ]);
 
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
     $response = $this->actingAs($administrator)
         ->patch(route('administration.orders.status.update', $order), [
             'status' => OrderStatus::Completed->value,
@@ -495,6 +504,9 @@ test('repeated completion processing cannot create duplicate sales', function ()
         'status' => OrderStatus::Processing,
         'payment_status' => PaymentStatus::Verified,
     ]);
+
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
 
     $this->actingAs($administrator)
         ->patch(route('administration.orders.status.update', $order), [
@@ -546,6 +558,9 @@ test('cancelling an eligible order restores its exact purchased quantities', fun
     OrderItem::factory()->for($order)->for($firstProduct)->create(['quantity' => 2]);
     OrderItem::factory()->for($order)->for($secondProduct)->create(['quantity' => 3]);
 
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
     $this->actingAs($administrator)
         ->patch(route('administration.orders.status.update', $order), [
             'status' => OrderStatus::Cancelled->value,
@@ -566,6 +581,9 @@ test('repeated cancellation cannot restore inventory more than once', function (
     $inventory = Inventory::factory()->for($product)->create(['quantity' => 4]);
     $order = Order::factory()->create();
     OrderItem::factory()->for($order)->for($product)->create(['quantity' => 2]);
+
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
 
     $this->actingAs($administrator)
         ->patch(route('administration.orders.status.update', $order), [
@@ -588,6 +606,9 @@ test('completed orders cannot be cancelled or restore inventory', function () {
     $inventory = Inventory::factory()->for($product)->create(['quantity' => 4]);
     $order = Order::factory()->create(['status' => OrderStatus::Completed]);
     OrderItem::factory()->for($order)->for($product)->create(['quantity' => 2]);
+
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
 
     $this->actingAs($administrator)
         ->patch(route('administration.orders.status.update', $order), [
@@ -637,6 +658,9 @@ test('pending or rejected prepaid payment blocks order processing and completion
         'payment_status' => $paymentStatus,
     ]);
 
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
     $response = $this->actingAs($administrator)
         ->from(route('administration.orders.show', $order))
         ->patch(route('administration.orders.status.update', $order), [
@@ -680,6 +704,9 @@ test('administrators cannot apply unapproved order status transitions', function
     $administrator = User::factory()->administrator()->create();
     $order = Order::factory()->paidWithGCash()->create(['status' => $currentStatus]);
 
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
     $response = $this->actingAs($administrator)
         ->from(route('administration.orders.show', $order))
         ->patch(route('administration.orders.status.update', $order), [
@@ -703,6 +730,9 @@ test('invalid order statuses are rejected without changing the order', function 
     $administrator = User::factory()->administrator()->create();
     $order = Order::factory()->create();
 
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
     $response = $this->actingAs($administrator)
         ->from(route('administration.orders.show', $order))
         ->patch(route('administration.orders.status.update', $order), [
@@ -721,6 +751,9 @@ test('wallet verification requires manual confirmation and accessible proof', fu
     $order = Order::factory()->paidWithGCash()->create([
         'payment_proof_path' => 'payment-proofs/missing.png',
     ]);
+
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
 
     $this->actingAs($administrator)
         ->from(route('administration.orders.show', $order))
@@ -749,6 +782,9 @@ test('administrators can manually verify wallet payment evidence', function () {
         'payment_proof_path' => 'payment-proofs/verified.png',
     ]);
 
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
     $response = $this->actingAs($administrator)
         ->from(route('administration.orders.show', $order))
         ->patch(route('administration.orders.payment-status.update', $order), [
@@ -774,6 +810,9 @@ test('administrators can reject missing or unverifiable payment evidence', funct
     ]);
     OrderItem::factory()->for($order)->for($product)->create(['quantity' => 2]);
 
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
     $this->actingAs($administrator)
         ->patch(route('administration.orders.payment-status.update', $order), [
             'payment_status' => PaymentStatus::Rejected->value,
@@ -792,6 +831,9 @@ test('wallet rejection requires a predefined reason', function () {
     $administrator = User::factory()->administrator()->create();
     $order = Order::factory()->paidWithGCash()->create();
 
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
     $this->actingAs($administrator)
         ->from(route('administration.orders.show', $order))
         ->patch(route('administration.orders.payment-status.update', $order), [
@@ -809,6 +851,9 @@ test('other wallet rejection requires a short explanation', function () {
     $administrator = User::factory()->administrator()->create();
     $order = Order::factory()->paidWithMaya()->create();
 
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
     $this->actingAs($administrator)
         ->from(route('administration.orders.show', $order))
         ->patch(route('administration.orders.payment-status.update', $order), [
@@ -825,6 +870,9 @@ test('other wallet rejection requires a short explanation', function () {
 test('wallet rejection rejects invalid feedback', function (array $feedback, string $field, string $message) {
     $administrator = User::factory()->administrator()->create();
     $order = Order::factory()->paidWithGCash()->create();
+
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
 
     $this->actingAs($administrator)
         ->from(route('administration.orders.show', $order))
@@ -857,6 +905,9 @@ test('wallet rejection persists an optional short administrator note', function 
         'status' => OrderStatus::Processing,
     ]);
 
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
     $this->actingAs($administrator)
         ->patch(route('administration.orders.payment-status.update', $order), [
             'payment_status' => PaymentStatus::Rejected->value,
@@ -878,6 +929,9 @@ test('payment cannot be rejected after order completion', function () {
         'payment_status' => PaymentStatus::Pending,
     ]);
 
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
     $response = $this->actingAs($administrator)
         ->from(route('administration.orders.show', $order))
         ->patch(route('administration.orders.payment-status.update', $order), [
@@ -897,6 +951,9 @@ test('payment cannot be rejected after order completion', function () {
 test('invalid payment decisions are rejected without changing payment status', function (string $paymentStatus) {
     $administrator = User::factory()->administrator()->create();
     $order = Order::factory()->create();
+
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
 
     $response = $this->actingAs($administrator)
         ->from(route('administration.orders.show', $order))
@@ -919,6 +976,9 @@ test('cash and card at store require combined pickup confirmation instead of sep
     $administrator = User::factory()->administrator()->create();
     $order = Order::factory()->create(['payment_method' => $paymentMethod]);
 
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
     $this->actingAs($administrator)
         ->patch(route('administration.orders.payment-status.update', $order), [
             'payment_status' => PaymentStatus::Verified->value,
@@ -937,6 +997,9 @@ test('final payment decisions cannot be changed', function () {
     $order = Order::factory()->paidWithGCash()->create([
         'payment_status' => PaymentStatus::Rejected,
     ]);
+
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
 
     $response = $this->actingAs($administrator)
         ->from(route('administration.orders.show', $order))

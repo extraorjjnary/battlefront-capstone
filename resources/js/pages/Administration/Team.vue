@@ -19,6 +19,8 @@ const props = defineProps({
     availableRoles: Array,
     canManagePermissions: Boolean,
     roleVersions: Object,
+    defaultPermissions: { type: Object, default: () => ({}) },
+    staffAllowedPermissions: { type: Array, default: () => [] },
     filters: Object,
     canViewOrders: Boolean,
     canAssignOrders: Boolean,
@@ -44,10 +46,36 @@ function applyFilters() {
         status: status.value === 'all' ? undefined : status.value,
     });
 }
-const hasGrant = (role, code) =>
-    props.grants.some(
-        (grant) => grant.role === role && grant.permission === code,
+const permissionDrafts = reactive({ staff: [], manager: [] });
+watch(
+    () => props.roleVersions,
+    (versions, previous) => {
+        for (const role of ['staff', 'manager']) {
+            if (!previous || versions?.[role] !== previous?.[role]) {
+                permissionDrafts[role] = props.grants
+                    .filter(
+                        (grant) =>
+                            grant.role === role &&
+                            isPermissionEligible(role, grant.permission),
+                    )
+                    .map((grant) => grant.permission);
+            }
+        }
+    },
+    { immediate: true },
+);
+function useDefaultPermissions(role) {
+    permissionDrafts[role] = (props.defaultPermissions[role] ?? []).filter(
+        (code) => isPermissionEligible(role, code),
     );
+}
+function isPermissionEligible(role, code) {
+    return role === 'staff'
+        ? props.staffAllowedPermissions.includes(code)
+        : !['users.manage', 'permissions.manage', 'audit.export'].includes(
+              code,
+          );
+}
 const roleLabel = (role) =>
     role === 'it'
         ? 'IT Administrator'
@@ -64,6 +92,7 @@ const permissionLabels = {
     'inventory.reorder': 'Manage reorders',
     'products.manage': 'Manage product details',
     'products.price': 'Manage product prices',
+    'products.cost': 'Manage acquisition costs',
     'catalog.delete': 'Delete products and categories',
     'customers.view': 'View customers',
     'reports.view': 'View sales reports',
@@ -77,6 +106,7 @@ const permissionLabels = {
     'returns.resolve': 'Resolve returns',
     'returns.reconcile': 'Review return payments',
     'suppliers.manage': 'Manage suppliers',
+    'branches.manage': 'Manage branches',
     'staff_reports.view': 'View staff reports',
     'audit.view': 'View activity log',
     'audit.export': 'Export activity log',
@@ -326,7 +356,8 @@ defineOptions({
         <section v-if="canManagePermissions" class="space-y-4">
             <h2 class="text-lg font-semibold">Role access</h2>
             <p class="text-muted-foreground text-sm">
-                Changes apply to everyone with that role.
+                Changes affect all accounts assigned to that role. Default
+                selections are only applied when you click Save permissions.
             </p>
             <Form
                 v-for="role in ['staff', 'manager']"
@@ -335,7 +366,18 @@ defineOptions({
                 v-slot="{ errors, processing }"
                 class="surface-card border-border bg-card max-w-full min-w-0 space-y-4 border p-5"
             >
-                <h3 class="font-semibold capitalize">{{ role }}</h3>
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <h3 class="font-semibold capitalize">{{ role }}</h3>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        class="min-h-11"
+                        :aria-label="`Use default permissions for ${roleLabel(role)}`"
+                        :disabled="processing"
+                        @click="useDefaultPermissions(role)"
+                        >Use default permissions</Button
+                    >
+                </div>
                 <input
                     type="hidden"
                     name="edit_version"
@@ -343,13 +385,8 @@ defineOptions({
                 />
                 <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <label
-                        v-for="permission in permissions.filter(
-                            (entry) =>
-                                ![
-                                    'users.manage',
-                                    'permissions.manage',
-                                    'audit.export',
-                                ].includes(entry.code),
+                        v-for="permission in permissions.filter((entry) =>
+                            isPermissionEligible(role, entry.code),
                         )"
                         :key="permission.code"
                         class="flex items-center gap-2 text-sm"
@@ -358,7 +395,7 @@ defineOptions({
                             type="checkbox"
                             name="permissions[]"
                             :value="permission.code"
-                            :checked="hasGrant(role, permission.code)"
+                            v-model="permissionDrafts[role]"
                         />{{ permissionLabel(permission) }}
                     </label>
                 </div>

@@ -11,6 +11,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\PayMongoFlow;
 use App\Services\Order\OrderProcessingService;
+use App\Support\OperationalRequestReason;
 
 class CustomerOrderPresenter
 {
@@ -18,6 +19,8 @@ class CustomerOrderPresenter
         private readonly DeliveryQuotePresenter $deliveryQuotePresenter,
         private readonly ShipmentPresenter $shipmentPresenter,
         private readonly OrderProcessingService $orderProcessingService,
+        private readonly CustomerReturnEligibility $returnEligibility,
+        private readonly CustomerReturnRequestPresenter $returnRequests,
     ) {}
 
     /**
@@ -61,8 +64,12 @@ class CustomerOrderPresenter
     public function detail(Order $order): array
     {
         $paymongoFlow = PayMongoFlow::query()->where('order_id', $order->id)->latest('id')->first();
+        $returnItems = collect($this->returnEligibility->forOrder($order));
 
         return [
+            'can_request_return' => $returnItems->contains(fn (array $item): bool => $item['can_request']),
+            'return_reason_options' => OperationalRequestReason::customerReturnOptions(),
+            'return_requests' => $this->returnRequests->forOrder($order),
             'can_cancel' => $this->orderProcessingService->canCustomerCancel($order),
             'product_subtotal' => $order->product_subtotal,
             'delivery_fee' => $order->delivery_fee,
@@ -124,7 +131,7 @@ class CustomerOrderPresenter
                     && $order->status === OrderStatus::Pending
                     && $order->payment_status === PaymentStatus::Pending,
             ],
-            'items' => $order->items->map(function (OrderItem $item): array {
+            'items' => $order->items->map(function (OrderItem $item) use ($returnItems): array {
                 $unitPrice = $item->price_at_time;
 
                 return [
@@ -138,6 +145,7 @@ class CustomerOrderPresenter
                     'quantity' => $item->quantity,
                     'unit_price' => $unitPrice,
                     'line_total' => bcmul($unitPrice, (string) $item->quantity, 2),
+                    ...$returnItems[$item->id],
                 ];
             })->values()->all(),
             'item_count' => $order->items->count(),

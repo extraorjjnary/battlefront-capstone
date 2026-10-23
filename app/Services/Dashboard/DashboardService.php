@@ -24,7 +24,7 @@ class DashboardService
         $canViewOrders = $actor->can('orders.view');
         $canViewInventory = $actor->can('inventory.view');
         $salesSummary = $canViewReports ? $this->salesReportRepository->recordedSalesSummary() : null;
-        $profitSummary = $actor->can('reports.profit') ? $this->salesReportRepository->recordedProfitabilitySummary() : null;
+        $profitSummary = $canViewReports && $actor->can('reports.profit') ? $this->salesReportRepository->recordedProfitabilitySummary() : null;
         $orderSummary = $canViewOrders ? Order::query()
             ->toBase()
             ->selectRaw(
@@ -60,6 +60,22 @@ class DashboardService
                 'low_stock_products' => $lowStockQuery === null ? [] : $this->stockProducts($lowStockQuery),
             ],
             'recent_orders' => $canViewOrders ? $this->recentOrders() : [],
+        ];
+    }
+
+    /** @return array{pending_orders: ?int, pending_payment_reviews: ?int, low_stock_products: ?int, out_of_stock_products: ?int} */
+    public function staff(User $actor): array
+    {
+        $canViewOrders = $actor->can('orders.view');
+        $operationalInventory = $actor->can('inventory.view')
+            ? Inventory::query()->whereIn('product_id', Product::query()->customerEligible()->select('id'))
+            : null;
+
+        return [
+            'pending_orders' => $canViewOrders ? Order::query()->where('status', OrderStatus::Pending)->count() : null,
+            'pending_payment_reviews' => $canViewOrders ? $this->pendingPaymentReviewsQuery()->count() : null,
+            'low_stock_products' => $operationalInventory === null ? null : (clone $operationalInventory)->lowStock()->count(),
+            'out_of_stock_products' => $operationalInventory === null ? null : (clone $operationalInventory)->outOfStock()->count(),
         ];
     }
 

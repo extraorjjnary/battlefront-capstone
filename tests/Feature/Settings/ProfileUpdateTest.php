@@ -1,7 +1,9 @@
 <?php
 
+use App\Actions\User\UpdateProfile;
 use App\Enums\UserRole;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('profile page is displayed', function () {
@@ -35,14 +37,19 @@ test('administrator profile excludes the default delivery address', function () 
             ->where('defaultDeliveryAddress', null));
 });
 
-test('profile information can be updated', function () {
-    $user = User::factory()->create();
+test('all account types can update their name with omitted or unchanged email', function (string $role, bool $includeEmail) {
+    $user = User::factory()->create([
+        'role' => $role === 'customer' ? UserRole::Customer : UserRole::Administrator,
+        'administration_role_id' => $role === 'customer' ? null : DB::table('administration_roles')->where('code', $role)->value('id'),
+    ]);
+    $email = $user->email;
+    $verifiedAt = $user->getRawOriginal('email_verified_at');
 
     $response = $this
         ->actingAs($user)
         ->patch(route('profile.update'), [
             'name' => 'Test User',
-            'email' => 'test@example.com',
+            ...($includeEmail ? ['email' => $email] : []),
         ]);
 
     $response
@@ -52,8 +59,77 @@ test('profile information can be updated', function () {
     $user->refresh();
 
     expect($user->name)->toBe('Test User');
-    expect($user->email)->toBe('test@example.com');
-    expect($user->email_verified_at)->toBeNull();
+    expect($user->email)->toBe($email);
+    expect($user->getRawOriginal('email_verified_at'))->toBe($verifiedAt);
+})->with(['customer', 'staff', 'manager', 'owner', 'it'])->with([
+    'omitted email' => false,
+    'unchanged email' => true,
+]);
+
+test('all account types reject email changes without saving accompanying profile changes', function (string $role) {
+    $user = User::factory()->create([
+        'role' => $role === 'customer' ? UserRole::Customer : UserRole::Administrator,
+        'administration_role_id' => $role === 'customer' ? null : DB::table('administration_roles')->where('code', $role)->value('id'),
+    ]);
+    $original = $user->refresh()->getAttributes();
+
+    $this->actingAs($user)->patch(route('profile.update'), [
+        'name' => 'Changed name',
+        'email' => 'replacement@example.test',
+        'default_delivery_contact_number' => '09171234567',
+        'personalized_recommendations_enabled' => false,
+    ])->assertSessionHasErrors(['email' => 'Your account email address cannot be changed.']);
+
+    expect($user->fresh()->getAttributes())->toBe($original);
+})->with(['customer', 'staff', 'manager', 'owner', 'it']);
+
+test('profile rejects invalid email replacements', function (mixed $email) {
+    $user = User::factory()->customer()->create(['email' => 'customer@example.test']);
+    User::factory()->customer()->create(['email' => 'taken@example.test']);
+    $original = $user->refresh()->getAttributes();
+
+    $this->actingAs($user)->patch(route('profile.update'), [
+        'name' => 'Changed name',
+        'email' => $email,
+    ])->assertSessionHasErrors(['email' => 'Your account email address cannot be changed.']);
+
+    expect($user->fresh()->getAttributes())->toBe($original);
+})->with([
+    'another account' => 'taken@example.test',
+    'case change' => 'CUSTOMER@example.test',
+    'blank' => '',
+    'null' => null,
+    'array' => [['customer@example.test']],
+    'number' => 123,
+    'invalid address' => 'invalid',
+]);
+
+test('unverified profile updates preserve a null verification timestamp', function () {
+    $user = User::factory()->customer()->unverified()->create();
+
+    $this->actingAs($user)->patch(route('profile.update'), [
+        'name' => 'Updated name',
+        'email_verified_at' => '2026-01-01 00:00:00',
+    ])->assertSessionHasNoErrors();
+
+    expect($user->refresh()->name)->toBe('Updated name')
+        ->and($user->email_verified_at)->toBeNull();
+});
+
+test('the shared profile action never writes email or its verification timestamp', function () {
+    $user = User::factory()->customer()->create();
+    $email = $user->email;
+    $verifiedAt = $user->getRawOriginal('email_verified_at');
+
+    app(UpdateProfile::class)($user, [
+        'name' => 'Updated name',
+        'email' => 'replacement@example.test',
+        'email_verified_at' => null,
+    ]);
+
+    expect($user->refresh()->name)->toBe('Updated name')
+        ->and($user->email)->toBe($email)
+        ->and($user->getRawOriginal('email_verified_at'))->toBe($verifiedAt);
 });
 
 test('customer profile saves and clears a normalized default mobile number independently of its address', function () {

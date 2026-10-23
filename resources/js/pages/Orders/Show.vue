@@ -17,6 +17,7 @@ import OrderController from '@/actions/App/Http/Controllers/OrderController';
 import OrderPaymentProofController from '@/actions/App/Http/Controllers/OrderPaymentProofController';
 import InputError from '@/components/InputError.vue';
 import ShipmentTracking from '@/components/ShipmentTracking.vue';
+import OrderReturnRequests from '@/components/OrderReturnRequests.vue';
 import ProductImage from '@/components/catalog/ProductImage.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -246,6 +247,8 @@ function finishPaymentWindow(page) {
                 :shipment="order.shipment"
                 :quote="order.delivery_quote"
             />
+
+            <OrderReturnRequests :order="order" />
 
             <div
                 class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_23rem] xl:items-start"

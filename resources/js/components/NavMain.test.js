@@ -79,6 +79,13 @@ function navigationHarness({
             '@/actions/App/Http/Controllers/Administration/BranchController': {
                 index: route('/administration/branches'),
             },
+            '@/actions/App/Http/Controllers/Administration/ProductController': {
+                default: { index: route('/administration/products') },
+            },
+            '@/actions/App/Http/Controllers/Administration/InventoryController':
+                {
+                    default: { index: route('/administration/inventory') },
+                },
             '@/routes/branches': { index: route('/branches') },
             '@/routes/cart': { index: route('/cart') },
             '@/routes/orders': { index: route('/orders') },
@@ -190,23 +197,38 @@ test('store navigation follows the branch capability and reacts to permission ch
             (item) => item.title === 'Stores',
         );
 
-    assert.equal(toUrl(stores().href), '/branches');
-    assert.match(await harness.render(), /href="\/branches"/);
+    assert.equal(stores(), undefined);
+    assert.doesNotMatch(
+        await harness.render(),
+        /href="\/(?:administration\/)?branches"/,
+    );
     harness.page.props.auth.can.manageBranches = true;
     assert.equal(toUrl(stores().href), '/administration/branches');
+    assert.match(await harness.render(), /href="\/administration\/branches"/);
     harness.page.props.auth.can.manageBranches = false;
-    assert.equal(toUrl(stores().href), '/branches');
-
-    const customer = navigationHarness();
-    assert.equal(
-        toUrl(
-            customer.navigation.mainNavItems.value.find(
-                (item) => item.title === 'Our stores',
-            ).href,
-        ),
-        '/branches',
+    assert.equal(stores(), undefined);
+    assert.doesNotMatch(
+        await harness.render(),
+        /href="\/(?:administration\/)?branches"/,
     );
 });
+
+for (const audience of ['guest', 'customer']) {
+    test(`${audience} navigation keeps public Products and Our stores links`, async () => {
+        const harness = navigationHarness();
+        if (audience === 'guest') {
+            harness.page.props.auth = null;
+        }
+
+        const html = await harness.render();
+        assert.match(html, /href="\/products"[^>]*>.*?<span>Products<\/span>/s);
+        assert.match(
+            html,
+            /href="\/branches"[^>]*>.*?<span>Our stores<\/span>/s,
+        );
+        assert.doesNotMatch(html, /href="\/administration(?:\/|")/);
+    });
+}
 
 for (const mode of ['expanded', 'collapsed', 'mobile']) {
     for (const [quantity, label] of [
@@ -290,50 +312,100 @@ test('administrator navigation keeps Orders and never receives a Cart badge', as
     assert.doesNotMatch(html, /cart-quantity-badge|lucide-shopping-cart/);
 });
 
-test('business roles can open the storefront catalog from administration navigation', async () => {
+test('business navigation uses Inventory and reacts to customizable product management permission', async () => {
     const harness = navigationHarness({
         administrator: true,
         catalogRole: true,
+        capabilities: { viewInventory: true },
     });
-    const catalog = harness.navigation.mainNavItems.value.find(
-        (item) => item.title === 'Products',
-    );
-
-    assert.equal(toUrl(catalog.href), '/products');
-    assert.equal(
-        harness.navigation.mainNavItems.value.some(
+    const inventory = () =>
+        harness.navigation.mainNavItems.value.find(
+            (item) => item.title === 'Inventory',
+        );
+    const manageProducts = () =>
+        harness.navigation.mainNavItems.value.find(
             (item) => item.title === 'Manage products',
-        ),
-        false,
-    );
-    assert.doesNotMatch(await harness.render(), /lucide-shopping-cart/);
+        );
 
-    const manager = navigationHarness({
+    assert.equal(toUrl(inventory().href), '/administration/inventory');
+    assert.equal(manageProducts(), undefined);
+    assert.doesNotMatch(
+        await harness.render(),
+        /href="\/(?:products|branches)"|lucide-shopping-cart/,
+    );
+
+    harness.page.props.auth.can.manageProducts = true;
+    assert.equal(toUrl(manageProducts().href), '/administration/products');
+    assert.match(await harness.render(), /href="\/administration\/products"/);
+    assert.doesNotMatch(await harness.render(), /href="\/products"/);
+
+    harness.page.props.auth.can.manageProducts = false;
+    assert.equal(manageProducts(), undefined);
+    assert.equal(toUrl(inventory().href), '/administration/inventory');
+    harness.page.props.auth.can.viewInventory = false;
+    assert.equal(inventory(), undefined);
+    assert.ok(
+        harness.navigation.mainNavItems.value.some(
+            (item) => item.title === 'Tasks',
+        ),
+    );
+});
+
+test('Manager and Owner navigation retains permitted management links without public shopping links', async () => {
+    const harness = navigationHarness({
         administrator: true,
         catalogRole: true,
         manageCatalog: true,
+        capabilities: { manageBranches: true },
     });
+
     assert.equal(
         toUrl(
-            manager.navigation.mainNavItems.value.find(
+            harness.navigation.mainNavItems.value.find(
                 (item) => item.title === 'Manage products',
             ).href,
         ),
-        '/administration',
+        '/administration/products',
     );
-
-    const it = navigationHarness({ administrator: true });
     assert.equal(
-        it.navigation.mainNavItems.value.some(
-            (item) => item.title === 'Products',
+        toUrl(
+            harness.navigation.mainNavItems.value.find(
+                (item) => item.title === 'Stores',
+            ).href,
         ),
-        false,
+        '/administration/branches',
+    );
+    assert.doesNotMatch(
+        await harness.render(),
+        /href="\/(?:products|branches|cart)"/,
+    );
+    assert.ok(
+        harness.navigation.mainNavItems.value.some(
+            (item) => item.title === 'Tasks',
+        ),
+    );
+});
+
+test('IT navigation keeps technical functions without Stores or product modules', async () => {
+    const harness = navigationHarness({
+        administrator: true,
+        capabilities: { viewOrders: false, manageUsers: true, viewAudit: true },
+    });
+
+    assert.deepEqual(
+        harness.navigation.mainNavItems.value.map((item) => item.title),
+        ['Dashboard', 'Activity log', 'Team', 'Account'],
+    );
+    assert.doesNotMatch(
+        await harness.render(),
+        /href="\/(?:products|branches|cart|administration\/(?:products|branches|inventory))"/,
     );
 });
 
 test('administration tasks have distinct icons and clear labels without granting access', async () => {
     const harness = navigationHarness({
         administrator: true,
+        catalogRole: true,
         capabilities: {
             viewInventory: true,
             manageSuppliers: true,
@@ -350,7 +422,7 @@ test('administration tasks have distinct icons and clear labels without granting
         'Supplier returns': icons.Truck,
         'Customer returns': icons.Undo2,
         Suppliers: icons.Handshake,
-        'Staff sales': icons.ChartColumnIncreasing,
+        'Sales by handler': icons.ChartColumnIncreasing,
         'Activity log': icons.Logs,
         Team: icons.UserRoundCog,
     };

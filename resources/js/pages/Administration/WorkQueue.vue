@@ -15,6 +15,7 @@ const taskLabels = {
     damage: 'Damage report',
     supplier_return: 'Supplier return',
     customer_return: 'Customer return',
+    customer_request: 'Customer request awaiting receipt',
     customer_handover: 'Return to customer',
     refund: 'Refund payment',
     refund_reconciliation: 'Refund review',
@@ -70,6 +71,9 @@ defineOptions({
                     <option value="damage">Damage</option>
                     <option value="supplier_return">Supplier return</option>
                     <option value="customer_return">Customer return</option>
+                    <option value="customer_request">
+                        Customer request awaiting receipt
+                    </option>
                     <option value="customer_handover">
                         Return to customer
                     </option>

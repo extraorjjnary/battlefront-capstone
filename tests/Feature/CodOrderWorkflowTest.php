@@ -166,7 +166,11 @@ test('the shared service refuses unquoted COD placement even with otherwise vali
 test('COD progresses through all shipment milestones unpaid and confirms collection exactly once', function () {
     $this->travelTo('2026-10-12 09:00:00');
     $order = codWorkflowOrder();
-    $this->actingAs(User::factory()->administrator()->create());
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator);
     $this->get(route('administration.orders.show', $order))->assertInertia(fn (Assert $page) => $page
         ->where('order.payment.status.value', 'pending')
         ->where('order.allowed_status_transitions', [
@@ -221,9 +225,13 @@ test('COD progresses through all shipment milestones unpaid and confirms collect
 
 test('COD collection is rejected before delivery or after cancellation with no payment sales or notification changes', function (ShipmentStatus $milestone, OrderStatus $status) {
     $order = codWorkflowOrder($milestone, $status);
+
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
     $before = $order->getAttributes();
 
-    $this->actingAs(User::factory()->administrator()->create())->post(route('administration.orders.cod-collection.store', $order), ['cod_collection_confirmed' => true])
+    $this->actingAs($administrator)->post(route('administration.orders.cod-collection.store', $order), ['cod_collection_confirmed' => true])
         ->assertSessionHasErrors('cod_collection_confirmed');
 
     expect($order->refresh()->getAttributes())->toBe($before);
@@ -245,7 +253,11 @@ test('COD collection requires explicit accepted confirmation', function (mixed $
     $order = codWorkflowOrder(ShipmentStatus::Delivered, OrderStatus::Processing);
     $payload = $confirmation === null ? [] : ['cod_collection_confirmed' => $confirmation];
 
-    $this->actingAs(User::factory()->administrator()->create())->post(route('administration.orders.cod-collection.store', $order), $payload)
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)->post(route('administration.orders.cod-collection.store', $order), $payload)
         ->assertSessionHasErrors(['cod_collection_confirmed' => 'Confirm that you manually verified LBC collected the COD payment.']);
 
     expect($order->refresh())->payment_status->toBe(PaymentStatus::Pending)->status->toBe(OrderStatus::Processing);
@@ -270,7 +282,11 @@ test('COD collection cannot be performed by guests customers or bearer-only web 
 
 test('ordinary payment decisions and order completion cannot bypass COD collection', function (string $operation) {
     $order = codWorkflowOrder(ShipmentStatus::Delivered, OrderStatus::Processing);
-    $this->actingAs(User::factory()->administrator()->create());
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator);
 
     if ($operation === 'completed') {
         $this->patch(route('administration.orders.status.update', $order), ['status' => 'completed'])->assertSessionHasErrors('status');
@@ -387,7 +403,11 @@ test('customers can cancel Pending COD orders through web and mobile and stock i
 test('Processing COD cannot be cancelled by its customer and administrators cannot cancel after handoff', function (ShipmentStatus $milestone) {
     $order = codWorkflowOrder($milestone, OrderStatus::Processing);
     $this->actingAs($order->user)->post(route('orders.cancel.store', $order))->assertSessionHasErrors('status');
-    $this->actingAs(User::factory()->administrator()->create())->patch(route('administration.orders.status.update', $order), ['status' => 'cancelled']);
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)->patch(route('administration.orders.status.update', $order), ['status' => 'cancelled']);
 
     $canCancel = in_array($milestone, [ShipmentStatus::AwaitingPreparation, ShipmentStatus::Preparing, ShipmentStatus::ReadyForDispatch], true);
     expect($order->refresh()->status)->toBe($canCancel ? OrderStatus::Cancelled : OrderStatus::Processing);
@@ -415,7 +435,11 @@ test('chatbot rules distinguish proof-free COD delivery from pickup payment', fu
 test('COD completion cannot bypass collection when a shipment is missing even if payment was marked verified outside the workflow', function () {
     $order = Order::factory()->cashOnDelivery()->create(['status' => OrderStatus::Processing, 'payment_status' => PaymentStatus::Verified]);
 
-    $this->actingAs(User::factory()->administrator()->create())->patch(route('administration.orders.status.update', $order), ['status' => 'completed'])
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)->patch(route('administration.orders.status.update', $order), ['status' => 'completed'])
         ->assertSessionHasErrors('status');
 
     expect($order->refresh()->status)->toBe(OrderStatus::Processing);
@@ -438,7 +462,11 @@ test('COD shipment progression rejects pending orders and skipped repeated or ba
     $order = codWorkflowOrder($current, $orderStatus);
     $before = $order->shipment->getAttributes();
 
-    $this->actingAs(User::factory()->administrator()->create())->patch(route('administration.orders.shipment.status.update', $order), ['status' => $requested->value])
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)->patch(route('administration.orders.shipment.status.update', $order), ['status' => $requested->value])
         ->assertSessionHasErrors('status');
 
     expect($order->refresh()->shipment->getAttributes())->toBe($before);

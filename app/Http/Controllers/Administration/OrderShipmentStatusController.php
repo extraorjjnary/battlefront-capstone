@@ -18,6 +18,7 @@ class OrderShipmentStatusController extends Controller
             $order,
             ShipmentStatus::from($request->validated('status')),
             $request->validated('tracking_reference'),
+            actor: $request->user(),
         );
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Shipment status updated.']);

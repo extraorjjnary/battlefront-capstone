@@ -190,6 +190,9 @@ test('administrator cancellation notifies the affected customer while preserving
     $otherAdministrator = User::factory()->administrator()->create();
     $otherCustomer = User::factory()->customer()->create();
 
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
     $this->actingAs($administrator)->from(route('administration.orders.show', $order))
         ->patch(route('administration.orders.status.update', $order), ['status' => 'cancelled', 'cancellation_initiator' => 'customer'])
         ->assertRedirect(route('administration.orders.show', $order))

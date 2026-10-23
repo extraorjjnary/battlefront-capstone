@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Order\AssignOrderHandler;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\ShipmentStatus;
@@ -7,12 +8,14 @@ use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Shipment;
+use App\Models\User;
 use App\Services\Order\OrderProcessingService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Laravel\SerializableClosure\SerializableClosure;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\Process\Process;
 
 /** Keep MySQL fixtures committed separately from Feature's shared SQLite transaction. */
@@ -62,9 +65,9 @@ function waitForCodWorker(Closure $ready): void
 }
 
 /** @param array<string, mixed> $connection */
-function codConcurrentTask(array $connection, int $orderId, string $operation, ?string $lockedPath = null, ?string $releasePath = null): Closure
+function codConcurrentTask(array $connection, int $orderId, string $operation, ?string $lockedPath = null, ?string $releasePath = null, ?int $actorId = null, ?int $handlerId = null): Closure
 {
-    return function () use ($connection, $orderId, $operation, $lockedPath, $releasePath): string {
+    return function () use ($connection, $orderId, $operation, $lockedPath, $releasePath, $actorId, $handlerId): string {
         config(['database.connections.mysql' => $connection]);
         DB::purge('mysql');
         DB::setDefaultConnection('mysql');
@@ -75,14 +78,17 @@ function codConcurrentTask(array $connection, int $orderId, string $operation, ?
                 Order::query()->whereKey($orderId)->lockForUpdate()->firstOrFail();
             }
             $order = Order::query()->with('shipment')->findOrFail($orderId);
+            $actor = $actorId === null ? null : User::query()->findOrFail($actorId);
             try {
                 if ($operation === 'delivered') {
-                    $processing->updateShipmentStatus($order, ShipmentStatus::Delivered);
+                    $processing->updateShipmentStatus($order, ShipmentStatus::Delivered, actor: $actor);
+                } elseif ($operation === 'claim' || $operation === 'assign') {
+                    app(AssignOrderHandler::class)->execute($order, $actor, $handlerId ?? $actor->id, claimOnly: $operation === 'claim');
                 } else {
-                    $processing->confirmCodCollection($order, true);
+                    $processing->confirmCodCollection($order, true, actor: $actor);
                 }
                 $outcome = 'accepted';
-            } catch (ValidationException) {
+            } catch (ValidationException|HttpException) {
                 $outcome = 'rejected';
             }
             if ($lockedPath !== null) {
@@ -198,3 +204,78 @@ test('MySQL COD migration preserves existing rows and enforces canonical deliver
     expect(fn () => DB::table('orders')->where('id', $legacy->id)->update(['payment_method' => 'cod']))->toThrow(QueryException::class);
     expect(fn () => $migration->down())->toThrow(RuntimeException::class, 'Cannot roll back payment methods while COD orders exist.');
 });
+
+test('real MySQL overlap serializes handler claims reassignment and completion', function (string $firstOperation, string $secondOperation, int $expectedSales) {
+    $manager = User::factory()->administrator()->create();
+    $handlers = User::factory()->administrator()->count(2)->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
+    [$original, $replacement] = $handlers->all();
+    $order = Order::factory()->cashOnDelivery()->create([
+        'status' => OrderStatus::Processing,
+        'assigned_handler_id' => $firstOperation === 'claim' ? null : $original->id,
+    ]);
+    Shipment::factory()->for($order)->create(['status' => ShipmentStatus::Delivered, 'delivered_at' => now()]);
+    $stock = Inventory::factory()->create(['quantity' => 7]);
+    OrderItem::factory()->for($order)->create(['product_id' => $stock->product_id, 'quantity' => 2, 'price_at_time' => '50.00']);
+    $connection = config('database.connections.mysql');
+    $barrier = storage_path('framework/testing/handler-'.bin2hex(random_bytes(6)));
+    mkdir($barrier, 0777, true);
+    $lockedPath = $barrier.'/locked';
+    $releasePath = $barrier.'/release';
+    $first = $second = null;
+
+    try {
+        $first = startCodWorker(codConcurrentTask($connection, $order->id, $firstOperation, $lockedPath, $releasePath,
+            actorId: $firstOperation === 'assign' ? $manager->id : $original->id,
+            handlerId: $firstOperation === 'assign' ? $replacement->id : null));
+        waitForCodWorker(fn (): bool => is_file($lockedPath));
+        $second = startCodWorker(codConcurrentTask($connection, $order->id, $secondOperation,
+            actorId: match ($secondOperation) {
+                'claim' => $replacement->id, 'assign' => $manager->id, default => $original->id,
+            }, handlerId: $secondOperation === 'assign' ? $replacement->id : null));
+        waitForCodWorker(fn (): bool => (int) DB::connection('cod_mysql_server')->selectOne(<<<'SQL'
+            SELECT COUNT(*) AS blocked
+            FROM performance_schema.data_lock_waits AS waits
+            JOIN performance_schema.data_locks AS locks
+                ON waits.BLOCKING_ENGINE_LOCK_ID = locks.ENGINE_LOCK_ID
+            WHERE locks.OBJECT_SCHEMA = ? AND locks.OBJECT_NAME = 'orders'
+        SQL, [$this->codDatabase])->blocked > 0);
+        file_put_contents($releasePath, 'release');
+        $first->wait();
+        $second->wait();
+        $outcomes = [];
+        foreach ([$first, $second] as $worker) {
+            expect($worker->getExitCode())->toBe(0);
+            $result = json_decode($worker->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+            expect($result['successful'])->toBeTrue();
+            $outcomes[] = unserialize($result['result']);
+        }
+        expect($outcomes)->toBe(['accepted', 'rejected']);
+        expect($order->refresh()->assigned_handler_id)->toBe($firstOperation === 'assign' ? $replacement->id : $original->id);
+        expect($stock->refresh()->quantity)->toBe(7);
+        $this->assertDatabaseCount('sales', $expectedSales);
+        $this->assertDatabaseCount('audit_logs', $expectedSales === 1 ? 2 : 1);
+        expect($order->user->notifications()->where('data->event', 'payment.verified')->count())->toBe($expectedSales);
+        if ($firstOperation === 'assign') {
+            app(OrderProcessingService::class)->confirmCodCollection($order, true, actor: $replacement);
+            expect($order->sale()->sole()->handler_id)->toBe($replacement->id);
+        } elseif ($expectedSales === 1) {
+            expect($order->sale()->sole()->handler_id)->toBe($original->id);
+        }
+    } finally {
+        file_put_contents($releasePath, 'release');
+        $first?->stop();
+        $second?->stop();
+        foreach ([$lockedPath, $releasePath] as $path) {
+            if (is_file($path)) {
+                unlink($path);
+            }
+        }
+        rmdir($barrier);
+    }
+})->with([
+    'competing claims' => ['claim', 'claim', 0],
+    'reassignment wins before former handler confirms collection' => ['assign', 'confirm', 0],
+    'completion wins before reassignment' => ['confirm', 'assign', 1],
+]);

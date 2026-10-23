@@ -27,7 +27,7 @@ test('only completion records a sale for the final assigned handler and subseque
     app(AssignOrderHandler::class)->execute($order, $manager, $final->id);
     $this->assertDatabaseCount('sales', 0);
 
-    app(OrderProcessingService::class)->updateStatus($order, OrderStatus::Completed);
+    app(OrderProcessingService::class)->updateStatus($order, OrderStatus::Completed, actor: $final);
     $this->actingAs($manager)->patch(route('administration.orders.handler.update', $order), ['handler_id' => $first->id])->assertSessionHasErrors('handler');
     expect($order->sale()->sole()->handler_id)->toBe($final->id);
     expect(fn () => app(OrderProcessingService::class)->updateStatus($order->fresh(), OrderStatus::Completed))->toThrow(ValidationException::class);
@@ -45,7 +45,7 @@ test('assigned pending and cancelled orders do not count and historical sales st
     $legacy->sale()->create(['amount' => '100.00', 'sale_date' => today(config('battlefront.timezone')), 'handler_id' => null]);
 
     $this->actingAs($manager)->get(route('administration.reports.staff'))->assertInertia(fn (Assert $page) => $page
-        ->where('unattributed_count', 1)->where('staff.0.orders_count', 0)->where('transactions.total', 0));
+        ->where('unattributed_count', 1)->where('staff.0.orders_count', 0)->where('transactions', null));
     expect($legacy->sale->handler_id)->toBeNull();
 });
 
@@ -133,6 +133,7 @@ test('manager sees team sales while staff sees only their own performance', func
 
     $this->actingAs($manager)->get(route('administration.reports.staff'))
         ->assertOk()->assertInertia(fn (Assert $page) => $page->component('Administration/Reports/StaffPerformance')
+        ->where('can_view_all', true)->where('selected_handler_id', null)->where('transactions', null)
         ->where('staff.0.id', $staff->id)->where('staff.0.orders_count', 1)->where('staff.0.gross_sales', '240')
         ->where('staff.0.refunds_paid', '30.00')->where('staff.0.net_sales', '210.00'));
     $this->actingAs($staff)->get(route('administration.reports.staff'))->assertOk()
@@ -181,10 +182,135 @@ test('manager can inspect a selected handler and sale records paginate with date
     $this->actingAs($manager)->get(route('administration.reports.staff', ['handler_id' => $staff->id]))
         ->assertInertia(fn (Assert $page) => $page->where('selected_handler_id', $staff->id)
             ->where('transactions.total', 21)->has('transactions.data', 20));
+    $this->get(route('administration.reports.staff', ['handler_id' => $staff->id, 'sale_page' => 2]))
+        ->assertInertia(fn (Assert $page) => $page->where('selected_handler_id', $staff->id)
+            ->where('transactions.current_page', 2)->where('transactions.total', 21)->has('transactions.data', 1));
     $this->actingAs($manager)->get(route('administration.reports.staff', [
         'handler_id' => $staff->id, 'from' => '2025-01-10', 'to' => '2025-01-10',
     ]))->assertInertia(fn (Assert $page) => $page->where('transactions.total', 1)
         ->where('staff.0.orders_count', 1));
+});
+
+test('handler report defaults to a team summary of eligible business roles', function (string $role) {
+    $this->travelTo('2026-10-22 12:00:00');
+    $handlers = [];
+    foreach (['staff', 'manager', 'owner'] as $handlerRole) {
+        $handlers[$handlerRole] = User::factory()->administrator()->create([
+            'administration_role_id' => DB::table('administration_roles')->where('code', $handlerRole)->value('id'),
+        ]);
+    }
+    User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'it')->value('id'),
+    ]);
+    User::factory()->administrator()->create(['is_active' => false]);
+    User::factory()->administrator()->create(['administration_role_id' => null]);
+    User::factory()->customer()->create();
+    $handlerIds = collect($handlers)->pluck('id')->sort()->values()->all();
+
+    $this->actingAs($handlers[$role])->get(route('administration.reports.staff'))->assertInertia(fn (Assert $page) => $page
+        ->where('can_view_all', true)
+        ->where('auth.can.viewStaffReports', true)
+        ->where('filters', ['from' => '2026-10-01', 'to' => '2026-10-22'])
+        ->where('selected_handler_id', null)->where('selected_handler_name', null)->where('transactions', null)
+        ->where('staff', fn ($rows): bool => collect($rows)->pluck('id')->sort()->values()->all() === $handlerIds));
+})->with(['manager', 'owner']);
+
+test('handler report excludes current accounts without order processing permission or sales history', function (string $role) {
+    $viewer = User::factory()->administrator()->create();
+    $roleId = DB::table('administration_roles')->where('code', $role)->value('id');
+    $handler = User::factory()->administrator()->create(['administration_role_id' => $roleId]);
+    DB::table('administration_role_permissions')->where('administration_role_id', $roleId)
+        ->where('administration_permission_id', DB::table('administration_permissions')->where('code', 'orders.process')->value('id'))
+        ->delete();
+
+    $this->actingAs($viewer)->get(route('administration.reports.staff'))->assertInertia(fn (Assert $page) => $page
+        ->where('staff', fn ($rows): bool => ! collect($rows)->pluck('id')->contains($handler->id)));
+    $this->get(route('administration.reports.staff', ['handler_id' => $handler->id]))->assertNotFound();
+})->with(['staff', 'manager']);
+
+test('handler report respects explicitly unbounded dates in the team summary', function () {
+    $viewer = User::factory()->administrator()->create();
+    $order = Order::factory()->withDeliverySnapshot(subtotal: '200.00')->create();
+    $order->sale()->create(['amount' => '260.00', 'sale_date' => '2024-01-05', 'handler_id' => $viewer->id]);
+
+    $this->actingAs($viewer)->get(route('administration.reports.staff', ['from' => '', 'to' => '']))
+        ->assertInertia(fn (Assert $page) => $page->where('filters', ['from' => null, 'to' => null])
+            ->where('transactions', null)->where('staff.0.id', $viewer->id)->where('staff.0.gross_sales', '200'));
+});
+
+test('handler report preserves genuine historical attribution after access changes', function (string $change) {
+    $viewer = User::factory()->administrator()->create();
+    $handler = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
+    $order = Order::factory()->withDeliverySnapshot(subtotal: '200.00')->create();
+    $sale = $order->sale()->create(['amount' => '260.00', 'sale_date' => '2025-01-05', 'handler_id' => $handler->id]);
+    $originalSale = $sale->fresh()->getRawOriginal();
+    if ($change === 'revoked processing permission') {
+        DB::table('administration_role_permissions')->where('administration_role_id', $handler->administration_role_id)
+            ->where('administration_permission_id', DB::table('administration_permissions')->where('code', 'orders.process')->value('id'))
+            ->delete();
+    } else {
+        $handler->update(match ($change) {
+            'IT role' => ['administration_role_id' => DB::table('administration_roles')->where('code', 'it')->value('id')],
+            'customer role' => ['role' => 'customer', 'administration_role_id' => null],
+            'unassigned role' => ['administration_role_id' => null],
+            'inactive account' => ['is_active' => false],
+        });
+    }
+    $filters = ['from' => '2025-01-01', 'to' => '2025-01-31'];
+
+    $this->actingAs($viewer)->get(route('administration.reports.staff', $filters))->assertInertia(fn (Assert $page) => $page
+        ->where('staff.0.id', $handler->id)->where('staff.0.orders_count', 1)->where('staff.0.gross_sales', '200')
+        ->where('transactions', null));
+    $this->get(route('administration.reports.staff', [...$filters, 'handler_id' => $handler->id]))->assertInertia(fn (Assert $page) => $page
+        ->where('selected_handler_name', $handler->name)->where('transactions.total', 1)
+        ->where('transactions.data.0.order_id', $order->id)->where('transactions.data.0.gross_sales', '200'));
+    expect($sale->fresh()->getRawOriginal())->toBe($originalSale);
+})->with(['revoked processing permission', 'IT role', 'customer role', 'unassigned role', 'inactive account']);
+
+test('handler report keeps staff on My sales even with a customized team reporting grant', function () {
+    $staff = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
+    $other = User::factory()->administrator()->create();
+    DB::table('administration_role_permissions')->insert([
+        'administration_role_id' => $staff->administration_role_id,
+        'administration_permission_id' => DB::table('administration_permissions')->where('code', 'staff_reports.view')->value('id'),
+    ]);
+
+    $this->actingAs($staff)->get(route('administration.reports.staff'))->assertInertia(fn (Assert $page) => $page
+        ->where('can_view_all', false)->where('auth.can.viewStaffReports', false)
+        ->where('selected_handler_id', $staff->id)->has('staff', 1)->where('staff.0.id', $staff->id));
+    $this->get(route('administration.reports.staff', ['handler_id' => $other->id]))->assertForbidden();
+});
+
+test('handler report requires team permission to select other handlers', function () {
+    $manager = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'manager')->value('id'),
+    ]);
+    $other = User::factory()->administrator()->create();
+    DB::table('administration_role_permissions')->where('administration_role_id', $manager->administration_role_id)
+        ->where('administration_permission_id', DB::table('administration_permissions')->where('code', 'staff_reports.view')->value('id'))
+        ->delete();
+
+    $this->actingAs($manager)->get(route('administration.reports.staff'))->assertInertia(fn (Assert $page) => $page
+        ->where('can_view_all', false)->where('selected_handler_id', $manager->id)->has('staff', 1));
+    $this->get(route('administration.reports.staff', ['handler_id' => $other->id]))->assertForbidden();
+});
+
+test('handler report excludes ordinary IT handlers and keeps IT viewers outside sales reporting', function () {
+    $viewer = User::factory()->administrator()->create();
+    $it = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'it')->value('id'),
+    ]);
+
+    $this->actingAs($viewer)->get(route('administration.reports.staff', ['handler_id' => $it->id]))->assertNotFound();
+    $this->actingAs($it)->get(route('administration.reports.staff'))->assertForbidden();
+    DB::table('administration_role_permissions')->where('administration_role_id', $viewer->administration_role_id)
+        ->where('administration_permission_id', DB::table('administration_permissions')->where('code', 'orders.view')->value('id'))
+        ->delete();
+    $this->actingAs($viewer)->get(route('administration.reports.staff'))->assertForbidden();
 });
 
 test('order handlers need order permission but do not need two factor enrollment', function () {

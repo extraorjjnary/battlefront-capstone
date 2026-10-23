@@ -53,10 +53,11 @@ test('a customer can update only their own approved profile fields', function ()
     $user = User::factory()->customer()->create();
     $otherUser = User::factory()->customer()->create();
     $token = $user->createToken('Pixel 8')->plainTextToken;
+    $verifiedAt = $user->getRawOriginal('email_verified_at');
 
     $this->withToken($token)->patchJson('/api/v1/profile', [
         'name' => 'Updated Customer',
-        'email' => 'updated@example.com',
+        'email' => $user->email,
         'default_delivery_address' => '45 Rizal Avenue, Escalante City',
         'search_recommendations_enabled' => true,
         'product_view_recommendations_enabled' => true,
@@ -68,7 +69,7 @@ test('a customer can update only their own approved profile fields', function ()
         ->assertExactJson(['data' => [
             'id' => $user->id,
             'name' => 'Updated Customer',
-            'email' => 'updated@example.com',
+            'email' => $user->email,
             'default_delivery_address' => '45 Rizal Avenue, Escalante City',
             'default_delivery_address_prefill' => [
                 'delivery_destination' => 'Escalante City', 'delivery_barangay_code' => '', 'delivery_address_details' => '',
@@ -82,7 +83,7 @@ test('a customer can update only their own approved profile fields', function ()
     $user->refresh();
     expect($user->role)->toBe(UserRole::Customer)
         ->and($user->appearance->value)->toBe('light')
-        ->and($user->email_verified_at)->toBeNull();
+        ->and($user->getRawOriginal('email_verified_at'))->toBe($verifiedAt);
     expect(Hash::check('password', $user->password))->toBeTrue();
     $this->assertDatabaseHas('users', [
         'id' => $otherUser->id,
@@ -129,15 +130,60 @@ test('profile update returns 422 for a duplicate email and leaves the profile un
     $user = User::factory()->customer()->create();
     $otherUser = User::factory()->customer()->create();
     $token = $user->createToken('Pixel 8')->plainTextToken;
+    $original = $user->refresh()->getAttributes();
 
     $this->withToken($token)->patchJson('/api/v1/profile', [
         'name' => 'Updated Customer',
         'email' => $otherUser->email,
     ])->assertUnprocessable()
-        ->assertJsonStructure(['message', 'errors' => ['email']]);
+        ->assertJsonValidationErrors(['email' => 'Your account email address cannot be changed.']);
 
-    expect($user->refresh()->name)->not->toBe('Updated Customer');
+    expect($user->fresh()->getAttributes())->toBe($original);
 });
+
+test('mobile name updates allow omitted email and preserve verification status', function (bool $verified) {
+    $user = User::factory()->customer()->create([
+        'email_verified_at' => $verified ? '2026-01-01 00:00:00' : null,
+        'default_delivery_address' => 'Saved address',
+    ]);
+    $token = $user->createToken('Pixel 8')->plainTextToken;
+    $verifiedAt = $user->getRawOriginal('email_verified_at');
+
+    $this->withToken($token)->patchJson('/api/v1/profile', [
+        'name' => 'Updated Customer',
+        'email_verified_at' => '2026-02-01 00:00:00',
+    ])->assertOk()
+        ->assertJsonPath('data.name', 'Updated Customer')
+        ->assertJsonPath('data.email', $user->email)
+        ->assertJsonPath('data.default_delivery_address', 'Saved address');
+
+    expect($user->refresh()->name)->toBe('Updated Customer')
+        ->and($user->getRawOriginal('email_verified_at'))->toBe($verifiedAt);
+})->with(['verified' => true, 'unverified' => false]);
+
+test('mobile email replacements return 422 without saving profile changes', function (mixed $email) {
+    $user = User::factory()->customer()->create(['email' => 'customer@example.test']);
+    $token = $user->createToken('Pixel 8')->plainTextToken;
+    $original = $user->refresh()->getAttributes();
+
+    $this->withToken($token)->patchJson('/api/v1/profile', [
+        'name' => 'Changed name',
+        'email' => $email,
+        'default_delivery_address' => 'Changed address',
+        'personalized_recommendations_enabled' => false,
+    ])->assertUnprocessable()
+        ->assertJsonValidationErrors(['email' => 'Your account email address cannot be changed.']);
+
+    expect($user->fresh()->getAttributes())->toBe($original);
+})->with([
+    'new address' => 'replacement@example.test',
+    'case change' => 'CUSTOMER@example.test',
+    'blank' => '',
+    'null' => null,
+    'array' => [['customer@example.test']],
+    'number' => 123,
+    'invalid address' => 'invalid',
+]);
 
 test('an administrator bearer token receives 403 on customer profile routes', function () {
     $administrator = User::factory()->administrator()->create();

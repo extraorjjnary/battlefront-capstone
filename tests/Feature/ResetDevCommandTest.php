@@ -23,7 +23,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 use Tests\HistoricalSalesCatalogFixtures;
 
 beforeEach(function () {
-    Storage::fake('local');
+    $this->fakeIsolatedStorage('local');
 });
 
 test('development reset rejects unsafe environments even with force', function (string $environment, bool $force) {

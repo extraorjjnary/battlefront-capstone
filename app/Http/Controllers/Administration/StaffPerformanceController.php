@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Repositories\Reporting\SalesReportRepository;
 use BcMath\Number;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -21,10 +22,27 @@ class StaffPerformanceController extends Controller
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
             'handler_id' => ['nullable', 'integer', 'min:1'],
         ]);
-        $canViewAll = $request->user()->can('staff_reports.view');
-        $handlerId = isset($filters['handler_id']) ? (int) $filters['handler_id'] : $request->user()->id;
+        $canViewAll = in_array($request->user()->administrationRoleCode(), ['manager', 'owner'], true)
+            && $request->user()->can('staff_reports.view');
+        $handlerId = isset($filters['handler_id']) ? (int) $filters['handler_id'] : ($canViewAll ? null : $request->user()->id);
         abort_if(! $canViewAll && $handlerId !== $request->user()->id, 403);
-        abort_unless(DB::table('users')->where('id', $handlerId)->where('role', 'administrator')->exists(), 404);
+
+        $handlers = DB::table('users')
+            ->when($canViewAll, fn (Builder $query): Builder => $query->where(function (Builder $eligible): void {
+                $eligible->where(function (Builder $current): void {
+                    $current->where('users.role', 'administrator')->where('users.is_active', true)
+                        ->whereIn('users.administration_role_id', DB::table('administration_role_permissions as grants')
+                            ->join('administration_permissions as permissions', 'permissions.id', '=', 'grants.administration_permission_id')
+                            ->join('administration_roles as roles', 'roles.id', '=', 'grants.administration_role_id')
+                            ->where('permissions.code', 'orders.process')
+                            ->whereIn('roles.code', ['staff', 'manager', 'owner'])
+                            ->select('grants.administration_role_id'));
+                })->orWhereExists(fn (Builder $history): Builder => $history->selectRaw('1')
+                    ->from('sales')->whereColumn('sales.handler_id', 'users.id'));
+            }))
+            ->when(! $canViewAll, fn (Builder $query): Builder => $query->where('users.id', $request->user()->id));
+        $selectedHandler = $handlerId === null ? null : (clone $handlers)->where('users.id', $handlerId)->first(['users.id', 'users.name']);
+        abort_if($handlerId !== null && $selectedHandler === null, 404);
 
         $useCurrentMonth = $canViewAll && ! isset($filters['handler_id'])
             && ! $request->has('from') && ! $request->has('to');
@@ -34,11 +52,8 @@ class StaffPerformanceController extends Controller
 
         $recordedSales = $reports->attributedSales($from, $to);
 
-        $sales = DB::table('users')
+        $sales = $handlers
             ->leftJoinSub(clone $recordedSales, 'recorded_sales', 'users.id', '=', 'recorded_sales.handler_id')
-            ->where('users.role', 'administrator')
-            ->whereNotNull('users.administration_role_id')
-            ->when(! $canViewAll, fn ($query) => $query->where('users.id', $request->user()->id))
             ->select('users.id', 'users.name')
             ->selectRaw('COUNT(recorded_sales.id) as orders_count, COALESCE(SUM(recorded_sales.product_revenue), 0) as gross_sales')
             ->groupBy('users.id', 'users.name')
@@ -63,12 +78,12 @@ class StaffPerformanceController extends Controller
             ->groupBy('sales.handler_id')
             ->pluck('amount', 'handler_id');
 
-        $transactions = (clone $recordedSales)->where('sales.handler_id', $handlerId)
+        $transactions = $handlerId === null ? null : (clone $recordedSales)->where('sales.handler_id', $handlerId)
             ->orderByDesc('sales.sale_date')->orderByDesc('sales.id')
             ->paginate(20, ['*'], 'sale_page')->withQueryString();
-        $orders = Order::query()->whereIn('id', $transactions->getCollection()->pluck('order_id'))
+        $orders = $transactions === null ? collect() : Order::query()->whereIn('id', $transactions->getCollection()->pluck('order_id'))
             ->get(['id'])->keyBy('id');
-        $transactions->through(fn (\stdClass $sale): array => [
+        $transactions?->through(fn (\stdClass $sale): array => [
             'id' => (int) $sale->id,
             'sale_date' => $sale->sale_date,
             'order_id' => (int) $sale->order_id,
@@ -81,7 +96,7 @@ class StaffPerformanceController extends Controller
             'filters' => ['from' => $from, 'to' => $to],
             'can_view_all' => $canViewAll,
             'selected_handler_id' => $handlerId,
-            'selected_handler_name' => DB::table('users')->where('id', $handlerId)->value('name'),
+            'selected_handler_name' => $selectedHandler?->name,
             'transactions' => $transactions,
             'staff' => $sales->map(fn (object $sale): array => [
                 'id' => $sale->id,

@@ -9,6 +9,7 @@ use App\Http\Requests\Administration\UpdateInventoryRequest;
 use App\Models\Inventory;
 use App\Models\Product;
 use App\Repositories\Inventory\InventoryRepository;
+use App\Support\OperationalRequestReason;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -85,7 +86,7 @@ class InventoryController extends Controller
             $product,
             $request->user(),
             $request->integer('quantity'),
-            $request->string('reason')->toString(),
+            OperationalRequestReason::resolve($request->string('reason_code')->toString(), $request->validated('reason'), openingStock: true),
             $request->integer('reorder_level'),
             reasonCode: $request->string('reason_code')->toString(),
         );
@@ -114,7 +115,7 @@ class InventoryController extends Controller
             $inventory->product,
             $request->user(),
             $request->integer('quantity'),
-            $request->string('reason')->toString(),
+            OperationalRequestReason::resolve($request->string('reason_code')->toString(), $request->validated('reason')),
             reasonCode: $request->string('reason_code')->toString(),
         );
 
@@ -131,7 +132,7 @@ class InventoryController extends Controller
         $validated = $request->validate([
             'quantity' => ['required', 'integer', 'min:0', 'max:4294967295'],
             'observed_quantity' => ['required', 'integer', 'min:0', 'max:4294967295'],
-            'reason' => ['required', 'string', 'min:5', 'max:2000'],
+            'reason' => ['required_if:reason_code,other', 'nullable', 'string', 'min:5', 'max:2000'],
             'reason_code' => ['required', Rule::in(['damage', 'theft_loss', 'found_stock', 'count_error', 'receiving_error', 'unit_of_measure_error', 'other'])],
         ]);
 
@@ -139,7 +140,7 @@ class InventoryController extends Controller
             $inventory->product,
             $request->user(),
             (int) $validated['quantity'],
-            'Physical sellable stock count: '.$validated['reason'],
+            'Physical sellable stock count: '.OperationalRequestReason::resolve($validated['reason_code'], $validated['reason'] ?? null),
             expectedQuantity: (int) $validated['observed_quantity'],
             reasonCode: $validated['reason_code'],
         );

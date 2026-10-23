@@ -6,6 +6,7 @@ import { App, Deferred, usePage } from '@inertiajs/vue3';
 import { renderToString } from '@vue/server-renderer';
 import * as Vue from 'vue';
 import { findAddressNode } from '../lib/deliveryAddressTestHelpers.js';
+import { toUrl } from '../lib/utils.js';
 import {
     compileSkeletonTestComponent,
     loadSkeletonComponent,
@@ -64,8 +65,13 @@ async function renderPage(
                 usePage,
                 router: {},
                 Link: {
+                    props: ['href'],
                     render() {
-                        return Vue.h('a', this.$attrs, this.$slots.default?.());
+                        return Vue.h(
+                            'a',
+                            { ...this.$attrs, href: toUrl(this.href) },
+                            this.$slots.default?.(),
+                        );
                     },
                 },
                 InfiniteScroll: {
@@ -153,6 +159,32 @@ async function renderPage(
             '@/actions/App/Http/Controllers/Administration/WorkQueueController':
                 {
                     default: { index: route },
+                },
+            '@/actions/App/Http/Controllers/Administration/StaffPerformanceController':
+                {
+                    default: {
+                        index: () => ({
+                            url: '/administration/reports/staff',
+                            method: 'get',
+                        }),
+                    },
+                },
+            '@/actions/App/Http/Controllers/Administration/TeamController': {
+                default: {
+                    index: () => ({
+                        url: '/administration/team',
+                        method: 'get',
+                    }),
+                },
+            },
+            '@/actions/App/Http/Controllers/Administration/AuditLogController':
+                {
+                    default: {
+                        index: () => ({
+                            url: '/administration/reports/audit',
+                            method: 'get',
+                        }),
+                    },
                 },
         },
         { get: (target, key) => target[key] ?? generic },
@@ -275,6 +307,143 @@ test('administrator skeletons preserve tool navigation and resolve to operationa
     assert.match(html, /PHP 250\.00/);
     assert.match(html, /No orders have been placed yet/);
     assert.doesNotMatch(html, /data-slot="[^"]*skeleton"/);
+});
+
+test('manager dashboard renders authorized operations without revenue or profit cards', async () => {
+    const props = {
+        auth: {
+            user: { name: 'Manager' },
+            can: {
+                viewOrders: true,
+                viewInventory: true,
+                viewProfitReports: true,
+            },
+        },
+    };
+    let html = await renderPage('Dashboard/Administration', props);
+    assert.equal((html.match(/data-slot="stat-skeleton"/g) ?? []).length, 4);
+
+    props.dashboard = {
+        kpis: {
+            pending_orders: 7,
+            processing_orders: 3,
+            low_stock_products: 2,
+            out_of_stock_products: 1,
+        },
+        needs_attention: {
+            pending_payment_reviews: 0,
+            payment_orders: [],
+            low_stock_products: [],
+            out_of_stock_products: [],
+        },
+        recent_orders: [],
+    };
+    html = await renderPage('Dashboard/Administration', props);
+    assert.match(html, /Pending orders/);
+    assert.match(html, /Low-stock products/);
+    assert.doesNotMatch(
+        html,
+        /All-time product revenue|Gross profit|Sales reports|PHP/,
+    );
+
+    props.auth.can = {};
+    html = await renderPage('Dashboard/Administration', props);
+    assert.match(html, /Administration tools/);
+    assert.doesNotMatch(
+        html,
+        /Operations summary|Needs attention|Recent orders|All-time product revenue|Gross profit/,
+    );
+});
+
+for (const [name, viewOrders, viewInventory, metricCount] of [
+    ['all operations', true, true, 4],
+    ['orders only', true, false, 2],
+    ['inventory only', false, true, 2],
+    ['no modules', false, false, 0],
+]) {
+    test(`staff dashboard shows permitted counts and shortcuts for ${name}`, async () => {
+        const props = {
+            auth: {
+                user: { name: 'Staff' },
+                can: { viewOrders, viewInventory },
+            },
+        };
+        let html = await renderPage('Dashboard/Staff', props);
+        assert.equal(
+            (html.match(/data-slot="stat-skeleton"/g) ?? []).length,
+            metricCount,
+        );
+        assert.match(html, />Tasks<\/span>/);
+
+        props.dashboard = {
+            pending_orders: 17,
+            pending_payment_reviews: 23,
+            low_stock_products: 31,
+            out_of_stock_products: 47,
+        };
+        html = await renderPage('Dashboard/Staff', props);
+        assert.equal(html.includes('Pending orders'), viewOrders);
+        assert.equal(html.includes('Payment checks'), viewOrders);
+        assert.equal(html.includes('Low-stock products'), viewInventory);
+        assert.equal(html.includes('Out-of-stock products'), viewInventory);
+        assert.equal(html.includes('>17</dd>'), viewOrders);
+        assert.equal(html.includes('>23</dd>'), viewOrders);
+        assert.equal(html.includes('>31</dd>'), viewInventory);
+        assert.equal(html.includes('>47</dd>'), viewInventory);
+        assert.equal(html.includes('>Orders</span>'), viewOrders);
+        assert.equal(html.includes('>Inventory</span>'), viewInventory);
+        assert.equal(html.includes('>My sales</span>'), viewOrders);
+        assert.equal(
+            html.includes('href="/administration/reports/staff"'),
+            viewOrders,
+        );
+        assert.doesNotMatch(
+            html,
+            /All-time product revenue|Gross profit|Sales reports|data-slot="stat-skeleton"/,
+        );
+    });
+}
+
+test('staff dashboard keeps Tasks available when operational data needs a retry', async () => {
+    const html = await renderPage(
+        'Dashboard/Staff',
+        { auth: { user: { name: 'Staff' }, can: { viewOrders: true } } },
+        { rescuedProps: ['dashboard'] },
+    );
+
+    assert.match(html, /The operational overview could not be loaded/);
+    assert.match(html, />Retry<\/button>/);
+    assert.match(html, />Tasks<\/span>/);
+    assert.doesNotMatch(html, /data-slot="stat-skeleton"/);
+});
+
+test('IT dashboard welcomes the user and contains only authorized technical shortcuts', async () => {
+    const props = {
+        auth: {
+            user: { name: 'IT Operator' },
+            can: { manageUsers: true, viewAudit: true },
+        },
+        dashboard: { recorded_revenue: '999.00', pending_orders: 17 },
+    };
+    let html = await renderPage('Dashboard/It', props);
+
+    assert.match(html, /Welcome, IT Operator/);
+    assert.match(html, /href="\/administration\/team"/);
+    assert.match(html, /href="\/administration\/reports\/audit"/);
+    assert.doesNotMatch(
+        html,
+        /999|Pending orders|Inventory|My sales|Sales reports|stat-skeleton/,
+    );
+
+    props.auth.can.manageUsers = false;
+    html = await renderPage('Dashboard/It', props);
+    assert.doesNotMatch(html, /href="\/administration\/team"/);
+    assert.match(html, /href="\/administration\/reports\/audit"/);
+
+    props.auth.can.viewAudit = false;
+    html = await renderPage('Dashboard/It', props);
+    assert.match(html, /Welcome, IT Operator/);
+    assert.doesNotMatch(html, /<a\b/);
 });
 
 test('catalog keeps existing results while deferred recommendations and the next page load', async () => {

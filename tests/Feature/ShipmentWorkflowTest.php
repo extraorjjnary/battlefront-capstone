@@ -83,6 +83,9 @@ test('administrators advance the full manual lifecycle and complete one sale wit
     Storage::disk('local')->put($order->payment_proof_path, 'evidence');
     $stock = Inventory::sole();
     $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
     $this->actingAs($administrator);
 
     $this->patch(route('administration.orders.payment-status.update', $order), [
@@ -126,7 +129,11 @@ test('shipment preparation requires both verified payment and a processing order
     $order = shipmentWorkflowOrder($status, $payment);
     $before = $order->shipment->getAttributes();
 
-    $this->actingAs(User::factory()->administrator()->create())
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)
         ->patch(route('administration.orders.shipment.status.update', $order), ['status' => 'preparing'])
         ->assertSessionHasErrors('status');
 
@@ -147,7 +154,11 @@ test('shipment rejects skips backwards repeats and terminal transitions', functi
     advanceShipmentForTest($order, $initial);
     $before = $order->shipment->getAttributes();
 
-    $this->actingAs(User::factory()->administrator()->create())
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)
         ->patch(route('administration.orders.shipment.status.update', $order), ['status' => $requested])
         ->assertSessionHasErrors('status');
 
@@ -167,7 +178,11 @@ test('pickup and legacy orders reject shipment mutations without creating shipme
     $order = ($delivery ? $factory->delivery() : $factory)->create(['status' => OrderStatus::Processing, 'payment_status' => PaymentStatus::Verified]);
     $payload = $endpoint === 'status' ? ['status' => 'preparing'] : ['tracking_reference' => 'SUPPLIED'];
 
-    $this->actingAs(User::factory()->administrator()->create())
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)
         ->patch(route('administration.orders.shipment.'.$endpoint.'.update', $order), $payload)
         ->assertSessionHasErrors($endpoint === 'status' ? 'status' : 'tracking_reference');
 
@@ -198,7 +213,11 @@ test('shipment endpoints reject unauthenticated and customer mutations', functio
 test('direct order completion cannot bypass delivery milestones', function () {
     $order = shipmentWorkflowOrder();
 
-    $this->actingAs(User::factory()->administrator()->create())
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)
         ->patch(route('administration.orders.status.update', $order), ['status' => 'completed'])
         ->assertSessionHasErrors(['status' => 'Complete delivery through the shipment Delivered milestone.']);
 
@@ -211,7 +230,11 @@ test('cancelling an eligible delivery terminates its shipment and restores stock
     $order = shipmentWorkflowOrder($status);
     advanceShipmentForTest($order, $milestone);
     $shipment = $order->shipment->getAttributes();
-    $this->actingAs(User::factory()->administrator()->create());
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator);
 
     $this->patch(route('administration.orders.status.update', $order), ['status' => 'cancelled'])->assertSessionHasNoErrors();
     expect($order->refresh()->status)->toBe(OrderStatus::Cancelled);
@@ -252,12 +275,16 @@ test('sale failure rolls back shipment delivery order completion and timestamps 
 test('administrator cancellation after LBC handoff preserves stock payment shipment history and sales', function (ShipmentStatus $milestone) {
     $order = shipmentWorkflowOrder();
     advanceShipmentForTest($order, $milestone);
-    $originalOrder = $order->refresh()->getAttributes();
     $originalShipment = $order->shipment->getAttributes();
     $notificationCount = $order->user->notifications()->count();
     $salesCount = Sale::query()->count();
     $message = 'This shipment has been handed to LBC. Normal order cancellation is no longer available.';
-    $this->actingAs(User::factory()->administrator()->create());
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+    $originalOrder = $order->refresh()->getAttributes();
+
+    $this->actingAs($administrator);
     $this->get(route('administration.orders.show', $order))->assertInertia(fn (Assert $page) => $page
         ->where('order.allowed_status_transitions', [])
         ->where('order.cancellation_blocked_reason', $message));
@@ -337,7 +364,11 @@ test('operational ETA is persisted at preparation and survives later time and co
 test('real references may be supplied at handoff and corrected or cleared without changing milestones', function () {
     $order = shipmentWorkflowOrder();
     advanceShipmentForTest($order, ShipmentStatus::ReadyForDispatch);
-    $this->actingAs(User::factory()->administrator()->create());
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator);
     $this->patch(route('administration.orders.shipment.status.update', $order), ['status' => 'handed_to_lbc', 'tracking_reference' => ' REAL-REFERENCE '])
         ->assertSessionHasNoErrors();
     expect($order->refresh()->shipment->tracking_reference)->toBe('REAL-REFERENCE');
@@ -361,7 +392,11 @@ test('references reject early entry and malformed values', function (mixed $refe
         advanceShipmentForTest($order, ShipmentStatus::HandedToLbc);
     }
 
-    $this->actingAs(User::factory()->administrator()->create())
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)
         ->patch(route('administration.orders.shipment.reference.update', $order), ['tracking_reference' => $reference])
         ->assertSessionHasErrors('tracking_reference');
 
@@ -375,7 +410,11 @@ test('references reject early entry and malformed values', function (mixed $refe
 test('shipment progression ignores submitted carrier timestamps ETA and order status', function () {
     $order = shipmentWorkflowOrder();
 
-    $this->actingAs(User::factory()->administrator()->create())
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)
         ->patch(route('administration.orders.shipment.status.update', $order), [
             'status' => 'preparing', 'carrier' => 'forged', 'preparing_at' => '2000-01-01',
             'estimated_delivery_start' => '2000-01-01', 'order_status' => 'completed', 'delivery_fee' => '0.00',
@@ -390,7 +429,11 @@ test('shipment progression ignores submitted carrier timestamps ETA and order st
 test('a reference supplied before handoff rejects the entire milestone update', function () {
     $order = shipmentWorkflowOrder();
 
-    $this->actingAs(User::factory()->administrator()->create())
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)
         ->patch(route('administration.orders.shipment.status.update', $order), [
             'status' => 'preparing', 'tracking_reference' => 'SUPPLIED-TOO-EARLY',
         ])->assertSessionHasErrors('tracking_reference');
@@ -419,6 +462,9 @@ test('administrators register a manual shipment without changing commercial snap
         $order->total_amount,
         $order->delivery_quote_metadata,
     ];
+
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
 
     $this->actingAs($administrator)
         ->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload([
@@ -463,6 +509,9 @@ test('manual shipment setup leaves unknown estimates null through preparation', 
     );
     $administrator = User::factory()->administrator()->create();
 
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
     $this->actingAs($administrator)
         ->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload())
         ->assertSessionHasNoErrors();
@@ -494,6 +543,9 @@ test('manual shipment setup rejects duplicate and ineligible orders without side
         ),
     };
     $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
     $this->actingAs($administrator);
 
     if ($scenario === 'duplicate') {
@@ -522,7 +574,11 @@ test('manual shipment setup rejects duplicate and ineligible orders without side
 test('manual shipment input requires explicit LBC confirmation and complete valid estimates', function (array $overrides, string $field) {
     $order = unconfiguredShipmentTestOrder();
 
-    $this->actingAs(User::factory()->administrator()->create())
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)
         ->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload($overrides))
         ->assertSessionHasErrors($field);
 
@@ -546,7 +602,11 @@ test('manual shipment registration is administrator-only', function (string $acc
     );
 
     if ($access === 'administrator') {
-        $this->actingAs(User::factory()->administrator()->create())
+        $administrator = User::factory()->administrator()->create();
+        $order->assigned_handler_id = $administrator->id;
+        $order->save();
+
+        $this->actingAs($administrator)
             ->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload())
             ->assertSessionHasNoErrors();
 
@@ -577,6 +637,9 @@ test('manual GCash and Maya shipments require verified payment and complete once
         'price_at_time' => '50.00',
     ]);
     $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
     $this->actingAs($administrator);
 
     $this->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload([
@@ -624,7 +687,11 @@ test('manual shipment cancellation is blocked after handoff to LBC', function ()
         status: OrderStatus::Processing,
         paymentStatus: PaymentStatus::Verified,
     );
-    $this->actingAs(User::factory()->administrator()->create());
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator);
     $this->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload())
         ->assertSessionHasNoErrors();
     foreach (['preparing', 'ready_for_dispatch', 'handed_to_lbc'] as $status) {
@@ -651,7 +718,11 @@ test('manual COD delivery still waits for explicit collection confirmation', fun
         'quantity' => 2,
         'price_at_time' => '50.00',
     ]);
-    $this->actingAs(User::factory()->administrator()->create());
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator);
     $this->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload())
         ->assertSessionHasNoErrors();
     $this->patch(route('administration.orders.status.update', $order), ['status' => 'processing'])

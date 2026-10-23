@@ -102,7 +102,11 @@ test('pickup and legacy orders remain readable with no shipment presentation', f
     $this->get(route('orders.show', $order))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('order.shipment', null)->where('order.delivery_quote', null));
     $this->get('/api/v1/orders/'.$order->id)->assertOk()->assertJsonPath('data.shipment', null)->assertJsonPath('data.total', $order->total_amount);
-    $this->actingAs(User::factory()->administrator()->create())
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)
         ->get(route('administration.orders.show', $order))->assertOk()
         ->assertInertia(fn (Assert $page) => $page->where('order.shipment', null)->where('order.shipment_actions', null));
 })->with(['pickup' => [false], 'legacy delivery' => [true]]);
@@ -122,7 +126,11 @@ test('cancelled delivery presents a terminal status and retains recorded milesto
         ->where('order.shipment.status.value', 'cancelled')
         ->where('order.shipment.timeline.3', ['status' => 'cancelled', 'label' => 'Cancelled', 'occurred_at' => '2026-10-08T10:00:00+00:00']));
     $this->get('/api/v1/orders/'.$order->id)->assertOk()->assertJsonPath('data.shipment', $web->inertiaProps('order.shipment'));
-    $this->actingAs(User::factory()->administrator()->create())
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)
         ->get(route('administration.orders.show', $order))->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('order.shipment_actions', ['next_status' => null, 'can_update_reference' => false])
@@ -133,7 +141,11 @@ test('administrator shipment actions reflect order prerequisites and only the ne
     $order = shipmentPresentationOrder();
     $order->update(['status' => $status, 'payment_status' => $payment]);
 
-    $this->actingAs(User::factory()->administrator()->create())
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)
         ->get(route('administration.orders.show', $order))->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('order.shipment_actions.next_status', $next)
@@ -168,6 +180,8 @@ test('administrator order details offer manual setup only for eligible unconfigu
         'payment_status' => PaymentStatus::Verified,
     ]);
     $configuredOrder = Order::factory()->withDeliverySnapshot()->create();
+    $manualEligibleOrder->assigned_handler_id = $administrator->id;
+    $manualEligibleOrder->save();
 
     $this->actingAs($administrator)
         ->get(route('administration.orders.show', $manualEligibleOrder))->assertOk()

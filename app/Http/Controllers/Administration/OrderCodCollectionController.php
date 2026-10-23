@@ -13,7 +13,7 @@ class OrderCodCollectionController extends Controller
 {
     public function store(ConfirmOrderCodCollectionRequest $request, Order $order, OrderProcessingService $processing): RedirectResponse
     {
-        $processing->confirmCodCollection($order, $request->boolean('cod_collection_confirmed'));
+        $processing->confirmCodCollection($order, $request->boolean('cod_collection_confirmed'), actor: $request->user());
 
         Inertia::flash('toast', [
             'type' => 'success',

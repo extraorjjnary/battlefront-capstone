@@ -113,10 +113,14 @@ const productViewRecommendationsEnabled = ref(
                     class="mt-1 block w-full"
                     name="email"
                     :default-value="user.email"
-                    required
+                    readonly
+                    aria-describedby="email-description"
                     autocomplete="username"
                     placeholder="Email address"
                 />
+                <p id="email-description" class="text-muted-foreground text-sm">
+                    Your account email address cannot be changed.
+                </p>
                 <InputError class="mt-2" :message="errors.email" />
             </div>
 

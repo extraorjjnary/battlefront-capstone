@@ -10,7 +10,9 @@ import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { watch } from 'vue';
+import { ref, watch } from 'vue';
+
+const requestReasonCode = ref('');
 
 const props = defineProps({
     reports: Object,
@@ -111,6 +113,7 @@ defineOptions({
                 <select
                     id="damage-reason-code"
                     name="reason_code"
+                    v-model="requestReasonCode"
                     required
                     class="border-input bg-background focus-visible:ring-ring min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
                 >
@@ -122,12 +125,16 @@ defineOptions({
                     <option value="other">Other</option>
                 </select>
                 <InputError :message="errors.reason_code" />
-                <Label for="damage-reason">Notes</Label
+                <Label for="damage-reason">{{
+                    requestReasonCode === 'other'
+                        ? 'Additional notes (required)'
+                        : 'Additional notes (optional)'
+                }}</Label
                 ><Input
                     class="min-h-11"
                     id="damage-reason"
                     name="reason"
-                    required
+                    :required="requestReasonCode === 'other'"
                     minlength="5"
                     maxlength="2000"
                 /><InputError :message="errors.reason" />

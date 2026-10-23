@@ -1,9 +1,8 @@
 # Project Rules Index
 
-Before planning or editing, find the row whose globs match the file's path and read that rule file.
+
 
 | Applies to | Rule file |
-| --- | --- |
 | app/Actions/Product/** | .ai/rules/actions-product.md |
 | app/Actions/{Inventory,Order}/**,app/Services/Order/**,app/Http/Controllers/Administration/Order*,resources/js/pages/Administration/Orders/** | .ai/rules/administration-orders.md |
 | app/Http/{Requests,Controllers}/Administration/SalesReport*,resources/js/pages/Administration/Reports/** | .ai/rules/administration-reports.md |
@@ -77,3 +76,5 @@ Before planning or editing, find the row whose globs match the file's path and r
 | routes/settings.php,app/Http/Controllers/Settings/**,resources/js/pages/settings/** | .ai/rules/settings.md |
 | tests/** | .ai/rules/tests.md |
 | app/Services/Notifications/**,app/Services/Order/**,app/Actions/Order/**,app/Jobs/**,app/Http/Controllers/**/*Notification*,app/Http/Controllers/Api/V1/PushDeviceController.php | .ai/rules/v1.md |
+| app/Actions/Inventory/HandleCustomerReturn*.php,app/Services/CustomerReturn*.php                                                                                                                                                                                      | .ai/rules/inventory-services.md                    |
+| app/Actions/Order/**,app/Services/Order/**,app/Http/Controllers/Administration/Order*,resources/js/pages/Administration/Orders/**                                                                                                                                     | .ai/rules/js-pages-administration-orders.md        |

@@ -1,8 +1,11 @@
 <?php
 
+use App\Actions\Order\AssignOrderHandler;
+use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\Order\OrderProcessingService;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -42,6 +45,32 @@ test('customers cannot open the administration work queue', function () {
     $this->actingAs(User::factory()->customer()->create())
         ->get(route('administration.work-queue.index'))->assertForbidden();
 });
+
+test('supervisors retain claimed orders in the shared queue until completion or cancellation', function (string $role, string $ending) {
+    $supervisor = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', $role)->value('id'),
+    ]);
+    $handler = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
+    $order = Order::factory()->paidWithGCash()->create(['status' => 'processing', 'payment_status' => 'verified']);
+    app(AssignOrderHandler::class)->execute($order, $handler, $handler->id, claimOnly: true);
+
+    $this->actingAs($supervisor)->get(route('administration.work-queue.index', ['kind' => 'order']))
+        ->assertInertia(fn (Assert $page) => $page->where('entries.total', 1)
+            ->where('entries.data.0.id', $order->id)->where('entries.data.0.responsible_name', $handler->name));
+    $handler->is_active = false;
+    $handler->save();
+    $this->get(route('administration.work-queue.index', ['kind' => 'order']))
+        ->assertInertia(fn (Assert $page) => $page->where('entries.total', 1)
+            ->where('entries.data.0.required_action', 'Reassign inactive handler'));
+    $handler->is_active = true;
+    $handler->save();
+    app(OrderProcessingService::class)->updateStatus($order, OrderStatus::from($ending), actor: $handler);
+
+    $this->get(route('administration.work-queue.index', ['kind' => 'order']))
+        ->assertInertia(fn (Assert $page) => $page->where('entries.total', 0));
+})->with(['manager', 'owner'])->with(['completed', 'cancelled']);
 
 test('technical administrators see no business work without business permissions', function () {
     $it = User::factory()->administrator()->create([

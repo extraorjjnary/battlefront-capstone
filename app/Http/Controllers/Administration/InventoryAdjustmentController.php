@@ -7,6 +7,7 @@ use App\Actions\Inventory\RequestInventoryAdjustment;
 use App\Actions\Inventory\WithdrawInventoryAdjustment;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Support\OperationalRequestReason;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -73,7 +74,7 @@ class InventoryAdjustmentController extends Controller
         $validated = $request->validate([
             'quantity' => ['required', 'integer', 'min:0', 'max:4294967295'],
             'reason_code' => ['required', Rule::in(['damage', 'theft_loss', 'found_stock', 'count_error', 'receiving_error', 'unit_of_measure_error', 'other'])],
-            'reason' => ['required', 'string', 'min:5', 'max:2000'],
+            'reason' => ['required_if:reason_code,other', 'nullable', 'string', 'min:5', 'max:2000'],
             'reorder_level' => ['nullable', 'integer', 'min:0', 'max:4294967295'],
         ]);
         $previous = DB::table('inventory_adjustment_requests')->where('id', $adjustment)->first();
@@ -81,7 +82,7 @@ class InventoryAdjustmentController extends Controller
             abort(404);
         }
         $product = Product::query()->whereKey($previous->product_id)->firstOrFail();
-        $replacement->execute($product, $request->user(), $validated['quantity'], $validated['reason'], $validated['reorder_level'] ?? null, $adjustment, reasonCode: $validated['reason_code']);
+        $replacement->execute($product, $request->user(), $validated['quantity'], OperationalRequestReason::resolve($validated['reason_code'], $validated['reason'] ?? null, openingStock: $previous->initial_reorder_level !== null), $validated['reorder_level'] ?? null, $adjustment, reasonCode: $validated['reason_code']);
 
         return back();
     }
