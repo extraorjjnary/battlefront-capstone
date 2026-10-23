@@ -8,7 +8,9 @@ import SearchField from '@/components/SearchField.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
-import { watch } from 'vue';
+import { ref, watch } from 'vue';
+
+const requestReasonCodes = ref({});
 
 const props = defineProps({
     requests: { type: Object, required: true },
@@ -231,6 +233,8 @@ defineOptions({
                 /></label>
                 <select
                     name="reason_code"
+                    :value="requestReasonCodes[entry.id] ?? ''"
+                    @change="requestReasonCodes[entry.id] = $event.target.value"
                     required
                     class="border-input bg-background focus-visible:ring-ring min-h-11 max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
                 >
@@ -239,18 +243,27 @@ defineOptions({
                     <option value="theft_loss">Theft or loss</option>
                     <option value="found_stock">Found stock</option>
                     <option value="count_error">Count correction</option>
-                    <option value="receiving_error">Receiving error</option>
+                    <option value="receiving_error">
+                        {{
+                            entry.initial_reorder_level !== null
+                                ? 'Initial receipt'
+                                : 'Receiving error'
+                        }}
+                    </option>
                     <option value="unit_of_measure_error">
                         Wrong stock unit
                     </option>
                     <option value="other">Other</option>
                 </select>
                 <label class="max-w-full min-w-0 text-sm sm:col-span-2"
-                    >Notes<Input
-                        aria-label="Notes"
+                    >{{
+                        requestReasonCodes[entry.id] === 'other'
+                            ? 'Additional notes (required)'
+                            : 'Additional notes (optional)'
+                    }}<Input
                         class="min-h-11"
                         name="reason"
-                        required
+                        :required="requestReasonCodes[entry.id] === 'other'"
                         minlength="5"
                         maxlength="2000"
                 /></label>

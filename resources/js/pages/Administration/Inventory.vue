@@ -29,6 +29,8 @@ import {
 import { Spinner } from '@/components/ui/spinner';
 import { formatDateTime } from '@/lib/dateTime';
 
+const requestReasonCodes = ref({});
+
 const props = defineProps({
     products: { type: Object, required: true },
     filters: { type: Object, required: true },
@@ -468,6 +470,13 @@ defineOptions({
                                     <select
                                         :id="`reason-code-${product.inventory.id}`"
                                         name="reason_code"
+                                        :value="
+                                            requestReasonCodes[product.id] ?? ''
+                                        "
+                                        @change="
+                                            requestReasonCodes[product.id] =
+                                                $event.target.value
+                                        "
                                         required
                                         class="border-input bg-background focus-visible:ring-ring min-h-11 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
                                     >
@@ -495,13 +504,21 @@ defineOptions({
                                     <InputError :message="errors.reason_code" />
                                     <Label
                                         :for="`reason-${product.inventory.id}`"
-                                        >Notes</Label
+                                        >{{
+                                            requestReasonCodes[product.id] ===
+                                            'other'
+                                                ? 'Additional notes (required)'
+                                                : 'Additional notes (optional)'
+                                        }}</Label
                                     >
                                     <Input
                                         class="min-h-11"
                                         :id="`reason-${product.inventory.id}`"
                                         name="reason"
-                                        required
+                                        :required="
+                                            requestReasonCodes[product.id] ===
+                                            'other'
+                                        "
                                         minlength="5"
                                         maxlength="2000"
                                     />
@@ -675,6 +692,13 @@ defineOptions({
                                     <select
                                         :id="`opening-reason-code-${product.id}`"
                                         name="reason_code"
+                                        :value="
+                                            requestReasonCodes[product.id] ?? ''
+                                        "
+                                        @change="
+                                            requestReasonCodes[product.id] =
+                                                $event.target.value
+                                        "
                                         required
                                         class="border-input bg-background focus-visible:ring-ring min-h-11 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
                                     >
@@ -690,14 +714,23 @@ defineOptions({
                                         <option value="other">Other</option>
                                     </select>
                                     <InputError :message="errors.reason_code" />
-                                    <Label :for="`opening-reason-${product.id}`"
-                                        >Notes</Label
+                                    <Label
+                                        :for="`opening-reason-${product.id}`"
+                                        >{{
+                                            requestReasonCodes[product.id] ===
+                                            'other'
+                                                ? 'Additional notes (required)'
+                                                : 'Additional notes (optional)'
+                                        }}</Label
                                     >
                                     <Input
                                         class="min-h-11"
                                         :id="`opening-reason-${product.id}`"
                                         name="reason"
-                                        required
+                                        :required="
+                                            requestReasonCodes[product.id] ===
+                                            'other'
+                                        "
                                         minlength="5"
                                         maxlength="2000"
                                     />

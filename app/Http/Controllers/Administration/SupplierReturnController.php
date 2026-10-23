@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Administration;
 use App\Actions\Inventory\HandleSupplierReturn;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Support\OperationalRequestReason;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -69,9 +70,9 @@ class SupplierReturnController extends Controller
             'product_id' => ['required', 'integer', Rule::exists(Product::class, 'id')],
             'quantity' => ['required', 'integer', 'min:1', 'max:4294967295'],
             'reason_code' => ['required', Rule::in(['defective', 'wrong_item', 'supplier_damage', 'other'])],
-            'reason' => ['required', 'string', 'min:5', 'max:2000'],
+            'reason' => ['required_if:reason_code,other', 'nullable', 'string', 'min:5', 'max:2000'],
         ]);
-        $returns->request($request->user(), $validated['supplier_id'], $validated['product_id'], $validated['quantity'], $validated['reason'], $validated['reason_code']);
+        $returns->request($request->user(), $validated['supplier_id'], $validated['product_id'], $validated['quantity'], OperationalRequestReason::resolve($validated['reason_code'], $validated['reason'] ?? null), $validated['reason_code']);
 
         return back();
     }

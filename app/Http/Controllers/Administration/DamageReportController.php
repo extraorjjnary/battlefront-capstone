@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Administration;
 use App\Actions\Inventory\HandleDamage;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Support\OperationalRequestReason;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -64,9 +65,9 @@ class DamageReportController extends Controller
             'product_id' => ['required', 'integer', Rule::exists(Product::class, 'id')],
             'quantity' => ['required', 'integer', 'min:1', 'max:4294967295'],
             'reason_code' => ['required', Rule::in(['handling_damage', 'storage_damage', 'packing_damage', 'defect_discovered', 'other'])],
-            'reason' => ['required', 'string', 'min:5', 'max:2000'],
+            'reason' => ['required_if:reason_code,other', 'nullable', 'string', 'min:5', 'max:2000'],
         ]);
-        $damage->report(Product::query()->whereKey($validated['product_id'])->firstOrFail(), $request->user(), $validated['quantity'], $validated['reason'], $validated['reason_code']);
+        $damage->report(Product::query()->whereKey($validated['product_id'])->firstOrFail(), $request->user(), $validated['quantity'], OperationalRequestReason::resolve($validated['reason_code'], $validated['reason'] ?? null), $validated['reason_code']);
 
         return back();
     }

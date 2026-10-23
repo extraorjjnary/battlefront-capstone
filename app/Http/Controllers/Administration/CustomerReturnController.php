@@ -7,6 +7,7 @@ use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Support\OperationalRequestReason;
 use BcMath\Number;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -175,9 +176,9 @@ class CustomerReturnController extends Controller
             'quantity' => ['required', 'integer', 'min:1', 'max:4294967295'],
             'condition' => ['required', Rule::in(['sealed', 'opened', 'damaged'])],
             'reason_code' => ['required', Rule::in(['wrong_item', 'defective', 'transit_damage', 'not_as_described', 'changed_mind', 'other'])],
-            'reason' => ['required', 'string', 'min:5', 'max:2000'],
+            'reason' => ['required_if:reason_code,other', 'nullable', 'string', 'min:5', 'max:2000'],
         ]);
-        $returns->receive($request->user(), $validated['order_item_id'], $validated['quantity'], $validated['condition'], $validated['reason'], $validated['reason_code']);
+        $returns->receive($request->user(), $validated['order_item_id'], $validated['quantity'], $validated['condition'], OperationalRequestReason::resolve($validated['reason_code'], $validated['reason'] ?? null), $validated['reason_code']);
 
         return back();
     }
