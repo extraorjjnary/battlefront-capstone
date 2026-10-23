@@ -56,7 +56,7 @@ test('full refund is prefilled from the server item value with no shipping addit
     );
     assert.match(html, /name="approved_amount" value="2999\.90"/);
     assert.match(html, /Shipping is not included/);
-    assert.match(html, /Approve a partial refund instead/);
+    assert.match(html, /Partial refund/);
     assert.doesNotMatch(html, /type="number"/);
 });
 
@@ -327,4 +327,33 @@ test('receipt errors include rejected images beyond the first selected file', ()
         }),
         'Too many product photos.',
     );
+});
+
+test('compact refund summary keeps confirmed amounts separate from pending records', async () => {
+    const html = await pageHtml({
+        approved_amount: '200.00',
+        verified_paid_amount: '50.00',
+        awaiting_review_amount: '75.00',
+        disputed_amount: '25.00',
+        refund_balance: '150.00',
+        unrecorded_refund_amount: '50.00',
+    });
+
+    for (const [label, value] of [
+        ['Approved', '200.00'],
+        ['Confirmed paid', '50.00'],
+        ['Awaiting review', '75.00'],
+        ['Disputed', '25.00'],
+        ['Awaiting confirmation', '150.00'],
+        ['Not recorded', '50.00'],
+    ]) {
+        assert.match(
+            html,
+            new RegExp(
+                `<dt[^>]*>\\s*${label}\\s*</dt><dd[^>]*>\\s*₱${value.replace('.', '\\.')}\\s*</dd>`,
+            ),
+        );
+    }
+    assert.doesNotMatch(html, /name="amount"/);
+    assert.match(html, /Only the return approver/);
 });

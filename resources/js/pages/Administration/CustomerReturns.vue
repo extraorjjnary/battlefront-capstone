@@ -77,6 +77,12 @@ const paymentLabels = {
     bank_transfer: 'Bank transfer',
     other: 'Other',
 };
+const outcomeLabels = {
+    refund: 'Refund',
+    replacement: 'Replacement',
+    repair: 'Repair',
+    other: 'Other outcome',
+};
 const decisions = reactive({});
 const resolutionTypes = reactive({});
 const stockDispositions = reactive({});
@@ -161,16 +167,42 @@ defineOptions({
             >
         </p>
         <PageHeader title="Customer returns" />
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <SearchField
+                id="return-search"
+                v-model="search"
+                class="min-w-0 flex-1"
+                compact
+                label="Search returns"
+                placeholder="Product, customer, or order"
+                :is-searching="isSearching"
+                @clear="clearSearch"
+            /><Link
+                :href="
+                    CustomerReturnController.index({
+                        query: {
+                            case: selected_case ?? undefined,
+                            payment_id: selected_payment ?? undefined,
+                            q: filters?.q ?? undefined,
+                            overdue: filters?.overdue ? undefined : 1,
+                        },
+                    })
+                "
+                class="border-input bg-card hover:bg-accent inline-flex min-h-11 shrink-0 items-center justify-center rounded-md border px-3 text-sm font-medium sm:mt-5.5"
+            >
+                {{ filters?.overdue ? 'All returns' : 'Overdue only' }}
+            </Link>
+        </div>
         <section
             class="surface-card border-border bg-card space-y-4 border p-5"
             aria-labelledby="customer-requests-heading"
         >
             <h2 id="customer-requests-heading" class="text-lg font-semibold">
-                Customer requests awaiting item receipt
+                Return requests
             </h2>
             <p class="text-muted-foreground text-sm">
-                A request does not place stock on hold. Confirm receipt only
-                after the actual product is received.
+                Requests do not change stock. Confirm receipt only after all
+                requested items arrive.
             </p>
             <p v-if="selected_request" class="text-sm">
                 Showing request #{{ selected_request }} ·
@@ -184,7 +216,7 @@ defineOptions({
                 v-if="!customerRequests?.data.length"
                 class="text-muted-foreground text-sm"
             >
-                No customer requests awaiting receipt.
+                No requests awaiting items.
             </p>
             <article
                 v-for="entry in customerRequests?.data"
@@ -192,21 +224,22 @@ defineOptions({
                 class="border-border space-y-3 border-t pt-4"
             >
                 <h3 class="font-semibold">
-                    {{ entry.product_name }} · {{ entry.quantity }} units
+                    {{ entry.product_name }} · {{ entry.quantity }}
+                    {{ entry.quantity === 1 ? 'unit' : 'units' }}
                 </h3>
                 <p
                     v-if="entry.eligibility_path === 'manual_review'"
                     class="text-sm font-medium"
                 >
-                    Manual eligibility assessment required.
+                    Eligibility needs review.
                 </p>
                 <p
                     v-if="entry.eligibility_receipt_at"
                     class="text-muted-foreground text-sm"
                 >
-                    Original purchase receipt:
-                    {{ formatDateTime(entry.eligibility_receipt_at) }} ·
-                    Assessed deadline:
+                    Purchase received:
+                    {{ formatDateTime(entry.eligibility_receipt_at) }} · Review
+                    deadline:
                     {{ formatDateTime(entry.eligibility_deadline_at) }}
                 </p>
                 <p class="text-sm">
@@ -262,7 +295,7 @@ defineOptions({
                             :message="evidenceError(receiptForm.errors)"
                         />
                         <Label :for="`receipt-condition-${entry.id}`"
-                            >Inspected item condition</Label
+                            >Condition received</Label
                         >
                         <select
                             :id="`receipt-condition-${entry.id}`"
@@ -270,9 +303,7 @@ defineOptions({
                             required
                             class="border-input bg-background min-h-11 w-full rounded-md border px-3 py-2 sm:max-w-xs"
                         >
-                            <option disabled value="">
-                                Select actual condition
-                            </option>
+                            <option disabled value="">Select condition</option>
                             <option value="sealed">Sealed</option>
                             <option value="opened">Opened</option>
                             <option value="damaged">Damaged</option>
@@ -289,7 +320,7 @@ defineOptions({
                         <p class="text-sm">
                             Confirm that you have physically received all
                             {{ entry.quantity }} requested units. They will be
-                            placed in quarantine for review by another employee.
+                            held for review by another employee.
                         </p>
                     </template>
                     <Button
@@ -298,8 +329,8 @@ defineOptions({
                         :disabled="receiptForm.processing"
                         >{{
                             receiptRequest === entry.id
-                                ? 'Confirm physical receipt'
-                                : 'Receive requested item'
+                                ? 'Confirm receipt'
+                                : 'Receive item'
                         }}</Button
                     >
                 </form>
@@ -328,171 +359,156 @@ defineOptions({
             Returned items are held for inspection. Refunds are paid manually
             and confirmed here.
         </p>
-        <section
+        <details
             v-if="can_receive_returns"
-            class="surface-card border-border bg-card space-y-4 border p-5"
+            class="surface-card border-border bg-card border p-4 sm:p-5"
+            :open="
+                Boolean(selected_order) || Boolean(page.props.errors?.order_id)
+            "
         >
-            <h2 class="text-lg font-semibold">Receive a return</h2>
-            <p class="text-muted-foreground text-sm">
-                Items cannot be sold until inspection is complete.
-            </p>
-            <Form
-                v-bind="CustomerReturnController.index.form()"
-                class="flex max-w-full min-w-0 flex-wrap items-end gap-3"
-                ><div class="space-y-2">
-                    <Label for="lookup-order">Order ID or reference</Label
-                    ><Input
-                        class="min-h-11"
-                        id="lookup-order"
-                        name="order_id"
-                        type="text"
-                        :default-value="selected_order?.reference"
-                        placeholder="BF-000123"
-                        required
-                    />
-                </div>
-                <Button class="min-h-11" type="submit" variant="outline"
-                    >Find completed order</Button
-                ></Form
+            <summary
+                class="focus-visible:ring-ring min-h-11 cursor-pointer content-center font-medium focus-visible:ring-2 focus-visible:outline-none"
             >
-            <Form
-                v-if="selected_order && can_receive_returns"
-                v-bind="CustomerReturnController.store.form()"
-                v-slot="{ errors, processing }"
-                class="grid max-w-full min-w-0 gap-4 sm:grid-cols-2"
-            >
-                <p class="text-sm sm:col-span-2">
-                    Order {{ selected_order.reference }}
+                Receive without a request
+            </summary>
+            <div class="mt-3 space-y-4">
+                <p class="text-muted-foreground text-sm">
+                    Items cannot be sold until inspection is complete.
                 </p>
-                <div class="space-y-2 sm:col-span-2">
-                    <EvidenceFileInput
-                        label="Product photos"
-                        images-only
-                        :disabled="processing"
-                    />
-                    <InputError :message="evidenceError(errors)" />
-                </div>
-                <div class="space-y-2">
-                    <Label for="return-item">Purchased item</Label
-                    ><select
-                        id="return-item"
-                        name="order_item_id"
-                        required
-                        class="border-input bg-background focus-visible:ring-ring min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
-                    >
-                        <option value="">Select item</option>
-                        <option
-                            v-for="item in selected_order.items"
-                            :key="item.id"
-                            :value="item.id"
-                            :disabled="item.remaining_returnable === 0"
-                        >
-                            {{ item.product }} ·
-                            {{ item.remaining_returnable }} of
-                            {{ item.quantity }} units still returnable · ₱{{
-                                item.price_at_time
-                            }}
-                            each
-                        </option></select
-                    ><InputError :message="errors.order_item_id" />
-                </div>
-                <div class="space-y-2">
-                    <Label for="return-units">Units received</Label
-                    ><Input
-                        class="min-h-11"
-                        id="return-units"
-                        name="quantity"
-                        type="number"
-                        min="1"
-                        required
-                    /><InputError :message="errors.quantity" />
-                </div>
-                <div class="space-y-2">
-                    <Label for="return-condition">Condition</Label
-                    ><select
-                        id="return-condition"
-                        name="condition"
-                        class="border-input bg-background focus-visible:ring-ring min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
-                    >
-                        <option value="sealed">Sealed</option>
-                        <option value="opened">Opened</option>
-                        <option value="damaged">Damaged</option>
-                    </select>
-                </div>
-                <div class="space-y-2">
-                    <Label for="return-reason-code">Reason</Label
-                    ><select
-                        id="return-reason-code"
-                        name="reason_code"
-                        v-model="requestReasonCode"
-                        required
-                        class="border-input bg-background focus-visible:ring-ring min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
-                    >
-                        <option value="">Select a reason</option>
-                        <option value="wrong_item">Wrong item</option>
-                        <option value="defective">Defective</option>
-                        <option value="transit_damage">
-                            Damaged in transit
-                        </option>
-                        <option value="not_as_described">
-                            Not as described
-                        </option>
-                        <option value="changed_mind">Changed mind</option>
-                        <option value="other">Other</option></select
-                    ><InputError :message="errors.reason_code" />
-                </div>
-                <div class="space-y-2">
-                    <Label for="return-reason">{{
-                        requestReasonCode === 'other'
-                            ? 'Additional notes (required)'
-                            : 'Additional notes (optional)'
-                    }}</Label
-                    ><Input
-                        class="min-h-11"
-                        id="return-reason"
-                        name="reason"
-                        :required="requestReasonCode === 'other'"
-                        minlength="5"
-                        maxlength="2000"
-                    /><InputError :message="errors.reason" />
-                </div>
-                <Button class="min-h-11" type="submit" :disabled="processing"
-                    >Receive and hold items</Button
+                <Form
+                    v-bind="CustomerReturnController.index.form()"
+                    class="flex max-w-full min-w-0 flex-wrap items-end gap-3"
+                    ><div class="space-y-2">
+                        <Label for="lookup-order">Order ID or reference</Label
+                        ><Input
+                            class="min-h-11"
+                            id="lookup-order"
+                            name="order_id"
+                            type="text"
+                            :default-value="selected_order?.reference"
+                            placeholder="BF-000123"
+                            required
+                        />
+                    </div>
+                    <Button class="min-h-11" type="submit" variant="outline"
+                        >Find order</Button
+                    ></Form
                 >
-            </Form>
-            <p v-else class="text-muted-foreground text-sm">
-                Find a completed order to select its purchased items.
-            </p>
-        </section>
+                <Form
+                    v-if="selected_order && can_receive_returns"
+                    v-bind="CustomerReturnController.store.form()"
+                    v-slot="{ errors, processing }"
+                    class="grid max-w-full min-w-0 gap-4 sm:grid-cols-2"
+                >
+                    <p class="text-sm sm:col-span-2">
+                        Order {{ selected_order.reference }}
+                    </p>
+                    <div class="space-y-2 sm:col-span-2">
+                        <EvidenceFileInput
+                            label="Product photos"
+                            images-only
+                            :disabled="processing"
+                        />
+                        <InputError :message="evidenceError(errors)" />
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="return-item">Purchased item</Label
+                        ><select
+                            id="return-item"
+                            name="order_item_id"
+                            required
+                            class="border-input bg-background focus-visible:ring-ring min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
+                        >
+                            <option value="">Select item</option>
+                            <option
+                                v-for="item in selected_order.items"
+                                :key="item.id"
+                                :value="item.id"
+                                :disabled="item.remaining_returnable === 0"
+                            >
+                                {{ item.product }} ·
+                                {{ item.remaining_returnable }} of
+                                {{ item.quantity }} units still returnable · ₱{{
+                                    item.price_at_time
+                                }}
+                                each
+                            </option></select
+                        ><InputError :message="errors.order_item_id" />
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="return-units">Units received</Label
+                        ><Input
+                            class="min-h-11"
+                            id="return-units"
+                            name="quantity"
+                            type="number"
+                            min="1"
+                            required
+                        /><InputError :message="errors.quantity" />
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="return-condition">Condition</Label
+                        ><select
+                            id="return-condition"
+                            name="condition"
+                            class="border-input bg-background focus-visible:ring-ring min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
+                        >
+                            <option value="sealed">Sealed</option>
+                            <option value="opened">Opened</option>
+                            <option value="damaged">Damaged</option>
+                        </select>
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="return-reason-code">Reason</Label
+                        ><select
+                            id="return-reason-code"
+                            name="reason_code"
+                            v-model="requestReasonCode"
+                            required
+                            class="border-input bg-background focus-visible:ring-ring min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
+                        >
+                            <option value="">Select a reason</option>
+                            <option value="wrong_item">Wrong item</option>
+                            <option value="defective">Defective</option>
+                            <option value="transit_damage">
+                                Damaged in transit
+                            </option>
+                            <option value="not_as_described">
+                                Not as described
+                            </option>
+                            <option value="changed_mind">Changed mind</option>
+                            <option value="other">Other</option></select
+                        ><InputError :message="errors.reason_code" />
+                    </div>
+                    <div class="space-y-2">
+                        <Label for="return-reason">{{
+                            requestReasonCode === 'other'
+                                ? 'Notes (required)'
+                                : 'Notes (optional)'
+                        }}</Label
+                        ><Input
+                            class="min-h-11"
+                            id="return-reason"
+                            name="reason"
+                            :required="requestReasonCode === 'other'"
+                            minlength="5"
+                            maxlength="2000"
+                        /><InputError :message="errors.reason" />
+                    </div>
+                    <Button
+                        class="min-h-11"
+                        type="submit"
+                        :disabled="processing"
+                        >Receive and hold items</Button
+                    >
+                </Form>
+                <p v-else class="text-muted-foreground text-sm">
+                    Find a completed order to select its purchased items.
+                </p>
+            </div>
+        </details>
         <section class="space-y-3" aria-label="Return cases">
-            <Link
-                :href="
-                    CustomerReturnController.index({
-                        query: {
-                            case: selected_case ?? undefined,
-                            payment_id: selected_payment ?? undefined,
-                            q: filters?.q ?? undefined,
-                            overdue: filters?.overdue ? undefined : 1,
-                        },
-                    })
-                "
-                class="text-primary text-sm underline"
-            >
-                {{
-                    filters?.overdue
-                        ? 'Show all customer returns'
-                        : 'Show overdue return follow-up'
-                }}
-            </Link>
-            <SearchField
-                id="return-search"
-                v-model="search"
-                class="max-w-xl"
-                label="Search returns"
-                placeholder="Product, customer, order ID, or reason"
-                :is-searching="isSearching"
-                @clear="clearSearch"
-            />
+            <h2 class="text-lg font-semibold">Received returns</h2>
             <p
                 v-if="returns.data.length === 0"
                 class="text-muted-foreground text-sm"
@@ -506,10 +522,10 @@ defineOptions({
             >
                 <div class="flex flex-wrap justify-between gap-2">
                     <div>
-                        <h2 class="font-semibold">
-                            {{ entry.product_name }} ·
-                            {{ entry.quantity }} units
-                        </h2>
+                        <h3 class="font-semibold">
+                            {{ entry.product_name }} · {{ entry.quantity }}
+                            {{ entry.quantity === 1 ? 'unit' : 'units' }}
+                        </h3>
                         <p class="text-muted-foreground text-sm">
                             Customer: {{ entry.customer_name }} · Order
                             <Link
@@ -521,8 +537,7 @@ defineOptions({
                                 class="text-primary underline"
                                 >#{{ entry.purchase_order_id }}</Link
                             >
-                            · {{ entry.condition }} · Received by
-                            {{ entry.requester_name }}
+                            · {{ entry.condition }}
                         </p>
                         <p class="mt-1 text-sm">
                             {{ entry.reason }} · {{ entry.age_days }} days old
@@ -545,14 +560,7 @@ defineOptions({
                 >
                     Return follow-up overdue
                 </p>
-                <div class="grid gap-2 text-sm sm:grid-cols-3">
-                    <p>
-                        <strong>Decision:</strong>
-                        {{
-                            returnLabels[entry.status] ??
-                            entry.status.replaceAll('_', ' ')
-                        }}
-                    </p>
+                <div class="grid gap-3 text-sm sm:grid-cols-2">
                     <p>
                         <strong>Stock:</strong> {{ stockHandling(entry) }} ·
                         {{ entry.held_quantity }} held
@@ -562,20 +570,25 @@ defineOptions({
                 <p v-if="entry.decision_reason" class="text-sm">
                     Review notes: {{ entry.decision_reason }}
                 </p>
-                <div class="space-y-2 text-sm">
+                <div class="border-border space-y-2 border-t pt-3 text-sm">
                     <p>
-                        Physical receiver: {{ entry.requester_name }} · Decision
-                        reviewer: {{ entry.reviewer_name ?? 'Awaiting review' }}
+                        Received by: {{ entry.requester_name }} · Reviewed by:
+                        {{ entry.reviewer_name ?? 'Awaiting review' }}
                     </p>
                     <template v-if="entry.status === 'accepted'">
                         <p v-if="entry.resolution_type">
-                            Customer resolution: {{ entry.resolution_type }} ·
+                            Outcome:
+                            {{
+                                outcomeLabels[entry.resolution_type] ??
+                                entry.resolution_type
+                            }}
+                            ·
                             {{
                                 entry.resolution_type === 'refund'
                                     ? refundProgress(entry)
                                     : entry.resolution_completed_at
                                       ? 'Completed'
-                                      : 'Pending fulfillment'
+                                      : 'Not completed'
                             }}
                         </p>
                         <p
@@ -584,21 +597,20 @@ defineOptions({
                                 Number(entry.approved_amount) <= 0
                             "
                         >
-                            Legacy customer resolution not recorded. Confirm the
-                            outcome manually; do not infer compensation.
+                            Outcome not recorded. Confirm it with the customer.
                         </p>
                         <p
                             v-if="entry.resolution_summary"
                             class="whitespace-pre-wrap"
                         >
-                            Customer summary: {{ entry.resolution_summary }}
+                            Customer note: {{ entry.resolution_summary }}
                         </p>
                         <p v-if="entry.resolution_reference">
-                            Internal resolution reference:
+                            Internal reference:
                             {{ entry.resolution_reference }}
                         </p>
                         <p v-if="entry.resolution_completed_at">
-                            Fulfilled by
+                            Completed by
                             {{ entry.resolution_completed_by_name }} ·
                             {{ formatDateTime(entry.resolution_completed_at) }}
                             · {{ entry.completion_notes }}
@@ -609,8 +621,12 @@ defineOptions({
                                 entry.resolution_type !== 'refund'
                             "
                         >
-                            No monetary refund approved; the documented
-                            {{ entry.resolution_type }} resolution applies.
+                            No refund approved; the agreed
+                            {{
+                                outcomeLabels[entry.resolution_type] ??
+                                entry.resolution_type
+                            }}
+                            outcome applies.
                         </p>
                     </template>
                 </div>
@@ -631,8 +647,7 @@ defineOptions({
                     class="space-y-3"
                 >
                     <Label :for="`complete-resolution-${entry.id}`"
-                        >Actual fulfillment details or reference
-                        (internal)</Label
+                        >Completion notes (internal)</Label
                     >
                     <Input
                         :id="`complete-resolution-${entry.id}`"
@@ -653,9 +668,8 @@ defineOptions({
                         customer.</label
                     >
                     <p class="text-muted-foreground text-sm">
-                        Confirm only after the repair/replacement/manual outcome
-                        has actually been fulfilled. This does not issue
-                        replacement stock or pay a refund.
+                        Confirm after completing the agreed outcome. This does
+                        not issue replacement stock or pay a refund.
                     </p>
                     <InputError
                         :message="
@@ -665,15 +679,15 @@ defineOptions({
                         "
                     />
                     <Button type="submit" :disabled="processing"
-                        >Confirm actual resolution fulfillment</Button
+                        >Confirm completion</Button
                     >
                 </Form>
-                <h3 class="font-semibold">Return/Inspection Evidence</h3>
+                <h4 class="font-semibold">Product photos</h4>
                 <p
                     v-if="entry.request_eligibility_path === 'manual_review'"
                     class="text-sm"
                 >
-                    Customer submitted this claim for manual eligibility review.
+                    Eligibility needs review.
                 </p>
                 <div
                     v-if="evidence[entry.id]?.length"
@@ -687,7 +701,7 @@ defineOptions({
                         "
                         target="_blank"
                         rel="noopener noreferrer"
-                        class="border-border bg-background text-primary space-y-2 border p-2 underline"
+                        class="text-primary-ink min-w-0 space-y-2 underline underline-offset-4"
                     >
                         <img
                             v-if="
@@ -702,7 +716,7 @@ defineOptions({
                                     .url
                             "
                             :alt="`Inspection photo: ${file.original_name}`"
-                            class="bg-muted max-h-56 w-full object-contain"
+                            class="bg-muted max-h-36 w-full rounded-md object-contain"
                             loading="lazy"
                         />
                         <span class="block">{{ file.original_name }}</span>
@@ -724,7 +738,7 @@ defineOptions({
                     class="flex max-w-full min-w-0 flex-wrap items-end gap-2"
                     ><EvidenceFileInput
                         :key="`return-${entry.id}-${evidence[entry.id]?.length ?? 0}`"
-                        label="Return/Inspection Evidence"
+                        label="Product photos"
                         images-only
                         :disabled="processing" /><Button
                         class="min-h-11"
@@ -744,6 +758,7 @@ defineOptions({
                     v-slot="{ errors, processing }"
                     class="grid max-w-full min-w-0 gap-3 sm:grid-cols-2"
                 >
+                    <h4 class="font-semibold sm:col-span-2">Review return</h4>
                     <div class="space-y-1">
                         <Label>Decision</Label
                         ><select
@@ -784,7 +799,7 @@ defineOptions({
                         class="space-y-2 sm:col-span-2"
                     >
                         <Label :for="`resolution-type-${entry.id}`"
-                            >Customer resolution (required)</Label
+                            >Outcome</Label
                         >
                         <select
                             :id="`resolution-type-${entry.id}`"
@@ -793,17 +808,11 @@ defineOptions({
                             required
                             class="border-input bg-background min-h-11 w-full rounded-md border px-3 py-2"
                         >
-                            <option disabled value="">
-                                Select the customer outcome
-                            </option>
-                            <option value="refund">Monetary refund</option>
-                            <option value="replacement">
-                                Manual replacement
-                            </option>
-                            <option value="repair">Manual repair</option>
-                            <option value="other">
-                                Other documented manual resolution
-                            </option>
+                            <option disabled value="">Select outcome</option>
+                            <option value="refund">Refund</option>
+                            <option value="replacement">Replacement</option>
+                            <option value="repair">Repair</option>
+                            <option value="other">Other agreed outcome</option>
                         </select>
                         <InputError
                             :message="errors.resolution_type || errors.type"
@@ -815,7 +824,7 @@ defineOptions({
                             "
                         >
                             <Label :for="`resolution-summary-${entry.id}`"
-                                >Resolution summary shared with customer</Label
+                                >Details shown to customer</Label
                             >
                             <Input
                                 :id="`resolution-summary-${entry.id}`"
@@ -852,16 +861,14 @@ defineOptions({
                             class="border-input bg-background focus-visible:ring-ring min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
                         >
                             <option disabled value="">
-                                Select inventory disposition
+                                Select stock action
                             </option>
                             <option value="restock">
-                                Return to sellable stock after inspection
+                                Restock after inspection
                             </option>
-                            <option value="write_off">
-                                Write off and remove from stock
-                            </option>
+                            <option value="write_off">Write off</option>
                             <option value="supplier_return">
-                                Keep held and start a supplier return
+                                Hold for supplier return
                             </option>
                             <option
                                 v-if="
@@ -871,8 +878,7 @@ defineOptions({
                                 "
                                 value="return_to_customer"
                             >
-                                Hold original item for customer handback after
-                                manual resolution
+                                Hold for return to customer after completion
                             </option>
                         </select>
                     </div>
@@ -896,7 +902,7 @@ defineOptions({
                         class="space-y-2 sm:col-span-2"
                     >
                         <Label :for="`inspection-findings-${entry.id}`"
-                            >Fit-for-sale inspection findings (internal)</Label
+                            >Inspection notes (internal)</Label
                         >
                         <Input
                             :id="`inspection-findings-${entry.id}`"
@@ -906,10 +912,9 @@ defineOptions({
                             maxlength="2000"
                         />
                         <p class="text-muted-foreground text-sm">
-                            Document testing and why the item is now fit for
-                            sale. Reported faults, transit damage, Other, and
-                            unclassified legacy cases also require accessible
-                            inspection evidence.
+                            Record tests confirming the item is safe to sell.
+                            Faults, transit damage, Other, and unclassified
+                            cases also need inspection photos.
                         </p>
                         <InputError :message="errors.inspection_notes" />
                     </div>
@@ -955,11 +960,11 @@ defineOptions({
                         v-if="!entry.has_product_photo"
                         class="text-sm sm:col-span-2"
                     >
-                        A product photo is required before acceptance. Ask Staff
-                        to supply missing photos.
+                        A product photo is required before acceptance. Ask staff
+                        to add missing photos.
                         {{
                             (evidence[entry.id]?.length ?? 0) >= 5
-                                ? 'The attachment limit is reached; manual follow-up is required.'
+                                ? 'Attachment limit reached. Follow up with staff.'
                                 : ''
                         }}
                     </p>
@@ -976,29 +981,63 @@ defineOptions({
                         class="min-h-11"
                         type="submit"
                         :disabled="processing"
-                        >Confirm handover to customer</Button
+                        >Confirm returned to customer</Button
                     ><InputError :message="errors.handover"
                 /></Form>
                 <div
                     v-if="entry.refund_id"
-                    class="border-border bg-muted/40 space-y-2 border p-3 text-sm"
+                    class="border-border space-y-4 border-t pt-4 text-sm"
                 >
-                    <p>
-                        Approved ₱{{ entry.approved_amount }} · Confirmed ₱{{
-                            entry.verified_paid_amount
-                        }}
-                        · Legacy awaiting review ₱{{
-                            entry.awaiting_review_amount
-                        }}
-                        · Disputed ₱{{ entry.disputed_amount }} · Awaiting
-                        confirmed payment ₱{{ entry.refund_balance }} · Not yet
-                        recorded ₱{{ entry.unrecorded_refund_amount }}
-                    </p>
+                    <h4 class="font-semibold">Refund</h4>
+                    <dl class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        <div>
+                            <dt class="text-muted-foreground">Approved</dt>
+                            <dd class="font-medium tabular-nums">
+                                ₱{{ entry.approved_amount }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-muted-foreground">
+                                Confirmed paid
+                            </dt>
+                            <dd class="font-medium tabular-nums">
+                                ₱{{ entry.verified_paid_amount }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-muted-foreground">
+                                Awaiting review
+                            </dt>
+                            <dd class="tabular-nums">
+                                ₱{{ entry.awaiting_review_amount }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-muted-foreground">Disputed</dt>
+                            <dd class="tabular-nums">
+                                ₱{{ entry.disputed_amount }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-muted-foreground">
+                                Awaiting confirmation
+                            </dt>
+                            <dd class="tabular-nums">
+                                ₱{{ entry.refund_balance }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-muted-foreground">Not recorded</dt>
+                            <dd class="tabular-nums">
+                                ₱{{ entry.unrecorded_refund_amount }}
+                            </dd>
+                        </div>
+                    </dl>
                     <div
                         v-for="payment in refundPayments[entry.refund_id] ?? []"
                         :id="`refund-payment-${payment.id}`"
                         :key="payment.id"
-                        class="border-border space-y-2 border p-3"
+                        class="border-border space-y-3 border-t pt-3"
                     >
                         <p>
                             ₱{{ payment.amount }} ·
@@ -1021,16 +1060,16 @@ defineOptions({
                             }}
                         </p>
                         <p class="text-sm">
-                            Payment recorder: {{ payment.recorder_name }} ·
+                            Recorded by: {{ payment.recorder_name }} ·
                             {{
                                 payment.review?.confirmation_method ===
                                 'approver'
                                     ? 'Confirmed by approver:'
-                                    : 'Legacy reviewer:'
+                                    : 'Reviewed by:'
                             }}
                             {{
                                 payment.review?.reviewer_name ??
-                                'Awaiting legacy review'
+                                'Awaiting review'
                             }}
                         </p>
                         <h4
@@ -1041,7 +1080,7 @@ defineOptions({
                             "
                             class="font-semibold"
                         >
-                            Refund Payment Proof
+                            Payment proof
                         </h4>
                         <div
                             v-if="
@@ -1060,7 +1099,7 @@ defineOptions({
                                 "
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                class="border-border bg-background text-primary space-y-2 border p-2 underline"
+                                class="text-primary-ink min-w-0 space-y-2 underline underline-offset-4"
                                 ><img
                                     v-if="
                                         [
@@ -1075,7 +1114,7 @@ defineOptions({
                                         ).url
                                     "
                                     :alt="`Payment proof: ${file.original_name}`"
-                                    class="bg-muted max-h-56 w-full object-contain"
+                                    class="bg-muted max-h-36 w-full rounded-md object-contain"
                                     loading="lazy"
                                 /><span class="block">{{
                                     file.original_name
@@ -1098,7 +1137,7 @@ defineOptions({
                             class="flex max-w-full min-w-0 flex-wrap items-end gap-2"
                             ><EvidenceFileInput
                                 :key="`payment-${payment.id}-${paymentEvidence[payment.id]?.length ?? 0}`"
-                                label="Refund Payment Proof"
+                                label="Payment proof"
                                 :disabled="processing" /><Button
                                 class="min-h-11"
                                 type="submit"
@@ -1178,7 +1217,10 @@ defineOptions({
                         "
                         v-slot="{ errors, processing }"
                         class="grid max-w-full min-w-0 gap-2 sm:grid-cols-3"
-                        ><input
+                        ><h4 class="font-semibold sm:col-span-3">
+                            Confirm payment
+                        </h4>
+                        <input
                             type="hidden"
                             name="submission_key"
                             :value="entry.payment_submission_key" /><Input
@@ -1220,15 +1262,15 @@ defineOptions({
                         >
                             <EvidenceFileInput
                                 :key="`${entry.refund_id}-${entry.unrecorded_refund_amount}-${paymentMethods[entry.refund_id]}`"
-                                label="Customer-visible payment proof"
+                                label="Payment proof"
                                 name="proof"
                                 :multiple="false"
                                 images-only
                                 :disabled="processing"
                             />
                             <p class="text-muted-foreground text-sm">
-                                The customer will see this image. Hide unrelated
-                                balances and account details before uploading.
+                                Customers can see this image. Hide unrelated
+                                balances and account details.
                             </p>
                             <InputError :message="errors.proof" />
                         </div>

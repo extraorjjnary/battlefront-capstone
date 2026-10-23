@@ -12,6 +12,7 @@ defineProps({
     placeholder: { type: String, default: '' },
     isSearching: { type: Boolean, default: false },
     maxlength: { type: Number, default: 100 },
+    compact: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['update:modelValue', 'clear']);
@@ -29,6 +30,7 @@ const emit = defineEmits(['update:modelValue', 'clear']);
                 :id="id"
                 :model-value="modelValue"
                 class="pl-9"
+                :class="{ 'min-h-11': compact }"
                 :maxlength="maxlength"
                 :placeholder="placeholder"
                 autocomplete="off"
@@ -36,14 +38,20 @@ const emit = defineEmits(['update:modelValue', 'clear']);
             />
         </div>
         <p
-            class="text-muted-foreground flex min-h-5 items-center gap-1 text-xs"
+            :class="
+                compact && !isSearching
+                    ? 'sr-only'
+                    : 'text-muted-foreground flex min-h-5 items-center gap-1 text-xs'
+            "
             aria-live="polite"
         >
             <Spinner v-if="isSearching" class="size-3" />
             {{
                 isSearching
                     ? 'Updating results...'
-                    : 'Results update automatically as you type.'
+                    : compact
+                      ? ''
+                      : 'Results update automatically as you type.'
             }}
         </p>
         <Button

@@ -116,6 +116,7 @@ function order(overrides = {}) {
             {
                 id: 8,
                 product: { name: 'Purchased monitor' },
+                quantity: 2,
                 can_request: true,
                 remaining_returnable: 2,
             },
@@ -189,7 +190,7 @@ test('server-ineligible orders cannot open or submit a return request', async ()
             order: order({ can_request_return: false }),
         }),
     );
-    assert.doesNotMatch(html, /Request Return\/Refund/);
+    assert.doesNotMatch(html, /Request a return/);
 });
 
 test('customer progress renders verified refund amounts and public refund explanations while escaping notes', async () => {
@@ -221,6 +222,7 @@ test('customer progress renders verified refund amounts and public refund explan
                         refund: {
                             approved_amount: '100.00',
                             verified_paid_amount: '40.00',
+                            payment_recorded: true,
                             remaining_amount: '60.00',
                         },
                     },
@@ -229,10 +231,10 @@ test('customer progress renders verified refund amounts and public refund explan
         }),
     );
     assert.match(html, /Refund processing/);
-    assert.match(html, /Confirmed refund payments/);
+    assert.match(html, /Confirmed paid/);
     assert.match(
         html,
-        /Refund explanation: Partial refund agreed for the returned component/,
+        /Refund note: Partial refund agreed for the returned component/,
     );
     assert.match(html, /40\.00/);
     assert.match(html, /60\.00/);
@@ -257,9 +259,9 @@ test('receipt eligibility labels the proposed policy and keeps manual review ava
             }),
         }),
     );
-    assert.match(html, /Purchase received/);
-    assert.match(html, /Changed mind window has expired/);
-    assert.match(html, /can still be submitted for manual review/);
+    assert.match(html, /Received/);
+    assert.match(html, /change-of-mind period has ended/);
+    assert.match(html, /can still be submitted for review/);
     assert.match(html, /2 of/);
 });
 
@@ -290,9 +292,9 @@ test('nonmonetary acceptance shows pending repair without claiming fulfillment o
             }),
         }),
     );
-    assert.match(html, /repair resolution: pending/);
+    assert.match(html, /Repair: Pending/);
     assert.match(html, /Repair the original hardware/);
-    assert.doesNotMatch(html, /Refund completed|Refund approved|Fulfilled/);
+    assert.doesNotMatch(html, /Refund completed|Confirmed paid|Completed/);
 });
 
 test('fully verified refunds display completion without asking customers to await verification', async () => {
@@ -332,7 +334,7 @@ test('fully verified refunds display completion without asking customers to awai
     assert.match(html, /Refund completed through confirmed payments/);
     assert.doesNotMatch(
         html,
-        /completion requires independent verification|No active refund payment recorded/,
+        /Awaiting full payment confirmation|No refund payment recorded yet/,
     );
 });
 
@@ -416,5 +418,36 @@ test('Staff-assisted refund proof remains visible without any customer request e
     );
     assert.match(html, /View payment proof/);
     assert.match(html, /\/orders\/7\/refund-payments\/3\/proof\/4/);
-    assert.doesNotMatch(html, /Request Return\/Refund|independently verified/);
+    assert.doesNotMatch(html, /Request a return|independently verified/);
+});
+
+test('proposed return limits stay inactive and supporting details remain available', async () => {
+    const { component } = loadComponent(true);
+    const html = await renderToString(
+        Vue.createSSRApp(component, {
+            order: order({
+                return_eligibility: {
+                    received_at: null,
+                    deadline_at: null,
+                    window_days: 7,
+                    window_approved: false,
+                    deadline_passed: false,
+                    remaining_seconds: null,
+                },
+            }),
+        }),
+    );
+
+    assert.match(
+        html,
+        /<details\b[^>]*>\s*<summary[^>]*>\s*Return details\s*<\/summary>/,
+    );
+    assert.match(html, /Receipt date unconfirmed/);
+    assert.match(
+        html,
+        /7-day change-of-mind limit awaits store approval and is not active/,
+    );
+    assert.match(html, /2 of 2 units available to request, subject to review/);
+    assert.match(html, /Approval and refunds are not guaranteed/);
+    assert.doesNotMatch(html, /period has ended/);
 });

@@ -27,7 +27,7 @@ function selectFiles(event) {
 </script>
 
 <template>
-    <div class="space-y-2">
+    <div class="min-w-0 space-y-2">
         <label class="block max-w-full min-w-0 text-sm"
             >{{ label }}
             <input
@@ -52,15 +52,14 @@ function selectFiles(event) {
             variant="outline"
             :disabled="disabled"
             @click="clearSelection"
-            >Clear selected files</Button
+            >Clear selection</Button
         >
-        <p class="text-muted-foreground text-sm">
+        <p class="text-muted-foreground max-w-xl text-xs leading-5">
             {{ imagesOnly ? 'JPG, PNG or WebP; up to 5 MB each.' : '' }}
             {{
                 multiple ? 'Up to five files in total.' : 'One image required.'
             }}
-            Clear this selection before uploading if needed; uploaded evidence
-            is preserved.
+            Clearing keeps uploaded files.
         </p>
     </div>
 </template>

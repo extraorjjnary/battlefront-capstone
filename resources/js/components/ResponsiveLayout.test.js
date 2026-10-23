@@ -814,6 +814,373 @@ async function assertFits(browser, label) {
 }
 
 test(
+    'return and refund screens keep compact summaries and role-specific forms usable',
+    {
+        skip: !baseUrl || !executable,
+        timeout: 120000,
+    },
+    async (t) => {
+        const browser = await openBrowser(t);
+        const paginated = (data) => ({
+            data,
+            total: data.length,
+            current_page: 1,
+            last_page: 1,
+            links: [],
+        });
+        const customerOrder = {
+            ...order,
+            can_cancel: false,
+            can_request_return: true,
+            items: [
+                {
+                    ...order.items[0],
+                    can_request: true,
+                    remaining_returnable: 1,
+                },
+            ],
+            return_reason_options: { defective: 'Defective', other: 'Other' },
+            return_eligibility: {
+                received_at: null,
+                deadline_at: null,
+                window_days: 7,
+                window_approved: false,
+                deadline_passed: false,
+                remaining_seconds: null,
+                reasons: {},
+            },
+            return_instructions: {
+                label: 'Return instructions',
+                branch: {
+                    name: 'Battlefront Sagay City',
+                    city: 'Sagay City',
+                    address: 'Verified return address',
+                    contact_number: '09386476046',
+                },
+                message: 'Contact Battlefront before sending items by courier.',
+            },
+            return_requests: [
+                {
+                    id: 1,
+                    product: { name: longName },
+                    quantity: 1,
+                    status: { value: 'submitted', label: 'Awaiting receipt' },
+                    reason_label: 'Defective',
+                    reason: 'The item needs inspection.',
+                    submitted_at: '2026-10-23T06:30:00Z',
+                    can_withdraw: true,
+                },
+                {
+                    id: 2,
+                    product: { name: 'Returned keyboard' },
+                    quantity: 1,
+                    status: {
+                        value: 'refund_processing',
+                        label: 'Refund processing',
+                    },
+                    reason_label: 'Defective',
+                    submitted_at: '2026-10-23T06:30:00Z',
+                    can_withdraw: false,
+                    return_decision: 'accepted',
+                    resolution: {
+                        type: 'refund',
+                        summary: 'Agreed refund for the returned keyboard.',
+                    },
+                    refund: {
+                        approved_amount: '200.00',
+                        confirmed_paid_amount: '50.00',
+                        remaining_amount: '150.00',
+                        payment_recorded: true,
+                    },
+                },
+            ],
+            refund_payments: [
+                {
+                    id: 9,
+                    amount: '50.00',
+                    payment_method: 'cash',
+                    paid_at: '2026-10-23T08:30:00Z',
+                    confirmation_method: 'approver',
+                },
+            ],
+        };
+        const returned = {
+            id: 1,
+            product_name: longName,
+            quantity: 1,
+            customer_name: 'Customer',
+            purchase_order_id: 7,
+            condition: 'opened',
+            requester_id: 12,
+            requester_name: 'Receiving staff',
+            reviewer_name: null,
+            reason: 'Inspection requested',
+            status: 'pending',
+            age_days: 2,
+            held_quantity: 1,
+            refundable_item_value: '200.00',
+            has_product_photo: false,
+            can_upload_evidence: true,
+        };
+        const refund = {
+            ...returned,
+            id: 2,
+            product_name: 'Returned keyboard',
+            status: 'accepted',
+            resolution_type: 'refund',
+            resolution_summary: 'Agreed refund for the returned keyboard.',
+            disposition: 'restock',
+            held_quantity: 0,
+            refund_id: 31,
+            approved_amount: '200.00',
+            verified_paid_amount: '50.00',
+            awaiting_review_amount: '0.00',
+            disputed_amount: '0.00',
+            refund_balance: '150.00',
+            unrecorded_refund_amount: '150.00',
+            payment_submission_key: 'preview-submission-key',
+            can_upload_evidence: false,
+        };
+        async function preview(name) {
+            if (!process.env.BATTLEFRONT_RETURN_PREVIEW) return;
+            const { data } = await browser.command('Page.captureScreenshot', {
+                format: 'png',
+            });
+            await writeFile(
+                join(process.env.BATTLEFRONT_RETURN_PREVIEW, name + '.png'),
+                Buffer.from(data, 'base64'),
+            );
+        }
+        for (const theme of ['light', 'dark']) {
+            await browser.show(
+                'Orders/Show',
+                { order: customerOrder, isConfirmation: false },
+                true,
+                theme,
+            );
+            const overview = `document.querySelector('[aria-labelledby="return-requests-heading"]')`;
+            assert.deepEqual(
+                await browser.evaluate(
+                    `${overview}.querySelectorAll('article dl dt').length`,
+                ),
+                3,
+            );
+            assert.match(
+                await browser.evaluate(`${overview}.textContent`),
+                /Confirmed paid/,
+            );
+            assert.doesNotMatch(
+                await browser.evaluate(`${overview}.className`),
+                /surface-panel|bg-card/,
+            );
+            for (const width of [320, 375, 768, 1440]) {
+                await browser.resize(width);
+                await assertFits(browser, `customer returns ${theme} ${width}`);
+                if ([375, 1440].includes(width))
+                    await preview(`${theme}-customer-${width}`);
+            }
+            const details = `${overview}.querySelector('details')`;
+            assert.equal(await browser.evaluate(`${details}.open`), false);
+            await browser.evaluate(
+                `${details}.querySelector('summary').focus()`,
+            );
+            for (const type of ['keyDown', 'keyUp'])
+                await browser.command('Input.dispatchKeyEvent', {
+                    type,
+                    key: ' ',
+                    code: 'Space',
+                    windowsVirtualKeyCode: 32,
+                });
+            assert.equal(await browser.evaluate(`${details}.open`), true);
+            assert.match(
+                await browser.evaluate(`${details}.textContent`),
+                /not active/,
+            );
+            await browser.evaluate(
+                `${overview}.querySelector('button').click()`,
+            );
+            assert.equal(
+                await browser.evaluate(
+                    `document.querySelector('[role=dialog] h2').textContent.trim()`,
+                ),
+                'Request a return',
+            );
+            await browser.evaluate(
+                `(() => { const select = document.querySelector('#return-item'); select.value = '11'; select.dispatchEvent(new Event('change', { bubbles: true })); const reason = document.querySelector('#return-reason'); reason.value = 'defective'; reason.dispatchEvent(new Event('change', { bubbles: true })); })()`,
+            );
+            await browser.evaluate(
+                `document.querySelector('[role=dialog] button[type=submit]').click()`,
+            );
+            assert.equal(
+                await browser.evaluate(
+                    `document.querySelector('[role=dialog] h2').textContent.trim()`,
+                ),
+                'Confirm return request',
+            );
+            assert.match(
+                await browser.evaluate(
+                    `document.querySelector('[role=dialog]').textContent`,
+                ),
+                /only after payment confirmation/,
+            );
+            await browser.resize(375);
+            assert.deepEqual(
+                await browser.evaluate(
+                    `(() => { const box = document.querySelector('[role=dialog]').getBoundingClientRect(); return [box.left >= 0, box.right <= innerWidth, box.height <= innerHeight]; })()`,
+                ),
+                [true, true, true],
+            );
+
+            for (const role of ['staff', 'manager', 'owner']) {
+                const canReceive = role === 'staff';
+                const props = {
+                    returns: paginated([
+                        returned,
+                        { ...refund, can_record_payment: role === 'owner' },
+                    ]),
+                    customerRequests: paginated([
+                        {
+                            id: 10,
+                            order_id: 7,
+                            order_reference: 'BF-000007',
+                            product_name: longName,
+                            quantity: 1,
+                            customer_name: 'Customer',
+                            reason_label: 'Defective',
+                            reason: 'Product inspection requested',
+                            created_at: '2026-10-23T06:30:00Z',
+                            can_receive: canReceive,
+                        },
+                    ]),
+                    can_receive_returns: canReceive,
+                    selected_order: null,
+                    suppliers: [],
+                    refundPayments: {},
+                    evidence: {},
+                    paymentEvidence: {},
+                    filters: {},
+                };
+                const capabilities = {
+                    viewOrders: true,
+                    requestReturns: canReceive,
+                    approveReturns: !canReceive,
+                    recordRefundPayments: role === 'owner',
+                    dispatchReturns: true,
+                };
+                await browser.show(
+                    'Administration/CustomerReturns',
+                    props,
+                    'admin',
+                    theme,
+                    {},
+                    capabilities,
+                );
+                assert.doesNotMatch(
+                    await browser.evaluate(
+                        `document.querySelector('main').textContent`,
+                    ),
+                    /Results update automatically as you type/,
+                );
+                assert.equal(
+                    await browser.evaluate(
+                        `document.querySelectorAll('main input[name=amount]').length`,
+                    ),
+                    role === 'owner' ? 1 : 0,
+                );
+                assert.equal(
+                    await browser.evaluate(
+                        `document.querySelectorAll('main select[name=decision]').length`,
+                    ),
+                    canReceive ? 0 : 1,
+                );
+                assert.equal(
+                    await browser.evaluate(
+                        `document.querySelector('main input[type=search], #return-search').getBoundingClientRect().top < document.querySelector('#customer-requests-heading').getBoundingClientRect().top`,
+                    ),
+                    true,
+                );
+                for (const width of [320, 375, 768, 1440]) {
+                    await browser.resize(width);
+                    await assertFits(
+                        browser,
+                        `administration returns ${role} ${theme} ${width}`,
+                    );
+                    if ([375, 1440].includes(width))
+                        await preview(`${theme}-${role}-${width}`);
+                }
+                if (canReceive) {
+                    const manual = `document.querySelector('main details')`;
+                    assert.equal(
+                        await browser.evaluate(`${manual}.open`),
+                        false,
+                    );
+                    await browser.evaluate(
+                        `${manual}.querySelector('summary').click()`,
+                    );
+                    assert.equal(
+                        await browser.evaluate(
+                            `${manual}.querySelector('[name=order_id]').required`,
+                        ),
+                        true,
+                    );
+                    await browser.evaluate(
+                        `document.querySelector('[aria-labelledby=customer-requests-heading] form button').click()`,
+                    );
+                    assert.equal(
+                        await browser.evaluate(
+                            `document.querySelector('#receipt-condition-10').required`,
+                        ),
+                        true,
+                    );
+                    assert.equal(
+                        await browser.evaluate(
+                            `document.querySelector('[aria-labelledby=customer-requests-heading] input[type=file]').accept`,
+                        ),
+                        '.jpg,.jpeg,.png,.webp',
+                    );
+                    await browser.resize(320);
+                    await assertFits(browser, `receipt form ${theme}`);
+                } else if (role === 'owner') {
+                    await browser.evaluate(
+                        `(() => { const select = document.querySelector('main select[name=payment_method]'); select.value = 'cash'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`,
+                    );
+                    assert.equal(
+                        await browser.evaluate(
+                            `document.querySelector('main input[name=payment_confirmed]').required`,
+                        ),
+                        true,
+                    );
+                    assert.equal(
+                        await browser.evaluate(
+                            `document.querySelector('main input[name=amount]').value`,
+                        ),
+                        '150.00',
+                    );
+                    await browser.evaluate(
+                        `(() => { const select = document.querySelector('main select[name=payment_method]'); select.value = 'gcash'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`,
+                    );
+                    assert.equal(
+                        await browser.evaluate(
+                            `document.querySelector('main input[name=proof]').required`,
+                        ),
+                        true,
+                    );
+                    assert.equal(
+                        await browser.evaluate(
+                            `document.querySelector('main input[name=proof]').multiple`,
+                        ),
+                        false,
+                    );
+                    await browser.resize(320);
+                    await assertFits(browser, `refund form ${theme}`);
+                }
+            }
+        }
+        assert.deepEqual(browser.exceptions, []);
+    },
+);
+
+test(
     'compact administration editors preserve drafts, request fields and visible validation errors',
     {
         skip: !baseUrl || !executable,

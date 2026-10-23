@@ -4,7 +4,7 @@ defineProps({ instructions: { type: Object, required: true } });
 
 <template>
     <aside
-        class="border-border bg-muted/40 space-y-1 border p-3 text-sm"
+        class="border-border min-w-0 space-y-1 border-l-2 pl-3 text-sm wrap-anywhere"
         aria-label="Return instructions"
     >
         <p class="font-medium">{{ instructions.label }}</p>

@@ -26,7 +26,7 @@ const approvedAmount = computed(() =>
 <template>
     <div class="space-y-2">
         <input type="hidden" name="approved_amount" :value="approvedAmount" />
-        <Label>Approved refund (₱)</Label>
+        <Label>Refund amount (₱)</Label>
         <Input
             v-if="monetary && partial"
             v-model="amount"
@@ -45,15 +45,14 @@ const approvedAmount = computed(() =>
         <InputError :message="errors.approved_amount" />
         <template v-if="monetary">
             <p class="text-muted-foreground text-sm">
-                Full item value: ₱{{ maximum }} (original unit price × returned
-                quantity). Shipping is not included.
+                Item value: ₱{{ maximum }}. Shipping is not included.
             </p>
             <label class="flex items-center gap-2 text-sm"
-                ><input v-model="partial" type="checkbox" />Approve a partial
-                refund instead</label
+                ><input v-model="partial" type="checkbox" />Partial
+                refund</label
             >
             <template v-if="partial">
-                <Label>Partial refund explanation shared with customer</Label>
+                <Label>Reason shown to customer</Label>
                 <Input
                     name="resolution_summary"
                     aria-label="Partial refund explanation"
@@ -67,10 +66,10 @@ const approvedAmount = computed(() =>
             </template>
         </template>
         <p v-else class="text-muted-foreground text-sm">
-            Nonmonetary resolutions have no approved refund.
+            No refund for this outcome.
         </p>
         <p class="text-muted-foreground text-sm">
-            Acceptance does not pay or fulfill the customer resolution.
+            Approval does not make a payment or complete the outcome.
         </p>
     </div>
 </template>
