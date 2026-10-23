@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Enums\AppearancePreference;
+use App\Services\AdministrationWorkQueue;
 use App\Services\Cart\CartService;
 use App\Services\Notifications\NotificationHistory;
 use Illuminate\Http\Request;
@@ -54,6 +55,9 @@ class HandleInertiaRequests extends Middleware
                 'cartQuantity' => Inertia::always(fn (): int => app(CartService::class)->totalQuantity($customer)),
             ] : []),
             'name' => config('app.name'),
+            'workQueueCounts' => fn (): array => $request->user()?->can('access-administration')
+                && $canBrowseProductCatalog
+                    ? app(AdministrationWorkQueue::class)->counts($request->user()) : [],
             'notificationSummary' => fn (): ?array => $request->user() === null
                 || (! $request->user()->can('access-administration') && ! $request->user()->can('use-customer-cart'))
                 ? null : app(NotificationHistory::class)->summary($request->user()),

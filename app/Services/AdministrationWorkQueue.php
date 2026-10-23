@@ -18,6 +18,31 @@ class AdministrationWorkQueue
      */
     public function paginate(User $actor, array $filters = []): LengthAwarePaginator
     {
+        $query = $this->query($actor);
+
+        if ($query === null) {
+            return new LengthAwarePaginator([], 0, 25);
+        }
+
+        return $query
+            ->when($filters['kind'] ?? null, fn (Builder $query, string $kind): Builder => $query->where('kind', $kind))
+            ->when($filters['responsible'] ?? null, fn (Builder $query, string $responsible): Builder => $query->where('responsible_name', 'like', '%'.$responsible.'%'))
+            ->when($filters['older_than'] ?? null, fn (Builder $query, int $days): Builder => $query->where('created_at', '<', now()->subDays($days)))
+            ->orderBy('created_at')->orderBy('kind')->orderBy('id')
+            ->paginate(25)->withQueryString()
+            ->through(fn (stdClass $entry): array => $this->present($entry));
+    }
+
+    /** @return array<string, int> */
+    public function counts(User $actor): array
+    {
+        return $this->query($actor)?->select('kind')->selectRaw('count(*) as total')
+            ->groupBy('kind')->pluck('total', 'kind')
+            ->map(fn (mixed $total): int => (int) $total)->all() ?? [];
+    }
+
+    private function query(User $actor): ?Builder
+    {
         $queries = [];
         if ($actor->can('orders.view') && $actor->can('returns.dispatch')) {
             $queries[] = DB::table('customer_return_resolutions as work')
@@ -98,7 +123,7 @@ class AdministrationWorkQueue
         }
 
         if ($queries === []) {
-            return new LengthAwarePaginator([], 0, 25);
+            return null;
         }
 
         $combined = array_shift($queries);
@@ -106,13 +131,7 @@ class AdministrationWorkQueue
             $combined->unionAll($query);
         }
 
-        return DB::query()->fromSub($combined, 'work_queue')
-            ->when($filters['kind'] ?? null, fn (Builder $query, string $kind): Builder => $query->where('kind', $kind))
-            ->when($filters['responsible'] ?? null, fn (Builder $query, string $responsible): Builder => $query->where('responsible_name', 'like', '%'.$responsible.'%'))
-            ->when($filters['older_than'] ?? null, fn (Builder $query, int $days): Builder => $query->where('created_at', '<', now()->subDays($days)))
-            ->orderBy('created_at')->orderBy('kind')->orderBy('id')
-            ->paginate(25)->withQueryString()
-            ->through(fn (stdClass $entry): array => $this->present($entry));
+        return DB::query()->fromSub($combined, 'work_queue');
     }
 
     /** @param string|list<string> $statuses */

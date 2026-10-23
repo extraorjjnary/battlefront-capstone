@@ -80,11 +80,18 @@ export function useAppNavigation() {
         }
 
         if (isAdministrator.value) {
+            const counts = page.props.workQueueCounts ?? {};
+            const count = (...kinds) =>
+                kinds.reduce((total, kind) => total + (counts[kind] ?? 0), 0);
             if (page.props.auth?.can?.browseProductCatalog) {
                 items.push({
                     title: 'Tasks',
                     href: WorkQueueController.index(),
                     icon: ListTodo,
+                    pendingCount: Object.values(counts).reduce(
+                        (total, value) => total + value,
+                        0,
+                    ),
                 });
             }
             if (page.props.auth?.can?.manageProducts)
@@ -108,6 +115,7 @@ export function useAppNavigation() {
                     title: 'Stock requests',
                     href: InventoryAdjustmentController.index(),
                     icon: ClipboardList,
+                    pendingCount: count('stock_adjustment'),
                 });
             if (page.props.auth?.can?.viewInventory)
                 items.push({
@@ -120,18 +128,28 @@ export function useAppNavigation() {
                     title: 'Damage reports',
                     href: DamageReportController.index(),
                     icon: PackageX,
+                    pendingCount: count('damage'),
                 });
             if (page.props.auth?.can?.viewInventory)
                 items.push({
                     title: 'Supplier returns',
                     href: SupplierReturnController.index(),
                     icon: Truck,
+                    pendingCount: count('supplier_return'),
                 });
             if (page.props.auth?.can?.viewOrders)
                 items.push({
                     title: 'Customer returns',
                     href: CustomerReturnController.index(),
                     icon: Undo2,
+                    pendingCount: count(
+                        'customer_request',
+                        'customer_return',
+                        'customer_handover',
+                        'customer_resolution',
+                        'refund',
+                        'refund_reconciliation',
+                    ),
                 });
             if (page.props.auth?.can?.manageSuppliers)
                 items.push({
@@ -144,6 +162,7 @@ export function useAppNavigation() {
                     title: 'Orders',
                     href: AdministrationOrderController.index(),
                     icon: ReceiptText,
+                    pendingCount: count('order'),
                 });
             if (page.props.auth?.can?.viewReports)
                 items.push({

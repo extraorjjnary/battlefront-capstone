@@ -5,6 +5,7 @@ use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\AdministrationWorkQueue;
 use App\Services\Order\OrderProcessingService;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -31,6 +32,8 @@ test('work queue is oldest first and excludes tasks outside existing permissions
     $this->actingAs($owner)->get(route('administration.work-queue.index'))
         ->assertInertia(fn (Assert $page) => $page->component('Administration/WorkQueue')
             ->where('entries.total', 2)
+            ->where('workQueueCounts.stock_adjustment', 1)
+            ->where('workQueueCounts.order', 1)
             ->where('entries.data.0.id', $requestId)
             ->where('entries.data.0.age_days', 19)
             ->where('entries.data.0.href', route('administration.inventory-adjustments.index', ['case' => $requestId]))
@@ -38,6 +41,7 @@ test('work queue is oldest first and excludes tasks outside existing permissions
 
     $this->actingAs($staff)->get(route('administration.work-queue.index'))
         ->assertInertia(fn (Assert $page) => $page->where('entries.total', 1)
+            ->where('workQueueCounts', ['order' => 1])
             ->where('entries.data.0.kind', 'order'));
 });
 
@@ -69,7 +73,8 @@ test('supervisors retain claimed orders in the shared queue until completion or 
     app(OrderProcessingService::class)->updateStatus($order, OrderStatus::from($ending), actor: $handler, productsHandedOver: $ending === 'completed');
 
     $this->get(route('administration.work-queue.index', ['kind' => 'order']))
-        ->assertInertia(fn (Assert $page) => $page->where('entries.total', 0));
+        ->assertInertia(fn (Assert $page) => $page->where('entries.total', 0)
+            ->where('workQueueCounts', []));
 })->with(['manager', 'owner'])->with(['completed', 'cancelled']);
 
 test('technical administrators see no business work without business permissions', function () {
@@ -79,7 +84,48 @@ test('technical administrators see no business work without business permissions
     Order::factory()->create();
 
     $this->actingAs($it)->get(route('administration.work-queue.index'))
-        ->assertInertia(fn (Assert $page) => $page->where('entries.total', 0));
+        ->assertInertia(fn (Assert $page) => $page->where('entries.total', 0)
+            ->where('workQueueCounts', []));
+});
+
+test('sidebar counts use one aggregate query and remain independent of queue pagination', function () {
+    $owner = User::factory()->administrator()->create();
+    Order::factory()->count(26)->create();
+    $queue = app(AdministrationWorkQueue::class);
+    $queue->counts($owner);
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+
+    $counts = $queue->counts($owner);
+
+    expect($counts)->toBe(['order' => 26]);
+    expect(DB::getQueryLog())->toHaveCount(1);
+    DB::disableQueryLog();
+    $this->actingAs($owner)->get(route('administration.work-queue.index', ['kind' => 'damage']))
+        ->assertInertia(fn (Assert $page) => $page->where('entries.total', 0)
+            ->where('workQueueCounts.order', 26));
+});
+
+test('unrelated partial reloads do not resolve sidebar work counts', function () {
+    $owner = User::factory()->administrator()->create();
+    $initial = $this->actingAs($owner)->get(route('administration.work-queue.index'));
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+
+    $this->actingAs($owner)->withHeaders([
+        'X-Inertia' => 'true',
+        'X-Inertia-Version' => $initial->viewData('page')['version'],
+        'X-Inertia-Partial-Component' => 'Administration/WorkQueue',
+        'X-Inertia-Partial-Data' => 'auth',
+    ])->get(route('administration.work-queue.index'))
+        ->assertOk()
+        ->assertJsonPath('props.auth.user.id', $owner->id)
+        ->assertJsonMissingPath('props.workQueueCounts')
+        ->assertJsonMissingPath('props.entries');
+
+    expect(collect(DB::getQueryLog())->filter(fn (array $query): bool => str_contains($query['query'], 'work_queue')
+        && str_contains($query['query'], 'group by')))->toHaveCount(0);
+    DB::disableQueryLog();
 });
 
 test('work queue includes damage supplier handover and unpaid refund actions for an owner', function () {
@@ -128,6 +174,7 @@ test('work queue includes damage supplier handover and unpaid refund actions for
 
     $this->actingAs($owner)->get(route('administration.work-queue.index'))
         ->assertInertia(fn (Assert $page) => $page->where('entries.total', 4)
+            ->where('workQueueCounts', ['customer_handover' => 1, 'damage' => 1, 'refund' => 1, 'supplier_return' => 1])
             ->where('entries.data.0.kind', 'damage')
             ->where('entries.data.1.kind', 'supplier_return')
             ->where('entries.data.2.kind', 'customer_handover')

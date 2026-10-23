@@ -31,10 +31,12 @@ function navigationHarness({
     manageCatalog = false,
     mode = 'expanded',
     capabilities = {},
+    workQueueCounts = {},
 } = {}) {
     const page = Vue.reactive({
         props: {
             cartQuantity: quantity,
+            workQueueCounts,
             auth: {
                 can: {
                     accessAdministration: administrator,
@@ -190,6 +192,59 @@ function cartLink(html) {
     return html.match(/<a\b[^>]*href="\/cart"[^>]*>.*?<\/a>/s)?.[0];
 }
 
+for (const mode of ['expanded', 'collapsed', 'mobile']) {
+    test(`${mode} navigation presents actionable counts and clears resolved badges`, async () => {
+        const harness = navigationHarness({
+            administrator: true,
+            catalogRole: true,
+            capabilities: { viewInventory: true },
+            mode,
+            workQueueCounts: {
+                stock_adjustment: 2,
+                customer_return: 1,
+                refund: 3,
+                order: 101,
+            },
+        });
+        const items = harness.navigation.mainNavItems.value;
+        assert.equal(
+            items.find((item) => item.title === 'Tasks').pendingCount,
+            107,
+        );
+        assert.equal(
+            items.find((item) => item.title === 'Customer returns')
+                .pendingCount,
+            4,
+        );
+        assert.equal(
+            items.find((item) => item.title === 'Stock requests').pendingCount,
+            2,
+        );
+        const html = await harness.render();
+        assert.match(html, /aria-label="Orders, 101 pending actions"/);
+        assert.match(
+            html,
+            /data-slot="pending-actions-badge"[^>]*>99\+<\/span>/,
+        );
+        assert.doesNotMatch(html, /aria-label="Damage reports,/);
+        harness.page.props.workQueueCounts = {};
+        assert.doesNotMatch(await harness.render(), /pending-actions-badge/);
+        harness.page.props.workQueueCounts = { stock_adjustment: 2 };
+        harness.page.props.auth.can.viewInventory = false;
+        assert.equal(
+            harness.navigation.mainNavItems.value.find(
+                (item) => item.title === 'Stock requests',
+            ),
+            undefined,
+        );
+    });
+}
+
+test('customer navigation does not present administration counts', async () => {
+    const harness = navigationHarness({ workQueueCounts: { order: 4 } });
+    assert.doesNotMatch(await harness.render(), /pending-actions-badge/);
+});
+
 test('store navigation follows the branch capability and reacts to permission changes', async () => {
     const harness = navigationHarness({ administrator: true });
     const stores = () =>
@@ -221,10 +276,13 @@ for (const audience of ['guest', 'customer']) {
         }
 
         const html = await harness.render();
-        assert.match(html, /href="\/products"[^>]*>.*?<span>Products<\/span>/s);
         assert.match(
             html,
-            /href="\/branches"[^>]*>.*?<span>Our stores<\/span>/s,
+            /href="\/products"[^>]*>.*?<span[^>]*>Products<\/span>/s,
+        );
+        assert.match(
+            html,
+            /href="\/branches"[^>]*>.*?<span[^>]*>Our stores<\/span>/s,
         );
         assert.doesNotMatch(html, /href="\/administration(?:\/|")/);
     });

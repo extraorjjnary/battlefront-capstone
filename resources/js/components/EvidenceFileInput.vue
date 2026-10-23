@@ -1,5 +1,6 @@
 <script setup>
 import { ref } from 'vue';
+import FileInput from '@/components/FileInput.vue';
 import { Button } from '@/components/ui/button';
 
 defineProps({
@@ -14,7 +15,7 @@ const input = ref(null);
 const selected = ref(false);
 function clearSelection() {
     if (input.value) {
-        input.value.value = '';
+        input.value.clear();
     }
     selected.value = false;
     emit('update:files', []);
@@ -30,7 +31,7 @@ function selectFiles(event) {
     <div class="min-w-0 space-y-2">
         <label class="block max-w-full min-w-0 text-sm"
             >{{ label }}
-            <input
+            <FileInput
                 ref="input"
                 :name="name"
                 type="file"

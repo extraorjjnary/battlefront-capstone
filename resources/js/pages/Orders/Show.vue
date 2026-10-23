@@ -30,7 +30,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import FileInput from '@/components/FileInput.vue';
 import { Spinner } from '@/components/ui/spinner';
 import { formatCurrency } from '@/lib/currency';
 import { formatDateTime } from '@/lib/dateTime';
@@ -526,7 +526,7 @@ function submitReplacementProof() {
                                     >
                                         Replacement proof
                                     </label>
-                                    <Input
+                                    <FileInput
                                         id="replacement-payment-proof"
                                         type="file"
                                         accept="image/jpeg,image/png,image/webp"
