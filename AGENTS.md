@@ -335,3 +335,33 @@ Prefer:
 - Do not make cosmetic-only formatting changes.
 - Do not run frontend formatters unless required by the task.
 - Do not reorder Tailwind utility classes or change quote style unless the edited code actually requires it.
+
+## PayMongo Preparation Boundary
+- Read `docs/paymongo/11-system-aligned-setup.md` for existing-system decisions and private test credential setup. Test keys belong in the ignored root `.env`, never chat, committed placeholders, logs or `VITE_*`. Follow current official PayMongo guides via `paymongo-api`; record endpoint-specific evidence rather than guessing. Preserve existing role permissions and manual refund recording/review workflows. Preparation-only requests do not activate payment configuration or external operations.
+
+- Follow the existing PHP/Laravel architecture and order/payment conventions documented in `.ai/rules`; do not introduce a parallel payment architecture without explicit review.
+- Preserve existing MySQL data and use forward-only, data-preserving migrations if implementation is later approved. Do not reset, truncate, or rewrite existing customer/order/payment history.
+- Use PayMongo test-mode credentials and transactions during development. Keep all credentials out of source, logs, documentation, browser code, and commits.
+- A customer redirect or return URL is not proof of payment. Only authenticated server-side PayMongo event processing and, where required, server-side status confirmation may establish payment.
+- Verify webhook signatures over the raw request body using the correct environment webhook secret before processing events.
+- Make payment creation, webhook delivery, and order-state transitions idempotent; retain external event identifiers to prevent duplicate effects.
+- The developer has approved PayMongo as the planned online payment gateway to replace manual GCash/Maya proof processing for new online orders and approved implementation within that scope; adviser approval and panel recommendation were reported by the developer. First-release methods are online card, GCash, Maya, QR Ph via Hosted Checkout v2 and Direct Online Banking through its documented Payment Intent flow for eligible banks. Absorb fees unless written PayMongo/acquirer permission and disclosure review approve pass-on fees. Use provider method expiry and the separate 24-hour merchant order cutoff; reconcile and confirm provider closure before restoring stock. Obtain renewed approval before expanding scope. Production credentials, live transactions, and deployment remain separately controlled. The manuscript and `CAPSTONE_CONTEXT.md` record the scope amendment.
+- Keep order and payment states separate. Before customer, administrator, or scheduled cancellation of an unpaid gateway order, reconcile the latest PayMongo state and confirm closure of the applicable Checkout Session or banking provider flow; never cancel/release stock for paid, pending, processing, or uncertain payment. Unsupported closure requires reconciliation/escalation. Treat retries, late payment, and refunds as distinct workflows; order cancellation is not a refund.
+- Local webhook testing may use an HTTPS tunnel only after explicit approval; expose only the webhook endpoint and never expose MySQL, administrative/debug routes, or secrets.
+- Require explicit developer approval before implementing payment processing, database changes, webhook registration, or any PayMongo side effect.
+- Production credentials, live transactions, deployment, and dashboard changes are out of scope until separately approved.
+- Preparation references and role descriptions live in `docs/paymongo/`; reusable workflows live in `.agents/skills/paymongo-api/` and `.agents/skills/payment-*/`. Read `docs/paymongo/10-readiness-audit.md` for operation/inbox recovery, state decisions, acceptance coverage, and outstanding evidence. A preparation-only task does not start implementation even when the gateway direction was previously approved.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+When the user types `/graphify`, use the installed graphify skill or instructions before doing anything else.
+
+Rules:
+- When graphify-out/graph.json exists, run `graphify query "<question>"` before your first grep, search or source-file read for a codebase question, and put this rule in every subagent prompt that explores code. Read raw files only for lines the graph or an earlier read already located. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
+- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).
+- A committed graphify-out/graph.json is rewritten whole on every build, so a large diff to it in a pull request is expected. Do not flag it as churn or suggest skipping the graph rebuild or its hooks.

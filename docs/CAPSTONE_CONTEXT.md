@@ -750,19 +750,22 @@ The customer-facing operating-hours value for each listed branch is **8:00 AM–
 
 ## Payments
 
-The system supports:
+Current implementation supports:
 
 - payment-method selection;
 - cash, card-at-store, GCash, and Maya as manually processed payment methods;
 - private payment-proof evidence for GCash and Maya;
 - manual payment verification procedures determined by Battlefront.
 
-Outside scope:
+Adviser-approved scope amendment reported by the developer and recommended by the panel:
 
-- real-time online payment gateway integration;
-- automated payment verification;
-- credit-card gateway processing;
-- third-party e-wallet gateway integration.
+- integrate PayMongo Hosted Checkout for online card, GCash, Maya, and QR Ph payments for pickup and delivery;
+- confirm completed online payments automatically from authenticated PayMongo evidence; customers do not upload payment receipts;
+- replace manual GCash/Maya proof upload and review for new online orders while preserving historical records;
+- keep cash at pickup, physical card-at-store, and COD as separate payment methods and workflows;
+- keep payment status separate from order and fulfillment status.
+
+Direct Online Banking is included through PayMongo's documented Payment Intent redirect flow, separate from Hosted Checkout; enable only bank routes confirmed available in test mode and activated for the merchant. Production credentials, live transactions, and deployment require separate approval.
 
 ## Delivery and Logistics
 
