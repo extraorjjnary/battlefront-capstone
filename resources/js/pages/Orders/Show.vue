@@ -12,7 +12,7 @@ import {
     Upload,
     UserRound,
 } from '@lucide/vue';
-import { ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import OrderController from '@/actions/App/Http/Controllers/OrderController';
 import OrderPaymentProofController from '@/actions/App/Http/Controllers/OrderPaymentProofController';
 import InputError from '@/components/InputError.vue';
@@ -41,6 +41,7 @@ import { retry as retryPayMongo } from '@/routes/orders/paymongo';
 const props = defineProps({
     order: { type: Object, required: true },
     isConfirmation: { type: Boolean, required: true },
+    isPayMongoReturn: { type: Boolean, required: true },
 });
 
 const replacementProofForm = useForm({
@@ -54,6 +55,7 @@ const paymentStatusPolling = usePoll(
     { only: ['order'], preserveErrors: true },
     { autoStart: false },
 );
+let paymentWindow = null;
 
 function updatePaymentStatusPolling() {
     const shouldPoll =
@@ -77,6 +79,21 @@ watch(
     updatePaymentStatusPolling,
     { immediate: true },
 );
+
+function refreshWhenVisible() {
+    if (document.visibilityState === 'visible' && props.order.payment.status.value === 'pending') {
+        paymentStatusPolling.start();
+    }
+}
+
+onMounted(() => {
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+
+    if (props.isPayMongoReturn) {
+        window.close();
+    }
+});
+onUnmounted(() => document.removeEventListener('visibilitychange', refreshWhenVisible));
 
 function requestCancellation() {
     if (!props.order.can_cancel || cancellationForm.processing) {
@@ -119,9 +136,27 @@ function submitReplacementProof() {
     });
 }
 
-function retryDirectBankPayment() {
-    if (!props.order.payment.can_retry || paymentRetryForm.processing) return;
-    paymentRetryForm.submit(retryPayMongo(props.order.id), { preserveScroll: true });
+function retryOnlinePayment() {
+    if (!(props.order.payment.can_retry || props.order.payment.can_retry_hosted) || paymentRetryForm.processing) return;
+    paymentWindow = window.open('about:blank', '_blank');
+    if (paymentWindow) {
+        paymentWindow.opener = null;
+    }
+    paymentRetryForm.submit(retryPayMongo(props.order.id), {
+        preserveScroll: true,
+        onSuccess: (page) => finishPaymentWindow(page),
+        onError: () => paymentWindow?.close(),
+    });
+}
+
+function finishPaymentWindow(page) {
+    const checkoutUrl = page.props.order?.payment?.checkout_url;
+    if (paymentWindow && checkoutUrl) {
+        paymentWindow.location.replace(checkoutUrl);
+    } else if (paymentWindow) {
+        paymentWindow.close();
+    }
+    paymentWindow = null;
 }
 </script>
 
@@ -522,15 +557,51 @@ function retryDirectBankPayment() {
                                         {{ order.payment.notice }}
                                     </dd>
                                     <dd v-if="order.payment.checkout_url" class="mt-3">
-                                        <a :href="order.payment.checkout_url" class="text-primary-ink text-sm font-semibold underline underline-offset-4">
-                                            {{ order.payment.hosted_payment_method === 'qrph' ? 'Continue to QR payment' : 'Continue to secure payment' }}
+                                        <Button as-child>
+                                            <a :href="order.payment.checkout_url" target="_blank" rel="noopener noreferrer">
+                                                Continue payment
+                                            </a>
+                                        </Button>
+                                    </dd>
+                                    <dd v-if="order.payment.qr_code_image_url" class="mt-4 grid justify-items-start gap-3">
+                                        <p class="font-semibold">Amount due: {{ formatCurrency(order.total) }}</p>
+                                        <img
+                                            :src="order.payment.qr_code_image_url"
+                                            :alt="`QR Ph payment code for order ${order.reference}`"
+                                            class="size-64 max-w-full border border-border bg-white p-2"
+                                        />
+                                        <p class="text-muted-foreground text-xs leading-5">
+                                            Scan with GCash, Maya, or a supported banking app. This code expires at {{ formatDateTime(order.payment.qr_expires_at, 'short') }}.
+                                        </p>
+                                        <a
+                                            :href="order.payment.qr_code_image_url"
+                                            :download="`${order.reference}-qrph.png`"
+                                            class="text-primary-ink text-sm font-semibold underline underline-offset-4"
+                                        >
+                                            Download QR code
                                         </a>
+                                    </dd>
+                                    <dd v-if="order.payment.qr_can_retry" class="mt-3 grid gap-2">
+                                        <p class="text-muted-foreground text-xs leading-5">The previous QR code expired. Create a new code to continue payment.</p>
+                                        <Button type="button" size="sm" :disabled="paymentRetryForm.processing" @click="retryOnlinePayment">
+                                            <Spinner v-if="paymentRetryForm.processing" />
+                                            Generate new QR code
+                                        </Button>
+                                        <InputError :message="paymentRetryForm.errors.payment" />
                                     </dd>
                                     <dd v-if="order.payment.can_retry" class="mt-3 grid gap-2">
                                         <p class="text-muted-foreground text-xs leading-5">The bank did not complete the payment. You can try again with {{ order.payment.bank_code }}.</p>
-                                        <Button type="button" size="sm" :disabled="paymentRetryForm.processing" @click="retryDirectBankPayment">
+                                        <Button type="button" size="sm" :disabled="paymentRetryForm.processing" @click="retryOnlinePayment">
                                             <Spinner v-if="paymentRetryForm.processing" />
                                             Retry bank payment
+                                        </Button>
+                                        <InputError :message="paymentRetryForm.errors.payment" />
+                                    </dd>
+                                    <dd v-if="order.payment.can_retry_hosted" class="mt-3 grid gap-2">
+                                        <p class="text-muted-foreground text-xs leading-5">Payment setup needs another check. Retry to resume this order's secure PayMongo checkout.</p>
+                                        <Button type="button" size="sm" :disabled="paymentRetryForm.processing" @click="retryOnlinePayment">
+                                            <Spinner v-if="paymentRetryForm.processing" />
+                                            Retry online payment
                                         </Button>
                                         <InputError :message="paymentRetryForm.errors.payment" />
                                     </dd>

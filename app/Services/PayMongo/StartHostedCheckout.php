@@ -2,7 +2,9 @@
 
 namespace App\Services\PayMongo;
 
+use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
+use App\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\PayMongoFlow;
 use App\Services\Notifications\OrderNotificationPublisher;
@@ -23,7 +25,12 @@ class StartHostedCheckout
 
     public function execute(Order $order): string
     {
-        if ($order->payment_method !== PaymentMethod::Online || ! config('services.paymongo.enabled')) {
+        if ($order->payment_method !== PaymentMethod::Online
+            || $order->payment_origin !== 'paymongo'
+            || $order->status !== OrderStatus::Pending
+            || $order->payment_status !== PaymentStatus::Pending
+            || $order->created_at->copy()->addDay()->isPast()
+            || ! config('services.paymongo.enabled')) {
             throw new RuntimeException('Online payment is unavailable.');
         }
 
@@ -49,9 +56,11 @@ class StartHostedCheckout
             $attributes['send_email_receipt'] = true;
         }
 
-        $flow = PayMongoFlow::query()->where('order_id', $order->id)->first();
+        $flow = PayMongoFlow::query()->where('order_id', $order->id)->where('active_slot', 'active')->first();
         if ($flow !== null) {
-            if ($flow->channel !== 'hosted_checkout' || (int) $flow->amount_minor !== $amountMinor) {
+            if ($flow->channel !== 'hosted_checkout'
+                || (int) $flow->amount_minor !== $amountMinor
+                || $flow->hosted_payment_method !== $order->hosted_payment_method) {
                 throw new RuntimeException('The payment is already active or requires reconciliation.');
             }
             if ($flow->checkout_url !== null && $flow->status === 'open') {
@@ -77,13 +86,15 @@ class StartHostedCheckout
             $idempotencyKey = (string) Str::uuid();
             $flow = DB::transaction(function () use ($order, $amountMinor, $attributes, $operationId, $idempotencyKey): PayMongoFlow {
                 $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
-                if (PayMongoFlow::query()->where('order_id', $lockedOrder->id)->exists()) {
+                if (PayMongoFlow::query()->where('order_id', $lockedOrder->id)->where('active_slot', 'active')->exists()) {
                     throw new RuntimeException('A payment flow already exists for this order.');
                 }
                 $flow = PayMongoFlow::query()->create([
                     'order_id' => $lockedOrder->id,
+                    'active_slot' => 'active',
                     'mode' => 'test',
                     'channel' => 'hosted_checkout',
+                    'hosted_payment_method' => $lockedOrder->hosted_payment_method,
                     'status' => 'creating',
                     'amount_minor' => $amountMinor,
                     'currency' => 'PHP',
@@ -190,7 +201,7 @@ class StartHostedCheckout
         }
 
         if ($sessionStatus === 'expired') {
-            $flow->update(['status' => 'closed', 'closed_at' => now()]);
+            $flow->update(['status' => 'closed', 'active_slot' => null, 'closed_at' => now()]);
             throw new RuntimeException('This checkout session has expired.');
         }
 

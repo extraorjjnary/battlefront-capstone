@@ -60,7 +60,7 @@ class CustomerOrderPresenter
      */
     public function detail(Order $order): array
     {
-        $paymongoFlow = PayMongoFlow::query()->where('order_id', $order->id)->first();
+        $paymongoFlow = PayMongoFlow::query()->where('order_id', $order->id)->latest('id')->first();
 
         return [
             'can_cancel' => $this->orderProcessingService->canCustomerCancel($order),
@@ -96,9 +96,28 @@ class CustomerOrderPresenter
                 'notice' => $this->paymentNotice($order),
                 'rejection' => $this->paymentRejectionData($order),
                 'can_resubmit_proof' => $this->canResubmitPaymentProof($order),
-                'checkout_url' => $paymongoFlow?->status === 'open' ? $paymongoFlow->checkout_url : null,
+                'checkout_url' => $paymongoFlow?->channel === 'hosted_checkout' && $paymongoFlow->status === 'open' ? $paymongoFlow->checkout_url : null,
+                'qr_code_image_url' => $paymongoFlow?->channel === 'direct_qrph'
+                    && $paymongoFlow->status === 'open'
+                    && $paymongoFlow->qr_expires_at?->isFuture()
+                        ? $paymongoFlow->qr_code_image_url
+                        : null,
+                'qr_expires_at' => $paymongoFlow?->channel === 'direct_qrph'
+                    ? $paymongoFlow->qr_expires_at?->toIso8601String()
+                    : null,
+                'qr_can_retry' => $paymongoFlow?->channel === 'direct_qrph'
+                    && ($paymongoFlow->status === 'awaiting_payment_method'
+                        || ($paymongoFlow->status === 'open' && $paymongoFlow->qr_expires_at?->isPast()))
+                    && $paymongoFlow->merchant_cutoff_at->isFuture()
+                    && $order->status === OrderStatus::Pending
+                    && $order->payment_status === PaymentStatus::Pending,
                 'bank_code' => $paymongoFlow?->bank_code,
-                'hosted_payment_method' => $order->hosted_payment_method,
+                'hosted_payment_method' => $paymongoFlow?->hosted_payment_method ?? $order->hosted_payment_method,
+                'can_retry_hosted' => $paymongoFlow?->channel === 'hosted_checkout'
+                    && $paymongoFlow->status === 'reconciliation_required'
+                    && $paymongoFlow->merchant_cutoff_at->isFuture()
+                    && $order->status === OrderStatus::Pending
+                    && $order->payment_status === PaymentStatus::Pending,
                 'can_retry' => $paymongoFlow?->channel === 'direct_online_banking'
                     && $paymongoFlow->status === 'awaiting_payment_method'
                     && $paymongoFlow->merchant_cutoff_at->isFuture()
@@ -132,6 +151,10 @@ class CustomerOrderPresenter
      */
     private function paymentNotice(Order $order): string
     {
+        if ($order->payment_origin === 'paymongo' && $order->status === OrderStatus::Cancelled) {
+            return 'This order is cancelled. Any payment received after cancellation requires Battlefront review; cancellation does not refund a payment.';
+        }
+
         if ($order->payment_origin === 'paymongo') {
             return $order->payment_status === PaymentStatus::Verified
                 ? 'PayMongo has confirmed your online payment. Battlefront will continue the existing order preparation and fulfillment process.'

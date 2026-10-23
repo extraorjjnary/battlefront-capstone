@@ -19,7 +19,7 @@ class RetryDirectOnlineBanking
     {
         [$flow, $previousAttempt] = DB::transaction(function () use ($order): array {
             $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
-            $flow = PayMongoFlow::query()->where('order_id', $lockedOrder->id)->lockForUpdate()->firstOrFail();
+            $flow = PayMongoFlow::query()->where('order_id', $lockedOrder->id)->where('active_slot', 'active')->lockForUpdate()->firstOrFail();
             $previousAttempt = $flow->attempts()->latest('attempt_number')->firstOrFail();
 
             if ($flow->channel !== 'direct_online_banking'

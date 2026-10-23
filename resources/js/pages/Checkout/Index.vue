@@ -35,7 +35,6 @@ const props = defineProps({
     fulfillmentMethods: { type: Array, required: true },
     paymentMethods: { type: Array, required: true },
     paymongoHostedMethods: { type: Array, required: true },
-    paymongoBanks: { type: Object, required: true },
     deliveryQuotes: { type: Array, required: true },
     deliveryLocations: { type: Array, required: true },
     deliveryAddressPrefill: { type: Object, required: true },
@@ -44,18 +43,13 @@ const props = defineProps({
 
 const fulfillmentMethod = ref('pickup');
 const paymentMethod = ref('cash');
-const paymentChannel = ref(
-    props.paymongoHostedMethods.length > 0
-        ? 'hosted_checkout'
-        : 'direct_online_banking',
-);
 const hostedPaymentMethod = ref(
     props.paymongoHostedMethods.includes('qrph')
         ? 'qrph'
         : (props.paymongoHostedMethods[0] ?? ''),
 );
-const paymentBank = ref(Object.keys(props.paymongoBanks)[0] ?? '');
 const checkoutSubmissionKey = createUuid();
+let paymentWindow = null;
 const paymentProofKey = ref(0);
 const deliveryAddress = ref({ ...props.deliveryAddressPrefill });
 const deliveryDestination = computed(
@@ -144,6 +138,29 @@ function choosePayment(value) {
     paymentProofKey.value += 1;
 }
 
+function preparePaymentWindow() {
+    if (paymentMethod.value !== 'online') {
+        return;
+    }
+
+    paymentWindow = window.open('about:blank', '_blank');
+    if (paymentWindow) {
+        paymentWindow.opener = null;
+        paymentWindow.document.title = 'Opening secure payment';
+        paymentWindow.document.body.innerHTML = '<p style="font-family: sans-serif; padding: 2rem">Preparing your secure payment…</p>';
+    }
+}
+
+function finishPaymentWindow(page) {
+    const checkoutUrl = page.props.order?.payment?.checkout_url;
+    if (paymentWindow && checkoutUrl) {
+        paymentWindow.location.replace(checkoutUrl);
+    } else if (paymentWindow) {
+        paymentWindow.close();
+    }
+    paymentWindow = null;
+}
+
 async function refreshQuote() {
     const destination = deliveryDestination.value;
     const fulfillment = fulfillmentMethod.value;
@@ -206,7 +223,8 @@ defineOptions({
 
             <Form
                 v-bind="storeOrder.form()"
-                :options="{ preserveScroll: true }"
+                :options="{ preserveScroll: true, onSuccess: finishPaymentWindow, onError: () => paymentWindow?.close() }"
+                @submit="preparePaymentWindow"
                 class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start"
                 v-slot="{ errors, processing, progress }"
             >
@@ -218,9 +236,8 @@ defineOptions({
                     :value="item.id"
                 />
                 <input type="hidden" name="checkout_submission_key" :value="checkoutSubmissionKey" />
-                <input v-if="paymentMethod === 'online'" type="hidden" name="payment_channel" :value="paymentChannel" />
-                <input v-if="paymentMethod === 'online' && paymentChannel === 'hosted_checkout'" type="hidden" name="hosted_payment_method" :value="hostedPaymentMethod" />
-                <input v-if="paymentMethod === 'online' && paymentChannel === 'direct_online_banking'" type="hidden" name="payment_bank" :value="paymentBank" />
+                <input v-if="paymentMethod === 'online'" type="hidden" name="payment_channel" value="hosted_checkout" />
+                <input v-if="paymentMethod === 'online'" type="hidden" name="hosted_payment_method" :value="hostedPaymentMethod" />
                 <div class="grid gap-6">
                     <Alert v-if="errors.cart" variant="destructive">
                         <AlertTitle>Your cart changed</AlertTitle>
@@ -692,30 +709,18 @@ defineOptions({
 
                         <div v-if="paymentMethod === 'online'" class="grid gap-4 border-border bg-secondary/40 border p-4">
                             <div class="grid gap-2">
-                                <Label for="payment-channel">Online payment option</Label>
-                                <select id="payment-channel" v-model="paymentChannel" class="border-input bg-background h-10 w-full border px-3 text-sm">
-                                    <option v-if="paymongoHostedMethods.length" value="hosted_checkout">PayMongo hosted checkout</option>
-                                    <option v-if="Object.keys(paymongoBanks).length" value="direct_online_banking">Direct online banking</option>
-                                </select>
                                 <InputError :message="errors.payment_channel" />
-                            </div>
-                            <div v-if="paymentChannel === 'direct_online_banking'" class="grid gap-2">
-                                <Label for="payment-bank">Bank</Label>
-                                <select id="payment-bank" v-model="paymentBank" class="border-input bg-background h-10 w-full border px-3 text-sm">
-                                    <option v-for="(label, code) in paymongoBanks" :key="code" :value="code">{{ label }}</option>
-                                </select>
-                                <InputError :message="errors.payment_bank" />
-                                <p class="text-muted-foreground text-xs leading-5">Your bank will open on PayMongo. Battlefront never receives your bank password or OTP.</p>
-                            </div>
-                            <div v-else class="grid gap-2">
                                 <Label for="hosted-payment-method">Pay with</Label>
                                 <select id="hosted-payment-method" v-model="hostedPaymentMethod" class="border-input bg-background h-10 w-full border px-3 text-sm">
                                     <option v-if="paymongoHostedMethods.includes('qrph')" value="qrph">QR Ph — GCash, Maya, and supported bank apps</option>
                                     <option v-if="paymongoHostedMethods.includes('card')" value="card">Credit or debit card</option>
+                                    <option v-if="paymongoHostedMethods.includes('gcash')" value="gcash">GCash</option>
+                                    <option v-if="paymongoHostedMethods.includes('paymaya')" value="paymaya">Maya</option>
                                 </select>
                                 <InputError :message="errors.hosted_payment_method" />
-                                <p v-if="hostedPaymentMethod === 'qrph'" class="text-muted-foreground text-xs leading-5">PayMongo will create a QR code for this order. Scan it with GCash, Maya, or a supported banking app.</p>
+                                <p v-if="hostedPaymentMethod === 'qrph'" class="text-muted-foreground text-xs leading-5">After you place the order, PayMongo will open in a new tab and display your QR Ph code. Keep this page open to check your order.</p>
                                 <p v-else-if="hostedPaymentMethod === 'card'" class="text-muted-foreground text-xs leading-5">Pay securely by card on PayMongo.</p>
+                                <p v-else class="text-muted-foreground text-xs leading-5">Continue to PayMongo to pay with your selected wallet.</p>
                             </div>
                         </div>
 

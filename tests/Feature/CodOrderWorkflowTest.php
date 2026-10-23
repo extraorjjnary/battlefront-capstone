@@ -61,10 +61,13 @@ test('web and mobile checkout advertise COD for delivery only without proof or r
 
     if ($channel === 'web') {
         $this->actingAs($customer)->get(route('checkout.index', $options))
-            ->assertInertia(fn (Assert $page) => $page->where('paymentMethods.4', $expected));
+            ->assertInertia(fn (Assert $page) => $page->where(
+                'paymentMethods',
+                fn ($methods): bool => collect($methods)->firstWhere('value', 'cod') === $expected,
+            ));
     } else {
         $this->withToken($customer->createToken('Phone')->plainTextToken)
-            ->getJson('/api/v1/checkout?'.http_build_query($options))->assertJsonPath('data.payment_methods.4', $expected);
+            ->getJson('/api/v1/checkout?'.http_build_query($options))->assertJsonFragment($expected);
     }
 
     $this->assertDatabaseCount('orders', 0);
@@ -405,7 +408,7 @@ test('COD collection does not accept prepaid orders or an internal unconfirmed a
 test('chatbot rules distinguish proof-free COD delivery from pickup payment', function () {
     $rules = app(ResolveChatbotRuleGuidance::class);
 
-    expect($rules->execute('payment_methods')['guidance'])->toBe('Pickup orders support Cash (Pay at Pickup), Debit/Credit Card (Pay at Store), GCash, Maya. Delivery orders support GCash, Maya, Cash on Delivery (COD).');
+    expect($rules->execute('payment_methods')['guidance'])->toBe('Pickup orders support Cash (Pay at Pickup), Debit/Credit Card (Pay at Store), GCash, Maya, Pay online. Delivery orders support GCash, Maya, Cash on Delivery (COD), Pay online.');
     expect($rules->execute('payment_proof')['guidance'])->toContain('COD) is delivery-only, requires no upload', 'manually confirms LBC collection after delivery');
 });
 

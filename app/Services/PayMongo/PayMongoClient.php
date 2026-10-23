@@ -13,6 +13,11 @@ class PayMongoClient
         return $this->authenticatedRequest('https://api.paymongo.com', config('services.paymongo.secret_key'), 'sk_test_');
     }
 
+    public function publicRequest(): PendingRequest
+    {
+        return $this->authenticatedRequest('https://api.paymongo.com', config('services.paymongo.public_key'), 'pk_test_');
+    }
+
     public function ordersApiRequest(): PendingRequest
     {
         return $this->authenticatedRequest('https://orders-api.paymongo.com', config('services.paymongo.secret_key'), 'sk_test_');

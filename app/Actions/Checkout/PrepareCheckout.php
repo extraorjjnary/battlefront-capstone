@@ -53,10 +53,7 @@ class PrepareCheckout
             ->operational()
             ->sole();
         $paymongoHostedMethods = config('services.paymongo.enabled')
-            ? array_values(array_intersect(config('services.paymongo.hosted_methods', []), ['qrph', 'card']))
-            : [];
-        $paymongoBanks = config('services.paymongo.enabled') && config('services.paymongo.direct_banking_enabled')
-            ? config('services.paymongo.direct_banking_banks', [])
+            ? array_values(array_intersect(['qrph', 'card', 'gcash', 'paymaya'], config('services.paymongo.hosted_methods', [])))
             : [];
 
         return [
@@ -105,10 +102,10 @@ class PrepareCheckout
                         ),
                     )),
                 ],
-                array_values(array_filter(PaymentMethod::cases(), fn (PaymentMethod $method): bool => ($method !== PaymentMethod::Online || $paymongoHostedMethods !== [] || $paymongoBanks !== [])
+                array_values(array_filter(PaymentMethod::cases(), fn (PaymentMethod $method): bool => ($method !== PaymentMethod::Online || $paymongoHostedMethods !== [])
                     && (! config('services.paymongo.enabled') || ! in_array($method, [PaymentMethod::GCash, PaymentMethod::Maya], strict: true)))),
             ),
-            'paymongoBanks' => $paymongoBanks,
+            'paymongoBanks' => [],
             'paymongoHostedMethods' => $paymongoHostedMethods,
         ];
     }

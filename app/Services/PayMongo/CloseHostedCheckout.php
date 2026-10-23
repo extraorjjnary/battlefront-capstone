@@ -24,29 +24,35 @@ class CloseHostedCheckout
      *
      * A false result means the order must remain pending with inventory reserved.
      */
-    public function execute(int $orderId): bool
+    public function execute(int $orderId, ?int $flowId = null): bool
     {
-        $flow = DB::transaction(function () use ($orderId): ?PayMongoFlow {
+        $flow = DB::transaction(function () use ($orderId, $flowId): ?PayMongoFlow {
             $order = Order::query()->lockForUpdate()->findOrFail($orderId);
-            $flow = PayMongoFlow::query()->where('order_id', $order->id)->lockForUpdate()->first();
+            $flowQuery = PayMongoFlow::query()->where('order_id', $order->id);
+            if ($flowId !== null) {
+                $flowQuery->whereKey($flowId);
+            } else {
+                $flowQuery->where('active_slot', 'active');
+            }
+            $flow = $flowQuery->lockForUpdate()->first();
 
             if ($flow === null || $flow->status === 'closed') {
                 return $flow;
             }
 
             if ($flow->status === 'failed' && $flow->checkout_session_id === null && $flow->payment_intent_id === null) {
-                $createOperation = $flow->operations()->whereIn('kind', ['create_checkout_session', 'create_payment_intent'])
+                $createOperation = $flow->operations()->whereIn('kind', ['create_checkout_session', 'create_payment_intent', 'create_qr_payment_intent'])
                     ->where('status', 'failed')->exists();
                 if ($createOperation) {
-                    $flow->update(['status' => 'closed', 'closed_at' => now()]);
+                    $flow->update(['status' => 'closed', 'active_slot' => null, 'closed_at' => now()]);
 
                     return $flow;
                 }
             }
 
-            if ((! in_array($flow->channel, ['hosted_checkout', 'direct_online_banking'], strict: true))
+            if ((! in_array($flow->channel, ['hosted_checkout', 'direct_online_banking', 'direct_qrph'], strict: true))
                 || ($flow->channel === 'hosted_checkout' && $flow->checkout_session_id === null)
-                || ($flow->channel === 'direct_online_banking' && $flow->payment_intent_id === null)
+                || (in_array($flow->channel, ['direct_online_banking', 'direct_qrph'], strict: true) && $flow->payment_intent_id === null)
                 || $order->payment_status->value === 'verified' || $order->status->value !== 'pending') {
                 return null;
             }
@@ -74,6 +80,10 @@ class CloseHostedCheckout
 
         if ($flow->channel === 'direct_online_banking') {
             return $this->closeDirectOnlineBanking($flow);
+        }
+
+        if ($flow->channel === 'direct_qrph') {
+            return $this->closeDirectQrPh($flow);
         }
 
         try {
@@ -135,7 +145,7 @@ class CloseHostedCheckout
                     return false;
                 }
 
-                $lockedFlow->update(['status' => 'closed', 'closed_at' => now()]);
+                $lockedFlow->update(['status' => 'closed', 'active_slot' => null, 'closed_at' => now()]);
 
                 return true;
             }, attempts: 3);
@@ -208,6 +218,80 @@ class CloseHostedCheckout
         }
     }
 
+    private function closeDirectQrPh(PayMongoFlow $flow): bool
+    {
+        try {
+            $intent = $this->client->request()
+                ->get('/v1/payment_intents/'.$flow->payment_intent_id)
+                ->throw()
+                ->json('data');
+            if (! is_array($intent)
+                || data_get($intent, 'id') !== $flow->payment_intent_id
+                || data_get($intent, 'attributes.livemode') !== false
+                || data_get($intent, 'attributes.amount') !== (int) $flow->amount_minor
+                || data_get($intent, 'attributes.currency') !== $flow->currency) {
+                throw new RuntimeException('PayMongo QR Ph intent could not be verified.');
+            }
+
+            if ($this->applyPaidIntentPayment($flow, $intent)) {
+                return false;
+            }
+
+            if (data_get($intent, 'attributes.status') === 'cancelled') {
+                return $this->markClosed($flow);
+            }
+
+            if (! in_array(data_get($intent, 'attributes.status'), ['awaiting_payment_method', 'awaiting_next_action'], strict: true)) {
+                $flow->update(['status' => 'reconciliation_required']);
+
+                return false;
+            }
+
+            $operation = $flow->operations()->create([
+                'operation_id' => (string) Str::uuid(),
+                'kind' => 'cancel_qr_payment_intent',
+                'idempotency_key' => (string) Str::uuid(),
+                'request_fingerprint' => hash('sha256', (string) $flow->payment_intent_id),
+                'status' => 'dispatched',
+                'dispatched_at' => now(),
+            ]);
+
+            try {
+                $this->client->request()
+                    ->post('/v1/payment_intents/'.$flow->payment_intent_id.'/cancel')
+                    ->throw();
+            } catch (Throwable) {
+                // Re-read below; a payment or terminal transition may have won.
+            }
+
+            $intent = $this->client->request()
+                ->get('/v1/payment_intents/'.$flow->payment_intent_id)
+                ->throw()
+                ->json('data');
+            if ($this->applyPaidIntentPayment($flow, $intent)) {
+                return false;
+            }
+            if (data_get($intent, 'attributes.status') !== 'cancelled') {
+                $operation->update(['status' => 'unknown', 'next_check_at' => now()->addMinute()]);
+                $flow->update(['status' => 'reconciliation_required']);
+
+                return false;
+            }
+
+            $operation->update([
+                'status' => 'completed',
+                'provider_reference' => $flow->payment_intent_id,
+                'completed_at' => now(),
+            ]);
+
+            return $this->markClosed($flow);
+        } catch (Throwable) {
+            $flow->update(['status' => 'reconciliation_required']);
+
+            return false;
+        }
+    }
+
     private function markClosed(PayMongoFlow $flow): bool
     {
         return DB::transaction(function () use ($flow): bool {
@@ -220,7 +304,7 @@ class CloseHostedCheckout
                 return false;
             }
 
-            $lockedFlow->update(['status' => 'closed', 'closed_at' => now()]);
+            $lockedFlow->update(['status' => 'closed', 'active_slot' => null, 'closed_at' => now()]);
             $attempt = $lockedFlow->attempts()->where('payment_intent_id', $lockedFlow->payment_intent_id)->latest('id')->first();
             $attempt?->update(['status' => 'cancelled', 'completed_at' => now()]);
 

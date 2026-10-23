@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\Order;
 use App\Models\PayMongoFlow;
 use App\Models\PayMongoWebhookInbox;
 use App\Services\Notifications\OrderNotificationPublisher;
@@ -32,7 +33,7 @@ class ProcessPayMongoWebhook implements ShouldQueue
                 return;
             }
 
-            if (! in_array($inbox->event_type, ['checkout_session.payment.paid', 'payment.paid', 'payment.failed'], strict: true)) {
+            if (! in_array($inbox->event_type, ['checkout_session.payment.paid', 'payment.paid', 'payment.failed', 'qrph.expired'], strict: true)) {
                 $inbox->update(['status' => 'ignored', 'processed_at' => now()]);
 
                 return;
@@ -42,7 +43,6 @@ class ProcessPayMongoWebhook implements ShouldQueue
             $flow = PayMongoFlow::query()
                 ->where('checkout_session_id', $inbox->resource_id)
                 ->when(is_string($intentId), fn ($query) => $query->orWhere('payment_intent_id', $intentId))
-                ->lockForUpdate()
                 ->first();
 
             if ($flow === null) {
@@ -51,10 +51,31 @@ class ProcessPayMongoWebhook implements ShouldQueue
                 return;
             }
 
+            if (Order::query()->lockForUpdate()->find($flow->order_id) === null) {
+                $inbox->update(['status' => 'unmatched', 'next_check_at' => now()->addMinute()]);
+
+                return;
+            }
+
+            $flow = PayMongoFlow::query()->lockForUpdate()->findOrFail($flow->id);
+
             $providerPayment = collect(data_get($inbox->verified_data, 'attributes.payments', []))->first();
 
+            if ($inbox->event_type === 'qrph.expired') {
+                if ($flow->channel === 'direct_qrph' && $flow->status !== 'paid') {
+                    $flow->update([
+                        'status' => 'awaiting_payment_method',
+                        'qr_code_image_url' => null,
+                        'qr_expires_at' => null,
+                    ]);
+                }
+                $inbox->update(['status' => 'processed', 'processed_at' => now()]);
+
+                return;
+            }
+
             if ($inbox->event_type === 'payment.failed') {
-                if ($flow->channel === 'direct_online_banking' && $providerPayment !== null && $flow->status !== 'paid') {
+                if (in_array($flow->channel, ['direct_online_banking', 'direct_qrph'], strict: true) && $providerPayment !== null && $flow->status !== 'paid') {
                     $attempt = $flow->attempts()->where('payment_id', $providerPayment['id'])->first()
                         ?? $flow->attempts()->where('payment_intent_id', $intentId)->whereNull('payment_id')->latest('id')->first();
                     if ($attempt === null) {

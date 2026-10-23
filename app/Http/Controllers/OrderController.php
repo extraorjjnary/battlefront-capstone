@@ -10,7 +10,6 @@ use App\Models\User;
 use App\Repositories\Order\CustomerOrderRepository;
 use App\Services\CustomerOrderPresenter;
 use App\Services\PayMongo\ReconcilePayMongoReturn;
-use App\Services\PayMongo\StartDirectOnlineBanking;
 use App\Services\PayMongo\StartHostedCheckout;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,31 +32,21 @@ class OrderController extends Controller
         ValidateCheckoutRequest $request,
         PlaceCustomerOrder $placeCustomerOrder,
         StartHostedCheckout $startHostedCheckout,
-        StartDirectOnlineBanking $startDirectOnlineBanking,
     ): RedirectResponse|\Symfony\Component\HttpFoundation\Response {
         /** @var User $customer */
         $customer = $request->user();
         $order = $placeCustomerOrder->execute($customer, $request->checkoutData(), $request->file('payment_proof'));
+        $toast = ['type' => 'success', 'message' => 'Order placed successfully.'];
 
         if ($order->payment_method === PaymentMethod::Online) {
             try {
-                $redirectUrl = ($request->validated('payment_channel') === 'direct_online_banking')
-                    ? $startDirectOnlineBanking->execute($order, [
-                        'payment_channel' => 'direct_online_banking',
-                        'payment_bank' => $request->validated('payment_bank'),
-                    ])
-                    : $startHostedCheckout->execute($order);
-
-                return Inertia::location($redirectUrl);
+                $startHostedCheckout->execute($order);
             } catch (\RuntimeException) {
-                Inertia::flash('toast', ['type' => 'info', 'message' => 'Your order is saved. Online payment is being reconciled; check this order again shortly.']);
+                $toast = ['type' => 'info', 'message' => 'Your order is saved. Online payment is being reconciled; check this order again shortly.'];
             }
         }
 
-        Inertia::flash('toast', [
-            'type' => 'success',
-            'message' => 'Order placed successfully.',
-        ]);
+        Inertia::flash('toast', $toast);
 
         return to_route('orders.show', $order)
             ->with('confirmed_order_id', $order->id);
@@ -72,12 +61,16 @@ class OrderController extends Controller
         if ($request->boolean('paymongo_return')) {
             $reconcilePayMongoReturn->execute($persistedOrder);
 
-            return to_route('orders.show', $persistedOrder);
+            return to_route('orders.show', [
+                'order' => $persistedOrder,
+                'paymongo_returned' => 1,
+            ]);
         }
 
         return Inertia::render('Orders/Show', [
             'order' => $presenter->detail($persistedOrder),
             'isConfirmation' => $request->session()->get('confirmed_order_id') === $persistedOrder->id,
+            'isPayMongoReturn' => $request->boolean('paymongo_returned'),
         ]);
     }
 }

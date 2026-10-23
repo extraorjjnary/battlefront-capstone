@@ -12,12 +12,22 @@ class PayMongoFlow extends Model
 
     protected $guarded = ['id'];
 
+    protected static function booted(): void
+    {
+        static::creating(function (PayMongoFlow $flow): void {
+            if ($flow->active_slot === null && ! in_array($flow->status, ['closed', 'paid'], strict: true)) {
+                $flow->active_slot = 'active';
+            }
+        });
+    }
+
     protected function casts(): array
     {
         return [
             'merchant_cutoff_at' => 'immutable_datetime',
             'paid_at' => 'immutable_datetime',
             'closed_at' => 'immutable_datetime',
+            'qr_expires_at' => 'immutable_datetime',
         ];
     }
 

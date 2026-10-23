@@ -55,7 +55,7 @@ class VerifyPayMongoWebhook
             'method' => data_get($payment, 'attributes.source.type'),
         ])->all();
 
-        if (! in_array($eventType, ['checkout_session.payment.paid', 'payment.paid', 'payment.failed'], strict: true)) {
+        if (! in_array($eventType, ['checkout_session.payment.paid', 'payment.paid', 'payment.failed', 'qrph.expired'], strict: true)) {
             return [
                 'mode' => 'test',
                 'event_id' => $eventId,
@@ -73,7 +73,9 @@ class VerifyPayMongoWebhook
             'verified_data' => [
                 'id' => data_get($resource, 'id'),
                 'attributes' => [
-                    'payment_intent_id' => data_get($attributes, 'payment_intent.id') ?? data_get($attributes, 'payment_intent_id'),
+                    'payment_intent_id' => data_get($attributes, 'payment_intent.id')
+                        ?? data_get($attributes, 'payment_intent_id')
+                        ?? ($resourceType === 'payment_intent' ? data_get($resource, 'id') : null),
                     'reference_number' => data_get($attributes, 'reference_number'),
                     'payments' => $payments,
                 ],

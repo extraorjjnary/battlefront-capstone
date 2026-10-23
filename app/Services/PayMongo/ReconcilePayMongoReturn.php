@@ -26,13 +26,13 @@ class ReconcilePayMongoReturn
             return;
         }
 
-        $flow = PayMongoFlow::query()->where('order_id', $order->id)->first();
+        $flow = PayMongoFlow::query()->where('order_id', $order->id)->where('active_slot', 'active')->latest('id')->first();
 
         if ($flow === null) {
             return;
         }
 
-        if (! in_array($flow->channel, ['hosted_checkout', 'direct_online_banking'], strict: true)) {
+        if (! in_array($flow->channel, ['hosted_checkout', 'direct_online_banking', 'direct_qrph'], strict: true)) {
             return;
         }
 
@@ -56,7 +56,9 @@ class ReconcilePayMongoReturn
         try {
             $resource = $flow->channel === 'hosted_checkout'
                 ? $this->client->request()->get('/v1/checkout_sessions/'.$providerReference)->throw()->json('data')
-                : $this->client->ordersApiRequest()->get('/v1/payment_intents/'.$providerReference)->throw()->json('data');
+                : ($flow->channel === 'direct_qrph'
+                    ? $this->client->request()->get('/v1/payment_intents/'.$providerReference)->throw()->json('data')
+                    : $this->client->ordersApiRequest()->get('/v1/payment_intents/'.$providerReference)->throw()->json('data'));
 
             if (! is_array($resource)
                 || data_get($resource, 'id') !== $providerReference

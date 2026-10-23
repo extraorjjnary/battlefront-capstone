@@ -15,12 +15,16 @@ class RecordPayMongoPayment
     public function execute(PayMongoFlow $flow, array $payment, OrderNotificationPublisher $notifications): bool
     {
         return DB::transaction(function () use ($flow, $payment, $notifications): bool {
+            $order = Order::query()->lockForUpdate()->findOrFail($flow->order_id);
             $lockedFlow = PayMongoFlow::query()->lockForUpdate()->findOrFail($flow->id);
-            $order = Order::query()->lockForUpdate()->findOrFail($lockedFlow->order_id);
 
             if ($payment['status'] !== 'paid'
                 || $payment['currency'] !== $lockedFlow->currency
                 || $payment['amount'] !== (int) $lockedFlow->amount_minor
+                || ($lockedFlow->channel === 'direct_qrph' && $payment['method'] !== 'qrph')
+                || ($lockedFlow->channel === 'hosted_checkout'
+                    && is_string($lockedFlow->hosted_payment_method ?? $order->hosted_payment_method)
+                    && $payment['method'] !== ($lockedFlow->hosted_payment_method ?? $order->hosted_payment_method))
                 || $order->status->value === 'cancelled'
                 || ($lockedFlow->payment_id !== null && $lockedFlow->payment_id !== $payment['id'])) {
                 $lockedFlow->update(['status' => 'reconciliation_required']);
@@ -47,6 +51,7 @@ class RecordPayMongoPayment
                 'payment_id' => $payment['id'],
                 'payment_method' => $payment['method'],
                 'status' => 'paid',
+                'active_slot' => null,
                 'paid_at' => $lockedFlow->paid_at ?? now(),
             ]);
             $attempt = PayMongoAttempt::query()

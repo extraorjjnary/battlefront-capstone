@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\PayMongoFlow;
 use App\Services\Order\OrderProcessingService;
 use App\Services\PayMongo\CloseHostedCheckout;
+use App\Services\PayMongo\StartHostedCheckout;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -30,16 +31,32 @@ class ReconcilePayMongoOrder implements ShouldQueue
         return [(new WithoutOverlapping('paymongo-flow-'.$this->flowId))->expireAfter(90)->releaseAfter(10)];
     }
 
-    public function handle(CloseHostedCheckout $closeHostedCheckout, OrderProcessingService $orderProcessing): void
+    public function handle(CloseHostedCheckout $closeHostedCheckout, OrderProcessingService $orderProcessing, StartHostedCheckout $startHostedCheckout): void
     {
         $flow = PayMongoFlow::query()->find($this->flowId);
 
-        if ($flow === null || $flow->merchant_cutoff_at->isFuture()
-            || ! in_array($flow->channel, ['hosted_checkout', 'direct_online_banking'], strict: true)) {
+        if ($flow === null
+            || ! in_array($flow->channel, ['hosted_checkout', 'direct_online_banking', 'direct_qrph'], strict: true)) {
             return;
         }
 
-        if (! $closeHostedCheckout->execute($flow->order_id)) {
+        if ($flow->channel === 'hosted_checkout'
+            && $flow->status === 'reconciliation_required'
+            && $flow->merchant_cutoff_at->isFuture()) {
+            try {
+                $startHostedCheckout->execute($flow->order);
+            } catch (\RuntimeException) {
+                // Keep the order pending; the next due operation sweep will retry reconciliation.
+            }
+
+            return;
+        }
+
+        if ($flow->merchant_cutoff_at->isFuture()) {
+            return;
+        }
+
+        if (! $closeHostedCheckout->execute($flow->order_id, $flow->id)) {
             return;
         }
 

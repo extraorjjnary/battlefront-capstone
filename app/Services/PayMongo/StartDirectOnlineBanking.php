@@ -54,7 +54,7 @@ class StartDirectOnlineBanking
             'description' => 'Battlefront order '.$order->reference,
             'metadata' => ['order_id' => (string) $order->id, 'bank_code' => $bank],
         ];
-        $flow = PayMongoFlow::query()->where('order_id', $order->id)->first();
+        $flow = PayMongoFlow::query()->where('order_id', $order->id)->where('active_slot', 'active')->first();
         $intentOperation = null;
         if ($flow !== null) {
             if ($flow->channel !== 'direct_online_banking' || $flow->bank_code !== $bank || (int) $flow->amount_minor !== $amountMinor) {
@@ -80,7 +80,7 @@ class StartDirectOnlineBanking
             }
         } else {
             $intentOperation = $this->persistOperation($order, $amountMinor, 'create_payment_intent', $intentAttributes, 'direct_online_banking', $bank);
-            $flow = PayMongoFlow::query()->where('order_id', $order->id)->firstOrFail();
+            $flow = PayMongoFlow::query()->where('order_id', $order->id)->where('active_slot', 'active')->firstOrFail();
         }
 
         try {
@@ -97,7 +97,7 @@ class StartDirectOnlineBanking
                 throw new RuntimeException('PayMongo returned an invalid payment intent.');
             }
 
-            $flow = PayMongoFlow::query()->where('order_id', $order->id)->firstOrFail();
+            $flow = PayMongoFlow::query()->where('order_id', $order->id)->where('active_slot', 'active')->firstOrFail();
             $attempt = DB::transaction(function () use ($flow, $intentId, $bank, $intentOperation): PayMongoAttempt {
                 $flow->update(['payment_intent_id' => $intentId]);
                 $intentOperation->update(['status' => 'completed', 'provider_reference' => $intentId, 'completed_at' => now()]);
@@ -163,8 +163,8 @@ class StartDirectOnlineBanking
                 'status' => $definitiveFailure ? 'failed' : 'unknown',
                 'next_check_at' => now()->addMinute(),
             ]);
-            PayMongoFlow::query()->where('order_id', $order->id)->update([
-                'status' => $definitiveFailure && PayMongoFlow::query()->where('order_id', $order->id)->whereNull('payment_intent_id')->exists()
+            PayMongoFlow::query()->where('order_id', $order->id)->where('active_slot', 'active')->update([
+                'status' => $definitiveFailure && PayMongoFlow::query()->where('order_id', $order->id)->where('active_slot', 'active')->whereNull('payment_intent_id')->exists()
                     ? 'failed'
                     : 'reconciliation_required',
             ]);
@@ -238,12 +238,13 @@ class StartDirectOnlineBanking
     {
         return DB::transaction(function () use ($order, $amountMinor, $kind, $attributes, $channel, $bank): PayMongoOperation {
             $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
-            if (PayMongoFlow::query()->where('order_id', $lockedOrder->id)->exists()) {
+            if (PayMongoFlow::query()->where('order_id', $lockedOrder->id)->where('active_slot', 'active')->exists()) {
                 throw new RuntimeException('A payment flow already exists for this order.');
             }
 
             $flow = PayMongoFlow::query()->create([
                 'order_id' => $order->id,
+                'active_slot' => 'active',
                 'mode' => 'test',
                 'channel' => $channel,
                 'bank_code' => $bank,

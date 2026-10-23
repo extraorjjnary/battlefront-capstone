@@ -4,6 +4,7 @@ use App\Enums\FulfillmentMethod;
 use App\Enums\PaymentMethod;
 use App\Events\OrderNotificationOccurred;
 use App\Jobs\ProcessPayMongoWebhook;
+use App\Jobs\ReconcilePayMongoOrder;
 use App\Models\Order;
 use App\Models\PayMongoFlow;
 use App\Models\PayMongoOperation;
@@ -19,6 +20,7 @@ use App\Services\PayMongo\StartHostedCheckout;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use Inertia\Testing\AssertableInertia as Assert;
 
 test('a valid test webhook is durably recorded and queued once', function () {
     Bus::fake();
@@ -223,7 +225,7 @@ test('hosted checkout persists an operation before sending the exact saved total
         && $request->hasHeader('Idempotency-Key'));
 });
 
-test('an uncertain hosted session creation retries with the same persisted idempotency key', function () {
+test('an uncertain hosted session can be resumed from the customer order with the same idempotency key', function () {
     Http::preventStrayRequests();
     $endpoint = 'https://api.paymongo.com/v2/checkout_sessions';
     Http::fake([$endpoint => Http::sequence()
@@ -250,7 +252,10 @@ test('an uncertain hosted session creation retries with the same persisted idemp
     $idempotencyKey = $operation->idempotency_key;
     $this->assertDatabaseHas('paymongo_flows', ['order_id' => $order->id, 'status' => 'reconciliation_required']);
 
-    expect(app(StartHostedCheckout::class)->execute($order))->toBe('https://checkout.paymongo.com/cs_test_recovered#key');
+    $this->actingAs($customer)->postJson(route('orders.paymongo.retry', $order))
+        ->assertOk()
+        ->assertJsonPath('payment.status', 'checkout_ready')
+        ->assertJsonPath('payment.checkout_url', 'https://checkout.paymongo.com/cs_test_recovered#key');
     Http::assertSent(fn ($request): bool => $request->url() === $endpoint && $request->hasHeader('Idempotency-Key', $idempotencyKey));
     $this->assertDatabaseHas('paymongo_operations', [
         'id' => $operation->id,
@@ -297,6 +302,62 @@ test('an overdue hosted checkout releases inventory only after PayMongo confirms
     Http::assertSent(fn ($request): bool => $request->method() === 'POST' && str_ends_with($request->url(), '/expire'));
 });
 
+test('overdue reconciliation dispatches QR Ph and excludes cancelled historical flows', function () {
+    Bus::fake();
+    $customer = User::factory()->customer()->create();
+
+    foreach (range(1, 101) as $index) {
+        $cancelledOrder = Order::factory()->for($customer)->create([
+            'payment_method' => PaymentMethod::Online,
+            'payment_origin' => 'paymongo',
+            'status' => 'cancelled',
+        ]);
+        PayMongoFlow::query()->create([
+            'order_id' => $cancelledOrder->id,
+            'mode' => 'test',
+            'channel' => 'hosted_checkout',
+            'status' => 'closed',
+            'amount_minor' => 10000,
+            'currency' => 'PHP',
+            'merchant_cutoff_at' => now()->subDay(),
+        ]);
+    }
+
+    $qrOrder = Order::factory()->for($customer)->create([
+        'payment_method' => PaymentMethod::Online,
+        'payment_origin' => 'paymongo',
+        'hosted_payment_method' => 'qrph',
+    ]);
+    $qrFlow = PayMongoFlow::query()->create([
+        'order_id' => $qrOrder->id,
+        'mode' => 'test',
+        'channel' => 'direct_qrph',
+        'status' => 'open',
+        'payment_intent_id' => 'pi_test_overdue_qr',
+        'amount_minor' => 10000,
+        'currency' => 'PHP',
+        'merchant_cutoff_at' => now()->subMinute(),
+    ]);
+
+    $this->artisan('paymongo:reconcile-overdue')->assertSuccessful();
+
+    Bus::assertDispatchedTimes(ReconcilePayMongoOrder::class, 1);
+    Bus::assertDispatched(ReconcilePayMongoOrder::class, fn (ReconcilePayMongoOrder $job): bool => $job->flowId === $qrFlow->id);
+});
+
+test('cancelled PayMongo orders show review guidance instead of saying stock remains reserved', function () {
+    $customer = User::factory()->customer()->create();
+    $order = Order::factory()->for($customer)->create([
+        'payment_method' => PaymentMethod::Online,
+        'payment_origin' => 'paymongo',
+        'status' => 'cancelled',
+    ]);
+
+    $this->actingAs($customer)->get(route('orders.show', $order))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('order.payment.notice', 'This order is cancelled. Any payment received after cancellation requires Battlefront review; cancellation does not refund a payment.'));
+});
+
 test('a hosted checkout with a processing payment is not expired', function () {
     Http::preventStrayRequests();
     $sessionUrl = 'https://api.paymongo.com/v1/checkout_sessions/cs_test_processing';
@@ -334,6 +395,7 @@ test('a hosted checkout with a processing payment is not expired', function () {
 });
 
 test('hosted checkout return retrieves PayMongo payment state before showing the order', function () {
+    config(['inertia.ssr.enabled' => false]);
     Http::preventStrayRequests();
     Http::fake([
         'https://api.paymongo.com/v1/checkout_sessions/cs_test_return_paid' => Http::response(['data' => [
@@ -379,7 +441,7 @@ test('hosted checkout return retrieves PayMongo payment state before showing the
 
     $this->actingAs($customer)
         ->get(route('orders.show', $order).'?paymongo_return=1')
-        ->assertRedirect(route('orders.show', $order));
+        ->assertRedirect(route('orders.show', ['order' => $order, 'paymongo_returned' => 1]));
 
     expect($flow->fresh()->status)->toBe('paid');
     Http::assertSent(fn ($request): bool => $request->url() === 'https://api.paymongo.com/v1/checkout_sessions/cs_test_return_paid');
@@ -392,6 +454,12 @@ test('hosted checkout return retrieves PayMongo payment state before showing the
         'status' => 'completed',
         'provider_reference' => 'cs_test_return_paid',
     ]);
+
+    $this->actingAs($customer)
+        ->get(route('orders.show', ['order' => $order, 'paymongo_returned' => 1]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Orders/Show')
+            ->where('isPayMongoReturn', true));
 });
 
 test('hosted checkout return alone cannot verify an unpaid payment', function () {
@@ -426,7 +494,7 @@ test('hosted checkout return alone cannot verify an unpaid payment', function ()
 
     $this->actingAs($customer)
         ->get(route('orders.show', $order).'?paymongo_return=1')
-        ->assertRedirect(route('orders.show', $order));
+        ->assertRedirect(route('orders.show', ['order' => $order, 'paymongo_returned' => 1]));
 
     expect($order->fresh()->payment_status->value)->toBe('pending')
         ->and($flow->fresh()->status)->toBe('open');
