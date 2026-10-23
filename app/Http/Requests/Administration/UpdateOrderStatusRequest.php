@@ -26,6 +26,7 @@ class UpdateOrderStatusRequest extends FormRequest
     {
         return [
             'status' => ['bail', 'required', Rule::enum(OrderStatus::class)],
+            'products_handed_over_confirmed' => ['sometimes', 'boolean'],
         ];
     }
 

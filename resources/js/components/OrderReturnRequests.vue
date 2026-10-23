@@ -6,6 +6,8 @@ import {
     withdraw,
 } from '@/actions/App/Http/Controllers/CustomerReturnRequestController';
 import InputError from '@/components/InputError.vue';
+import ReturnInstructions from '@/components/ReturnInstructions.vue';
+import { show as showRefundProof } from '@/routes/orders/refund-payments/proof';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -33,6 +35,19 @@ const form = useForm({
     reason: '',
 });
 const withdrawalForm = useForm({});
+const refundPayments = computed(
+    () =>
+        props.order.refund_payments ??
+        props.order.return_requests?.flatMap(
+            (entry) => entry.refund?.payments ?? [],
+        ) ??
+        [],
+);
+const awaitingReceipt = computed(() =>
+    props.order.return_requests?.some(
+        (entry) => entry.status.value === 'submitted',
+    ),
+);
 const eligibleItems = computed(() =>
     props.order.items.filter((item) => item.can_request),
 );
@@ -82,7 +97,11 @@ function submitWithdrawal() {
 
 <template>
     <section
-        v-if="order.can_request_return || order.return_requests?.length"
+        v-if="
+            order.can_request_return ||
+            order.return_requests?.length ||
+            refundPayments.length
+        "
         aria-labelledby="return-requests-heading"
         class="surface-panel border-border bg-card space-y-4 border p-5 sm:p-6"
     >
@@ -104,6 +123,71 @@ function submitWithdrawal() {
                 >Request Return/Refund</Button
             >
         </div>
+        <ReturnInstructions
+            v-if="awaitingReceipt && order.return_instructions"
+            :instructions="order.return_instructions"
+        />
+        <div
+            v-if="order.return_eligibility"
+            class="border-border space-y-2 border-t pt-4 text-sm"
+        >
+            <p v-if="order.return_eligibility.received_at">
+                Purchase received
+                {{ formatDateTime(order.return_eligibility.received_at) }} ({{
+                    order.return_eligibility.receipt_source === 'pickup'
+                        ? 'pickup handover'
+                        : 'delivery'
+                }}).
+            </p>
+            <p v-else>
+                Original receipt date is not recorded. Return eligibility needs
+                manual confirmation.
+            </p>
+            <p v-if="!order.return_eligibility.window_approved">
+                The proposed {{ order.return_eligibility.window_days }}-day
+                discretionary window awaits store approval and is not enforced.
+            </p>
+            <p v-if="order.return_eligibility.deadline_at">
+                {{
+                    order.return_eligibility.window_approved
+                        ? 'Discretionary deadline'
+                        : 'Proposed discretionary deadline'
+                }}: {{ formatDateTime(order.return_eligibility.deadline_at) }}.
+            </p>
+            <p
+                v-if="
+                    order.return_eligibility.window_approved &&
+                    order.return_eligibility.deadline_passed
+                "
+            >
+                The Changed mind window has expired. Defect and other remedy
+                concerns can still be submitted for manual review.
+            </p>
+            <p
+                v-else-if="
+                    order.return_eligibility.window_approved &&
+                    order.return_eligibility.remaining_seconds !== null
+                "
+            >
+                {{
+                    Math.ceil(order.return_eligibility.remaining_seconds / 3600)
+                }}
+                hours remaining in the discretionary window.
+            </p>
+            <p>
+                Defect, damage, wrong-item, description, and Other claims
+                receive manual assessment without an automatic refund guarantee.
+            </p>
+        </div>
+        <p
+            v-for="item in order.items"
+            :key="`balance-${item.id}`"
+            class="text-muted-foreground text-sm"
+        >
+            {{ item.product.name }}: {{ item.remaining_returnable ?? 0 }} of
+            {{ item.quantity }} purchased units remain returnable, subject to
+            eligibility.
+        </p>
         <article
             v-for="entry in order.return_requests"
             :key="entry.id"
@@ -141,9 +225,65 @@ function submitWithdrawal() {
                 {{ entry.reason }}
             </p>
             <p v-if="entry.received_at" class="text-muted-foreground text-sm">
-                Item received {{ formatDateTime(entry.received_at) }}
+                Return received by Battlefront
+                {{ formatDateTime(entry.received_at) }}
             </p>
             <p v-if="entry.feedback" class="text-sm">{{ entry.feedback }}</p>
+            <p
+                v-if="entry.return_decision === 'accepted'"
+                class="text-sm font-medium"
+            >
+                Return accepted
+            </p>
+            <div
+                v-if="entry.resolution && entry.resolution.type !== 'refund'"
+                class="space-y-1 text-sm"
+            >
+                <p v-if="entry.resolution.type === 'unknown'">
+                    Customer resolution not recorded.
+                </p>
+                <template v-else>
+                    <p>
+                        {{ entry.resolution.type }} resolution:
+                        {{ entry.resolution.status }}
+                    </p>
+                    <p
+                        v-if="entry.resolution.summary"
+                        class="whitespace-pre-wrap"
+                    >
+                        {{ entry.resolution.summary }}
+                    </p>
+                    <p v-if="entry.resolution.completed_at">
+                        Fulfilled
+                        {{ formatDateTime(entry.resolution.completed_at) }}
+                    </p>
+                </template>
+            </div>
+            <p
+                v-if="entry.eligibility_path === 'manual_review'"
+                class="text-muted-foreground text-sm"
+            >
+                Eligibility submitted for manual review.
+            </p>
+            <p v-if="entry.refund" class="text-sm">
+                Refund approved.
+                {{
+                    entry.status.value === 'refunded'
+                        ? 'Refund completed through confirmed payments.'
+                        : entry.refund.payment_recorded
+                          ? 'Payment recorded; completion requires confirmed payment covering the approved refund.'
+                          : 'No active refund payment recorded.'
+                }}
+            </p>
+            <p
+                v-if="
+                    entry.resolution?.type === 'refund' &&
+                    entry.resolution.summary
+                "
+                class="text-sm whitespace-pre-wrap"
+            >
+                Refund explanation: {{ entry.resolution.summary }}
+            </p>
             <dl v-if="entry.refund" class="grid gap-2 text-sm sm:grid-cols-3">
                 <div>
                     <dt class="text-muted-foreground">Approved refund</dt>
@@ -151,20 +291,63 @@ function submitWithdrawal() {
                 </div>
                 <div>
                     <dt class="text-muted-foreground">
-                        Verified refund payments
+                        Confirmed refund payments
                     </dt>
                     <dd>
-                        {{ formatCurrency(entry.refund.verified_paid_amount) }}
+                        {{
+                            formatCurrency(
+                                entry.refund.confirmed_paid_amount ??
+                                    entry.refund.verified_paid_amount,
+                            )
+                        }}
                     </dd>
                 </div>
                 <div>
                     <dt class="text-muted-foreground">
-                        Awaiting verified payment
+                        Awaiting confirmed payment
                     </dt>
                     <dd>{{ formatCurrency(entry.refund.remaining_amount) }}</dd>
                 </div>
             </dl>
         </article>
+        <div
+            v-for="payment in refundPayments"
+            :key="payment.id"
+            class="space-y-1 text-sm"
+        >
+            <p>
+                {{
+                    payment.payment_method === 'cash'
+                        ? 'Cash refund confirmed'
+                        : 'Refund payment confirmed'
+                }}
+                · {{ formatCurrency(payment.amount) }} ·
+                {{ formatDateTime(payment.paid_at) }}
+            </p>
+            <a
+                v-if="payment.proof"
+                :href="
+                    showRefundProof({
+                        order: order.id,
+                        payment: payment.id,
+                        evidence: payment.proof.id,
+                    }).url
+                "
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-primary underline"
+                >View payment proof</a
+            >
+            <p
+                v-else-if="
+                    payment.payment_method !== 'cash' &&
+                    payment.confirmation_method === 'approver'
+                "
+            >
+                Payment proof is unavailable. Contact Battlefront for
+                assistance.
+            </p>
+        </div>
 
         <Dialog v-model:open="open">
             <DialogContent class="max-h-[90dvh] overflow-y-auto">
@@ -179,6 +362,10 @@ function submitWithdrawal() {
                         per request.</DialogDescription
                     >
                 </DialogHeader>
+                <ReturnInstructions
+                    v-if="order.return_instructions"
+                    :instructions="order.return_instructions"
+                />
                 <form
                     class="space-y-4"
                     @submit.prevent="
@@ -245,11 +432,27 @@ function submitWithdrawal() {
                                     ) in order.return_reason_options"
                                     :key="code"
                                     :value="code"
+                                    :disabled="
+                                        order.return_eligibility?.reasons[code]
+                                            ?.can_request === false
+                                    "
                                 >
                                     {{ label }}
                                 </option>
                             </select>
                             <InputError :message="form.errors.reason_code" />
+                            <p
+                                v-if="
+                                    order.return_eligibility?.reasons[
+                                        form.reason_code
+                                    ]?.manual_review
+                                "
+                                class="text-muted-foreground text-sm"
+                            >
+                                This request requires manual eligibility
+                                assessment. Submission does not establish
+                                entitlement to a refund or other remedy.
+                            </p>
                         </div>
                         <div class="space-y-2">
                             <Label for="return-notes"
@@ -290,7 +493,7 @@ function submitWithdrawal() {
                         <p>
                             Battlefront must receive and inspect the item before
                             deciding your request. A refund is completed only
-                            after payment verification.
+                            after payment confirmation.
                         </p>
                     </div>
                     <DialogFooter class="gap-2">

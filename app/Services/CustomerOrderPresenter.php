@@ -20,6 +20,7 @@ class CustomerOrderPresenter
         private readonly OrderProcessingService $orderProcessingService,
         private readonly CustomerReturnEligibility $returnEligibility,
         private readonly CustomerReturnRequestPresenter $returnRequests,
+        private readonly BranchDirectory $branches,
     ) {}
 
     /**
@@ -63,11 +64,15 @@ class CustomerOrderPresenter
     public function detail(Order $order): array
     {
         $returnItems = collect($this->returnEligibility->forOrder($order));
+        $refundPayments = $this->returnRequests->paymentsForOrder($order);
 
         return [
             'can_request_return' => $returnItems->contains(fn (array $item): bool => $item['can_request']),
             'return_reason_options' => OperationalRequestReason::customerReturnOptions(),
-            'return_requests' => $this->returnRequests->forOrder($order),
+            'return_requests' => $this->returnRequests->forOrder($order, $refundPayments),
+            'refund_payments' => array_merge([], ...array_values($refundPayments)),
+            'return_instructions' => $this->branches->returnInstructions(),
+            'return_eligibility' => $this->returnEligibility->window($order),
             'can_cancel' => $this->orderProcessingService->canCustomerCancel($order),
             'product_subtotal' => $order->product_subtotal,
             'delivery_fee' => $order->delivery_fee,

@@ -5,6 +5,8 @@ import CustomerReturnController from '@/actions/App/Http/Controllers/Administrat
 import AdministrationEvidenceController from '@/actions/App/Http/Controllers/Administration/AdministrationEvidenceController';
 import OrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
 import InputError from '@/components/InputError.vue';
+import RefundAmountFields from '@/components/RefundAmountFields.vue';
+import EvidenceFileInput from '@/components/EvidenceFileInput.vue';
 import SearchField from '@/components/SearchField.vue';
 import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
 import { Button } from '@/components/ui/button';
@@ -27,12 +29,26 @@ const props = defineProps({
     selected_case: { type: Number, default: null },
     selected_payment: { type: Number, default: null },
     filters: Object,
+    can_receive_returns: { type: Boolean, default: false },
 });
 const page = usePage();
 const receiptRequest = ref(null);
-const receiptForm = useForm({ condition: '' });
+const receiptForm = useForm({ condition: '', files: [] });
+function evidenceError(errors) {
+    return (
+        errors.files ||
+        Object.entries(errors).find(([field]) =>
+            field.startsWith('files.'),
+        )?.[1]
+    );
+}
 function receiveCustomerRequest(entry) {
-    if (!entry.can_receive || receiptForm.processing) return;
+    if (
+        !props.can_receive_returns ||
+        !entry.can_receive ||
+        receiptForm.processing
+    )
+        return;
     if (receiptRequest.value !== entry.id) {
         receiptRequest.value = entry.id;
         receiptForm.reset();
@@ -41,6 +57,7 @@ function receiveCustomerRequest(entry) {
     }
     receiptForm.submit(CustomerReturnController.receiveRequest(entry.id), {
         preserveScroll: true,
+        forceFormData: true,
         onSuccess: () => {
             receiptRequest.value = null;
             receiptForm.reset();
@@ -61,6 +78,9 @@ const paymentLabels = {
     other: 'Other',
 };
 const decisions = reactive({});
+const resolutionTypes = reactive({});
+const stockDispositions = reactive({});
+const paymentMethods = reactive({});
 const returnStatusHelp = {
     pending: 'Another administrator must inspect and review this return.',
     accepted: 'Accepted. Check the stock and refund status below.',
@@ -74,6 +94,10 @@ const stockHandling = (entry) => {
         return 'Held while awaiting customer handover';
     if (entry.status === 'rejected') return 'Handed back to the customer';
     if (entry.disposition === 'restock') return 'Returned to available stock';
+    if (entry.disposition === 'return_to_customer')
+        return entry.resolution_completed_at
+            ? 'Original item handed back'
+            : 'Original item held for customer handback';
     if (entry.disposition === 'write_off') return 'Written off';
     if (entry.disposition === 'supplier_return' && entry.held_quantity > 0)
         return 'Held for supplier return';
@@ -81,18 +105,18 @@ const stockHandling = (entry) => {
     return 'Supplier return: no units on hold';
 };
 const refundProgress = (entry) => {
-    if (!entry.refund_id) return 'No refund approved';
+    if (!entry.refund_id) return 'No refund approval recorded';
     if (entry.approved_amount === '0.00' || Number(entry.approved_amount) === 0)
         return 'No refund amount approved';
-    if (entry.refund_fully_verified) return 'Approved amount fully verified';
+    if (entry.refund_fully_verified) return 'Approved amount fully confirmed';
     if (entry.refund_has_disputed_payment)
         return 'Payment disputed; review required';
     if (entry.refund_has_verified_payment)
-        return 'Partly verified; balance remains';
+        return 'Partly confirmed; balance remains';
     if (entry.refund_has_unreviewed_payment)
         return 'Payment recorded; awaiting review';
 
-    return 'Approved; no payment has been verified';
+    return 'Approved; no payment has been confirmed';
 };
 const { search, isSearching, clearSearch } = useDebouncedSearch({
     initialSearch: props.filters?.q,
@@ -170,6 +194,21 @@ defineOptions({
                 <h3 class="font-semibold">
                     {{ entry.product_name }} · {{ entry.quantity }} units
                 </h3>
+                <p
+                    v-if="entry.eligibility_path === 'manual_review'"
+                    class="text-sm font-medium"
+                >
+                    Manual eligibility assessment required.
+                </p>
+                <p
+                    v-if="entry.eligibility_receipt_at"
+                    class="text-muted-foreground text-sm"
+                >
+                    Original purchase receipt:
+                    {{ formatDateTime(entry.eligibility_receipt_at) }} ·
+                    Assessed deadline:
+                    {{ formatDateTime(entry.eligibility_deadline_at) }}
+                </p>
                 <p class="text-sm">
                     {{ entry.customer_name }} ·
                     <Link
@@ -212,6 +251,16 @@ defineOptions({
                     @submit.prevent="receiveCustomerRequest(entry)"
                 >
                     <template v-if="receiptRequest === entry.id">
+                        <EvidenceFileInput
+                            :key="entry.id"
+                            label="Product photos"
+                            images-only
+                            :disabled="receiptForm.processing"
+                            @update:files="receiptForm.files = $event"
+                        />
+                        <InputError
+                            :message="evidenceError(receiptForm.errors)"
+                        />
                         <Label :for="`receipt-condition-${entry.id}`"
                             >Inspected item condition</Label
                         >
@@ -276,10 +325,11 @@ defineOptions({
             </nav>
         </section>
         <p class="text-muted-foreground text-sm" role="note">
-            Returned items are held for inspection. Refunds are paid outside
-            Battlefront and recorded separately.
+            Returned items are held for inspection. Refunds are paid manually
+            and confirmed here.
         </p>
         <section
+            v-if="can_receive_returns"
             class="surface-card border-border bg-card space-y-4 border p-5"
         >
             <h2 class="text-lg font-semibold">Receive a return</h2>
@@ -306,7 +356,7 @@ defineOptions({
                 ></Form
             >
             <Form
-                v-if="selected_order && page.props.auth.can?.requestReturns"
+                v-if="selected_order && can_receive_returns"
                 v-bind="CustomerReturnController.store.form()"
                 v-slot="{ errors, processing }"
                 class="grid max-w-full min-w-0 gap-4 sm:grid-cols-2"
@@ -314,6 +364,14 @@ defineOptions({
                 <p class="text-sm sm:col-span-2">
                     Order {{ selected_order.reference }}
                 </p>
+                <div class="space-y-2 sm:col-span-2">
+                    <EvidenceFileInput
+                        label="Product photos"
+                        images-only
+                        :disabled="processing"
+                    />
+                    <InputError :message="evidenceError(errors)" />
+                </div>
                 <div class="space-y-2">
                     <Label for="return-item">Purchased item</Label
                     ><select
@@ -504,6 +562,119 @@ defineOptions({
                 <p v-if="entry.decision_reason" class="text-sm">
                     Review notes: {{ entry.decision_reason }}
                 </p>
+                <div class="space-y-2 text-sm">
+                    <p>
+                        Physical receiver: {{ entry.requester_name }} · Decision
+                        reviewer: {{ entry.reviewer_name ?? 'Awaiting review' }}
+                    </p>
+                    <template v-if="entry.status === 'accepted'">
+                        <p v-if="entry.resolution_type">
+                            Customer resolution: {{ entry.resolution_type }} ·
+                            {{
+                                entry.resolution_type === 'refund'
+                                    ? refundProgress(entry)
+                                    : entry.resolution_completed_at
+                                      ? 'Completed'
+                                      : 'Pending fulfillment'
+                            }}
+                        </p>
+                        <p
+                            v-else-if="
+                                !entry.refund_id ||
+                                Number(entry.approved_amount) <= 0
+                            "
+                        >
+                            Legacy customer resolution not recorded. Confirm the
+                            outcome manually; do not infer compensation.
+                        </p>
+                        <p
+                            v-if="entry.resolution_summary"
+                            class="whitespace-pre-wrap"
+                        >
+                            Customer summary: {{ entry.resolution_summary }}
+                        </p>
+                        <p v-if="entry.resolution_reference">
+                            Internal resolution reference:
+                            {{ entry.resolution_reference }}
+                        </p>
+                        <p v-if="entry.resolution_completed_at">
+                            Fulfilled by
+                            {{ entry.resolution_completed_by_name }} ·
+                            {{ formatDateTime(entry.resolution_completed_at) }}
+                            · {{ entry.completion_notes }}
+                        </p>
+                        <p
+                            v-if="
+                                entry.resolution_type &&
+                                entry.resolution_type !== 'refund'
+                            "
+                        >
+                            No monetary refund approved; the documented
+                            {{ entry.resolution_type }} resolution applies.
+                        </p>
+                    </template>
+                </div>
+                <Form
+                    v-if="
+                        entry.status === 'accepted' &&
+                        entry.resolution_type &&
+                        entry.resolution_type !== 'refund' &&
+                        !entry.resolution_completed_at &&
+                        page.props.auth.can?.dispatchReturns
+                    "
+                    v-bind="
+                        CustomerReturnController.completeResolution.form(
+                            entry.id,
+                        )
+                    "
+                    v-slot="{ errors, processing }"
+                    class="space-y-3"
+                >
+                    <Label :for="`complete-resolution-${entry.id}`"
+                        >Actual fulfillment details or reference
+                        (internal)</Label
+                    >
+                    <Input
+                        :id="`complete-resolution-${entry.id}`"
+                        name="completion_notes"
+                        required
+                        minlength="5"
+                        maxlength="2000"
+                    />
+                    <label
+                        v-if="entry.disposition === 'return_to_customer'"
+                        class="flex gap-2 text-sm"
+                        ><input
+                            type="checkbox"
+                            name="handover_confirmed"
+                            value="1"
+                            required
+                        />I physically handed the original item back to the
+                        customer.</label
+                    >
+                    <p class="text-muted-foreground text-sm">
+                        Confirm only after the repair/replacement/manual outcome
+                        has actually been fulfilled. This does not issue
+                        replacement stock or pay a refund.
+                    </p>
+                    <InputError
+                        :message="
+                            errors.resolution ||
+                            errors.completion_notes ||
+                            errors.handover_confirmed
+                        "
+                    />
+                    <Button type="submit" :disabled="processing"
+                        >Confirm actual resolution fulfillment</Button
+                    >
+                </Form>
+                <h3 class="font-semibold">Return/Inspection Evidence</h3>
+                <p
+                    v-if="entry.request_eligibility_path === 'manual_review'"
+                    class="text-sm"
+                >
+                    Customer submitted this claim for manual eligibility review.
+                </p>
                 <div
                     v-if="evidence[entry.id]?.length"
                     class="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3"
@@ -539,7 +710,7 @@ defineOptions({
                 </div>
                 <Form
                     v-if="
-                        page.props.auth.can?.requestReturns &&
+                        entry.can_upload_evidence &&
                         (evidence[entry.id]?.length ?? 0) < 5
                     "
                     v-bind="
@@ -549,21 +720,19 @@ defineOptions({
                         })
                     "
                     v-slot="{ errors, processing }"
+                    reset-on-success
                     class="flex max-w-full min-w-0 flex-wrap items-end gap-2"
-                    ><label class="max-w-full min-w-0 text-sm"
-                        >Photos or documents<input
-                            name="files[]"
-                            type="file"
-                            multiple
-                            accept=".jpg,.jpeg,.png,.webp,.pdf"
-                            class="mt-1 block w-full max-w-full min-w-0" /></label
-                    ><Button
+                    ><EvidenceFileInput
+                        :key="`return-${entry.id}-${evidence[entry.id]?.length ?? 0}`"
+                        label="Return/Inspection Evidence"
+                        images-only
+                        :disabled="processing" /><Button
                         class="min-h-11"
                         type="submit"
                         variant="outline"
                         :disabled="processing"
                         >Upload files</Button
-                    ><InputError :message="errors.files || errors['files.0']"
+                    ><InputError :message="evidenceError(errors)"
                 /></Form>
                 <Form
                     v-if="
@@ -598,6 +767,78 @@ defineOptions({
                             maxlength="2000"
                         /><InputError :message="errors.reason" />
                     </div>
+                    <div class="space-y-1">
+                        <Label :for="`public-review-${entry.id}`"
+                            >Customer-visible feedback (optional)</Label
+                        >
+                        <Input
+                            :id="`public-review-${entry.id}`"
+                            name="public_feedback"
+                            minlength="5"
+                            maxlength="2000"
+                        />
+                        <InputError :message="errors.public_feedback" />
+                    </div>
+                    <div
+                        v-if="decisions[entry.id] !== 'reject'"
+                        class="space-y-2 sm:col-span-2"
+                    >
+                        <Label :for="`resolution-type-${entry.id}`"
+                            >Customer resolution (required)</Label
+                        >
+                        <select
+                            :id="`resolution-type-${entry.id}`"
+                            v-model="resolutionTypes[entry.id]"
+                            name="resolution_type"
+                            required
+                            class="border-input bg-background min-h-11 w-full rounded-md border px-3 py-2"
+                        >
+                            <option disabled value="">
+                                Select the customer outcome
+                            </option>
+                            <option value="refund">Monetary refund</option>
+                            <option value="replacement">
+                                Manual replacement
+                            </option>
+                            <option value="repair">Manual repair</option>
+                            <option value="other">
+                                Other documented manual resolution
+                            </option>
+                        </select>
+                        <InputError
+                            :message="errors.resolution_type || errors.type"
+                        />
+                        <template
+                            v-if="
+                                resolutionTypes[entry.id] &&
+                                resolutionTypes[entry.id] !== 'refund'
+                            "
+                        >
+                            <Label :for="`resolution-summary-${entry.id}`"
+                                >Resolution summary shared with customer</Label
+                            >
+                            <Input
+                                :id="`resolution-summary-${entry.id}`"
+                                name="resolution_summary"
+                                required
+                                minlength="5"
+                                maxlength="2000"
+                            />
+                            <InputError
+                                :message="
+                                    errors.resolution_summary || errors.summary
+                                "
+                            />
+                            <Label :for="`resolution-reference-${entry.id}`"
+                                >Internal reference (optional)</Label
+                            >
+                            <Input
+                                :id="`resolution-reference-${entry.id}`"
+                                name="resolution_reference"
+                                maxlength="255"
+                            />
+                        </template>
+                    </div>
                     <div
                         v-if="decisions[entry.id] !== 'reject'"
                         class="space-y-1"
@@ -606,8 +847,13 @@ defineOptions({
                         ><select
                             aria-label="Stock action"
                             name="disposition"
+                            v-model="stockDispositions[entry.id]"
+                            required
                             class="border-input bg-background focus-visible:ring-ring min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
                         >
+                            <option disabled value="">
+                                Select inventory disposition
+                            </option>
                             <option value="restock">
                                 Return to sellable stock after inspection
                             </option>
@@ -616,6 +862,17 @@ defineOptions({
                             </option>
                             <option value="supplier_return">
                                 Keep held and start a supplier return
+                            </option>
+                            <option
+                                v-if="
+                                    ['repair', 'other'].includes(
+                                        resolutionTypes[entry.id],
+                                    )
+                                "
+                                value="return_to_customer"
+                            >
+                                Hold original item for customer handback after
+                                manual resolution
                             </option>
                         </select>
                     </div>
@@ -632,26 +889,36 @@ defineOptions({
                                 :message="errors.inspection_confirmed" /></span
                     ></label>
                     <div
-                        v-if="decisions[entry.id] !== 'reject'"
-                        class="space-y-1"
+                        v-if="
+                            decisions[entry.id] !== 'reject' &&
+                            stockDispositions[entry.id] === 'restock'
+                        "
+                        class="space-y-2 sm:col-span-2"
                     >
-                        <Label :for="`refund-${entry.id}`"
-                            >Approved refund (₱)</Label
-                        ><Input
-                            class="min-h-11"
-                            :id="`refund-${entry.id}`"
-                            name="approved_amount"
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value="0"
+                        <Label :for="`inspection-findings-${entry.id}`"
+                            >Fit-for-sale inspection findings (internal)</Label
+                        >
+                        <Input
+                            :id="`inspection-findings-${entry.id}`"
+                            name="inspection_notes"
+                            required
+                            minlength="5"
+                            maxlength="2000"
                         />
-                        <p class="text-muted-foreground text-xs">
-                            Approval does not pay the refund. Record the payment
-                            separately.
+                        <p class="text-muted-foreground text-sm">
+                            Document testing and why the item is now fit for
+                            sale. Reported faults, transit damage, Other, and
+                            unclassified legacy cases also require accessible
+                            inspection evidence.
                         </p>
-                        <InputError :message="errors.approved_amount" />
+                        <InputError :message="errors.inspection_notes" />
                     </div>
+                    <RefundAmountFields
+                        v-if="decisions[entry.id] !== 'reject'"
+                        :maximum="entry.refundable_item_value"
+                        :monetary="resolutionTypes[entry.id] === 'refund'"
+                        :errors="errors"
+                    />
                     <div
                         v-if="decisions[entry.id] !== 'reject'"
                         class="space-y-1"
@@ -675,11 +942,27 @@ defineOptions({
                     <Button
                         class="min-h-11"
                         type="submit"
-                        :disabled="processing"
+                        :disabled="
+                            processing ||
+                            (decisions[entry.id] !== 'reject' &&
+                                !entry.has_product_photo)
+                        "
                         >Record decision</Button
                     ><InputError
                         :message="errors.decision || errors.evidence"
                     />
+                    <p
+                        v-if="!entry.has_product_photo"
+                        class="text-sm sm:col-span-2"
+                    >
+                        A product photo is required before acceptance. Ask Staff
+                        to supply missing photos.
+                        {{
+                            (evidence[entry.id]?.length ?? 0) >= 5
+                                ? 'The attachment limit is reached; manual follow-up is required.'
+                                : ''
+                        }}
+                    </p>
                 </Form>
                 <Form
                     v-if="
@@ -701,13 +984,15 @@ defineOptions({
                     class="border-border bg-muted/40 space-y-2 border p-3 text-sm"
                 >
                     <p>
-                        Approved ₱{{ entry.approved_amount }} · Verified ₱{{
+                        Approved ₱{{ entry.approved_amount }} · Confirmed ₱{{
                             entry.verified_paid_amount
                         }}
-                        · Awaiting review ₱{{ entry.awaiting_review_amount }} ·
-                        Disputed ₱{{ entry.disputed_amount }} · Balance ₱{{
-                            entry.refund_balance
+                        · Legacy awaiting review ₱{{
+                            entry.awaiting_review_amount
                         }}
+                        · Disputed ₱{{ entry.disputed_amount }} · Awaiting
+                        confirmed payment ₱{{ entry.refund_balance }} · Not yet
+                        recorded ₱{{ entry.unrecorded_refund_amount }}
                     </p>
                     <div
                         v-for="payment in refundPayments[entry.refund_id] ?? []"
@@ -721,14 +1006,43 @@ defineOptions({
                                 paymentLabels[payment.payment_method] ??
                                 payment.payment_method
                             }}
-                            · {{ payment.external_reference }} ·
+                            <template v-if="payment.external_reference">
+                                · {{ payment.external_reference }}</template
+                            >
+                            ·
                             {{
-                                payment.review?.decision === 'voided'
-                                    ? 'Voided after dispute'
-                                    : (payment.review?.decision ??
-                                      'Awaiting review')
+                                payment.review?.confirmation_method ===
+                                'approver'
+                                    ? 'Confirmed by approver'
+                                    : payment.review?.decision === 'voided'
+                                      ? 'Voided after dispute'
+                                      : (payment.review?.decision ??
+                                        'Awaiting review')
                             }}
                         </p>
+                        <p class="text-sm">
+                            Payment recorder: {{ payment.recorder_name }} ·
+                            {{
+                                payment.review?.confirmation_method ===
+                                'approver'
+                                    ? 'Confirmed by approver:'
+                                    : 'Legacy reviewer:'
+                            }}
+                            {{
+                                payment.review?.reviewer_name ??
+                                'Awaiting legacy review'
+                            }}
+                        </p>
+                        <h4
+                            v-if="
+                                payment.payment_method !== 'cash' ||
+                                paymentEvidence[payment.id]?.length ||
+                                payment.can_upload_evidence
+                            "
+                            class="font-semibold"
+                        >
+                            Refund Payment Proof
+                        </h4>
                         <div
                             v-if="
                                 page.props.auth.can?.viewOrders &&
@@ -770,9 +1084,7 @@ defineOptions({
                         </div>
                         <Form
                             v-if="
-                                page.props.auth.can?.recordRefundPayments &&
-                                payment.recorded_by ===
-                                    page.props.auth.user.id &&
+                                payment.can_upload_evidence &&
                                 (paymentEvidence[payment.id]?.length ?? 0) < 5
                             "
                             v-bind="
@@ -782,22 +1094,18 @@ defineOptions({
                                 })
                             "
                             v-slot="{ errors, processing }"
+                            reset-on-success
                             class="flex max-w-full min-w-0 flex-wrap items-end gap-2"
-                            ><label
-                                >Payment proof<input
-                                    name="files[]"
-                                    type="file"
-                                    multiple
-                                    accept=".jpg,.jpeg,.png,.webp,.pdf"
-                                    class="mt-1 block w-full max-w-full min-w-0" /></label
-                            ><Button
+                            ><EvidenceFileInput
+                                :key="`payment-${payment.id}-${paymentEvidence[payment.id]?.length ?? 0}`"
+                                label="Refund Payment Proof"
+                                :disabled="processing" /><Button
                                 class="min-h-11"
                                 type="submit"
                                 variant="outline"
                                 :disabled="processing"
                                 >Upload files</Button
-                            ><InputError
-                                :message="errors.files || errors['files.0']"
+                            ><InputError :message="evidenceError(errors)"
                         /></Form>
                         <p
                             v-if="payment.review?.reason"
@@ -862,10 +1170,7 @@ defineOptions({
                         </Form>
                     </div>
                     <Form
-                        v-if="
-                            page.props.auth.can?.recordRefundPayments &&
-                            entry.refund_has_outstanding_balance
-                        "
+                        v-if="entry.can_record_payment"
                         v-bind="
                             CustomerReturnController.recordPayment.form(
                                 entry.refund_id,
@@ -873,40 +1178,101 @@ defineOptions({
                         "
                         v-slot="{ errors, processing }"
                         class="grid max-w-full min-w-0 gap-2 sm:grid-cols-3"
-                        ><Input
+                        ><input
+                            type="hidden"
+                            name="submission_key"
+                            :value="entry.payment_submission_key" /><Input
                             aria-label="Amount paid"
                             class="min-h-11"
                             name="amount"
-                            type="number"
-                            min="0.01"
-                            step="0.01"
-                            :max="entry.refund_balance"
+                            type="text"
+                            inputmode="decimal"
+                            pattern="[0-9]+([.][0-9]{1,2})?"
+                            :default-value="entry.unrecorded_refund_amount"
+                            :key="`${entry.refund_id}-${entry.unrecorded_refund_amount}`"
                             placeholder="Amount paid"
                             required /><select
                             aria-label="Payment method"
                             name="payment_method"
+                            :value="paymentMethods[entry.refund_id] ?? ''"
+                            required
+                            @change="
+                                paymentMethods[entry.refund_id] =
+                                    $event.target.value
+                            "
                             class="border-input bg-background focus-visible:ring-ring min-h-11 max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
                         >
+                            <option value="" disabled>
+                                Select payment method
+                            </option>
                             <option value="cash">Cash</option>
                             <option value="gcash">GCash</option>
                             <option value="maya">Maya</option>
                             <option value="bank_transfer">Bank transfer</option>
-                            <option value="other">Other</option></select
-                        ><Input
-                            aria-label="Receipt or reference"
-                            class="min-h-11"
-                            name="external_reference"
-                            placeholder="Receipt or transfer reference"
-                            required /><Button
+                            <option value="other">Other</option>
+                        </select>
+                        <div
+                            v-if="
+                                paymentMethods[entry.refund_id] &&
+                                paymentMethods[entry.refund_id] !== 'cash'
+                            "
+                            class="space-y-2 sm:col-span-3"
+                        >
+                            <EvidenceFileInput
+                                :key="`${entry.refund_id}-${entry.unrecorded_refund_amount}-${paymentMethods[entry.refund_id]}`"
+                                label="Customer-visible payment proof"
+                                name="proof"
+                                :multiple="false"
+                                images-only
+                                :disabled="processing"
+                            />
+                            <p class="text-muted-foreground text-sm">
+                                The customer will see this image. Hide unrelated
+                                balances and account details before uploading.
+                            </p>
+                            <InputError :message="errors.proof" />
+                        </div>
+                        <label
+                            v-if="paymentMethods[entry.refund_id]"
+                            class="flex items-start gap-2 text-sm sm:col-span-3"
+                            ><input
+                                type="checkbox"
+                                name="payment_confirmed"
+                                value="1"
+                                required
+                            />{{
+                                paymentMethods[entry.refund_id] === 'cash'
+                                    ? 'I handed this cash refund to the customer.'
+                                    : 'I sent this refund payment and attached its customer-visible proof.'
+                            }}</label
+                        >
+                        <Button
                             class="min-h-11"
                             type="submit"
                             :disabled="processing"
-                            >Record payment</Button
+                            >Confirm refund payment</Button
                         ><InputError
                             :message="
-                                errors.amount || errors.external_reference
+                                errors.amount ||
+                                errors.payment_confirmed ||
+                                errors.submission_key
                             "
                     /></Form>
+                    <p
+                        v-if="
+                            !entry.can_record_payment &&
+                            Number(entry.approved_amount) > 0
+                        "
+                        class="text-muted-foreground text-sm"
+                    >
+                        {{
+                            entry.refund_fully_verified
+                                ? 'Refund completed through confirmed payment.'
+                                : entry.unrecorded_refund_amount === '0.00'
+                                  ? 'The approved refund is already recorded. Legacy payments may still need review; do not record them again.'
+                                  : 'Only the return approver may make and record this refund payment.'
+                        }}
+                    </p>
                 </div>
             </article>
             <div

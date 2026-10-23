@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CustomerReturnRequest;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Services\AdministrationEvidenceService;
 use App\Services\CustomerReturnEligibility;
 use App\Support\OperationalRequestReason;
 use BcMath\Number;
@@ -16,6 +17,8 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -24,6 +27,7 @@ class CustomerReturnController extends Controller
 {
     public function index(Request $request): Response
     {
+        $canReceive = app(AdministrationEvidenceService::class)->canReceiveCustomerReturn($request->user());
         $filters = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'overdue' => ['nullable', 'boolean']]);
         $overdueCutoff = now()->startOfDay()->subDays(3);
         $case = $request->validate(['case' => ['nullable', 'integer', 'min:1']])['case'] ?? null;
@@ -39,8 +43,11 @@ class CustomerReturnController extends Controller
                 'reason_label' => OperationalRequestReason::customerReturnOptions()[$entry->reason_code],
                 'reason' => $entry->reason, 'created_at' => $entry->created_at->toIso8601String(),
                 'customer_return_id' => $entry->customer_return_id,
-                'can_receive' => $entry->customer_return_id === null && $entry->withdrawn_at === null,
+                'can_receive' => $canReceive && $entry->customer_return_id === null && $entry->withdrawn_at === null,
                 'withdrawn' => $entry->withdrawn_at !== null,
+                'eligibility_path' => $entry->eligibility_path,
+                'eligibility_receipt_at' => $entry->eligibility_receipt_at?->toIso8601String(),
+                'eligibility_deadline_at' => $entry->eligibility_deadline_at?->toIso8601String(),
             ]);
         $paymentId = $request->validate(['payment_id' => ['nullable', 'integer', 'min:1']])['payment_id'] ?? null;
         if ($paymentId !== null) {
@@ -69,13 +76,21 @@ class CustomerReturnController extends Controller
             ->join('orders', 'orders.id', '=', 'returns.order_id')
             ->join('users', 'users.id', '=', 'returns.requester_id')
             ->join('users as customers', 'customers.id', '=', 'orders.user_id')
+            ->leftJoin('users as reviewers', 'reviewers.id', '=', 'returns.reviewer_id')
             ->join('customer_return_items as items', 'items.customer_return_id', '=', 'returns.id')
             ->join('order_items', 'order_items.id', '=', 'items.order_item_id')
             ->join('products', 'products.id', '=', 'order_items.product_id')
             ->leftJoin('customer_refunds as refunds', 'refunds.customer_return_id', '=', 'returns.id')
+            ->leftJoin('customer_return_resolutions as resolution', 'resolution.customer_return_id', '=', 'returns.id')
+            ->leftJoin('customer_return_requests as origin_request', 'origin_request.customer_return_id', '=', 'returns.id')
+            ->leftJoin('users as completers', 'completers.id', '=', 'resolution.completed_by')
             ->select('returns.*', 'users.name as requester_name', 'customers.name as customer_name', 'items.quantity', 'items.condition', 'items.disposition',
-                'orders.id as purchase_order_id', 'refunds.id as refund_id',
-                'refunds.approved_amount', 'refunds.paid_amount')
+                'orders.id as purchase_order_id', 'refunds.id as refund_id', 'refunds.approved_by as refund_approver_id',
+                'reviewers.name as reviewer_name',
+                'resolution.type as resolution_type', 'resolution.summary as resolution_summary', 'resolution.reference as resolution_reference',
+                'resolution.completed_at as resolution_completed_at', 'resolution.completion_notes', 'completers.name as resolution_completed_by_name',
+                'origin_request.eligibility_path as request_eligibility_path', 'origin_request.eligibility_deadline_at as request_deadline_at')
+            ->selectRaw('CAST(order_items.price_at_time AS CHAR) as purchased_unit_price, CAST(refunds.approved_amount AS CHAR) as approved_amount, CAST(refunds.paid_amount AS CHAR) as paid_amount')
             ->selectRaw('COALESCE(order_items.product_name_at_time, products.name) as product_name')
             ->when($case, fn ($query, $id) => $query->where('returns.id', $id))
             ->when($filters['q'] ?? null, fn ($query, $search) => $query->where(function ($query) use ($search): void {
@@ -97,12 +112,13 @@ class CustomerReturnController extends Controller
             ->whereIn('status', ['pending', 'approved', 'rejected_follow_up'])
             ->pluck('customer_return_item_id');
         $heldReturnIds = DB::table('customer_return_items')->whereIn('id', $heldBySupplierReturn)->pluck('customer_return_id')->flip();
-        $payments = DB::table('customer_refund_payments')
+        $payments = DB::table('customer_refund_payments')->join('users as recorders', 'recorders.id', '=', 'customer_refund_payments.recorded_by')
             ->whereIn('customer_refund_id', $returns->getCollection()->pluck('refund_id')->filter())
-            ->orderBy('id')->get(['id', 'customer_refund_id', 'recorded_by', 'amount', 'payment_method', 'external_reference', 'paid_at']);
-        $reviews = DB::table('customer_refund_payment_reviews')
+            ->orderBy('customer_refund_payments.id')->select(['customer_refund_payments.id', 'customer_refund_id', 'recorded_by', 'recorders.name as recorder_name', 'payment_method', 'external_reference', 'paid_at'])
+            ->selectRaw('CAST(customer_refund_payments.amount AS CHAR) as amount')->get();
+        $reviews = DB::table('customer_refund_payment_reviews')->join('users as verifiers', 'verifiers.id', '=', 'customer_refund_payment_reviews.reviewed_by')
             ->whereIn('customer_refund_payment_id', $payments->pluck('id'))
-            ->orderByDesc('id')->get(['customer_refund_payment_id', 'decision', 'reason'])
+            ->orderByDesc('customer_refund_payment_reviews.id')->get(['customer_refund_payment_id', 'decision', 'reason', 'confirmation_method', 'verifiers.name as reviewer_name'])
             ->unique('customer_refund_payment_id')->keyBy('customer_refund_payment_id');
         $refundBalances = $payments->groupBy('customer_refund_id')->map(function ($refundPayments) use ($reviews): array {
             $verified = '0.00';
@@ -125,19 +141,32 @@ class CustomerReturnController extends Controller
 
             return ['verified' => $verified, 'awaiting_review' => $awaitingReview, 'disputed' => $disputed];
         });
-        $returns->getCollection()->transform(function ($return) use ($heldReturnIds, $refundBalances, $overdueCutoff) {
+        $photoReturnIds = DB::table('administration_evidence')->where('subject_type', 'customer_return')
+            ->whereIn('subject_id', $returns->getCollection()->pluck('id'))->whereIn('mime_type', ['image/jpeg', 'image/png', 'image/webp'])
+            ->get(['subject_id', 'path'])->filter(fn ($file): bool => Storage::disk('local')->exists($file->path))->pluck('subject_id')->flip();
+        $returns->getCollection()->transform(function ($return) use ($heldReturnIds, $refundBalances, $overdueCutoff, $request, $photoReturnIds) {
+            $return->has_product_photo = $photoReturnIds->has($return->id);
+            $return->can_upload_evidence = app(AdministrationEvidenceService::class)->canUpload($request->user(), 'customer_return', $return);
             $return->held_quantity = in_array($return->status, ['pending', 'rejected_pending_handover'], true)
-                || ($return->status === 'accepted' && $return->disposition === 'supplier_return' && $heldReturnIds->has($return->id))
+                || ($return->status === 'accepted' && (($return->disposition === 'supplier_return' && $heldReturnIds->has($return->id))
+                    || ($return->disposition === 'return_to_customer' && $return->resolution_type !== null && $return->resolution_completed_at === null)))
                 ? $return->quantity : 0;
             $balance = $refundBalances->get($return->refund_id, ['verified' => '0.00', 'awaiting_review' => '0.00', 'disputed' => '0.00']);
             $return->verified_paid_amount = $balance['verified'];
             $return->awaiting_review_amount = $balance['awaiting_review'];
             $return->disputed_amount = $balance['disputed'];
             $approvedAmount = self::numericAmount($return->approved_amount ?? '0.00');
+            $return->refundable_item_value = (new Number(self::numericAmount($return->purchased_unit_price)))->mul(self::numericAmount((string) $return->quantity), 2)->value;
+            $unrecorded = (new Number($approvedAmount))->sub(self::numericAmount($return->paid_amount ?? '0.00'), 2);
+            $return->unrecorded_refund_amount = $unrecorded->compare('0.00') > 0 ? $unrecorded->value : '0.00';
+            $return->can_record_payment = $request->user()->can('returns.record_payment') && $request->user()->can('returns.approve')
+                && (int) $return->refund_approver_id === $request->user()->id && $unrecorded->compare('0.00') > 0;
+            $return->payment_submission_key = $return->can_record_payment ? (string) Str::uuid() : null;
             $refundBalance = (new Number($approvedAmount))
                 ->sub(self::numericAmount($balance['verified']), 2);
             $return->refund_balance = $refundBalance->value;
-            $return->refund_fully_verified = (new Number(self::numericAmount($balance['verified'])))->compare($approvedAmount) >= 0;
+            $return->refund_fully_verified = (new Number($approvedAmount))->compare('0.00') > 0
+                && (new Number(self::numericAmount($balance['verified'])))->compare($approvedAmount) >= 0;
             $return->refund_has_verified_payment = (new Number(self::numericAmount($balance['verified'])))->compare('0.00') > 0;
             $return->refund_has_unreviewed_payment = (new Number(self::numericAmount($balance['awaiting_review'])))->compare('0.00') > 0;
             $return->refund_has_disputed_payment = (new Number(self::numericAmount($balance['disputed'])))->compare('0.00') > 0;
@@ -150,6 +179,7 @@ class CustomerReturnController extends Controller
         });
 
         return Inertia::render('Administration/CustomerReturns', [
+            'can_receive_returns' => $canReceive,
             'returns' => $returns,
             'customerRequests' => $customerRequests,
             'selected_request' => $requestId === null ? null : (int) $requestId,
@@ -162,11 +192,13 @@ class CustomerReturnController extends Controller
             'paymentEvidence' => DB::table('administration_evidence')->where('subject_type', 'refund_payment')
                 ->whereIn('subject_id', $payments->pluck('id'))
                 ->get(['id', 'subject_id', 'original_name', 'mime_type'])->groupBy('subject_id'),
-            'refundPayments' => $payments->map(function ($payment) use ($reviews): array {
+            'refundPayments' => $payments->map(function ($payment) use ($reviews, $request): array {
                 return [
                     'id' => $payment->id,
                     'refund_id' => $payment->customer_refund_id,
                     'recorded_by' => $payment->recorded_by,
+                    'recorder_name' => $payment->recorder_name,
+                    'can_upload_evidence' => app(AdministrationEvidenceService::class)->canUpload($request->user(), 'refund_payment', $payment, $reviews->get($payment->id)?->decision),
                     'amount' => $payment->amount,
                     'payment_method' => $payment->payment_method,
                     'external_reference' => $payment->external_reference,
@@ -185,22 +217,25 @@ class CustomerReturnController extends Controller
 
     public function store(Request $request, HandleCustomerReturn $returns): RedirectResponse
     {
+        abort_unless(app(AdministrationEvidenceService::class)->canReceiveCustomerReturn($request->user()), 403);
         $validated = $request->validate([
             'order_item_id' => ['required', 'integer', Rule::exists(OrderItem::class, 'id')],
             'quantity' => ['required', 'integer', 'min:1', 'max:4294967295'],
             'condition' => ['required', Rule::in(['sealed', 'opened', 'damaged'])],
             'reason_code' => ['required', Rule::in(array_keys(OperationalRequestReason::customerReturnOptions()))],
             'reason' => ['required_if:reason_code,other', 'nullable', 'string', 'min:5', 'max:2000'],
+            ...AdministrationEvidenceService::productPhotoRules(),
         ]);
-        $returns->receive($request->user(), $validated['order_item_id'], $validated['quantity'], $validated['condition'], OperationalRequestReason::resolve($validated['reason_code'], $validated['reason'] ?? null), $validated['reason_code']);
+        $returns->receive($request->user(), $validated['order_item_id'], $validated['quantity'], $validated['condition'], OperationalRequestReason::resolve($validated['reason_code'], $validated['reason'] ?? null), $validated['reason_code'], photos: $validated['files']);
 
         return back();
     }
 
     public function receiveRequest(Request $request, int $returnRequest, HandleCustomerReturnRequest $returns): RedirectResponse
     {
-        $validated = $request->validate(['condition' => ['required', Rule::in(['sealed', 'opened', 'damaged'])]]);
-        $returnId = $returns->receive($request->user(), $returnRequest, $validated['condition']);
+        abort_unless(app(AdministrationEvidenceService::class)->canReceiveCustomerReturn($request->user()), 403);
+        $validated = $request->validate(['condition' => ['required', Rule::in(['sealed', 'opened', 'damaged'])], ...AdministrationEvidenceService::productPhotoRules()]);
+        $returnId = $returns->receive($request->user(), $returnRequest, $validated['condition'], $validated['files']);
 
         return to_route('administration.customer-returns.index', ['case' => $returnId]);
     }
@@ -210,13 +245,25 @@ class CustomerReturnController extends Controller
         $validated = $request->validate([
             'decision' => ['required', Rule::in(['accept', 'reject'])],
             'reason' => ['required', 'string', 'min:5', 'max:2000'],
-            'disposition' => ['required_if:decision,accept', 'prohibited_if:decision,reject', 'nullable', Rule::in(['restock', 'write_off', 'supplier_return'])],
+            'disposition' => ['required_if:decision,accept', 'prohibited_if:decision,reject', 'nullable', Rule::in(['restock', 'write_off', 'supplier_return', 'return_to_customer'])],
             'approved_amount' => ['required_if:decision,accept', 'prohibited_if:decision,reject', 'nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
             'supplier_id' => ['required_if:disposition,supplier_return', 'prohibited_if:decision,reject', 'nullable', 'integer', Rule::exists('suppliers', 'id')],
             'inspection_confirmed' => ['sometimes', 'required_if:disposition,restock', 'accepted'],
+            'resolution_type' => ['required_if:decision,accept', 'prohibited_if:decision,reject', 'nullable', Rule::in(['refund', 'replacement', 'repair', 'other'])],
+            'resolution_summary' => ['required_if:resolution_type,replacement,repair,other', 'prohibited_if:decision,reject', 'nullable', 'string', 'min:5', 'max:2000'],
+            'resolution_reference' => ['prohibited_if:decision,reject', 'nullable', 'string', 'max:255'],
+            'inspection_notes' => ['required_if:disposition,restock', 'prohibited_if:decision,reject', 'nullable', 'string', 'min:5', 'max:2000'],
+            'public_feedback' => ['nullable', 'string', 'min:5', 'max:2000'],
         ]);
         $accept = $validated['decision'] === 'accept';
-        $returns->decide($customerReturn, $request->user(), $accept, $validated['disposition'] ?? '', (string) ($validated['approved_amount'] ?? '0.00'), $validated['reason'], $validated['supplier_id'] ?? null, isset($validated['inspection_confirmed']));
+        $resolution = ['public_feedback' => isset($validated['public_feedback']) ? (string) $validated['public_feedback'] : null];
+        if ($accept) {
+            $resolution['type'] = (string) $validated['resolution_type'];
+            $resolution['summary'] = isset($validated['resolution_summary']) ? (string) $validated['resolution_summary'] : null;
+            $resolution['reference'] = isset($validated['resolution_reference']) ? (string) $validated['resolution_reference'] : null;
+            $resolution['inspection_notes'] = isset($validated['inspection_notes']) ? (string) $validated['inspection_notes'] : null;
+        }
+        $returns->decide($customerReturn, $request->user(), $accept, $validated['disposition'] ?? '', (string) ($validated['approved_amount'] ?? '0.00'), $validated['reason'], $validated['supplier_id'] ?? null, isset($validated['inspection_confirmed']), $resolution);
 
         return back();
     }
@@ -228,14 +275,25 @@ class CustomerReturnController extends Controller
         return back();
     }
 
+    public function completeResolution(Request $request, int $customerReturn, HandleCustomerReturn $returns): RedirectResponse
+    {
+        $validated = $request->validate(['completion_notes' => ['required', 'string', 'min:5', 'max:2000'], 'handover_confirmed' => ['sometimes', 'accepted']]);
+        $returns->completeResolution($customerReturn, $request->user(), $validated['completion_notes'], $request->boolean('handover_confirmed'));
+
+        return back();
+    }
+
     public function recordPayment(Request $request, int $refund, HandleCustomerReturn $returns): RedirectResponse
     {
+        abort_unless($request->user()->can('returns.approve') && DB::table('customer_refunds')->where('id', $refund)->where('approved_by', $request->user()->id)->exists(), 403);
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'decimal:0,2', 'gt:0', 'max:9999999999.99'],
             'payment_method' => ['required', Rule::in(['cash', 'gcash', 'maya', 'bank_transfer', 'other'])],
-            'external_reference' => ['required', 'string', 'max:255'],
+            'submission_key' => ['required', 'uuid'],
+            'payment_confirmed' => ['required', 'accepted'],
+            'proof' => ['required_unless:payment_method,cash', 'prohibited_if:payment_method,cash', 'nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'extensions:jpg,jpeg,png,webp', 'max:5120'],
         ]);
-        $returns->recordPayment($refund, $request->user(), (string) $validated['amount'], $validated['payment_method'], $validated['external_reference']);
+        $returns->recordPayment($refund, $request->user(), (string) $validated['amount'], $validated['payment_method'], $validated['submission_key'], $request->boolean('payment_confirmed'), $validated['proof'] ?? null);
 
         return back();
     }

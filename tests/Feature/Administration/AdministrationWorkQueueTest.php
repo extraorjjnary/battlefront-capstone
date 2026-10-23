@@ -66,7 +66,7 @@ test('supervisors retain claimed orders in the shared queue until completion or 
             ->where('entries.data.0.required_action', 'Reassign inactive handler'));
     $handler->is_active = true;
     $handler->save();
-    app(OrderProcessingService::class)->updateStatus($order, OrderStatus::from($ending), actor: $handler);
+    app(OrderProcessingService::class)->updateStatus($order, OrderStatus::from($ending), actor: $handler, productsHandedOver: $ending === 'completed');
 
     $this->get(route('administration.work-queue.index', ['kind' => 'order']))
         ->assertInertia(fn (Assert $page) => $page->where('entries.total', 0));

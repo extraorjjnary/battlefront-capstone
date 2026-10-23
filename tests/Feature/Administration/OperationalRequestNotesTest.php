@@ -6,7 +6,9 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * @return array{method: string, url: string, payload: array<string, mixed>, table: string, subject: string, action: string, explanation: string, product: Product}
@@ -61,11 +63,14 @@ function operationalNotesRequest(string $kind, User $actor): array
         $case['action'] = 'supplier_return.requested';
         $case['explanation'] = 'Wrong item';
     } elseif ($kind === 'customer') {
+        Storage::fake('local');
+        $actor->administration_role_id = DB::table('administration_roles')->where('code', 'staff')->value('id');
+        $actor->save();
         $order = Order::factory()->create(['status' => OrderStatus::Completed, 'payment_status' => PaymentStatus::Verified, 'product_subtotal' => '200.00', 'total_amount' => '200.00']);
         $item = OrderItem::factory()->for($order)->for($product)->create(['quantity' => 2, 'price_at_time' => '100.00']);
         $order->sale()->create(['amount' => '200.00', 'sale_date' => today()]);
         $case['url'] = route('administration.customer-returns.store');
-        $case['payload'] = ['order_item_id' => $item->id, 'quantity' => 1, 'condition' => 'opened', 'reason_code' => 'defective'];
+        $case['payload'] = ['order_item_id' => $item->id, 'quantity' => 1, 'condition' => 'opened', 'reason_code' => 'defective', 'files' => [UploadedFile::fake()->image('receipt.jpg')]];
         $case['table'] = 'customer_returns';
         $case['subject'] = 'customer_return';
         $case['action'] = 'customer_return.received';

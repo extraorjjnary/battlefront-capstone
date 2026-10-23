@@ -71,9 +71,9 @@ class OrderProcessingService
     /**
      * Move an order through an approved administrator transition.
      */
-    public function updateStatus(Order $order, OrderStatus $status, ?User $actor = null): Order
+    public function updateStatus(Order $order, OrderStatus $status, ?User $actor = null, bool $productsHandedOver = false): Order
     {
-        return DB::transaction(function () use ($order, $status, $actor): Order {
+        return DB::transaction(function () use ($order, $status, $actor, $productsHandedOver): Order {
             $lockedOrder = Order::query()
                 ->whereKey($order->getKey())
                 ->lockForUpdate()
@@ -90,7 +90,7 @@ class OrderProcessingService
                     ? 'Complete COD delivery through Confirm COD Collection after the Delivered milestone.'
                     : 'Complete delivery through the shipment Delivered milestone.']);
             }
-            $this->transitionLockedOrder($lockedOrder, $status, $shipment, actor: $actor);
+            $this->transitionLockedOrder($lockedOrder, $status, $shipment, actor: $actor, productsHandedOver: $productsHandedOver);
 
             return $lockedOrder->refresh();
         }, attempts: 3);
@@ -311,7 +311,11 @@ class OrderProcessingService
         ?Shipment $shipment,
         UserRole $cancellationInitiator = UserRole::Administrator,
         ?User $actor = null,
+        bool $productsHandedOver = false,
     ): void {
+        if ($status === OrderStatus::Completed && $order->fulfillment_method === FulfillmentMethod::Pickup && ! $productsHandedOver) {
+            throw ValidationException::withMessages(['products_handed_over_confirmed' => 'Confirm actual product handover before completing pickup.']);
+        }
         if ($status === OrderStatus::Cancelled) {
             $blockedReason = $this->shipmentCancellationBlockedReason($shipment);
             if ($blockedReason !== null) {
@@ -342,6 +346,9 @@ class OrderProcessingService
         }
 
         $previousStatus = $order->status->value;
+        if ($status === OrderStatus::Completed && $order->fulfillment_method === FulfillmentMethod::Pickup) {
+            $order->pickup_handed_over_at = CarbonImmutable::now('UTC');
+        }
         $order->update(['status' => $status]);
         $this->auditOrderChange($order, 'order.status.updated', ['before' => $previousStatus, 'after' => $status->value], $actor);
         if ($status === OrderStatus::Cancelled) {
@@ -515,7 +522,7 @@ class OrderProcessingService
                 'payment_rejection_note' => null,
             ]);
             $this->auditOrderChange($lockedOrder, 'order.payment_status.updated', ['after' => PaymentStatus::Verified->value], $actor);
-            $this->transitionLockedOrder($lockedOrder, OrderStatus::Completed, $shipment, actor: $actor);
+            $this->transitionLockedOrder($lockedOrder, OrderStatus::Completed, $shipment, actor: $actor, productsHandedOver: $productsHandedOver);
             if ($paymentWasPending) {
                 $this->notifications->afterCommit($lockedOrder, 'payment.verified');
             }

@@ -2,14 +2,17 @@
 
 namespace App\Services;
 
+use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Support\OperationalRequestReason;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 class CustomerReturnEligibility
 {
-    /** @return array<int, array{remaining_returnable: int, can_request: bool}> */
+    /** @return array<int, array{purchased_quantity: int, returned_quantity: int, pending_request_quantity: int, remaining_returnable: int, can_request: bool}> */
     public function forOrder(Order $order): array
     {
         $eligible = $this->orderEligible($order);
@@ -29,13 +32,48 @@ class CustomerReturnEligibility
             $request = $requests->get($item->id);
             $remaining = $eligible ? max(0, $item->quantity - (int) $physical->get($item->id, 0) - (int) ($request->reserved ?? 0)) : 0;
 
-            return [$item->id => ['remaining_returnable' => $remaining, 'can_request' => $remaining > 0 && ! ($request->open_request ?? false)]];
+            return [$item->id => ['purchased_quantity' => $item->quantity, 'returned_quantity' => (int) $physical->get($item->id, 0),
+                'pending_request_quantity' => (int) ($request->reserved ?? 0),
+                'remaining_returnable' => $remaining, 'can_request' => $remaining > 0 && ! ($request->open_request ?? false)]];
         })->all();
     }
 
     public function orderEligible(Order $order): bool
     {
         return $order->status === OrderStatus::Completed && $order->sale()->exists();
+    }
+
+    /** @return array<string, mixed> */
+    public function window(Order $order): array
+    {
+        $days = (int) config('battlefront.returns.window_days', 7);
+        if ($days < 1) {
+            throw new \InvalidArgumentException('The proposed return window must be a positive number of days.');
+        }
+        $receipt = $order->fulfillment_method === FulfillmentMethod::Pickup
+            ? $order->pickup_handed_over_at : $order->shipment?->delivered_at;
+        $receivedAt = $receipt === null ? null : CarbonImmutable::instance($receipt)->utc();
+        $deadline = $receivedAt?->addHours($days * 24);
+        $now = CarbonImmutable::now('UTC');
+        $approved = (bool) config('battlefront.returns.window_approved', false);
+        $passed = $deadline !== null && $now->greaterThan($deadline);
+        $reasons = [];
+        foreach (OperationalRequestReason::customerReturnOptions() as $code => $label) {
+            $discretionary = in_array($code, config('battlefront.returns.discretionary_reasons', ['changed_mind']), true);
+            $reasons[$code] = [
+                'can_request' => ! ($approved && $discretionary && $passed),
+                'manual_review' => ! $approved || $receivedAt === null || ! $discretionary,
+            ];
+        }
+
+        return [
+            'received_at' => $receivedAt?->toIso8601String(),
+            'receipt_source' => $receivedAt === null ? null : $order->fulfillment_method->value,
+            'deadline_at' => $deadline?->toIso8601String(), 'window_days' => $days,
+            'window_approved' => $approved, 'policy_status' => $approved ? 'approved' : 'proposed',
+            'deadline_passed' => $passed, 'remaining_seconds' => $deadline === null ? null : max(0, $deadline->getTimestamp() - $now->getTimestamp()),
+            'timezone' => config('battlefront.timezone', 'Asia/Manila'), 'reasons' => $reasons,
+        ];
     }
 
     public function remaining(OrderItem $item, ?int $convertingRequest = null): int

@@ -10,16 +10,20 @@ use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\User;
+use App\Services\AdministrationEvidenceService;
 use App\Services\AdministrationWorkQueue;
 use App\Services\AuditLogPresenter;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /** @return array{Order, OrderItem, Inventory} */
 function returnRequestPurchase(int $quantity = 3): array
 {
+    Storage::fake('local');
     $order = Order::factory()->create(['status' => OrderStatus::Completed, 'payment_status' => PaymentStatus::Verified]);
     $inventory = Inventory::factory()->create(['quantity' => 0, 'quarantined_quantity' => 0]);
     $item = OrderItem::factory()->for($order)->for($inventory->product)->create([
@@ -191,9 +195,9 @@ test('one open request blocks duplicates and legacy receipt respects its reserva
     $record = $requests->submit($order->user, $order->id, returnRequestPayload($item));
     expect(fn () => $requests->submit($order->user, $order->id, returnRequestPayload($item)))->toThrow(ValidationException::class);
     $staff = returnRequestEmployee('staff');
-    expect(fn () => app(HandleCustomerReturn::class)->receive($staff, $item->id, 2, 'opened', 'Defective', 'defective'))->toThrow(ValidationException::class);
-    app(HandleCustomerReturn::class)->receive($staff, $item->id, 1, 'opened', 'Defective', 'defective');
-    $requests->receive($staff, $record->id, 'opened');
+    expect(fn () => app(HandleCustomerReturn::class)->receive($staff, $item->id, 2, 'opened', 'Defective', 'defective', photos: [UploadedFile::fake()->image('receipt.jpg')]))->toThrow(ValidationException::class);
+    app(HandleCustomerReturn::class)->receive($staff, $item->id, 1, 'opened', 'Defective', 'defective', photos: [UploadedFile::fake()->image('receipt.jpg')]);
+    $requests->receive($staff, $record->id, 'opened', photos: [UploadedFile::fake()->image('receipt.jpg')]);
     $this->assertDatabaseCount('customer_returns', 2);
     expect(fn () => $requests->submit($order->user, $order->id, returnRequestPayload($item)))->toThrow(ValidationException::class);
 });
@@ -202,14 +206,16 @@ test('staff receipt quarantines once and keeps receiving and approving employees
     [$order, $item, $inventory] = returnRequestPurchase();
     $record = app(HandleCustomerReturnRequest::class)->submit($order->user, $order->id, returnRequestPayload($item));
     $staff = returnRequestEmployee('staff');
-    $this->actingAs($staff)->post(route('administration.customer-return-requests.receive', $record), ['condition' => 'opened'])->assertSessionHasNoErrors();
+    $this->actingAs($staff)->post(route('administration.customer-return-requests.receive', $record), ['condition' => 'opened', 'files' => [UploadedFile::fake()->image('receipt.jpg')]])->assertSessionHasNoErrors();
     $record->refresh();
     $this->assertDatabaseHas('customer_returns', ['id' => $record->customer_return_id, 'requester_id' => $staff->id, 'status' => 'pending']);
     expect($inventory->refresh()->quarantined_quantity)->toBe(1);
     expect($inventory->quantity)->toBe(0);
-    $this->post(route('administration.customer-return-requests.receive', $record), ['condition' => 'opened'])->assertSessionHasErrors('return_request');
+    $this->post(route('administration.customer-return-requests.receive', $record), ['condition' => 'opened', 'files' => [UploadedFile::fake()->image('duplicate.jpg')]])->assertSessionHasErrors('return_request');
     $this->actingAs($order->user)->post(route('orders.return-requests.withdraw', [$order, $record]))->assertSessionHasErrors('return_request');
-    $decision = ['decision' => 'accept', 'disposition' => 'restock', 'approved_amount' => '0.00', 'reason' => 'Inspected in person', 'inspection_confirmed' => true];
+    Storage::fake('local');
+    app(AdministrationEvidenceService::class)->store($staff, 'customer_return', $record->customer_return_id, [UploadedFile::fake()->image('fit-for-sale.jpg')]);
+    $decision = ['decision' => 'accept', 'resolution_type' => 'replacement', 'resolution_summary' => 'Manual replacement arranged with customer', 'disposition' => 'restock', 'approved_amount' => '0.00', 'reason' => 'Inspected in person', 'inspection_confirmed' => true, 'inspection_notes' => 'Hardware tested and confirmed fit for sale'];
     $reviewer = returnRequestEmployee($reviewRole);
     $this->actingAs($reviewer)->post(route('administration.customer-returns.decide', $record->customer_return_id), $decision)->assertSessionHasNoErrors();
     expect($inventory->refresh()->quantity)->toBe(1);
@@ -221,11 +227,12 @@ test('staff receipt quarantines once and keeps receiving and approving employees
         ->where('order.return_requests.0.status.value', 'approved')->where('order.can_request_return', true));
 })->with(['manager', 'owner']);
 
-test('a receiving manager cannot approve their own converted return', function () {
+test('a legacy receiving manager cannot approve their own converted return', function () {
     [$order, $item] = returnRequestPurchase();
     $record = app(HandleCustomerReturnRequest::class)->submit($order->user, $order->id, returnRequestPayload($item));
     $manager = returnRequestEmployee('manager');
-    $id = app(HandleCustomerReturnRequest::class)->receive($manager, $record->id, 'sealed');
+    $id = app(HandleCustomerReturnRequest::class)->receive(returnRequestEmployee('staff'), $record->id, 'sealed', photos: [UploadedFile::fake()->image('receipt.jpg')]);
+    DB::table('customer_returns')->where('id', $id)->update(['requester_id' => $manager->id]);
     expect(fn () => app(HandleCustomerReturn::class)->decide($id, $manager, false, '', '0.00', 'Not eligible after inspection'))
         ->toThrow(ValidationException::class, 'You cannot decide your own return.');
 });
@@ -236,7 +243,7 @@ test('withdrawn requests and invalid conditions cannot be physically received', 
     $record = $requests->submit($order->user, $order->id, returnRequestPayload($item));
     $this->actingAs(returnRequestEmployee('staff'))->post(route('administration.customer-return-requests.receive', $record), ['condition' => 'invented'])->assertSessionHasErrors('condition');
     $requests->withdraw($order->user, $order->id, $record->id);
-    $this->post(route('administration.customer-return-requests.receive', $record), ['condition' => 'opened'])->assertSessionHasErrors('return_request');
+    $this->post(route('administration.customer-return-requests.receive', $record), ['condition' => 'opened', 'files' => [UploadedFile::fake()->image('withdrawn.jpg')]])->assertSessionHasErrors('return_request');
     $this->assertDatabaseCount('customer_returns', 0);
     expect($inventory->refresh()->quarantined_quantity)->toBe(0);
 });
@@ -265,7 +272,7 @@ test('receipt rechecks current order eligibility and physical quantities without
     }
     $beforeReturns = DB::table('customer_returns')->count();
 
-    $this->actingAs($staff)->post(route('administration.customer-return-requests.receive', $record), ['condition' => 'opened'])
+    $this->actingAs($staff)->post(route('administration.customer-return-requests.receive', $record), ['condition' => 'opened', 'files' => [UploadedFile::fake()->image('receipt.jpg')]])
         ->assertSessionHasErrors($conflict === 'status' ? 'order_item_id' : 'quantity');
 
     expect($record->refresh()->customer_return_id)->toBeNull();
@@ -292,27 +299,30 @@ test('customer progress uses latest verified payments and never exposes internal
     $staff = returnRequestEmployee('staff');
     $reviewer = returnRequestEmployee('manager');
     $returns = app(HandleCustomerReturn::class);
-    $id = app(HandleCustomerReturnRequest::class)->receive($staff, $record->id, 'opened');
+    $id = app(HandleCustomerReturnRequest::class)->receive($staff, $record->id, 'opened', photos: [UploadedFile::fake()->image('receipt.jpg')]);
+    Storage::fake('local');
+    app(AdministrationEvidenceService::class)->store($staff, 'customer_return', $id, [UploadedFile::fake()->image('tested-device.jpg')]);
     $this->withToken($order->user->createToken('Phone')->plainTextToken);
     $url = route('api.v1.orders.return-requests.show', [$order, $record]);
     $this->getJson($url)->assertJsonPath('data.status.value', 'under_review');
-    $returns->decide($id, $reviewer, true, 'restock', $approvedAmount, 'Private employee review notes', inspectionConfirmed: true);
+    $returns->decide($id, $reviewer, true, 'restock', $approvedAmount, 'Private employee review notes', inspectionConfirmed: true, resolution: ['type' => 'refund', 'summary' => 'Customer agreed to the documented partial amount', 'inspection_notes' => 'Device tested and confirmed suitable for sale']);
     $refundId = DB::table('customer_refunds')->where('customer_return_id', $id)->value('id');
     $this->getJson($url)->assertJsonPath('data.status.value', 'refund_processing')->assertJsonPath('data.refund.verified_paid_amount', '0.00')
         ->assertDontSee('Private employee review notes')->assertJsonMissingPath('data.requester_id')->assertJsonMissingPath('data.customer_return_id');
-    $returns->recordPayment($refundId, $staff, $approvedAmount, 'cash', 'PRIVATE-REF');
+    $verifier = returnRequestEmployee('owner');
+    $this->recordLegacyRefundPayment($refundId, $reviewer, $approvedAmount, 'cash', 'PRIVATE-REF');
     $payment = DB::table('customer_refund_payments')->where('customer_refund_id', $refundId)->value('id');
     $this->getJson($url)->assertJsonPath('data.status.value', 'refund_processing')->assertDontSee('PRIVATE-REF');
-    $returns->reviewPayment($payment, $reviewer, 'disputed', 'Private reconciliation reason');
+    $returns->reviewPayment($payment, $verifier, 'disputed', 'Private reconciliation reason');
     $this->getJson($url)->assertJsonPath('data.refund.verified_paid_amount', '0.00');
-    $returns->reviewPayment($payment, $reviewer, 'voided', 'Wrong payment was recorded');
-    $returns->recordPayment($refundId, $staff, $firstPayment, 'cash', 'PART-1');
+    $returns->reviewPayment($payment, $verifier, 'voided', 'Wrong payment was recorded');
+    $this->recordLegacyRefundPayment($refundId, $reviewer, $firstPayment, 'cash', 'PART-1');
     $first = DB::table('customer_refund_payments')->where('external_reference', 'PART-1')->value('id');
-    $returns->reviewPayment($first, $reviewer, 'verified', 'Confirmed actual manual payment');
+    $returns->reviewPayment($first, $verifier, 'verified', 'Confirmed actual manual payment');
     $this->getJson($url)->assertJsonPath('data.status.value', 'refund_processing')->assertJsonPath('data.refund.remaining_amount', $remainingPayment);
-    $returns->recordPayment($refundId, $staff, $remainingPayment, 'cash', 'PART-2');
+    $this->recordLegacyRefundPayment($refundId, $reviewer, $remainingPayment, 'cash', 'PART-2');
     $second = DB::table('customer_refund_payments')->where('external_reference', 'PART-2')->value('id');
-    $returns->reviewPayment($second, $reviewer, 'verified', 'Confirmed remaining manual payment');
+    $returns->reviewPayment($second, $verifier, 'verified', 'Confirmed remaining manual payment');
     $this->getJson($url)->assertJsonPath('data.status.value', 'refunded')->assertJsonPath('data.refund.verified_paid_amount', $approvedAmount)
         ->assertJsonPath('data.refund.remaining_amount', '0.00')->assertDontSee('Private reconciliation reason');
 })->with([
@@ -325,7 +335,7 @@ test('rejected progress preserves quarantine and releases eligibility only after
     $requests = app(HandleCustomerReturnRequest::class);
     $record = $requests->submit($order->user, $order->id, returnRequestPayload($item));
     $staff = returnRequestEmployee('staff');
-    $id = $requests->receive($staff, $record->id, 'opened');
+    $id = $requests->receive($staff, $record->id, 'opened', photos: [UploadedFile::fake()->image('receipt.jpg')]);
     $returns = app(HandleCustomerReturn::class);
     $returns->decide($id, returnRequestEmployee('owner'), false, '', '0.00', 'Private rejection notes');
     $this->withToken($order->user->createToken('Phone')->plainTextToken)->getJson(route('api.v1.orders.show', $order))
@@ -341,8 +351,10 @@ test('pending requests appear in eligible Tasks and audits and block product arc
     foreach (['staff', 'manager', 'owner'] as $role) {
         $employee = returnRequestEmployee($role);
         $tasks = app(AdministrationWorkQueue::class)->paginate($employee, ['kind' => 'customer_request']);
-        expect($tasks->total())->toBe(1);
-        expect($tasks->items()[0]['href'])->toContain('request_id='.$record->id);
+        expect($tasks->total())->toBe($role === 'staff' ? 1 : 0);
+        if ($role === 'staff') {
+            expect($tasks->items()[0]['href'])->toContain('request_id='.$record->id);
+        }
         $this->actingAs($employee)->get(route('administration.customer-returns.index', ['request_id' => $record->id]))
             ->assertInertia(fn (Assert $page) => $page->where('customerRequests.data.0.customer_name', $order->user->name));
     }

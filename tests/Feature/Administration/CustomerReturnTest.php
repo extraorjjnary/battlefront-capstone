@@ -9,6 +9,8 @@ use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('customer return cases can be searched by product, requester, order, or reason', function () {
@@ -83,7 +85,8 @@ test('return search uses the customer and order lookup shows remaining returnabl
 });
 
 test('a completed purchase can be returned and manually refunded without rewriting its sale', function () {
-    $requester = User::factory()->administrator()->create();
+    $requester = User::factory()->administrator()->create(['administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id')]);
+    Storage::fake('local');
     $reviewer = User::factory()->administrator()->create();
     $product = Product::factory()->available()->create();
     $order = Order::factory()->create(['status' => OrderStatus::Completed, 'payment_status' => PaymentStatus::Verified, 'product_subtotal' => '200.00', 'total_amount' => '200.00']);
@@ -91,43 +94,45 @@ test('a completed purchase can be returned and manually refunded without rewriti
     $sale = $order->sale()->create(['amount' => '200.00', 'sale_date' => today()]);
 
     $this->actingAs($requester)->post(route('administration.customer-returns.store'), [
+        'files' => [UploadedFile::fake()->image('receipt.jpg')],
         'order_item_id' => $item->id, 'quantity' => 1, 'condition' => 'opened', 'reason_code' => 'defective', 'reason' => 'Customer reported a defect',
     ])->assertSessionHasNoErrors();
     $returnId = DB::table('customer_returns')->where('order_id', $order->id)->value('id');
     expect($product->inventory->fresh()->quarantined_quantity)->toBe(1);
 
     $this->actingAs($requester)->post(route('administration.customer-returns.decide', $returnId), [
-        'decision' => 'accept', 'disposition' => 'write_off', 'approved_amount' => '100.00', 'reason' => 'Inspection confirms a fault',
-    ])->assertSessionHasErrors('decision');
+        'decision' => 'accept', 'resolution_type' => 'refund', 'disposition' => 'write_off', 'approved_amount' => '100.00', 'reason' => 'Inspection confirms a fault',
+    ])->assertForbidden();
+    Storage::disk('local')->delete(DB::table('administration_evidence')->where('subject_type', 'customer_return')->where('subject_id', $returnId)->value('path'));
     $this->actingAs($reviewer)->post(route('administration.customer-returns.decide', $returnId), [
-        'decision' => 'accept', 'disposition' => 'write_off', 'approved_amount' => '100.00', 'reason' => 'Inspection confirms a fault',
+        'decision' => 'accept', 'resolution_type' => 'refund', 'disposition' => 'write_off', 'approved_amount' => '100.00', 'reason' => 'Inspection confirms a fault',
     ])->assertSessionHasErrors('evidence');
     $this->actingAs($requester)->post(route('administration.evidence.store', ['subjectType' => 'customer_return', 'subjectId' => $returnId]), [
         'files' => [UploadedFile::fake()->image('return.jpg')],
     ])->assertSessionHasNoErrors();
-    $evidence = DB::table('administration_evidence')->where('subject_type', 'customer_return')->where('subject_id', $returnId)->first();
+    $evidence = DB::table('administration_evidence')->where('subject_type', 'customer_return')->where('subject_id', $returnId)->where('original_name', 'return.jpg')->first();
     $this->actingAs($requester)->get(route('administration.evidence.show', $evidence->id))
         ->assertOk()->assertHeader('content-type', 'image/jpeg')
         ->assertHeader('content-disposition', 'inline; filename=return.jpg');
     $this->actingAs($requester)->get(route('administration.customer-returns.index', ['case' => $returnId]))
         ->assertInertia(fn (Assert $page) => $page->where("evidence.{$returnId}.0.mime_type", 'image/jpeg'));
     $this->actingAs($reviewer)->post(route('administration.customer-returns.decide', $returnId), [
-        'decision' => 'accept', 'disposition' => 'write_off', 'approved_amount' => '100.00', 'reason' => 'Inspection confirms a fault',
+        'decision' => 'accept', 'resolution_type' => 'refund', 'disposition' => 'write_off', 'approved_amount' => '100.00', 'reason' => 'Inspection confirms a fault',
     ])->assertSessionHasNoErrors();
 
     $refundId = DB::table('customer_refunds')->where('customer_return_id', $returnId)->value('id');
-    $this->actingAs($requester)->post(route('administration.customer-refunds.payments.store', $refundId), [
-        'amount' => '60.00', 'payment_method' => 'cash', 'external_reference' => 'CASH-1',
+    $this->actingAs($reviewer)->post(route('administration.customer-refunds.payments.store', $refundId), [
+        'amount' => '60.00', 'payment_method' => 'cash', 'submission_key' => (string) Str::uuid(), 'payment_confirmed' => true,
     ])->assertSessionHasNoErrors();
     $paymentId = DB::table('customer_refund_payments')->where('customer_refund_id', $refundId)->value('id');
     $this->assertDatabaseHas('audit_logs', [
         'action' => 'customer_refund.paid', 'subject_type' => 'refund_payment', 'subject_id' => $paymentId,
     ]);
-    $this->actingAs($requester)->post(route('administration.customer-refunds.payments.store', $refundId), [
-        'amount' => '40.00', 'payment_method' => 'cash', 'external_reference' => 'CASH-2',
+    $this->actingAs($reviewer)->post(route('administration.customer-refunds.payments.store', $refundId), [
+        'amount' => '40.00', 'payment_method' => 'cash', 'submission_key' => (string) Str::uuid(), 'payment_confirmed' => true,
     ])->assertSessionHasNoErrors();
-    $this->actingAs($requester)->post(route('administration.customer-refunds.payments.store', $refundId), [
-        'amount' => '1.00', 'payment_method' => 'cash', 'external_reference' => 'CASH-3',
+    $this->actingAs($reviewer)->post(route('administration.customer-refunds.payments.store', $refundId), [
+        'amount' => '1.00', 'payment_method' => 'cash', 'submission_key' => (string) Str::uuid(), 'payment_confirmed' => true,
     ])->assertSessionHasErrors('amount');
 
     expect($order->fresh()->status)->toBe(OrderStatus::Completed)
@@ -138,20 +143,22 @@ test('a completed purchase can be returned and manually refunded without rewriti
 });
 
 test('the received quantity cannot exceed the purchased quantity across pending returns', function () {
-    $actor = User::factory()->administrator()->create();
+    Storage::fake('local');
+    $actor = User::factory()->administrator()->create(['administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id')]);
     $product = Product::factory()->available()->create();
     $order = Order::factory()->create(['status' => OrderStatus::Completed, 'payment_status' => PaymentStatus::Verified]);
     $item = OrderItem::factory()->for($order)->for($product)->create(['quantity' => 1, 'price_at_time' => '50.00']);
     $order->sale()->create(['amount' => '50.00', 'sale_date' => today()]);
 
-    $payload = ['order_item_id' => $item->id, 'quantity' => 1, 'condition' => 'sealed', 'reason_code' => 'wrong_item', 'reason' => 'Wrong product delivered'];
+    $payload = ['files' => [UploadedFile::fake()->image('receipt.jpg')], 'order_item_id' => $item->id, 'quantity' => 1, 'condition' => 'sealed', 'reason_code' => 'wrong_item', 'reason' => 'Wrong product delivered'];
     $this->actingAs($actor)->post(route('administration.customer-returns.store'), $payload)->assertSessionHasNoErrors();
     $this->actingAs($actor)->post(route('administration.customer-returns.store'), $payload)->assertSessionHasErrors('quantity');
     expect(DB::table('customer_returns')->where('order_id', $order->id)->count())->toBe(1);
 });
 
 test('restocking a customer return requires an explicit sellability inspection', function () {
-    $requester = User::factory()->administrator()->create();
+    $requester = User::factory()->administrator()->create(['administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id')]);
+    Storage::fake('local');
     $reviewer = User::factory()->administrator()->create();
     $product = Product::factory()->available()->create();
     $order = Order::factory()->create(['status' => OrderStatus::Completed, 'payment_status' => PaymentStatus::Verified]);
@@ -160,12 +167,15 @@ test('restocking a customer return requires an explicit sellability inspection',
     $sellableBefore = $product->inventory->quantity;
 
     $this->actingAs($requester)->post(route('administration.customer-returns.store'), [
+        'files' => [UploadedFile::fake()->image('receipt.jpg')],
         'order_item_id' => $item->id, 'quantity' => 1, 'condition' => 'opened', 'reason_code' => 'changed_mind', 'reason' => 'Customer returned the item',
     ])->assertSessionHasNoErrors();
     $returnId = DB::table('customer_returns')->where('order_id', $order->id)->value('id');
     $decision = [
         'decision' => 'accept', 'disposition' => 'restock', 'approved_amount' => '0.00',
         'reason' => 'Inspection found no damage',
+        'resolution_type' => 'replacement', 'resolution_summary' => 'Manual replacement agreed with customer',
+        'inspection_notes' => 'Sealed unit inspected and confirmed sellable',
     ];
 
     $this->actingAs($reviewer)->post(route('administration.customer-returns.decide', $returnId), $decision)
@@ -180,18 +190,20 @@ test('restocking a customer return requires an explicit sellability inspection',
         ->and($product->inventory->fresh()->quarantined_quantity)->toBe(0);
     $this->assertDatabaseHas('customer_returns', [
         'id' => $returnId,
-        'decision_reason' => 'Sellability inspected and confirmed. Inspection found no damage',
+        'decision_reason' => 'Fit for sale: Sealed unit inspected and confirmed sellable. Inspection found no damage',
     ]);
 });
 
 test('a rejected customer return remains quarantined until a single customer handover', function () {
-    $requester = User::factory()->administrator()->create();
+    $requester = User::factory()->administrator()->create(['administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id')]);
+    Storage::fake('local');
     $reviewer = User::factory()->administrator()->create();
     $product = Product::factory()->available()->create();
     $order = Order::factory()->create(['status' => OrderStatus::Completed, 'payment_status' => PaymentStatus::Verified]);
     $item = OrderItem::factory()->for($order)->for($product)->create(['quantity' => 1, 'price_at_time' => '50.00']);
     $order->sale()->create(['amount' => '50.00', 'sale_date' => today()]);
     $this->actingAs($requester)->post(route('administration.customer-returns.store'), [
+        'files' => [UploadedFile::fake()->image('receipt.jpg')],
         'order_item_id' => $item->id, 'quantity' => 1, 'condition' => 'opened', 'reason_code' => 'changed_mind', 'reason' => 'Customer requested a return',
     ])->assertSessionHasNoErrors();
     $returnId = DB::table('customer_returns')->where('order_id', $order->id)->value('id');
@@ -215,31 +227,32 @@ test('a rejected customer return remains quarantined until a single customer han
 });
 
 test('another administrator can reconcile a recorded refund payment without changing its amount', function () {
-    $requester = User::factory()->administrator()->create();
+    $requester = User::factory()->administrator()->create(['administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id')]);
+    Storage::fake('local');
     $approver = User::factory()->administrator()->create();
-    $recorder = User::factory()->administrator()->create();
+    $recorder = $approver;
     $reviewer = User::factory()->administrator()->create();
     $product = Product::factory()->available()->create();
     $order = Order::factory()->create(['status' => OrderStatus::Completed, 'payment_status' => PaymentStatus::Verified]);
     $item = OrderItem::factory()->for($order)->for($product)->create(['quantity' => 1, 'price_at_time' => '50.00']);
     $order->sale()->create(['amount' => '50.00', 'sale_date' => today()]);
     $this->actingAs($requester)->post(route('administration.customer-returns.store'), [
+        'files' => [UploadedFile::fake()->image('receipt.jpg')],
         'order_item_id' => $item->id, 'quantity' => 1, 'condition' => 'damaged', 'reason_code' => 'transit_damage', 'reason' => 'Customer reported damaged item',
     ])->assertSessionHasNoErrors();
     $returnId = DB::table('customer_returns')->where('order_id', $order->id)->value('id');
+    Storage::disk('local')->delete(DB::table('administration_evidence')->where('subject_type', 'customer_return')->where('subject_id', $returnId)->value('path'));
     $this->actingAs($approver)->post(route('administration.customer-returns.decide', $returnId), [
-        'decision' => 'accept', 'disposition' => 'write_off', 'approved_amount' => '50.00', 'reason' => 'Inspection confirmed damage',
+        'decision' => 'accept', 'resolution_type' => 'refund', 'disposition' => 'write_off', 'approved_amount' => '50.00', 'reason' => 'Inspection confirmed damage',
     ])->assertSessionHasErrors('evidence');
     $this->actingAs($requester)->post(route('administration.evidence.store', ['subjectType' => 'customer_return', 'subjectId' => $returnId]), [
         'files' => [UploadedFile::fake()->image('return-damage.jpg')],
     ])->assertSessionHasNoErrors();
     $this->actingAs($approver)->post(route('administration.customer-returns.decide', $returnId), [
-        'decision' => 'accept', 'disposition' => 'write_off', 'approved_amount' => '50.00', 'reason' => 'Inspection confirmed damage',
+        'decision' => 'accept', 'resolution_type' => 'refund', 'disposition' => 'write_off', 'approved_amount' => '50.00', 'reason' => 'Inspection confirmed damage',
     ])->assertSessionHasNoErrors();
     $refundId = DB::table('customer_refunds')->where('customer_return_id', $returnId)->value('id');
-    $this->actingAs($recorder)->post(route('administration.customer-refunds.payments.store', $refundId), [
-        'amount' => '30.00', 'payment_method' => 'cash', 'external_reference' => 'CASH-REVIEW-1',
-    ])->assertSessionHasNoErrors();
+    $this->recordLegacyRefundPayment($refundId, $recorder, '30.00', 'cash', 'CASH-REVIEW-1');
     $paymentId = DB::table('customer_refund_payments')->where('customer_refund_id', $refundId)->value('id');
     $staff = User::factory()->administrator()->create([
         'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
@@ -265,9 +278,7 @@ test('another administrator can reconcile a recorded refund payment without chan
     ]);
     $this->assertDatabaseCount('customer_refund_payments', 1);
 
-    $this->actingAs($requester)->post(route('administration.customer-refunds.payments.store', $refundId), [
-        'amount' => '20.00', 'payment_method' => 'cash', 'external_reference' => 'CASH-REVIEW-2',
-    ])->assertSessionHasNoErrors();
+    $this->recordLegacyRefundPayment($refundId, $approver, '20.00', 'cash', 'CASH-REVIEW-2');
     $disputedPaymentId = DB::table('customer_refund_payments')->where('external_reference', 'CASH-REVIEW-2')->value('id');
     $this->actingAs($reviewer)->post(route('administration.customer-refund-payments.review', $disputedPaymentId), [
         'decision' => 'disputed', 'reason' => 'Receipt does not match the cash book',

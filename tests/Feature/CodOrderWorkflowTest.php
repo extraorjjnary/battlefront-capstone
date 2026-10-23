@@ -174,7 +174,7 @@ test('COD progresses through all shipment milestones unpaid and confirms collect
             ['value' => 'processing', 'label' => 'Processing'],
             ['value' => 'cancelled', 'label' => 'Cancelled'],
         ]));
-    $this->patch(route('administration.orders.status.update', $order), ['status' => 'processing'])->assertSessionHasNoErrors();
+    $this->patch(route('administration.orders.status.update', $order), ['status' => 'processing', 'products_handed_over_confirmed' => false])->assertSessionHasNoErrors();
     expect($order->refresh())->status->toBe(OrderStatus::Processing)->payment_status->toBe(PaymentStatus::Pending);
     expect($order->shipment->status)->toBe(ShipmentStatus::AwaitingPreparation);
     expect(Inventory::sole()->quantity)->toBe(8);

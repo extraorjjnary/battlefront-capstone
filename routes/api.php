@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\PushDeviceController;
 use App\Http\Controllers\Api\V1\RecommendationController;
+use App\Http\Controllers\CustomerRefundProofController;
 use App\Http\Controllers\DeliveryLocationController;
 use App\Http\Controllers\DeliveryQuoteController;
 use App\Http\Controllers\RecommendationInteractionController;
@@ -59,6 +60,8 @@ Route::prefix('v1')
 
         // auth customers endpoint
         Route::middleware(['auth:sanctum', 'can:use-customer-cart'])->group(function (): void {
+            Route::get('orders/{order}/refund-payments/{payment}/proof/{evidence}', CustomerRefundProofController::class)
+                ->whereNumber(['order', 'payment', 'evidence'])->name('orders.refund-payments.proof.show');
             Route::get('orders/{order}/return-requests', [CustomerReturnRequestController::class, 'index'])
                 ->whereNumber('order')->name('orders.return-requests.index');
             Route::post('orders/{order}/return-requests', [CustomerReturnRequestController::class, 'store'])

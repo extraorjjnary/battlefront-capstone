@@ -21,6 +21,7 @@ test('the order schema follows the approved ERD and checkout amendments', functi
         'development_fixture_key',
         'contact_number',
         'fulfillment_method',
+        'pickup_handed_over_at',
         'delivery_address',
         'delivery_destination',
         'delivery_base_fee',

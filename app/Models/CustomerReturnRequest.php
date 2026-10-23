@@ -22,11 +22,14 @@ use Illuminate\Support\Carbon;
  * @property int|null $customer_return_id
  * @property Carbon|CarbonImmutable|null $withdrawn_at
  * @property Carbon|CarbonImmutable $created_at
+ * @property string|null $eligibility_path
+ * @property CarbonImmutable|null $eligibility_receipt_at
+ * @property CarbonImmutable|null $eligibility_deadline_at
  * @property-read User $customer
  * @property-read Order $order
  * @property-read OrderItem $item
  */
-#[Fillable(['user_id', 'order_id', 'order_item_id', 'quantity', 'reason_code', 'reason'])]
+#[Fillable(['user_id', 'order_id', 'order_item_id', 'quantity', 'reason_code', 'reason', 'eligibility_path', 'eligibility_receipt_at', 'eligibility_deadline_at'])]
 class CustomerReturnRequest extends Model
 {
     /** @use HasFactory<CustomerReturnRequestFactory> */
@@ -35,13 +38,13 @@ class CustomerReturnRequest extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['quantity' => 'integer', 'withdrawn_at' => 'datetime'];
+        return ['quantity' => 'integer', 'withdrawn_at' => 'datetime', 'eligibility_receipt_at' => 'immutable_datetime', 'eligibility_deadline_at' => 'immutable_datetime'];
     }
 
     protected static function booted(): void
     {
         static::updating(function (CustomerReturnRequest $request): void {
-            if ($request->isDirty(['user_id', 'order_id', 'order_item_id', 'quantity', 'reason_code', 'reason'])
+            if ($request->isDirty(['user_id', 'order_id', 'order_item_id', 'quantity', 'reason_code', 'reason', 'eligibility_path', 'eligibility_receipt_at', 'eligibility_deadline_at'])
                 || $request->getOriginal('customer_return_id') !== null
                 || $request->getOriginal('withdrawn_at') !== null) {
                 throw new DomainException('Submitted return request history cannot be changed.');

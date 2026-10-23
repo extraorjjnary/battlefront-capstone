@@ -40,6 +40,7 @@ use App\Http\Controllers\CartController;
 use App\Http\Controllers\CartItemController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\CustomerRefundProofController;
 use App\Http\Controllers\CustomerReturnRequestController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryLocationController;
@@ -131,6 +132,8 @@ Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {
         ->name('orders.index');
     Route::post('orders/{order}/return-requests', [CustomerReturnRequestController::class, 'store'])
         ->whereNumber('order')->name('orders.return-requests.store');
+    Route::get('orders/{order}/refund-payments/{payment}/proof/{evidence}', CustomerRefundProofController::class)
+        ->whereNumber(['order', 'payment', 'evidence'])->name('orders.refund-payments.proof.show');
     Route::post('orders/{order}/return-requests/{returnRequest}/withdraw', [CustomerReturnRequestController::class, 'withdraw'])
         ->whereNumber(['order', 'returnRequest'])->name('orders.return-requests.withdraw');
     Route::post('orders', [OrderController::class, 'store'])
@@ -241,6 +244,8 @@ Route::middleware(['auth', 'can:access-administration'])
             ->middleware('can:returns.approve')->name('customer-returns.decide');
         Route::post('customer-returns/{customerReturn}/handover', [CustomerReturnController::class, 'handBack'])
             ->middleware('can:returns.dispatch')->name('customer-returns.handover');
+        Route::post('customer-returns/{customerReturn}/resolution-completion', [CustomerReturnController::class, 'completeResolution'])
+            ->whereNumber('customerReturn')->middleware(['can:orders.view', 'can:returns.dispatch'])->name('customer-returns.resolution-completion');
         Route::post('customer-refunds/{refund}/payments', [CustomerReturnController::class, 'recordPayment'])
             ->middleware('can:returns.record_payment')->name('customer-refunds.payments.store');
         Route::post('customer-refund-payments/{payment}/review', [CustomerReturnController::class, 'reviewPayment'])
