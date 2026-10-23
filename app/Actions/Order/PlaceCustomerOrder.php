@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\User;
 use App\Services\Order\OrderPlacementService;
 use DomainException;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\ValidationException;
 use Throwable;
@@ -21,7 +22,7 @@ class PlaceCustomerOrder
     ) {}
 
     /**
-     * @param  array{cart_item_ids: list<int>, recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address?: string|null, delivery_destination: string|null, payment_method: string, delivery_address_components?: array<string, mixed>|null}  $validated
+     * @param  array{cart_item_ids: list<int>, recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address?: string|null, delivery_destination: string|null, payment_method: string, payment_channel?: string|null, payment_bank?: string|null, delivery_address_components?: array<string, mixed>|null}  $validated
      */
     public function execute(User $customer, array $validated, ?UploadedFile $paymentProof): Order
     {
@@ -40,12 +41,38 @@ class PlaceCustomerOrder
                 'delivery_address' => $validated['delivery_address'] ?? null,
                 'delivery_address_components' => $validated['delivery_address_components'] ?? null,
                 'payment_method' => $paymentMethod,
+                'payment_channel' => $validated['payment_channel'] ?? null,
+                'payment_bank' => $validated['payment_bank'] ?? null,
                 'payment_proof_path' => $paymentProofPath,
+                'checkout_submission_key' => $validated['checkout_submission_key'] ?? null,
+                'checkout_request_fingerprint' => isset($validated['checkout_submission_key'])
+                    ? hash('sha256', json_encode([
+                        'cart_item_ids' => $validated['cart_item_ids'],
+                        'recipient_name' => $validated['recipient_name'],
+                        'contact_number' => $validated['contact_number'],
+                        'fulfillment_method' => $validated['fulfillment_method'],
+                        'delivery_address' => $validated['delivery_address'] ?? null,
+                        'delivery_destination' => $validated['delivery_destination'] ?? null,
+                        'payment_method' => $validated['payment_method'],
+                        'payment_channel' => $validated['payment_channel'] ?? null,
+                        'payment_bank' => $validated['payment_bank'] ?? null,
+                    ], JSON_THROW_ON_ERROR))
+                    : null,
             ];
 
             return $checkout['fulfillment_method'] === FulfillmentMethod::Delivery
                 ? $this->orderPlacementService->executeWithDeliveryQuote($customer, $checkout, $validated['delivery_destination'] ?? '')
                 : $this->orderPlacementService->execute($customer, $checkout);
+        } catch (QueryException $exception) {
+            if (($validated['checkout_submission_key'] ?? null) !== null
+                && str_contains($exception->getMessage(), 'checkout_submission_key')) {
+                $existing = $customer->orders()->where('checkout_submission_key', $validated['checkout_submission_key'])->first();
+                if ($existing !== null && hash_equals((string) $existing->checkout_request_fingerprint, (string) $checkout['checkout_request_fingerprint'])) {
+                    return $existing;
+                }
+                throw ValidationException::withMessages(['checkout_submission_key' => 'This checkout token was already used with different order details. Refresh checkout to start a new order.']);
+            }
+            throw $exception;
         } catch (OrderPlacementException $exception) {
             $this->deletePaymentProof->execute($paymentProofPath);
 

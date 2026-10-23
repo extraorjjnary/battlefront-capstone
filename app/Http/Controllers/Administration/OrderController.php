@@ -12,6 +12,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\OrderIndexRequest;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\PayMongoFlow;
 use App\Models\User;
 use App\Repositories\Order\AdministratorOrderRepository;
 use App\Services\DeliveryQuotePresenter;
@@ -162,6 +163,7 @@ class OrderController extends Controller
         $grossProfit = ! $hasMissingCost && $orderHasSale && $order->status === OrderStatus::Completed
             ? bcsub(bcsub($productRevenue, $salesReturns, 2), bcsub($costOfGoodsSold, $costRecovered, 2), 2)
             : null;
+        $payMongoFlow = PayMongoFlow::query()->where('order_id', $order->id)->first();
 
         return Inertia::render('Administration/Orders/Show', [
             'handler_options' => $order->status === OrderStatus::Completed || $order->status === OrderStatus::Cancelled
@@ -221,6 +223,12 @@ class OrderController extends Controller
                     'status' => [
                         'value' => $order->payment_status->value,
                         'label' => $order->paymentStatusLabel(),
+                    ],
+                    'gateway' => $payMongoFlow === null ? null : [
+                        'channel' => $payMongoFlow->channel,
+                        'bank' => $payMongoFlow->bank_code,
+                        'status' => $payMongoFlow->status,
+                        'merchant_cutoff_at' => $payMongoFlow->merchant_cutoff_at->toIso8601String(),
                     ],
                     'can_confirm_cod_collection' => $processing->canConfirmCodCollection($order),
                     'pay_at_pickup' => $order->payment_method->isPayAtPickup(),

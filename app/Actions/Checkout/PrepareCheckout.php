@@ -99,8 +99,12 @@ class PrepareCheckout
                         ),
                     )),
                 ],
-                PaymentMethod::cases(),
+                array_values(array_filter(PaymentMethod::cases(), fn (PaymentMethod $method): bool => ($method !== PaymentMethod::Online || config('services.paymongo.enabled'))
+                    && (! config('services.paymongo.enabled') || ! in_array($method, [PaymentMethod::GCash, PaymentMethod::Maya], strict: true)))),
             ),
+            'paymongoBanks' => config('services.paymongo.direct_banking_enabled')
+                ? config('services.paymongo.direct_banking_banks', [])
+                : [],
         ];
     }
 

@@ -3,7 +3,7 @@
 Reviewed 2026-10-23. This is preparation only. Earlier approval of the gateway direction does not start implementation in this task. Existing approved method, fee, and 24-hour merchant-cutoff policies remain in `09-decisions-and-open-questions.md`; the requirements below make their execution reviewable. New persistence names are conceptual, not migrations or provider statuses.
 
 ## Gaps addressed
-Follow-up system inspection and resolved choices are in `11-system-aligned-setup.md`. That document supersedes the earlier proposed operating targets and unresolved local-version/retention/ownership questions below. Deployment/account/provider evidence remains distinct from local repository findings.
+Follow-up system inspection and selected operating settings are in `11-system-aligned-setup.md`. Use this audit for recovery/state contracts, document 11 for local settings and permissions, document 09 for scope decisions, and document 08 for sequencing. None overrides approved scope. Deployment/account/provider evidence remains distinct from local repository findings.
 
 
 | ID | Gap found | Preparation resolution | Implementation evidence required |
@@ -65,15 +65,15 @@ Bank transaction limits matter for computer orders: validate the selected bank a
 
 Bank closure is an unresolved provider capability gate, not an invented cancellation endpoint. Keep unsupported bank routes disabled until safe retry, closure, and stale-link behavior are demonstrated. Bank scope remains approved; incomplete evidence prevents enabling the affected route.
 
-## Operations and support proposal
+## Operations and support baseline
 
-- During development the developer monitors worker failures and provider reconciliation; the administrator reviews payment exceptions. Assign named production owners and escalation contacts before live approval.
-- Proposed operating targets, requiring implementation review: scan durable unprocessed inbox/unknown operations every minute; bounded retries with backoff/jitter; alert if work remains stuck for 15 minutes; run periodic paginated reconciliation as well as cutoff checks. These values are application proposals, not provider guarantees. A stalled process never authorizes cancelling an uncertain payment.
+- During development the developer monitors technical failures; Owner and appropriately permitted business operators review payment exceptions under the existing role boundaries in document 11. Technical access does not confer refund approval. Assign named production owners and escalation contacts before live approval.
+- Apply the selected sweep, batch, retry and escalation settings in document 11, with periodic paginated reconciliation as well as cutoff checks. These are project starting values, not provider guarantees. Demonstrate effective worker termination/recovery in the target runtime. A stalled process never authorizes cancelling an uncertain payment.
 - Reconciliation uses known provider references and the same idempotent transition path as events; record last check, next check, retry count, safe error category, and unresolved reason. Rate-limit provider retrieval; honor documented retry guidance and distinguish validation/auth failures from transient errors. Do not immediately retry every 4xx/5xx.
 - Customer order history remains available after the browser/app closes or loses its session. Reauthentication and owner-scoped status retrieval recover the journey; a mobile return/deep link never marks paid. Specify owned HTTPS return URLs and approved app links before mobile E2E testing. Avoid logging checkout URLs or client keys as they may grant payment-flow access.
 - Payment completion is distinct from payout/settlement. Reconcile provider fee/net values separately from merchandise and delivery amounts; retain existing sales reporting semantics. A successful payment does not prove funds have reached the merchant bank account.
 - Refunds/disputes remain manual support cases in first release. Record provider reference, reason, responsible administrator, action, and confirmed outcome; never claim cancellation refunded funds. Do not require receipt uploads for ordinary confirmation. A customer reporting a bank debit with no provider payment goes to provider tracing, without marking paid from the customer's claim.
-- Define audit/event retention duration and access roles with the developer before enabling the integration. No arbitrary legal retention period is asserted. Minimize payloads; preserve enough verified identifiers and immutable evidence to replay/reconcile. Provider IDs, outcomes, and order history must survive rollback.
+- Apply document 11's first-release history-preservation and existing-role policy: retain minimal verified financial evidence without automatic deletion, omit full raw payloads and secrets, and review any later deletion policy separately. This is not a legal retention determination. Provider IDs, outcomes, and order history must survive rollback.
 - Rollback means disable new gateway starts, retain consumers/reconciliation for issued flows, and deploy compatible application code. Never drop payment records, disable ingress while flows are payable, or silently reclassify pending PayMongo orders as manual wallets.
 
 ## Skills and agent responsibility matrix

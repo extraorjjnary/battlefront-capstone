@@ -25,6 +25,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { formatCurrency } from '@/lib/currency';
+import { createUuid } from '@/lib/uuid';
 import { index as cartIndex } from '@/routes/cart';
 
 const props = defineProps({
@@ -33,6 +34,7 @@ const props = defineProps({
     pickupLocation: { type: Object, required: true },
     fulfillmentMethods: { type: Array, required: true },
     paymentMethods: { type: Array, required: true },
+    paymongoBanks: { type: Object, required: true },
     deliveryQuotes: { type: Array, required: true },
     deliveryLocations: { type: Array, required: true },
     deliveryAddressPrefill: { type: Object, required: true },
@@ -41,6 +43,9 @@ const props = defineProps({
 
 const fulfillmentMethod = ref('pickup');
 const paymentMethod = ref('cash');
+const paymentChannel = ref('hosted_checkout');
+const paymentBank = ref(Object.keys(props.paymongoBanks)[0] ?? '');
+const checkoutSubmissionKey = createUuid();
 const paymentProofKey = ref(0);
 const deliveryAddress = ref({ ...props.deliveryAddressPrefill });
 const deliveryDestination = computed(
@@ -69,16 +74,26 @@ function formatDeliveryDate(value) {
 }
 
 const availablePaymentMethods = computed(() =>
-    props.paymentMethods.filter(
-        (method) =>
-            method.available_for.includes(fulfillmentMethod.value) &&
-            (fulfillmentMethod.value !== 'delivery' ||
-                (selectedQuote.value?.order_placement_allowed !== false &&
-                    (!selectedQuote.value?.payment_methods ||
-                        selectedQuote.value.payment_methods.includes(
-                            method.value,
-                        )))),
-    ),
+    props.paymentMethods.filter((method) => {
+        if (!method.available_for.includes(fulfillmentMethod.value)) {
+            return false;
+        }
+
+        if (fulfillmentMethod.value !== 'delivery') {
+            return true;
+        }
+
+        if (selectedQuote.value?.order_placement_allowed === false) {
+            return false;
+        }
+
+        const quotePaymentMethods = selectedQuote.value?.payment_methods;
+
+        return !quotePaymentMethods ||
+            quotePaymentMethods.includes(method.value) ||
+            (method.value === 'online' &&
+                quotePaymentMethods.some((value) => ['gcash', 'maya'].includes(value)));
+    }),
 );
 const selectedPaymentMethod = computed(() =>
     props.paymentMethods.find((method) => method.value === paymentMethod.value),
@@ -192,6 +207,9 @@ defineOptions({
                     name="cart_item_ids[]"
                     :value="item.id"
                 />
+                <input type="hidden" name="checkout_submission_key" :value="checkoutSubmissionKey" />
+                <input v-if="paymentMethod === 'online'" type="hidden" name="payment_channel" :value="paymentChannel" />
+                <input v-if="paymentMethod === 'online' && paymentChannel === 'direct_online_banking'" type="hidden" name="payment_bank" :value="paymentBank" />
                 <div class="grid gap-6">
                     <Alert v-if="errors.cart" variant="destructive">
                         <AlertTitle>Your cart changed</AlertTitle>
@@ -646,6 +664,8 @@ defineOptions({
                                             method.description ??
                                             (method.value === 'cod'
                                                 ? 'Pay upon delivery. Delivery orders only.'
+                                                : method.value === 'online'
+                                                  ? 'Pay securely on PayMongo using an available online method. No receipt upload is required.'
                                                 : method.requires_proof
                                                   ? 'Manual e-wallet payment with proof.'
                                                   : fulfillmentMethod ===
@@ -658,6 +678,25 @@ defineOptions({
                             </label>
                         </div>
                         <InputError :message="errors.payment_method" />
+
+                        <div v-if="paymentMethod === 'online'" class="grid gap-4 border-border bg-secondary/40 border p-4">
+                            <div class="grid gap-2">
+                                <Label for="payment-channel">Online payment option</Label>
+                                <select id="payment-channel" v-model="paymentChannel" class="border-input bg-background h-10 w-full border px-3 text-sm">
+                                    <option value="hosted_checkout">Card, GCash, Maya, or QR Ph</option>
+                                    <option v-if="Object.keys(paymongoBanks).length" value="direct_online_banking">Direct online banking</option>
+                                </select>
+                                <InputError :message="errors.payment_channel" />
+                            </div>
+                            <div v-if="paymentChannel === 'direct_online_banking'" class="grid gap-2">
+                                <Label for="payment-bank">Bank</Label>
+                                <select id="payment-bank" v-model="paymentBank" class="border-input bg-background h-10 w-full border px-3 text-sm">
+                                    <option v-for="(label, code) in paymongoBanks" :key="code" :value="code">{{ label }}</option>
+                                </select>
+                                <InputError :message="errors.payment_bank" />
+                                <p class="text-muted-foreground text-xs leading-5">Your bank will open on PayMongo. Battlefront never receives your bank password or OTP.</p>
+                            </div>
+                        </div>
 
                         <Alert v-if="isCod">
                             <AlertTitle>Pay upon delivery</AlertTitle>

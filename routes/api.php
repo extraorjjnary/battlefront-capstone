@@ -10,16 +10,20 @@ use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\OrderCancellationController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\OrderPaymentProofController;
+use App\Http\Controllers\Api\V1\OrderPaymentRetryController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\PushDeviceController;
 use App\Http\Controllers\Api\V1\RecommendationController;
 use App\Http\Controllers\DeliveryLocationController;
 use App\Http\Controllers\DeliveryQuoteController;
+use App\Http\Controllers\PayMongoWebhookController;
 use App\Http\Controllers\RecommendationInteractionController;
 use App\Http\Middleware\AuthorizeApiChatbot;
 use App\Http\Middleware\AuthorizeApiRecommendations;
 use Illuminate\Support\Facades\Route;
+
+Route::post('paymongo/webhook', PayMongoWebhookController::class)->name('paymongo.webhook');
 
 // Version 1 endpoints: (note: mobile is customer-centric only it's exclude administration responsibility/operations.)
 Route::prefix('v1')
@@ -97,6 +101,9 @@ Route::prefix('v1')
             Route::post('orders', [OrderController::class, 'store'])->name('orders.store');
             Route::post('orders/{order}/cancel', OrderCancellationController::class)
                 ->whereNumber('order')->name('orders.cancel.store');
+            Route::post('orders/{order}/paymongo/retry', OrderPaymentRetryController::class)
+                ->middleware('throttle:10,1')
+                ->whereNumber('order')->name('orders.paymongo.retry');
             Route::get('orders/{order}', [OrderController::class, 'show'])
                 ->whereNumber('order')->name('orders.show');
             Route::post('orders/{order}/payment-proof', OrderPaymentProofController::class)

@@ -13,9 +13,11 @@ use App\Enums\ShipmentArrangement;
 use App\Enums\ShipmentStatus;
 use App\Enums\UserRole;
 use App\Models\Order;
+use App\Models\PayMongoFlow;
 use App\Models\Shipment;
 use App\Models\User;
 use App\Services\Notifications\OrderNotificationPublisher;
+use App\Services\PayMongo\CloseHostedCheckout;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -28,11 +30,18 @@ class OrderProcessingService
         private readonly RestoreOrderInventory $restoreOrderInventory,
         private readonly RecordCompletedOrderSale $recordCompletedOrderSale,
         private readonly OrderNotificationPublisher $notifications,
+        private readonly CloseHostedCheckout $closeHostedCheckout,
     ) {}
 
     public function canCustomerCancel(Order $order): bool
     {
-        return $order->status === OrderStatus::Pending
+        $gatewayFlowCanClose = $order->payment_origin !== 'paymongo'
+            || PayMongoFlow::query()->where('order_id', $order->id)
+                ->whereIn('status', ['open', 'closing', 'closed', 'reconciliation_required'])
+                ->exists();
+
+        return $gatewayFlowCanClose
+            && $order->status === OrderStatus::Pending
             && $order->payment_status === PaymentStatus::Pending
             && (! $order->payment_method->requiresPaymentProof() || $order->payment_proof_path === null)
             && ($order->shipment === null || $order->shipment->status === ShipmentStatus::AwaitingPreparation);
@@ -40,6 +49,14 @@ class OrderProcessingService
 
     public function cancelForCustomer(User $customer, int $orderId): Order
     {
+        $order = $customer->orders()->findOrFail($orderId);
+
+        if ($order->payment_origin === 'paymongo' && ! $this->closeHostedCheckout->execute($order->id)) {
+            throw ValidationException::withMessages([
+                'status' => $this->payMongoCancellationBlockedMessage($order),
+            ]);
+        }
+
         return DB::transaction(function () use ($customer, $orderId): Order {
             $order = $customer->orders()->whereKey($orderId)->lockForUpdate()->firstOrFail();
             $shipment = $order->shipment()->lockForUpdate()->first();
@@ -73,6 +90,13 @@ class OrderProcessingService
      */
     public function updateStatus(Order $order, OrderStatus $status): Order
     {
+        if ($status === OrderStatus::Cancelled && $order->payment_origin === 'paymongo'
+            && ! $this->closeHostedCheckout->execute($order->id)) {
+            throw ValidationException::withMessages([
+                'status' => $this->payMongoCancellationBlockedMessage($order),
+            ]);
+        }
+
         return DB::transaction(function () use ($order, $status): Order {
             $lockedOrder = Order::query()
                 ->whereKey($order->getKey())
@@ -81,6 +105,11 @@ class OrderProcessingService
 
             $shipment = $lockedOrder->shipment()->lockForUpdate()->first();
             $lockedOrder->setRelation('shipment', $shipment);
+            if ($status === OrderStatus::Cancelled && $lockedOrder->payment_origin === 'paymongo'
+                && ($lockedOrder->payment_status !== PaymentStatus::Pending
+                    || PayMongoFlow::query()->where('order_id', $lockedOrder->id)->where('status', 'closed')->doesntExist())) {
+                throw ValidationException::withMessages(['status' => 'Online payment must be confirmed closed and unpaid before this order can be cancelled.']);
+            }
             if ($status === OrderStatus::Completed && $lockedOrder->payment_method->isPayAtPickup()) {
                 throw ValidationException::withMessages(['status' => 'Use Confirm Payment & Complete Pickup after receiving payment and handing over the products.']);
             }
@@ -104,7 +133,11 @@ class OrderProcessingService
             }
 
             if ($status === OrderStatus::Cancelled) {
-                return $this->shipmentCancellationBlockedReason($order->shipment) === null;
+                return ($order->payment_origin !== 'paymongo'
+                    || PayMongoFlow::query()->where('order_id', $order->id)
+                        ->whereIn('status', ['open', 'closing', 'closed', 'awaiting_payment_method', 'failed', 'reconciliation_required'])
+                        ->exists())
+                    && $this->shipmentCancellationBlockedReason($order->shipment) === null;
             }
 
             return $status === OrderStatus::Processing
@@ -360,6 +393,12 @@ class OrderProcessingService
                 ->lockForUpdate()
                 ->firstOrFail();
 
+            if ($lockedOrder->payment_origin === 'paymongo') {
+                throw ValidationException::withMessages([
+                    'payment_status' => 'PayMongo payments can only be confirmed from authenticated provider events.',
+                ]);
+            }
+
             if ($lockedOrder->payment_method === PaymentMethod::Cod) {
                 throw ValidationException::withMessages([
                     'payment_status' => 'Use Confirm COD Collection after delivery. COD does not accept ordinary payment verification or proof rejection.',
@@ -468,6 +507,17 @@ class OrderProcessingService
     {
         return $order->payment_status === PaymentStatus::Verified
             || ($order->payment_status === PaymentStatus::Pending && ($this->isCodDelivery($order) || $this->isPayAtPickupOrder($order)));
+    }
+
+    private function payMongoCancellationBlockedMessage(Order $order): string
+    {
+        $order->refresh();
+
+        if ($order->payment_status === PaymentStatus::Verified) {
+            return 'PayMongo confirmed your payment, so this order was not cancelled. Cancellation does not refund a payment. Contact Battlefront for help with this paid order.';
+        }
+
+        return 'PayMongo still reports a possible payment. The order remains pending and inventory stays reserved while payment is reconciled.';
     }
 
     private function isPayAtPickupOrder(Order $order): bool

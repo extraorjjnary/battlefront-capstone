@@ -54,6 +54,8 @@ Use the G01-G12 traceability in `10-readiness-audit.md`; these are planned tests
 | Exact amount conversion, delivery fee, integer bounds, missing provider fee/net | No float drift; missing fee is not zero; settlement net never substitutes for payable total |
 
 ## Evidence layers
+For worker acceptance, use the inspection and run procedure in `11-system-aligned-setup.md`: current Windows PHP lacks PCNTL. Demonstrate HTTP budgets locally; demonstrate enforced worker termination and concurrent lease recovery on a supported runtime/supervisor before claiming those properties. Do not treat `--timeout` or `--once` as proof of enforcement.
+
 Use the actual MySQL 8.0.46/InnoDB/REPEATABLE-READ baseline and selected worker/HTTP budgets in `11-system-aligned-setup.md`. Include the existing manual refund recording/review permissions and reports in compatibility checks. Use synthetic test configuration in automated tests; root `.env` holds private developer test credentials only for authorized provider checks.
 
 1. Unit tests for signature parser/calculation, event mapping, money conversion, and transition decisions.

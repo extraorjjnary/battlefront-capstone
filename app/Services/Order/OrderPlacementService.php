@@ -188,7 +188,10 @@ class OrderPlacementService
                 ? $this->deliveryRules->quote(FulfillmentMethod::Delivery, $deliveryDestination, $products)
                 : null;
             $zone = $deliveryDestination !== null ? $this->deliveryRules->zone($deliveryDestination) : null;
-            if ($zone !== null && ! in_array($checkout['payment_method']->value, $zone['payment_methods'], true)) {
+            $methodAvailableForZone = $checkout['payment_method'] === PaymentMethod::Online
+                ? (bool) array_intersect(['gcash', 'maya'], $zone['payment_methods'] ?? [])
+                : in_array($checkout['payment_method']->value, $zone['payment_methods'] ?? [], true);
+            if ($zone !== null && ! $methodAvailableForZone) {
                 throw ValidationException::withMessages(['payment_method' => 'This payment method is unavailable for the selected delivery route.']);
             }
             $deliveryFee = $quote['delivery_fee'] ?? '0.00';
@@ -215,7 +218,9 @@ class OrderPlacementService
                     'pricing_status' => $zone['configured'] ? 'configured_estimate' : 'not_configured',
                     'payment_methods' => $zone['payment_methods'],
                     'address_components' => $checkout['delivery_address_components'] ?? null,
-                    'payment_assumption' => Config::string(($zone['configured']
+                    'payment_assumption' => $checkout['payment_method'] === PaymentMethod::Online
+                        ? 'Online payment through PayMongo Hosted Checkout. Provider fees are absorbed by Battlefront.'
+                        : Config::string(($zone['configured']
                         ? 'battlefront.delivery.payment_assumptions.'
                         : 'battlefront.delivery.unconfigured_route.payment_assumptions.').$checkout['payment_method']->value),
                 ] : null,
@@ -233,6 +238,9 @@ class OrderPlacementService
                 'payment_status' => PaymentStatus::Pending,
                 'payment_method' => $checkout['payment_method'],
                 'payment_proof_path' => $checkout['payment_proof_path'],
+                'payment_origin' => $checkout['payment_method'] === PaymentMethod::Online ? 'paymongo' : 'manual',
+                'checkout_submission_key' => $checkout['checkout_submission_key'] ?? null,
+                'checkout_request_fingerprint' => $checkout['checkout_request_fingerprint'] ?? null,
             ]);
 
             foreach ($lines as $line) {

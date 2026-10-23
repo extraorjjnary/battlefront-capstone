@@ -1,6 +1,6 @@
 <script setup>
 import PageHeader from '@/components/PageHeader.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePoll } from '@inertiajs/vue3';
 import {
     ArrowRight,
     CircleAlert,
@@ -12,7 +12,7 @@ import {
     Upload,
     UserRound,
 } from '@lucide/vue';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import OrderController from '@/actions/App/Http/Controllers/OrderController';
 import OrderPaymentProofController from '@/actions/App/Http/Controllers/OrderPaymentProofController';
 import InputError from '@/components/InputError.vue';
@@ -36,6 +36,7 @@ import { formatDateTime } from '@/lib/dateTime';
 import { orderStatusBadgeClass } from '@/lib/orderStatus';
 import { index as productIndex } from '@/routes/products';
 import { store as cancelOrder } from '@/routes/orders/cancel';
+import { retry as retryPayMongo } from '@/routes/orders/paymongo';
 
 const props = defineProps({
     order: { type: Object, required: true },
@@ -45,8 +46,37 @@ const props = defineProps({
 const replacementProofForm = useForm({
     payment_proof: null,
 });
+const paymentRetryForm = useForm({});
 const cancellationOpen = ref(false);
 const cancellationForm = useForm({});
+const paymentStatusPolling = usePoll(
+    5000,
+    { only: ['order'], preserveErrors: true },
+    { autoStart: false },
+);
+
+function updatePaymentStatusPolling() {
+    const shouldPoll =
+        props.order.payment.method.value === 'online' &&
+        props.order.payment.status.value === 'pending' &&
+        props.order.status.value === 'pending';
+
+    if (shouldPoll) {
+        paymentStatusPolling.start();
+    } else {
+        paymentStatusPolling.stop();
+    }
+}
+
+watch(
+    () => [
+        props.order.payment.method.value,
+        props.order.payment.status.value,
+        props.order.status.value,
+    ],
+    updatePaymentStatusPolling,
+    { immediate: true },
+);
 
 function requestCancellation() {
     if (!props.order.can_cancel || cancellationForm.processing) {
@@ -87,6 +117,11 @@ function submitReplacementProof() {
             replacementProofForm.reset();
         },
     });
+}
+
+function retryDirectBankPayment() {
+    if (!props.order.payment.can_retry || paymentRetryForm.processing) return;
+    paymentRetryForm.submit(retryPayMongo(props.order.id), { preserveScroll: true });
 }
 </script>
 
@@ -479,6 +514,19 @@ function submitReplacementProof() {
                                         class="text-muted-foreground mt-2 text-xs leading-5"
                                     >
                                         {{ order.payment.notice }}
+                                    </dd>
+                                    <dd v-if="order.payment.checkout_url" class="mt-3">
+                                        <a :href="order.payment.checkout_url" class="text-primary-ink text-sm font-semibold underline underline-offset-4">
+                                            Continue to secure payment
+                                        </a>
+                                    </dd>
+                                    <dd v-if="order.payment.can_retry" class="mt-3 grid gap-2">
+                                        <p class="text-muted-foreground text-xs leading-5">The bank did not complete the payment. You can try again with {{ order.payment.bank_code }}.</p>
+                                        <Button type="button" size="sm" :disabled="paymentRetryForm.processing" @click="retryDirectBankPayment">
+                                            <Spinner v-if="paymentRetryForm.processing" />
+                                            Retry bank payment
+                                        </Button>
+                                        <InputError :message="paymentRetryForm.errors.payment" />
                                     </dd>
                                 </div>
                             </div>

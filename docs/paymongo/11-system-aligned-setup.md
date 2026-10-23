@@ -14,6 +14,12 @@ PAYMONGO_PUBLIC_KEY=
 PAYMONGO_WEBHOOK_SECRET=
 ```
 
+### Enable flag and recovery contract
+
+These names are planned configuration, not currently functioning switches. In implementation, `PAYMONGO_ENABLED=false` blocks new gateway checkout creation and method switches into PayMongo. It must not disable signature verification, durable webhook receipt, status retrieval, reconciliation, or closure for already issued flows. Disabling a method follows the same rule. Keep recovery credentials available while those flows remain unresolved; missing credentials must produce a visible blocked recovery condition, never a paid/cancelled decision or stock release. Each operation validates only its required credentials; unrelated application boot must not require payment keys. Test mode rejects live credentials and live events. A mode/secret change requires a separately reviewed drain plan.
+
+Acceptance must cover disabling new starts while a payment is in flight, subsequent verified success, duplicate delivery, reconciliation and safe closure. Flag changes alone never invalidate a provider URL or refund money.
+
 These names are our proposed configuration contract, not PayMongo-required environment variable names. They currently do nothing because the application has no PayMongo binding. Keep enabled false until the implementation and test setup are ready. Do not replace the existing application, database, mail or manual-wallet variables.
 
 - Obtain the test API keys from the PayMongo Dashboard Developers/API Keys area in test mode. The secret key starts with `sk_test_`; a public test key starts with `pk_test_`. Put them only in the corresponding local entries. Hosted Checkout is server-created; do not expose a secret to Vue or mobile code. Keep a public key private in server configuration until a verified banking operation specifically requires client use.
@@ -64,10 +70,39 @@ The `paymongo-api` skill must reopen the relevant official page before implement
 
 ## Remaining external evidence, with safe outcomes
 
-- Account owner privately supplies test keys and confirms available methods/banks. Missing keys or unavailable methods keep payment creation disabled; local fake-based implementation can be planned independently.
+Developer update: test keys and webhook setup are reported handled, and payment methods are confirmed by the developer for development/test mode only. Record these as supplied account prerequisites, not independently verified endpoint delivery or live activation. No actual key values or dashboard records were accessed. Do not repeatedly ask for keys or method approval; inspect only redacted/presence evidence during the authorized implementation test setup.
+
+- Test keys and development-only method availability are reported ready by the developer. Validate presence/mode and the precise selected bank list during authorized test setup without exposing values or requesting the same approval again. Missing keys or unavailable methods still fail closed.
 - Provider evidence must establish each banking route's safe lifecycle. If it cannot, that route remains unavailable rather than risking a duplicate charge or premature stock release.
-- Authorized HTTPS test endpoint and correct test-mode webhook registration are needed only for external end-to-end testing. No real webhook registration or tunnel was performed here.
+- Webhook setup is reported handled by the developer. Actual signed delivery to the implemented receiver remains a later end-to-end acceptance check; registration alone does not prove application processing. No webhook registration or tunnel was performed by this preparation.
 - Deployment must demonstrate a running worker that consumes the payments queue and a scheduler, and confirm its effective timeout/retry settings. Existing code proves the mechanism exists, not process health.
 - Runtime Codex agent discovery remains to be demonstrated in the normal CLI session; documented roles/skills remain usable explicitly. No missing-home workaround or global configuration change is assumed.
 
 These are account/environment/provider evidence requirements, not unanswered repository design choices. Do not report them as completed without evidence.
+
+## Worker and scheduler readiness assessment
+
+Read-only checks found two PHP queue processes (`queue:listen` and `queue:work`); neither command explicitly targeted `payments`, and their command lines did not identify this project's directory. They are evidence of PHP queue processes, not proof this project's payment work is consumed. No persistent `schedule:work` process was observed; an external periodically triggered `schedule:run` is not ruled out by a process snapshot.
+
+`php artisan schedule:list --no-interaction` currently lists only the existing Sanctum, customer search and recommendation-interaction pruning commands. No payment reconciliation command exists yet. `queue:work`, `schedule:work` and `schedule:run` options were checked through installed Artisan help. Nothing was started, stopped or dispatched during this assessment.
+
+For later authorized local test operation, run from the project root in separate terminals:
+
+```powershell
+php artisan queue:work database --queue=payments --sleep=1 --tries=3 --timeout=30 --no-interaction
+php artisan schedule:work --no-interaction
+```
+
+These are existing Laravel commands, not new application commands. The payments queue is the selected future logical queue; it needs no new queue driver. Preserve other workers for notifications/default work. Do not run a second scheduler if another launcher already invokes this application's schedule. `schedule:work` runs all due registered tasks, including existing prune commands; it is not an isolated payment simulator.
+
+**Windows timeout limitation:** `php -m` shows PDO MySQL but no PCNTL in this runtime. Laravel's daemon job timeout enforcement requires PCNTL, so `--timeout=30` alone cannot prove hard termination here. Keep explicit 3-second connect/10-second HTTP timeouts and one bounded provider stage per job. Native Windows development can use a single dedicated payment consumer for functional checks; it cannot certify hard timeout/concurrent recovery behavior. Before concurrent payment workers or production acceptance, use a verified runtime with PCNTL or an independently verified process supervisor that terminates the old worker before any replacement/lease takeover. Installing or switching runtimes is not performed by this preparation. Do not use `--once` as a timeout workaround: Laravel documents that it bypasses worker timeout enforcement.
+
+Payment worker acceptance during implementation must demonstrate: correct project/queue consumption, inbox recovery after enqueue failure, scheduler discovery of due payment work, explicit HTTP timeout behavior, and safe recovery after a terminated worker with no duplicate provider operation or state application. The selected 30-second job budget must remain below effective database `retry_after` (currently the config default is 90 seconds); numeric settings without enforced termination are insufficient.
+
+Sources: [Laravel local scheduler](https://laravel.com/docs/13.x/scheduling#running-the-scheduler-locally), [queue timeouts and PCNTL](https://laravel.com/docs/13.x/queues#timeout). This resolves the preparation procedure and identifies the platform acceptance limit; it does not claim nonexistent payment jobs have run successfully.
+
+## PayMongo Money Movement and customer bank payments
+
+The developer requested Money Movement documentation as a reference. [Money Movement introduction](https://docs.paymongo.com/docs/money-movement-introduction) and [key concepts](https://docs.paymongo.com/docs/money-movement-key-concepts) explain wallet balances, settlement, transfers and rails. Use those guides for settlement vocabulary and reconciliation context. They do not establish cancellation behavior for a customer checkout Payment Intent merely because both involve banks.
+
+Customer bank acceptance continues to use the [Direct Online Banking guide](https://docs.paymongo.com/docs/payment-acceptance-direct-online-banking). Match states and callbacks to the actual resource/API involved; do not substitute transfer success for order payment success or import wallet-transfer cancellation semantics into checkout. Merchant wallet transfers, payouts and disbursements are not added to this implementation scope. If a specific Money Movement operation is later proposed for checkout, require an explicit scope decision and resource-level contract first.

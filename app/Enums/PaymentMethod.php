@@ -9,6 +9,7 @@ enum PaymentMethod: string
     case GCash = 'gcash';
     case Maya = 'maya';
     case Cod = 'cod';
+    case Online = 'online';
 
     /**
      * Get the customer-facing payment label.
@@ -21,6 +22,7 @@ enum PaymentMethod: string
             self::GCash => 'GCash',
             self::Maya => 'Maya',
             self::Cod => 'Cash on Delivery (COD)',
+            self::Online => 'Pay online',
         };
     }
 
@@ -31,7 +33,7 @@ enum PaymentMethod: string
     {
         return match ($this) {
             self::GCash, self::Maya => true,
-            self::Cash, self::CardAtStore, self::Cod => false,
+            self::Cash, self::CardAtStore, self::Cod, self::Online => false,
         };
     }
 
@@ -56,7 +58,7 @@ enum PaymentMethod: string
     {
         return match ($fulfillmentMethod) {
             FulfillmentMethod::Pickup => $this !== self::Cod,
-            FulfillmentMethod::Delivery => in_array($this, [self::GCash, self::Maya, self::Cod], strict: true),
+            FulfillmentMethod::Delivery => in_array($this, [self::GCash, self::Maya, self::Cod, self::Online], strict: true),
         };
     }
 }

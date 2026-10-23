@@ -48,6 +48,7 @@ use App\Http\Controllers\NotificationController as CustomerNotificationControlle
 use App\Http\Controllers\OrderCancellationController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderPaymentProofController as CustomerOrderPaymentProofController;
+use App\Http\Controllers\OrderPaymentRetryController;
 use App\Http\Controllers\PendingCartIntentController;
 use App\Http\Controllers\ProductCatalogController;
 use App\Http\Controllers\ProductDwellController;
@@ -133,6 +134,10 @@ Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {
     Route::post('orders/{order}/cancel', OrderCancellationController::class)
         ->whereNumber('order')
         ->name('orders.cancel.store');
+    Route::post('orders/{order}/paymongo/retry', OrderPaymentRetryController::class)
+        ->middleware('throttle:10,1')
+        ->whereNumber('order')
+        ->name('orders.paymongo.retry');
     Route::post('orders/{order}/payment-proof', CustomerOrderPaymentProofController::class)
         ->whereNumber('order')
         ->name('orders.payment-proof.store');

@@ -2,6 +2,9 @@
 
 use App\Console\Commands\PruneExpiredCustomerSearches;
 use App\Console\Commands\PruneExpiredRecommendationInteractions;
+use App\Console\Commands\ReconcilePayMongoOrders;
+use App\Jobs\ProcessPayMongoWebhook;
+use App\Models\PayMongoWebhookInbox;
 use App\Services\CatalogImagePipeline;
 use App\Services\RealCatalogImportService;
 use Illuminate\Foundation\Inspiring;
@@ -11,6 +14,21 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::command('sanctum:prune-expired --hours=24')->daily();
 Schedule::command(PruneExpiredCustomerSearches::class)->daily();
 Schedule::command(PruneExpiredRecommendationInteractions::class)->daily();
+Schedule::call(static function (): void {
+    PayMongoWebhookInbox::query()
+        ->whereIn('status', ['received', 'unmatched'])
+        ->where(function ($query): void {
+            $query->whereNull('next_check_at')->orWhere('next_check_at', '<=', now());
+        })
+        ->orderBy('id')
+        ->limit(100)
+        ->pluck('id')
+        ->each(static fn (int $id) => ProcessPayMongoWebhook::dispatch($id)->onQueue('payments'));
+})->name('paymongo-webhook-inbox-recovery')->everyMinute()->withoutOverlapping();
+Schedule::command(ReconcilePayMongoOrders::class)
+    ->name('paymongo-overdue-order-reconciliation')
+    ->everyMinute()
+    ->withoutOverlapping();
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());

@@ -55,6 +55,7 @@ class CustomerOrderRepository
                 'status',
                 'payment_status',
                 'payment_method',
+                'payment_origin',
                 'payment_proof_path',
                 'payment_rejection_reason',
                 'payment_rejection_note',

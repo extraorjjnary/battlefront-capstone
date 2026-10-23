@@ -9,6 +9,7 @@ use App\Enums\PaymentStatus;
 use App\Enums\ShipmentStatus;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\PayMongoFlow;
 use App\Services\Order\OrderProcessingService;
 
 class CustomerOrderPresenter
@@ -59,6 +60,8 @@ class CustomerOrderPresenter
      */
     public function detail(Order $order): array
     {
+        $paymongoFlow = PayMongoFlow::query()->where('order_id', $order->id)->first();
+
         return [
             'can_cancel' => $this->orderProcessingService->canCustomerCancel($order),
             'product_subtotal' => $order->product_subtotal,
@@ -93,6 +96,13 @@ class CustomerOrderPresenter
                 'notice' => $this->paymentNotice($order),
                 'rejection' => $this->paymentRejectionData($order),
                 'can_resubmit_proof' => $this->canResubmitPaymentProof($order),
+                'checkout_url' => $paymongoFlow?->status === 'open' ? $paymongoFlow->checkout_url : null,
+                'bank_code' => $paymongoFlow?->bank_code,
+                'can_retry' => $paymongoFlow?->channel === 'direct_online_banking'
+                    && $paymongoFlow->status === 'awaiting_payment_method'
+                    && $paymongoFlow->merchant_cutoff_at->isFuture()
+                    && $order->status === OrderStatus::Pending
+                    && $order->payment_status === PaymentStatus::Pending,
             ],
             'items' => $order->items->map(function (OrderItem $item): array {
                 $unitPrice = $item->price_at_time;
@@ -121,6 +131,12 @@ class CustomerOrderPresenter
      */
     private function paymentNotice(Order $order): string
     {
+        if ($order->payment_origin === 'paymongo') {
+            return $order->payment_status === PaymentStatus::Verified
+                ? 'PayMongo has confirmed your online payment. Battlefront will continue the existing order preparation and fulfillment process.'
+                : 'Your online payment is pending confirmation from PayMongo. This order remains reserved while payment is reconciled.';
+        }
+
         if ($order->status === OrderStatus::Cancelled) {
             return 'This order is cancelled. Cancellation does not refund or reverse any recorded payment.';
         }

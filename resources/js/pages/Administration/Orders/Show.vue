@@ -1288,6 +1288,39 @@ defineOptions({
                     </div>
 
                     <div
+                        v-if="order.payment.gateway"
+                        class="border-border mt-5 border-t pt-5"
+                    >
+                        <p class="text-sm font-medium">Online payment</p>
+                        <dl class="text-muted-foreground mt-3 grid gap-2 text-sm">
+                            <div class="flex justify-between gap-4">
+                                <dt>Provider flow</dt>
+                                <dd class="text-foreground text-right">
+                                    {{ order.payment.gateway.channel === 'hosted_checkout' ? 'Hosted Checkout' : 'Direct Online Banking' }}
+                                </dd>
+                            </div>
+                            <div v-if="order.payment.gateway.bank" class="flex justify-between gap-4">
+                                <dt>Bank</dt>
+                                <dd class="text-foreground uppercase">{{ order.payment.gateway.bank }}</dd>
+                            </div>
+                            <div class="flex justify-between gap-4">
+                                <dt>Reconciliation status</dt>
+                                <dd class="text-foreground">{{ order.payment.gateway.status.replaceAll('_', ' ') }}</dd>
+                            </div>
+                            <div class="flex justify-between gap-4">
+                                <dt>Merchant cutoff</dt>
+                                <dd class="text-foreground text-right">{{ formatDateTime(order.payment.gateway.merchant_cutoff_at) }}</dd>
+                            </div>
+                        </dl>
+                        <p
+                            v-if="['closing', 'failed', 'retrying', 'reconciliation_required'].includes(order.payment.gateway.status)"
+                            class="text-muted-foreground mt-3 text-sm leading-6"
+                        >
+                            Provider confirmation is still required. Keep this order pending and inventory reserved until reconciliation completes.
+                        </p>
+                    </div>
+
+                    <div
                         v-if="order.payment.method.requires_proof"
                         class="border-border mt-5 border-t pt-5"
                     >

@@ -8,15 +8,35 @@ The developer has approved PayMongo implementation within the documented replace
 |---|---|---|
 | 0. Foundation review | Confirm project instructions, approved manuscript/context, `09-decisions-and-open-questions.md`, agent roles, Linear issue, current provider docs, and external readiness gates. | Approved implementation baseline is recorded; test credentials and account method availability are handled in test setup. |
 | 1. Detailed design | Map Hosted Checkout v2 for card/GCash/Maya/QR Ph and the separate Payment Intent redirect flow for Direct Online Banking. Finalize order/payment state mapping, one-provider-flow retries, 24-hour cutoff/reconciliation, stock restoration, existing-order cutover, webhook inbox, audit retention, refund boundary, and MySQL concurrency design. | Architecture/security review complete; target MySQL version and scheduler/queue behavior confirmed before migration/job implementation. |
-| 2. Persistence and domain boundary | Add additive migration/model/status mapping with data-preserving compatibility for attempts, event dedupe, audit history, and any approved refund records. | Migration reviewed against MySQL and legacy records; focused tests pass. |
+| 1a. Local client bootstrap | Implement the separately assigned first issue below: disabled test configuration and a safe HTTP boundary exercised only with fakes. No payment creation or persistence changes. | Focused fake tests and developer review; no external account evidence needed for this isolated slice. |
+| 2. Persistence and domain boundary | Add additive migration/model/status mapping with data-preserving compatibility for flows, operations, attempts, event dedupe, and audit history. Preserve existing refund records; new refund behavior requires separate scope. | Migration reviewed against MySQL and legacy records; focused tests pass. |
 | 3. Provider client and payment creation | Server-side test-key clients for the approved Checkout Session and Direct Online Banking flows, validated errors, idempotent create, order association. | Automated fake tests; no secret leakage; test-mode method support verified. |
 | 4. Webhook and state transitions | HTTPS route, raw-body signature verifier, durable dedupe/inbox, flow-specific event mapping, separate payment/order transitions, 24-hour reconciliation and safe stock restoration. | Security review and duplicate/race/failure tests pass. |
 | 5. Customer UX and compatibility | Add the approved online methods and return/status UI. At approved cutover, replace manual GCash/Maya proof upload/review for new online orders; retain historical records and preserve cash pickup, physical card-at-store, COD, fulfillment, and web/API rules. | End-to-end acceptance and existing workflows verified. |
 | 6. Test-mode validation | Test every enabled card, wallet, QR Ph, and bank route; provider receipts; native method expiry; 24-hour closure races; retries; missed/duplicate events; recovery; and legacy compatibility with test credentials only. Fees are absorbed. Use a public HTTPS test endpoint only after explicit authorization; do not expose the database. | Redacted evidence, defect disposition, developer acceptance. |
 | 7. Production readiness (separately approved) | Account verification, live secrets/webhook, monitoring, support, rollback and controlled launch. | Explicit production authorization; currently out of scope. |
 
-Each implementation slice must name its G01-G12 acceptance criteria from `10-readiness-audit.md`, touched web/API/admin entry points, source evidence, migration implications, and required tests. Phase 1 must settle operation/inbox recovery, active-flow enforcement, money conversion, cancellation serialization, retained-data access and operational retry/retention values before dependent work. Pure local design/fakes do not require production activation; external test evidence is obtained only at its authorized phase.
+Each implementation slice must name its G01-G12 acceptance criteria from `10-readiness-audit.md`, touched web/API/admin entry points, source evidence, migration implications, and required tests. Phase 1 translates the selected contracts and settings in documents 10 and 11 into concrete schema and transition designs before dependent work; it does not reopen settled local defaults without a reason. Phase 1a precedes persistence; phase 3 adds actual provider operations to that boundary. Pure local design/fakes do not require production activation; external test evidence is obtained only at its authorized phase.
 
 The cutover/rollback plan must disable new starts while retaining ingress and reconciliation for existing flows; historical manual orders stay identifiable by persisted origin. Do not rely on turning off the webhook or deleting tables as rollback.
 
 Do not combine phases into one broad issue. Keep payment implementation separate from production activation, credentials, and live transactions. This preparation request starts none of these implementation phases.
+
+## Recommended first implementation issue
+
+**Title:** Add disabled-by-default PayMongo test configuration and safe HTTP client boundary.
+
+**Purpose:** establish the server-side provider boundary using existing Laravel service configuration and HTTP conventions before connecting it to orders. This is a proposed local issue description, not an issue created in Linear or implementation started.
+
+**Scope:** map the documented environment names through `config/services.php`, add empty example entries, and add a focused provider client within existing Services conventions. No SDK/dependency change. Actual endpoints and their authentication must be verified against current official references before adding a method. The first issue can validate the client with HTTP fakes and must not create sessions or call PayMongo using the real keys.
+
+**Acceptance criteria:**
+
+1. Disabled by default; test mode only. Missing required key, live-mode selection or live-key prefix fails closed when the boundary is used; unrelated existing application flows still boot and work.
+2. Secret values are read through configuration and never serialized to Vue/mobile responses, logs or exceptions. Public and webhook keys remain distinct; no webhook consumer is introduced in this slice.
+3. Provider requests use the verified operation-specific authentication, server-selected origin, 3-second connection and 10-second request budgets. No customer-controlled host or callback can redirect credentials.
+4. Error handling distinguishes invalid/authentication requests, rate limits, transient failures and unknown mutation outcomes. No automatic creation retry with a new key; endpoint idempotency support must be evidenced before relying on it.
+5. Focused fake-based tests cover disabled mode, missing/live credentials, authentication construction, timeouts and redaction. Block stray network calls; run focused checks and Pint for changed PHP under project rules.
+6. No routes, order/payment states, schemas, checkout UI, external webhook registration, payments or live settings change. Human review closes the slice.
+
+**Next slices:** additive payment-origin/flow/operation/inbox persistence; order-bound creation and recovery; authenticated webhook application; cancellation/reconciliation jobs and the worker acceptance procedure in `11-system-aligned-setup.md`; customer web/mobile checkout; authorized provider test-mode E2E evidence. Keep each separately reviewable.

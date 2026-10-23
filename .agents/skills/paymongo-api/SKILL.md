@@ -15,6 +15,8 @@ Own verified PayMongo API behavior and the server-to-provider boundary. Do not d
 - Read applicable project `.ai/rules` and order/checkout implementation before proposing code.
 
 ## Operations
+Use the Money Movement references in `11-system-aligned-setup.md` for wallet/settlement context. Customer bank payments use the Payment Acceptance contract; never infer checkout success, cancellation or webhook names from transfer/payout resources. Account test readiness reported by the developer is not live activation or endpoint test evidence.
+
 Read `docs/paymongo/10-readiness-audit.md` for the shared implementation contracts and outstanding evidence gates. Verify endpoint-specific authentication/idempotency, the full bank create-method/attach flow, account limits, and closure evidence. Treat provider documentation contradictions and unknown outcomes as unresolved facts; do not invent cancellation or lookup capabilities. Preparation-only tasks produce review artifacts, not application changes or external operations.
 
 1. Follow the approved product split: Hosted Checkout v2 for card, GCash, Maya, and QR Ph; the documented Payment Intent redirect flow for Direct Online Banking. Do not claim DOB/Brankas is supported by Hosted Checkout.
