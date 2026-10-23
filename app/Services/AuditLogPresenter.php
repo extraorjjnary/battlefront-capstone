@@ -71,7 +71,7 @@ class AuditLogPresenter
         }
 
         $permission = match ($subjectType) {
-            'order', 'customer_return', 'customer_refund', 'refund_payment' => 'orders.view',
+            'order', 'customer_return', 'customer_return_request', 'customer_refund', 'refund_payment' => 'orders.view',
             'inventory', 'inventory_adjustment_request', 'damage_report', 'supplier_return' => 'inventory.view',
             'product', 'chatbot_knowledge' => 'products.manage',
             'supplier' => 'suppliers.manage',
@@ -96,6 +96,7 @@ class AuditLogPresenter
             'damage_report' => route('administration.damage-reports.index', ['case' => $subjectId]),
             'supplier_return' => route('administration.supplier-returns.index', ['case' => $subjectId]),
             'customer_return' => route('administration.customer-returns.index', ['case' => $subjectId]),
+            'customer_return_request' => route('administration.customer-returns.index', ['request_id' => $subjectId]),
             'refund_payment' => route('administration.customer-returns.index', ['payment_id' => $subjectId]),
             default => null,
         };

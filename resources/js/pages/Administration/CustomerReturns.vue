@@ -1,6 +1,6 @@
 <script setup>
 import PageHeader from '@/components/PageHeader.vue';
-import { Form, Head, Link, usePage } from '@inertiajs/vue3';
+import { Form, Head, Link, usePage, useForm } from '@inertiajs/vue3';
 import CustomerReturnController from '@/actions/App/Http/Controllers/Administration/CustomerReturnController';
 import AdministrationEvidenceController from '@/actions/App/Http/Controllers/Administration/AdministrationEvidenceController';
 import OrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
@@ -11,11 +11,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ref, reactive, watch } from 'vue';
+import { formatDateTime } from '@/lib/dateTime';
 
 const requestReasonCode = ref('');
 
 const props = defineProps({
     returns: Object,
+    customerRequests: Object,
+    selected_request: { type: Number, default: null },
     selected_order: Object,
     suppliers: Array,
     refundPayments: Object,
@@ -26,6 +29,24 @@ const props = defineProps({
     filters: Object,
 });
 const page = usePage();
+const receiptRequest = ref(null);
+const receiptForm = useForm({ condition: '' });
+function receiveCustomerRequest(entry) {
+    if (!entry.can_receive || receiptForm.processing) return;
+    if (receiptRequest.value !== entry.id) {
+        receiptRequest.value = entry.id;
+        receiptForm.reset();
+        receiptForm.clearErrors();
+        return;
+    }
+    receiptForm.submit(CustomerReturnController.receiveRequest(entry.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            receiptRequest.value = null;
+            receiptForm.reset();
+        },
+    });
+}
 const returnLabels = {
     pending: 'Awaiting review',
     accepted: 'Accepted',
@@ -79,6 +100,7 @@ const { search, isSearching, clearSearch } = useDebouncedSearch({
     route: CustomerReturnController.index,
     query: () => ({
         case: props.selected_case ?? undefined,
+        request_id: props.selected_request ?? undefined,
         payment_id: props.selected_payment ?? undefined,
         overdue: props.filters?.overdue ? 1 : undefined,
     }),
@@ -115,6 +137,144 @@ defineOptions({
             >
         </p>
         <PageHeader title="Customer returns" />
+        <section
+            class="surface-card border-border bg-card space-y-4 border p-5"
+            aria-labelledby="customer-requests-heading"
+        >
+            <h2 id="customer-requests-heading" class="text-lg font-semibold">
+                Customer requests awaiting item receipt
+            </h2>
+            <p class="text-muted-foreground text-sm">
+                A request does not place stock on hold. Confirm receipt only
+                after the actual product is received.
+            </p>
+            <p v-if="selected_request" class="text-sm">
+                Showing request #{{ selected_request }} ·
+                <Link
+                    :href="CustomerReturnController.index()"
+                    class="text-primary-ink underline"
+                    >Show all</Link
+                >
+            </p>
+            <p
+                v-if="!customerRequests?.data.length"
+                class="text-muted-foreground text-sm"
+            >
+                No customer requests awaiting receipt.
+            </p>
+            <article
+                v-for="entry in customerRequests?.data"
+                :key="entry.id"
+                class="border-border space-y-3 border-t pt-4"
+            >
+                <h3 class="font-semibold">
+                    {{ entry.product_name }} · {{ entry.quantity }} units
+                </h3>
+                <p class="text-sm">
+                    {{ entry.customer_name }} ·
+                    <Link
+                        :href="OrderController.show(entry.order_id)"
+                        class="text-primary-ink underline"
+                        >{{ entry.order_reference }}</Link
+                    >
+                </p>
+                <p class="text-muted-foreground text-sm">
+                    {{ entry.reason_label }} · Requested
+                    {{ formatDateTime(entry.created_at) }}
+                </p>
+                <p
+                    v-if="entry.reason"
+                    class="text-sm wrap-anywhere whitespace-pre-wrap"
+                >
+                    {{ entry.reason }}
+                </p>
+                <Link
+                    v-if="entry.customer_return_id"
+                    :href="
+                        CustomerReturnController.index({
+                            query: { case: entry.customer_return_id },
+                        })
+                    "
+                    class="text-primary-ink text-sm underline"
+                    >View received return #{{ entry.customer_return_id }}</Link
+                >
+                <p
+                    v-else-if="entry.withdrawn"
+                    class="text-muted-foreground text-sm"
+                >
+                    Withdrawn by customer
+                </p>
+                <form
+                    v-else-if="
+                        entry.can_receive && page.props.auth.can.requestReturns
+                    "
+                    class="space-y-3"
+                    @submit.prevent="receiveCustomerRequest(entry)"
+                >
+                    <template v-if="receiptRequest === entry.id">
+                        <Label :for="`receipt-condition-${entry.id}`"
+                            >Inspected item condition</Label
+                        >
+                        <select
+                            :id="`receipt-condition-${entry.id}`"
+                            v-model="receiptForm.condition"
+                            required
+                            class="border-input bg-background min-h-11 w-full rounded-md border px-3 py-2 sm:max-w-xs"
+                        >
+                            <option disabled value="">
+                                Select actual condition
+                            </option>
+                            <option value="sealed">Sealed</option>
+                            <option value="opened">Opened</option>
+                            <option value="damaged">Damaged</option>
+                        </select>
+                        <InputError
+                            :message="receiptForm.errors.condition"
+                        /><InputError
+                            :message="receiptForm.errors.quantity"
+                        /><InputError
+                            :message="receiptForm.errors.order_item_id"
+                        /><InputError
+                            :message="receiptForm.errors.return_request"
+                        />
+                        <p class="text-sm">
+                            Confirm that you have physically received all
+                            {{ entry.quantity }} requested units. They will be
+                            placed in quarantine for review by another employee.
+                        </p>
+                    </template>
+                    <Button
+                        type="submit"
+                        variant="outline"
+                        :disabled="receiptForm.processing"
+                        >{{
+                            receiptRequest === entry.id
+                                ? 'Confirm physical receipt'
+                                : 'Receive requested item'
+                        }}</Button
+                    >
+                </form>
+            </article>
+            <nav
+                v-if="customerRequests?.last_page > 1"
+                aria-label="Customer requests pages"
+                class="flex flex-wrap gap-2"
+            >
+                <Button
+                    v-for="link in customerRequests.links.filter(
+                        (entry) => entry.url,
+                    )"
+                    :key="link.label"
+                    variant="outline"
+                    size="sm"
+                    as-child
+                    ><Link
+                        :href="link.url"
+                        :aria-current="link.active ? 'page' : undefined"
+                        ><span v-html="link.label" /></Link
+                ></Button>
+            </nav>
+        </section>
         <p class="text-muted-foreground text-sm" role="note">
             Returned items are held for inspection. Refunds are paid outside
             Battlefront and recorded separately.

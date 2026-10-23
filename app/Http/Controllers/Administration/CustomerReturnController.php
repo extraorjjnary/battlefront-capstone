@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Administration;
 
 use App\Actions\Inventory\HandleCustomerReturn;
+use App\Actions\Inventory\HandleCustomerReturnRequest;
 use App\Enums\OrderStatus;
 use App\Http\Controllers\Controller;
+use App\Models\CustomerReturnRequest;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Services\CustomerReturnEligibility;
 use App\Support\OperationalRequestReason;
 use BcMath\Number;
 use Illuminate\Http\RedirectResponse;
@@ -24,6 +27,21 @@ class CustomerReturnController extends Controller
         $filters = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'overdue' => ['nullable', 'boolean']]);
         $overdueCutoff = now()->startOfDay()->subDays(3);
         $case = $request->validate(['case' => ['nullable', 'integer', 'min:1']])['case'] ?? null;
+        $requestId = $request->validate(['request_id' => ['nullable', 'integer', 'min:1']])['request_id'] ?? null;
+        $customerRequests = CustomerReturnRequest::query()->with(['customer:id,name', 'order', 'item.product'])
+            ->when($requestId !== null, fn ($query) => $query->whereKey($requestId),
+                fn ($query) => $query->whereNull('customer_return_id')->whereNull('withdrawn_at'))
+            ->orderBy('created_at')->orderBy('id')->paginate(10, ['*'], 'requests_page')->withQueryString()
+            ->through(fn (CustomerReturnRequest $entry): array => [
+                'id' => $entry->id, 'customer_name' => $entry->customer->name,
+                'order_id' => $entry->order_id, 'order_reference' => $entry->order->reference,
+                'product_name' => $entry->item->purchasedProductName(), 'quantity' => $entry->quantity,
+                'reason_label' => OperationalRequestReason::customerReturnOptions()[$entry->reason_code],
+                'reason' => $entry->reason, 'created_at' => $entry->created_at->toIso8601String(),
+                'customer_return_id' => $entry->customer_return_id,
+                'can_receive' => $entry->customer_return_id === null && $entry->withdrawn_at === null,
+                'withdrawn' => $entry->withdrawn_at !== null,
+            ]);
         $paymentId = $request->validate(['payment_id' => ['nullable', 'integer', 'min:1']])['payment_id'] ?? null;
         if ($paymentId !== null) {
             $returnId = DB::table('customer_refund_payments as payments')
@@ -39,17 +57,11 @@ class CustomerReturnController extends Controller
         $order = $orderId !== null ? Order::query()->whereKey($orderId)->where('status', OrderStatus::Completed->value)
             ->with('items.product:id,name')->first() : null;
         $selectedOrderItems = $order?->items->map(function (OrderItem $item): array {
-            $alreadyReturned = (int) DB::table('customer_return_items as items')
-                ->join('customer_returns as returns', 'returns.id', '=', 'items.customer_return_id')
-                ->where('items.order_item_id', $item->id)
-                ->whereIn('returns.status', ['pending', 'accepted', 'rejected_pending_handover'])
-                ->sum('items.quantity');
-
             return [
                 'id' => $item->id,
                 'product' => $item->purchasedProductName(),
                 'quantity' => $item->quantity,
-                'remaining_returnable' => max(0, $item->quantity - $alreadyReturned),
+                'remaining_returnable' => app(CustomerReturnEligibility::class)->remaining($item),
                 'price_at_time' => $item->price_at_time,
             ];
         })->all();
@@ -139,6 +151,8 @@ class CustomerReturnController extends Controller
 
         return Inertia::render('Administration/CustomerReturns', [
             'returns' => $returns,
+            'customerRequests' => $customerRequests,
+            'selected_request' => $requestId === null ? null : (int) $requestId,
             'filters' => ['q' => $filters['q'] ?? null, 'overdue' => $request->boolean('overdue')],
             'selected_case' => $case,
             'selected_payment' => $paymentId === null ? null : (int) $paymentId,
@@ -175,12 +189,20 @@ class CustomerReturnController extends Controller
             'order_item_id' => ['required', 'integer', Rule::exists(OrderItem::class, 'id')],
             'quantity' => ['required', 'integer', 'min:1', 'max:4294967295'],
             'condition' => ['required', Rule::in(['sealed', 'opened', 'damaged'])],
-            'reason_code' => ['required', Rule::in(['wrong_item', 'defective', 'transit_damage', 'not_as_described', 'changed_mind', 'other'])],
+            'reason_code' => ['required', Rule::in(array_keys(OperationalRequestReason::customerReturnOptions()))],
             'reason' => ['required_if:reason_code,other', 'nullable', 'string', 'min:5', 'max:2000'],
         ]);
         $returns->receive($request->user(), $validated['order_item_id'], $validated['quantity'], $validated['condition'], OperationalRequestReason::resolve($validated['reason_code'], $validated['reason'] ?? null), $validated['reason_code']);
 
         return back();
+    }
+
+    public function receiveRequest(Request $request, int $returnRequest, HandleCustomerReturnRequest $returns): RedirectResponse
+    {
+        $validated = $request->validate(['condition' => ['required', Rule::in(['sealed', 'opened', 'damaged'])]]);
+        $returnId = $returns->receive($request->user(), $returnRequest, $validated['condition']);
+
+        return to_route('administration.customer-returns.index', ['case' => $returnId]);
     }
 
     public function decide(Request $request, int $customerReturn, HandleCustomerReturn $returns): RedirectResponse

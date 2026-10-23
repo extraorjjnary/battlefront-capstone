@@ -6,6 +6,15 @@ use Illuminate\Validation\ValidationException;
 
 class OperationalRequestReason
 {
+    /** @return array<string, string> */
+    public static function customerReturnOptions(): array
+    {
+        return [
+            'wrong_item' => 'Wrong item', 'defective' => 'Defective', 'transit_damage' => 'Damaged in transit',
+            'not_as_described' => 'Not as described', 'changed_mind' => 'Changed mind', 'other' => 'Other',
+        ];
+    }
+
     public static function resolve(string $reasonCode, ?string $notes, bool $openingStock = false): string
     {
         if ($notes !== null && trim($notes) !== '') {

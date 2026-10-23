@@ -40,6 +40,7 @@ use App\Http\Controllers\CartController;
 use App\Http\Controllers\CartItemController;
 use App\Http\Controllers\ChatbotController;
 use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\CustomerReturnRequestController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryLocationController;
 use App\Http\Controllers\DeliveryQuoteController;
@@ -128,6 +129,10 @@ Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {
     Route::patch('notifications/{notification}/read', [CustomerNotificationController::class, 'update'])->whereUuid('notification')->name('notifications.update');
     Route::get('orders', [OrderController::class, 'index'])
         ->name('orders.index');
+    Route::post('orders/{order}/return-requests', [CustomerReturnRequestController::class, 'store'])
+        ->whereNumber('order')->name('orders.return-requests.store');
+    Route::post('orders/{order}/return-requests/{returnRequest}/withdraw', [CustomerReturnRequestController::class, 'withdraw'])
+        ->whereNumber(['order', 'returnRequest'])->name('orders.return-requests.withdraw');
     Route::post('orders', [OrderController::class, 'store'])
         ->name('orders.store');
     Route::post('orders/{order}/cancel', OrderCancellationController::class)
@@ -229,6 +234,8 @@ Route::middleware(['auth', 'can:access-administration'])
         Route::post('supplier-returns/{supplierReturn}/resolution', [SupplierReturnController::class, 'resolve'])
             ->middleware('can:returns.resolve')->name('supplier-returns.resolve');
         Route::get('customer-returns', [CustomerReturnController::class, 'index'])->middleware('can:orders.view')->name('customer-returns.index');
+        Route::post('customer-return-requests/{returnRequest}/receive', [CustomerReturnController::class, 'receiveRequest'])
+            ->whereNumber('returnRequest')->middleware(['can:orders.view', 'can:returns.request'])->name('customer-return-requests.receive');
         Route::post('customer-returns', [CustomerReturnController::class, 'store'])->middleware('can:returns.request')->name('customer-returns.store');
         Route::post('customer-returns/{customerReturn}/decision', [CustomerReturnController::class, 'decide'])
             ->middleware('can:returns.approve')->name('customer-returns.decide');

@@ -85,39 +85,43 @@ Registration/login create a new Sanctum personal access token with a **30-day pe
 
 All paths below are relative to `base_url`. GET routes also support HEAD through Laravel.
 
-| Method | Path                               | Access         | Success |
-| ------ | ---------------------------------- | -------------- | ------- |
-| GET    | /health                            | Public         | 200     |
-| POST   | /auth/register                     | Public         | 201     |
-| POST   | /auth/login                        | Public         | 200     |
-| POST   | /auth/logout                       | Customer       | 204     |
-| GET    | /profile                           | Customer       | 200     |
-| PATCH  | /profile                           | Customer       | 200     |
-| GET    | /products                          | Public         | 200     |
-| GET    | /products/filters                  | Public         | 200     |
-| GET    | /products/{product}                | Public         | 200     |
-| GET    | /branches                          | Public         | 200     |
-| GET    | /cart                              | Customer       | 200     |
-| POST   | /cart/items                        | Customer       | 200     |
-| PATCH  | /cart/items/{cartItem}             | Customer       | 200     |
-| DELETE | /cart/items/{cartItem}             | Customer       | 200     |
-| GET    | /checkout                          | Customer       | 200     |
-| GET    | /delivery-locations                | Customer       | 200     |
-| GET    | /checkout/delivery-quote           | Customer       | 200     |
-| POST   | /orders                            | Customer       | 201     |
-| GET    | /orders                            | Customer       | 200     |
-| GET    | /orders/{order}                    | Customer       | 200     |
-| POST   | /orders/{order}/payment-proof      | Customer       | 200     |
-| GET    | /notifications                     | Customer       | 200     |
-| GET    | /notifications/unread-count        | Customer       | 200     |
-| PATCH  | /notifications/{notification}/read | Customer       | 200     |
-| PATCH  | /notifications/read-all            | Customer       | 200     |
-| PUT    | /push-devices/{device}             | Customer       | 200     |
-| DELETE | /push-devices/{device}             | Customer       | 204     |
-| POST   | /chatbot                           | Guest/customer | 200     |
-| GET    | /recommendations                   | Guest/customer | 200     |
-| GET    | /recommendations/personalized      | Customer       | 200     |
-| POST   | /recommendations/interactions      | Guest/customer | 204     |
+| Method | Path                                                     | Access         | Success |
+| ------ | -------------------------------------------------------- | -------------- | ------- |
+| GET    | /health                                                  | Public         | 200     |
+| POST   | /auth/register                                           | Public         | 201     |
+| POST   | /auth/login                                              | Public         | 200     |
+| POST   | /auth/logout                                             | Customer       | 204     |
+| GET    | /profile                                                 | Customer       | 200     |
+| PATCH  | /profile                                                 | Customer       | 200     |
+| GET    | /products                                                | Public         | 200     |
+| GET    | /products/filters                                        | Public         | 200     |
+| GET    | /products/{product}                                      | Public         | 200     |
+| GET    | /branches                                                | Public         | 200     |
+| GET    | /cart                                                    | Customer       | 200     |
+| POST   | /cart/items                                              | Customer       | 200     |
+| PATCH  | /cart/items/{cartItem}                                   | Customer       | 200     |
+| DELETE | /cart/items/{cartItem}                                   | Customer       | 200     |
+| GET    | /checkout                                                | Customer       | 200     |
+| GET    | /delivery-locations                                      | Customer       | 200     |
+| GET    | /checkout/delivery-quote                                 | Customer       | 200     |
+| POST   | /orders                                                  | Customer       | 201     |
+| GET    | /orders                                                  | Customer       | 200     |
+| GET    | /orders/{order}                                          | Customer       | 200     |
+| GET    | /orders/{order}/return-requests                          | Customer       | 200     |
+| POST   | /orders/{order}/return-requests                          | Customer       | 201     |
+| GET    | /orders/{order}/return-requests/{returnRequest}          | Customer       | 200     |
+| POST   | /orders/{order}/return-requests/{returnRequest}/withdraw | Customer       | 200     |
+| POST   | /orders/{order}/payment-proof                            | Customer       | 200     |
+| GET    | /notifications                                           | Customer       | 200     |
+| GET    | /notifications/unread-count                              | Customer       | 200     |
+| PATCH  | /notifications/{notification}/read                       | Customer       | 200     |
+| PATCH  | /notifications/read-all                                  | Customer       | 200     |
+| PUT    | /push-devices/{device}                                   | Customer       | 200     |
+| DELETE | /push-devices/{device}                                   | Customer       | 204     |
+| POST   | /chatbot                                                 | Guest/customer | 200     |
+| GET    | /recommendations                                         | Guest/customer | 200     |
+| GET    | /recommendations/personalized                            | Customer       | 200     |
+| POST   | /recommendations/interactions                            | Guest/customer | 204     |
 
 Public health/catalog/branches do not authenticate supplied credentials. Registration/login authenticate their submitted fields, not a bearer header.
 
@@ -1017,4 +1021,102 @@ The developer subsequently reported completing manual tests in Postman Desktop w
 
 Known implementation details are documented, not changed: registration's validated-but-unsaved address; different page validation between products/orders; stateless guest context is not per-device identity; private proof has no mobile download endpoint.
 
-The behavior-driven recommendation update adds the public recommendation feed and anonymous aggregate interaction endpoint and retires the superseded input/options endpoints after developer-confirmed mobile migration. EXT-89 exposes manual shipment facts through existing order detail endpoints; EXT-90 adds notification history/read-state and Expo device registration/revocation endpoints. No mobile password reset/change, token refresh, customer order cancellation, admin operations, payment gateways, live courier/GPS tracking, or compatibility checking are introduced.
+The behavior-driven recommendation update adds the public recommendation feed and anonymous aggregate interaction endpoint and retires the superseded input/options endpoints after developer-confirmed mobile migration. EXT-89 exposes manual shipment facts through existing order detail endpoints; EXT-90 adds notification history/read-state and Expo device registration/revocation endpoints. No mobile password reset/change, token refresh, admin operations, payment gateways, live courier/GPS tracking, or compatibility checking are introduced.
+
+## 11. Customer return/refund requests
+
+These endpoints share Laravel business rules and presentation with customer web order details. They require a valid customer Sanctum bearer token; browser sessions alone do not authenticate them. Administration and physical receipt remain web-only. Paths below are relative to `/api/v1`.
+
+| Method | Path                                                       | Success                                       |
+| ------ | ---------------------------------------------------------- | --------------------------------------------- |
+| GET    | `/orders/{order}/return-requests`                          | 200 `{"data":[...]}`                          |
+| POST   | `/orders/{order}/return-requests`                          | 201 `{"data":{...}}`                          |
+| GET    | `/orders/{order}/return-requests/{returnRequest}`          | 200 `{"data":{...}}`                          |
+| POST   | `/orders/{order}/return-requests/{returnRequest}/withdraw` | 200 updated `{"data":{...}}`; no request body |
+
+Creation payload (one order item per request):
+
+```json
+{
+    "order_item_id": 81,
+    "quantity": 1,
+    "reason_code": "defective",
+    "reason": null
+}
+```
+
+Use purchased **order item IDs**, not product IDs. `quantity` must be a positive integer within the server's remaining eligible purchased quantity. The order must belong to the customer, be completed, and have a recorded sale. A second open customer request for an item is blocked while awaiting receipt or review. Physical returns and outstanding requests both reserve purchased quantities. Withdrawn requests remain in history and release their reservation; received requests cannot be withdrawn or received twice.
+
+Reason codes/labels are `wrong_item` (Wrong item), `defective` (Defective), `transit_damage` (Damaged in transit), `not_as_described` (Not as described), `changed_mind` (Changed mind), and `other` (Other). `reason` is the customer's additional notes: optional/null for predefined reasons, required for Other, and 5–2000 characters when supplied. Blank predefined notes normalize to null. No condition, refund amount, ownership, review status, or receipt fields are accepted as trusted customer input.
+
+Representative create/detail response:
+
+```json
+{
+    "data": {
+        "id": 12,
+        "order_id": 7,
+        "order_reference": "BF-000007",
+        "order_item_id": 81,
+        "product": { "id": 42, "name": "Purchased monitor" },
+        "quantity": 1,
+        "reason_code": "defective",
+        "reason_label": "Defective",
+        "reason": null,
+        "submitted_at": "2026-10-23T08:00:00+00:00",
+        "withdrawn_at": null,
+        "received_at": null,
+        "status": {
+            "value": "submitted",
+            "label": "Request submitted / Awaiting item receipt"
+        },
+        "can_withdraw": true,
+        "feedback": null,
+        "refund": null
+    }
+}
+```
+
+An empty list returns `{"data":[]}`. Lists are unpaginated, newest request first. `GET /orders/{order}` adds `can_request_return`, `return_reason_options` (code-to-label object), and `return_requests` containing the same resources. Each purchased item adds `remaining_returnable` and `can_request`; respect both because an open request can block new submission even with remaining units. Existing order/payment status values remain unchanged.
+
+| `status.value`      | Label / meaning                                                                      |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| `submitted`         | Request submitted / Awaiting item receipt; no physical return or inventory change    |
+| `withdrawn`         | Withdrawn; history retained                                                          |
+| `under_review`      | Item received / Under review; Staff has recorded actual receipt                      |
+| `approved`          | Approved; no positive approved refund exists                                         |
+| `rejected`          | Rejected; safe feedback distinguishes awaiting collection from handed back           |
+| `refund_processing` | Refund processing; positive refund approved, not fully verified                      |
+| `refunded`          | Refund completed; latest verified payment records cover the positive approved refund |
+
+For positive approved refunds, `refund` has decimal-string peso amounts. Example partial progress:
+
+```json
+{
+    "status": { "value": "refund_processing", "label": "Refund processing" },
+    "can_withdraw": false,
+    "feedback": "Your return has been approved.",
+    "refund": {
+        "approved_amount": "100.00",
+        "verified_paid_amount": "40.00",
+        "remaining_amount": "60.00"
+    }
+}
+```
+
+On full verification the status becomes `{"value":"refunded","label":"Refund completed"}` and `remaining_amount` becomes `"0.00"`. Recorded, disputed, or voided payments do not establish completion. Approval does not pay a refund. Internal notes, employee identities, evidence paths, audit records, and payment references are excluded.
+
+Errors retain native Laravel envelopes: missing/invalid bearer token **401**, administrator identity **403**, foreign/missing orders/items/requests **404**, invalid input or lifecycle/quantity conflict **422**, existing API rate limit **429**. For example, a repeated request returns:
+
+```json
+{
+    "message": "This item already has an open return request.",
+    "errors": {
+        "order_item_id": ["This item already has an open return request."]
+    }
+}
+```
+
+Render field errors instead of parsing the summary message. Repeated withdrawal/receipt conflicts use `errors.return_request`. This API has no idempotency-key contract: after an uncertain response, retrieve request history before retrying.
+
+The separate Expo repository must add the completed-order action, single-item form, quantity bounds, optional/Other notes, confirmation before submission, history/status, and pre-receipt withdrawal confirmation. Disable repeated taps while requests are in flight and refresh order details after mutations. Display the manual-review notice without adding return deadlines, approval promises, pickup scheduling, or refund guarantees. Native UI and device/LAN integration were not implemented in this Laravel repository.
