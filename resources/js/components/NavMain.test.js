@@ -33,6 +33,10 @@ function navigationHarness({
     capabilities = {},
     workQueueCounts = {},
 } = {}) {
+    const sidebarState = Vue.ref(
+        mode === 'collapsed' ? 'collapsed' : 'expanded',
+    );
+    const isMobile = Vue.ref(mode === 'mobile');
     const page = Vue.reactive({
         props: {
             cartQuantity: quantity,
@@ -100,10 +104,8 @@ function navigationHarness({
             },
             './utils': {
                 useSidebar: () => ({
-                    state: Vue.ref(
-                        mode === 'collapsed' ? 'collapsed' : 'expanded',
-                    ),
-                    isMobile: Vue.ref(mode === 'mobile'),
+                    state: sidebarState,
+                    isMobile,
                 }),
             },
             '@/composables/useCurrentUrl': {
@@ -152,6 +154,8 @@ function navigationHarness({
             'SidebarMenuItem',
         ].map((name) => [name, component(`./ui/sidebar/${name}.vue`)]),
     );
+    modules['@/components/ui/sidebar'].useSidebar =
+        modules['./utils'].useSidebar;
     const navigationSource = readFileSync(
         new URL('../composables/useAppNavigation.js', import.meta.url),
         'utf8',
@@ -168,14 +172,20 @@ function navigationHarness({
     return {
         page,
         navigation,
+        sidebarState,
+        isMobile,
         render: () =>
             renderToString(
                 Vue.h(
                     'div',
                     {
                         class: 'group',
-                        'data-collapsible': mode === 'collapsed' ? 'icon' : '',
-                        'data-mobile': mode === 'mobile' ? 'true' : undefined,
+                        'data-collapsible':
+                            sidebarState.value === 'collapsed' &&
+                            !isMobile.value
+                                ? 'icon'
+                                : '',
+                        'data-mobile': isMobile.value ? 'true' : undefined,
                     },
                     [
                         Vue.h(nav, {
@@ -226,6 +236,37 @@ for (const mode of ['expanded', 'collapsed', 'mobile']) {
             html,
             /data-slot="pending-actions-badge"[^>]*>99\+<\/span>/,
         );
+        const badges = [
+            ...html.matchAll(
+                /<span\b[^>]*data-slot="pending-actions-badge"[^>]*>.*?<\/span>/gs,
+            ),
+        ];
+        assert.equal(badges.length, 4);
+        for (const [badge] of badges) {
+            assert.match(badge, /aria-hidden="true"/);
+            assert.match(badge, /bg-destructive-action /);
+            if (mode === 'collapsed') {
+                assert.match(badge, /absolute -top-1\.5 -right-1\.5/);
+            } else {
+                assert.match(badge, /ml-auto/);
+                assert.doesNotMatch(badge, /absolute/);
+            }
+            assert.doesNotMatch(
+                badge.match(/class="([^"]*)"/)[1],
+                /hidden|truncate|overflow-hidden|group-data/,
+            );
+        }
+        if (mode === 'collapsed') {
+            assert.match(
+                html,
+                /class="relative size-4 shrink-0"><svg[^>]*>.*?<\/svg><span[^>]*data-slot="pending-actions-badge"/s,
+            );
+        } else {
+            assert.match(
+                html,
+                /<span[^>]*>Orders<\/span><span[^>]*data-slot="pending-actions-badge"/,
+            );
+        }
         assert.doesNotMatch(html, /aria-label="Damage reports,/);
         harness.page.props.workQueueCounts = {};
         assert.doesNotMatch(await harness.render(), /pending-actions-badge/);
@@ -244,6 +285,42 @@ test('customer navigation does not present administration counts', async () => {
     const harness = navigationHarness({ workQueueCounts: { order: 4 } });
     assert.doesNotMatch(await harness.render(), /pending-actions-badge/);
 });
+
+for (const administrator of [false, true]) {
+    test(`${administrator ? 'administration' : 'cart'} badges move between row and icon as the sidebar changes`, async () => {
+        const harness = navigationHarness({
+            administrator,
+            catalogRole: administrator,
+            quantity: 3,
+            workQueueCounts: administrator ? { order: 3 } : {},
+        });
+        for (const [state, mobile, iconBadge] of [
+            ['expanded', false, false],
+            ['collapsed', false, true],
+            ['collapsed', true, false],
+            ['expanded', false, false],
+        ]) {
+            harness.sidebarState.value = state;
+            harness.isMobile.value = mobile;
+            const html = await harness.render();
+            const badges = [
+                ...html.matchAll(
+                    /<span\b[^>]*data-slot="(?:cart-quantity|pending-actions)-badge"[^>]*>.*?<\/span>/gs,
+                ),
+            ];
+            assert.equal(badges.length, administrator ? 2 : 1);
+            for (const [badge] of badges) {
+                assert.match(badge, />3<\/span>/);
+                if (iconBadge) {
+                    assert.match(badge, /absolute -top-1\.5 -right-1\.5/);
+                } else {
+                    assert.match(badge, /ml-auto/);
+                    assert.doesNotMatch(badge, /absolute/);
+                }
+            }
+        }
+    });
+}
 
 test('store navigation follows the branch capability and reacts to permission changes', async () => {
     const harness = navigationHarness({ administrator: true });
@@ -322,8 +399,22 @@ for (const mode of ['expanded', 'collapsed', 'mobile']) {
                     badge.match(/class="([^"]*)"/)[1],
                     /hidden|truncate|overflow-hidden|group-data/,
                 );
-                assert.match(cart, /class="relative size-4 shrink-0"/);
-                assert.match(badge, /absolute -top-1\.5 -right-1\.5/);
+                assert.equal(
+                    [...cart.matchAll(/data-slot="cart-quantity-badge"/g)]
+                        .length,
+                    1,
+                );
+                if (mode === 'collapsed') {
+                    assert.match(cart, /class="relative size-4 shrink-0"/);
+                    assert.match(badge, /absolute -top-1\.5 -right-1\.5/);
+                } else {
+                    assert.match(badge, /ml-auto/);
+                    assert.doesNotMatch(badge, /absolute/);
+                    assert.match(
+                        cart,
+                        /<span[^>]*>Cart<\/span><span[^>]*data-slot="cart-quantity-badge"/,
+                    );
+                }
             }
             const orders = html.match(
                 /<a\b[^>]*href="\/orders"[^>]*>.*?<\/a>/s,

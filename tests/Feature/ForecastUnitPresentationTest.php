@@ -32,43 +32,49 @@ test('generated and saved forecast views round units without changing decimal co
     ];
     $script = <<<'JS'
         import { readFileSync } from 'node:fs';
-        import { resolve } from 'node:path';
-        import { createServer } from 'vite';
-        import vue from '@vitejs/plugin-vue';
-        import { createInertiaApp } from '@inertiajs/vue3';
-        import { createSSRApp, h } from 'vue';
+        import * as Inertia from '@inertiajs/vue3';
+        import * as Vue from 'vue';
+        import * as ChartJS from 'chart.js';
         import { renderToString } from 'vue/server-renderer';
+        import { compileSkeletonTestComponent } from './resources/js/lib/skeletonTestHelpers.js';
+        import { formatForecastUnits } from './resources/js/lib/forecastUnits.js';
+        import * as dateTime from './resources/js/lib/dateTime.js';
         const input = JSON.parse(readFileSync(0, 'utf8'));
-        const server = await createServer({
-            configFile: false, logLevel: 'silent',
-            server: { middlewareMode: true, hmr: false, watch: null },
-            optimizeDeps: { noDiscovery: true },
-            resolve: { alias: { '@': resolve('resources/js'), 'vue-chartjs': 'virtual:forecast-chart' } },
-            plugins: [vue(), {
-                name: 'capture-forecast-chart',
-                resolveId(id) { if (id === 'virtual:forecast-chart') return id; },
-                load(id) {
-                    if (id === 'virtual:forecast-chart') return 'export let chart; export const Line = { props: ["data", "options"], setup(props) { chart = props; return () => null; } };';
-                },
-            }],
+        let chart;
+        const primitive = { setup: (_, { slots }) => () => Vue.h('div', slots.default?.()) };
+        const primitives = new Proxy({ default: primitive }, { get: (target, key) => target[key] ?? primitive });
+        const modules = new Proxy({
+            vue: Vue,
+            '@inertiajs/vue3': Inertia,
+            'chart.js': ChartJS,
+            'vue-chartjs': { Line: { props: ['data', 'options'], setup(props) { chart = props; return () => null; } } },
+            '@/lib/forecastUnits': { formatForecastUnits },
+            '@/lib/dateTime': dateTime,
+            '@/composables/useChartTheme': { useChartTheme: () => Vue.shallowRef({}) },
+            '@/composables/useDebouncedSearch': { useDebouncedSearch: () => ({ search: Vue.ref(''), isSearching: Vue.ref(false), cancelPendingSearch() {} }) },
+            '@/actions/App/Http/Controllers/Administration/ForecastingController': { default: {
+                index: Object.assign(() => ({ url: '/administration/forecasting' }), { url: () => '/administration/forecasting' }),
+                store: { url: () => '/administration/forecasting' },
+            } },
+        }, { get(target, key) {
+            if (key in target) return target[key];
+            if (key.startsWith('@/components/') || key === '@lucide/vue') return primitives;
+            throw new Error(`Unexpected forecast test import: ${key}`);
+        } });
+        const page = compileSkeletonTestComponent(readFileSync('resources/js/pages/Administration/Forecasting.vue', 'utf8'), modules);
+        const rendered = await Inertia.createInertiaApp({
+            page: { component: 'Administration/Forecasting', props: input.props, flash: { forecast_result: input.generated }, url: '/administration/forecasting', version: null },
+            render: renderToString, resolve: () => page,
+            setup: ({ App, props, plugin }) => Vue.createSSRApp({ render: () => Vue.h(App, props) }).use(plugin),
         });
-        try {
-            const page = await server.ssrLoadModule('/resources/js/pages/Administration/Forecasting.vue');
-            const rendered = await createInertiaApp({
-                page: { component: 'Administration/Forecasting', props: input.props, flash: { forecast_result: input.generated }, url: '/administration/forecasting', version: null },
-                render: renderToString, resolve: () => page,
-                setup: ({ App, props, plugin }) => createSSRApp({ render: () => h(App, props) }).use(plugin),
-            });
-            const { chart } = await server.ssrLoadModule('virtual:forecast-chart');
-            process.stdout.write(JSON.stringify({
-                html: rendered.body,
-                monthlyData: chart.data.datasets[1].data.slice(-3),
-                historicalData: chart.data.datasets[0].data[0],
-                tooltip: chart.options.plugins.tooltip.callbacks.label({ dataset: { label: 'Forecast' }, parsed: { y: Number(input.generated.forecast_quantity) } }),
-                zeroTick: chart.options.scales.y.ticks.callback(0),
-                originalQuantity: input.generated.forecast_quantity,
-            }));
-        } finally { await server.close(); }
+        process.stdout.write(JSON.stringify({
+            html: rendered.body,
+            monthlyData: chart.data.datasets[1].data.slice(-3),
+            historicalData: chart.data.datasets[0].data[0],
+            tooltip: chart.options.plugins.tooltip.callbacks.label({ dataset: { label: 'Forecast' }, parsed: { y: Number(input.generated.forecast_quantity) } }),
+            zeroTick: chart.options.scales.y.ticks.callback(0),
+            originalQuantity: input.generated.forecast_quantity,
+        }));
         JS;
     $process = new Process(['node', '--input-type=module', '-e', $script], base_path());
     $process->setInput(json_encode(['props' => $props, 'generated' => $generated], JSON_THROW_ON_ERROR));

@@ -179,7 +179,7 @@ class InventoryRepository
      * @param  array<string, mixed>  $filters
      * @return LengthAwarePaginator<int, \stdClass>
      */
-    public function paginateAdjustments(array $filters, int|string|null $case): LengthAwarePaginator
+    public function paginateAdjustments(array $filters, int|string|null $case, int $viewerId, bool $canApprove): LengthAwarePaginator
     {
         $requests = DB::table('inventory_adjustment_requests as requests')
             ->join('products', 'products.id', '=', 'requests.product_id')
@@ -187,6 +187,11 @@ class InventoryRepository
             ->leftJoin('inventories', 'inventories.product_id', '=', 'requests.product_id')
             ->select('requests.id', 'requests.requester_id', 'requests.replaces_request_id', 'requests.observed_quantity', 'requests.target_quantity', 'requests.initial_reorder_level', 'requests.reason_code', 'requests.reason', 'requests.decision_reason', 'requests.status', 'requests.created_at', 'products.name as product_name', 'users.name as requester_name')
             ->selectRaw('COALESCE(inventories.quantity, 0) as current_quantity')
+            ->when($filters['view'] === 'mine', fn ($query) => $query->where('requests.requester_id', $viewerId))
+            ->when($filters['view'] === 'to_review', fn ($query) => $query
+                ->where('requests.status', 'pending')
+                ->where('requests.requester_id', '!=', $viewerId)
+                ->when(! $canApprove, fn ($query) => $query->whereRaw('1 = 0')))
             ->when($case, fn ($query, $id) => $query->where('requests.id', $id))
             ->when($filters['q'] ?? null, fn ($query, $search) => $query->where(fn ($query) => $query
                 ->where('products.name', 'like', '%'.$search.'%')

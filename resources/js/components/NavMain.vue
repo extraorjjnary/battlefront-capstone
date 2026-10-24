@@ -1,11 +1,13 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import {
     SidebarGroup,
     SidebarGroupLabel,
     SidebarMenu,
     SidebarMenuButton,
     SidebarMenuItem,
+    useSidebar,
 } from '@/components/ui/sidebar';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
 defineProps({
@@ -13,6 +15,10 @@ defineProps({
     label: { type: String, default: 'Navigation' },
 });
 const { isCurrentOrParentUrl, isCurrentUrl } = useCurrentUrl();
+const { state, isMobile } = useSidebar();
+const isCollapsed = computed(
+    () => state.value === 'collapsed' && !isMobile.value,
+);
 </script>
 
 <template>
@@ -46,7 +52,11 @@ const { isCurrentOrParentUrl, isCurrentUrl } = useCurrentUrl();
                         "
                     >
                         <span
-                            v-if="item.badgeCount !== undefined"
+                            v-if="
+                                isCollapsed &&
+                                (item.badgeCount !== undefined ||
+                                    item.pendingCount > 0)
+                            "
                             class="relative size-4 shrink-0"
                         >
                             <component
@@ -55,29 +65,42 @@ const { isCurrentOrParentUrl, isCurrentUrl } = useCurrentUrl();
                                 aria-hidden="true"
                             />
                             <span
-                                v-if="item.badgeCount > 0"
-                                data-slot="cart-quantity-badge"
+                                v-if="
+                                    (item.badgeCount ?? item.pendingCount) > 0
+                                "
+                                :data-slot="
+                                    item.badgeCount !== undefined
+                                        ? 'cart-quantity-badge'
+                                        : 'pending-actions-badge'
+                                "
                                 aria-hidden="true"
                                 class="bg-destructive-action text-destructive-action-foreground ring-sidebar pointer-events-none absolute -top-1.5 -right-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-1 text-[9px] leading-none font-semibold tabular-nums ring-1"
                             >
                                 {{
-                                    item.badgeCount > 99
+                                    (item.badgeCount ?? item.pendingCount) > 99
                                         ? '99+'
-                                        : item.badgeCount
+                                        : (item.badgeCount ?? item.pendingCount)
                                 }}
                             </span>
                         </span>
                         <component :is="item.icon" v-else aria-hidden="true" />
                         <span class="min-w-0 truncate">{{ item.title }}</span>
                         <span
-                            v-if="item.pendingCount > 0"
-                            data-slot="pending-actions-badge"
+                            v-if="
+                                !isCollapsed &&
+                                (item.badgeCount ?? item.pendingCount) > 0
+                            "
+                            :data-slot="
+                                item.badgeCount !== undefined
+                                    ? 'cart-quantity-badge'
+                                    : 'pending-actions-badge'
+                            "
                             aria-hidden="true"
-                            class="bg-primary text-primary-foreground ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums group-data-[collapsible=icon]:hidden"
+                            class="bg-destructive-action text-destructive-action-foreground pointer-events-none ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums"
                             >{{
-                                item.pendingCount > 99
+                                (item.badgeCount ?? item.pendingCount) > 99
                                     ? '99+'
-                                    : item.pendingCount
+                                    : (item.badgeCount ?? item.pendingCount)
                             }}</span
                         >
                     </Link>
