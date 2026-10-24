@@ -17,7 +17,6 @@ import {
 import { computed, ref, watch } from 'vue';
 import OrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
 import OrderHandlerController from '@/actions/App/Http/Controllers/Administration/OrderHandlerController';
-import CustomerReturnController from '@/actions/App/Http/Controllers/Administration/CustomerReturnController';
 import OrderPaymentProofController from '@/actions/App/Http/Controllers/Administration/OrderPaymentProofController';
 import OrderPaymentStatusController from '@/actions/App/Http/Controllers/Administration/OrderPaymentStatusController';
 import OrderManualShipmentController from '@/actions/App/Http/Controllers/Administration/OrderManualShipmentController';
@@ -153,7 +152,7 @@ const orderStatusForm = useForm({
 const manualShipmentDialogOpen = ref(false);
 const manualShipmentForm = useForm({
     arrangement_confirmed: false,
-    carrier: '',
+    carrier: 'lbc',
     tracking_reference: '',
     eta_min_days: '',
     eta_max_days: '',
@@ -607,16 +606,6 @@ defineOptions({
                     "
                 />
             </form>
-            <Link
-                v-if="order.status.value === 'completed'"
-                :href="
-                    CustomerReturnController.index({
-                        query: { order_id: order.id },
-                    })
-                "
-                class="text-primary text-sm underline"
-                >Record return</Link
-            >
         </section>
 
         <div
@@ -639,9 +628,10 @@ defineOptions({
                     <p class="font-semibold">No configured delivery rate</p>
                     <p class="text-muted-foreground leading-6">
                         This order remains at its saved product subtotal with no
-                        delivery fee. No LBC quote, booking, or estimate is
-                        implied. Recording a manually arranged LBC shipment will
-                        not change the saved order amount or add a fee.
+                        delivery fee included. This does not guarantee free
+                        delivery. No LBC quote, booking, or estimate is implied.
+                        Confirming a delivery arrangement will not change the
+                        saved order amount or add a fee.
                     </p>
                     <p class="text-muted-foreground text-xs leading-5">
                         {{ order.delivery_quote.assumption_label }}
@@ -649,18 +639,18 @@ defineOptions({
                     <div v-if="order.can_create_manual_shipment && canProcess">
                         <Button type="button" @click="requestManualShipment">
                             <Truck />
-                            Create Manual Shipment
+                            Confirm delivery arrangement
                         </Button>
                         <Dialog v-model:open="manualShipmentDialogOpen">
                             <DialogContent>
                                 <DialogHeader>
                                     <DialogTitle>
-                                        Create Manual Shipment
+                                        Confirm delivery arrangement
                                     </DialogTitle>
                                     <DialogDescription>
-                                        Record an LBC arrangement confirmed
-                                        outside checkout. This does not add a
-                                        delivery fee or change the order total.
+                                        Confirm an LBC arrangement already made
+                                        outside checkout. The order total stays
+                                        unchanged.
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div class="grid gap-4">
@@ -668,29 +658,11 @@ defineOptions({
                                         <Label for="manual-shipment-carrier">
                                             Carrier
                                         </Label>
-                                        <Select
-                                            :model-value="
-                                                manualShipmentForm.carrier
-                                            "
-                                            @update:model-value="
-                                                manualShipmentForm.carrier =
-                                                    $event
-                                            "
-                                        >
-                                            <SelectTrigger
-                                                id="manual-shipment-carrier"
-                                                class="w-full"
-                                            >
-                                                <SelectValue
-                                                    placeholder="Select confirmed carrier"
-                                                />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="lbc">
-                                                    LBC
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        <Input
+                                            id="manual-shipment-carrier"
+                                            model-value="LBC"
+                                            readonly
+                                        />
                                         <InputError
                                             :message="
                                                 manualShipmentForm.errors
@@ -700,7 +672,7 @@ defineOptions({
                                     </div>
                                     <div class="grid gap-2">
                                         <Label for="manual-tracking-reference">
-                                            LBC tracking / reference (optional)
+                                            Tracking reference (optional)
                                         </Label>
                                         <Input
                                             id="manual-tracking-reference"
@@ -719,16 +691,13 @@ defineOptions({
                                     </div>
                                     <fieldset class="grid gap-2">
                                         <legend class="text-sm font-medium">
-                                            Estimated delivery from preparation
-                                            (optional)
+                                            Estimated delivery days (optional)
                                         </legend>
                                         <p
                                             class="text-muted-foreground text-xs leading-5"
                                         >
-                                            Enter both day values only when an
-                                            estimate is available. Leave both
-                                            blank if no estimate has been
-                                            supplied.
+                                            Days from preparation. Leave both
+                                            blank when unknown.
                                         </p>
                                         <div class="grid gap-3 sm:grid-cols-2">
                                             <div class="grid gap-2">
@@ -787,11 +756,9 @@ defineOptions({
                                                 for="manual-arrangement-confirmed"
                                                 class="text-sm leading-5 font-normal"
                                             >
-                                                I confirm LBC has accepted this
-                                                delivery arrangement. I
-                                                understand no delivery fee or
-                                                estimate is added unless
-                                                explicitly entered above.
+                                                I confirm that the delivery
+                                                arrangement with LBC has
+                                                actually been made.
                                             </Label>
                                         </div>
                                         <InputError
@@ -805,7 +772,7 @@ defineOptions({
                                 <DialogFooter>
                                     <DialogClose as-child>
                                         <Button type="button" variant="outline">
-                                            Keep unconfigured
+                                            Cancel
                                         </Button>
                                     </DialogClose>
                                     <Button
@@ -820,7 +787,7 @@ defineOptions({
                                         <Spinner
                                             v-if="manualShipmentForm.processing"
                                         />
-                                        Create Manual Shipment
+                                        Confirm delivery arrangement
                                     </Button>
                                 </DialogFooter>
                             </DialogContent>
@@ -971,6 +938,16 @@ defineOptions({
                                 </dt>
                                 <dd class="mt-1 font-semibold tabular-nums">
                                     {{ formatCurrency(order.delivery_fee) }}
+                                    <p
+                                        v-if="
+                                            order.delivery_quote
+                                                ?.pricing_configured === false
+                                        "
+                                        class="text-muted-foreground mt-1 text-xs font-normal"
+                                    >
+                                        No delivery fee included; this does not
+                                        guarantee free delivery.
+                                    </p>
                                 </dd>
                             </div>
                             <div>

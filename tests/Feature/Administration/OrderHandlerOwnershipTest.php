@@ -38,7 +38,7 @@ function orderHandlerOperation(string $operation): array
         default => Order::factory()->paidWithGCash(),
     };
     $order = $factory->create([
-        'status' => in_array($operation, ['complete', 'shipment', 'reference', 'delivered', 'pickup', 'cod'], true) ? OrderStatus::Processing : OrderStatus::Pending,
+        'status' => in_array($operation, ['complete', 'manual', 'shipment', 'reference', 'delivered', 'pickup', 'cod'], true) ? OrderStatus::Processing : OrderStatus::Pending,
         'payment_status' => in_array($operation, ['verify', 'reject', 'pickup', 'cod'], true) ? PaymentStatus::Pending : PaymentStatus::Verified,
         'handler_required' => false,
     ]);

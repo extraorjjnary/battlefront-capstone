@@ -2,8 +2,21 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { renderToString } from '@vue/server-renderer';
+import { useVModel } from '@vueuse/core';
 import * as Vue from 'vue';
 import { compileSkeletonTestComponent } from '../../../lib/skeletonTestHelpers.js';
+
+const input = compileSkeletonTestComponent(
+    readFileSync(
+        new URL('../../../components/ui/input/Input.vue', import.meta.url),
+        'utf8',
+    ),
+    {
+        vue: Vue,
+        '@vueuse/core': { useVModel },
+        '@/lib/utils': { cn: () => '' },
+    },
+);
 
 function orderHarness(t, overrides = {}, permissions = {}) {
     const primitive = {
@@ -106,7 +119,11 @@ function orderHarness(t, overrides = {}, permissions = {}) {
         },
     };
     const source = readFileSync(new URL('./Show.vue', import.meta.url), 'utf8');
-    const modules = { vue: Vue, '@inertiajs/vue3': inertia };
+    const modules = {
+        vue: Vue,
+        '@inertiajs/vue3': inertia,
+        '@/components/ui/input': { Input: input },
+    };
     for (const [, name] of source.matchAll(/from ['"]([^'"]+)['"]/g)) {
         if (modules[name]) continue;
         if (name.startsWith('@/actions/')) {
@@ -153,9 +170,11 @@ function orderHarness(t, overrides = {}, permissions = {}) {
     };
 }
 
-function findButton(node, label) {
+function findButton(node, label, matches = () => true) {
     if (Array.isArray(node)) {
-        return node.map((child) => findButton(child, label)).find(Boolean);
+        return node
+            .map((child) => findButton(child, label, matches))
+            .find(Boolean);
     }
     if (!node || typeof node !== 'object') return null;
     if (node.children?.default) {
@@ -168,11 +187,11 @@ function findButton(node, label) {
                     child.children.includes(label),
             )
         ) {
-            if (node.props?.onClick) return node;
+            if (node.props?.onClick && matches(node)) return node;
         }
-        return findButton(children, label);
+        return findButton(children, label, matches);
     }
-    return findButton(node.children, label);
+    return findButton(node.children, label, matches);
 }
 
 function findElement(node, type) {
@@ -183,6 +202,70 @@ function findElement(node, type) {
     if (node.type === type) return node;
     return findElement(node.children?.default?.() ?? node.children, type);
 }
+
+test('delivery arrangement confirmation keeps optional details blank and requires actual arrangement', async (t) => {
+    const view = orderHarness(t, {
+        can_process: true,
+        assigned_handler_id: 1,
+        shipment: null,
+        can_create_manual_shipment: true,
+        delivery_quote: { pricing_configured: false },
+    });
+    let html = await view.html();
+    assert.match(html, /Confirm delivery arrangement/);
+    assert.doesNotMatch(html, /Create Manual Shipment/);
+    findButton(view.tree(), 'Confirm delivery arrangement').props.onClick();
+    html = await view.html();
+
+    const form = view.forms.find(
+        (candidate) => 'arrangement_confirmed' in candidate,
+    );
+    assert.equal(form.carrier, 'lbc');
+    assert.equal(form.tracking_reference, '');
+    assert.equal(form.eta_min_days, '');
+    assert.equal(form.eta_max_days, '');
+    assert.equal(form.arrangement_confirmed, false);
+    assert.match(
+        html,
+        /<input[^>]*id="manual-shipment-carrier"[^>]*readonly[^>]*value="LBC"/,
+    );
+    assert.match(html, /Estimated delivery days \(optional\)/);
+    assert.match(html, /Leave both blank when unknown/);
+    assert.match(html, /arrangement with LBC has actually been made/);
+
+    const submitButton = () =>
+        findButton(
+            view.tree(),
+            'Confirm delivery arrangement',
+            (node) => 'disabled' in node.props,
+        );
+    assert.equal(submitButton().props.disabled, true);
+    submitButton().props.onClick();
+    assert.equal(view.submissions.length, 0);
+    form.arrangement_confirmed = true;
+    await view.html();
+    assert.equal(submitButton().props.disabled, false);
+    submitButton().props.onClick();
+    assert.equal(view.submissions.length, 1);
+    assert.equal(form.carrier, 'lbc');
+    assert.equal(form.tracking_reference, '');
+    assert.equal(form.eta_min_days, '');
+    assert.equal(form.eta_max_days, '');
+
+    view.submissions[0][1].onSuccess();
+    assert.equal(form.arrangement_confirmed, false);
+    assert.equal(form.carrier, 'lbc');
+});
+
+test('unconfigured delivery fee remains explicitly unpriced after shipment confirmation', async (t) => {
+    const view = orderHarness(t, {
+        delivery_quote: { pricing_configured: false },
+    });
+    assert.match(
+        await view.html(),
+        /No delivery fee included; this does not guarantee free delivery/,
+    );
+});
 
 test('other staff can inspect details without processing controls', async (t) => {
     const view = orderHarness(t);

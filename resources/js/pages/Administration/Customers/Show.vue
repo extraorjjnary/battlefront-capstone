@@ -4,7 +4,6 @@ import { Head, Link } from '@inertiajs/vue3';
 import { ArrowLeft, CalendarDays, Mail } from '@lucide/vue';
 import CustomerController from '@/actions/App/Http/Controllers/Administration/CustomerController';
 import OrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
-import CustomerReturnController from '@/actions/App/Http/Controllers/Administration/CustomerReturnController';
 import UserInfo from '@/components/UserInfo.vue';
 import { Button } from '@/components/ui/button';
 import { formatTimestampDate } from '@/lib/dateTime';
@@ -102,21 +101,7 @@ defineOptions({
                             >{{ order.reference }}</Link
                         ><span v-else class="font-semibold">{{
                             order.reference
-                        }}</span
-                        ><Link
-                            v-if="
-                                order.status === 'completed' &&
-                                $page.props.auth.can?.viewOrders &&
-                                $page.props.auth.can?.requestReturns
-                            "
-                            :href="
-                                CustomerReturnController.index({
-                                    query: { order_id: order.id },
-                                })
-                            "
-                            class="text-primary text-sm underline"
-                            >Record return</Link
-                        >
+                        }}</span>
                     </div>
                     <span class="text-muted-foreground text-sm"
                         >{{ formatJoinedDate(order.created_at) }} ·

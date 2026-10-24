@@ -193,7 +193,7 @@ class OrderProcessingService
             if ($status === OrderStatus::Completed && $lockedOrder->payment_method->isPayAtPickup()) {
                 throw ValidationException::withMessages(['status' => 'Use Confirm Payment & Complete Pickup after receiving payment and handing over the products.']);
             }
-            if ($status === OrderStatus::Completed && ($shipment !== null || $lockedOrder->payment_method === PaymentMethod::Cod)) {
+            if ($status === OrderStatus::Completed && ($shipment !== null || $this->requiresManualShipment($lockedOrder) || $lockedOrder->payment_method === PaymentMethod::Cod)) {
                 throw ValidationException::withMessages(['status' => $lockedOrder->payment_method === PaymentMethod::Cod
                     ? 'Complete COD delivery through Confirm COD Collection after the Delivered milestone.'
                     : 'Complete delivery through the shipment Delivered milestone.']);
@@ -212,7 +212,7 @@ class OrderProcessingService
         }
 
         return array_values(array_filter($order->status->allowedTransitions(), function (OrderStatus $status) use ($order): bool {
-            if ($status === OrderStatus::Completed && ($order->shipment !== null || $order->payment_method === PaymentMethod::Cod || $order->payment_method->isPayAtPickup())) {
+            if ($status === OrderStatus::Completed && ($order->shipment !== null || $this->requiresManualShipment($order) || $order->payment_method === PaymentMethod::Cod || $order->payment_method->isPayAtPickup())) {
                 return false;
             }
 
@@ -238,15 +238,22 @@ class OrderProcessingService
         return $order->shipment?->status->next();
     }
 
+    private function requiresManualShipment(Order $order): bool
+    {
+        return $order->fulfillment_method === FulfillmentMethod::Delivery
+            && ($order->delivery_quote_metadata['pricing_status'] ?? null) === 'not_configured';
+    }
+
     public function canCreateManualShipment(Order $order): bool
     {
         return ! $this->hasCancellationHold($order)
-            && $order->fulfillment_method === FulfillmentMethod::Delivery
-            && ($order->delivery_quote_metadata['pricing_status'] ?? null) === 'not_configured'
+            && $this->requiresManualShipment($order)
             && $order->delivery_fee === '0.00'
             && $order->product_subtotal !== null
             && bccomp($order->total_amount, $order->product_subtotal, 2) === 0
             && in_array($order->status, [OrderStatus::Pending, OrderStatus::Processing], strict: true)
+            && (! in_array($order->payment_method, [PaymentMethod::GCash, PaymentMethod::Maya], strict: true)
+                || $order->status === OrderStatus::Processing)
             && $order->payment_status !== PaymentStatus::Rejected
             && $order->shipment === null;
     }
@@ -453,6 +460,11 @@ class OrderProcessingService
         if (($status === OrderStatus::Processing && ! $this->paymentAllowsFulfillment($order))
             || ($status === OrderStatus::Completed && $order->payment_status !== PaymentStatus::Verified)) {
             throw ValidationException::withMessages(['status' => 'Verify payment before processing or completing this order.']);
+        }
+
+        if ($status === OrderStatus::Completed && $this->requiresManualShipment($order)
+            && ($shipment === null || $shipment->arrangement_type !== ShipmentArrangement::Manual || $shipment->status !== ShipmentStatus::Delivered)) {
+            throw ValidationException::withMessages(['status' => 'Confirm the delivery arrangement and reach the shipment Delivered milestone before completing this order.']);
         }
 
         if ($status === OrderStatus::Completed && $shipment !== null && $shipment->status !== ShipmentStatus::Delivered) {
