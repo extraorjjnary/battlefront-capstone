@@ -199,7 +199,9 @@ test('COD progresses through all shipment milestones unpaid and confirms collect
         expect($order->shipment->getAttribute($field))->toBe($shipmentSnapshot[$field]);
     }
     $deliveredSnapshot = $order->shipment->getAttributes();
-    $this->patch(route('administration.orders.shipment.reference.update', $order), ['tracking_reference' => 'LBC-COD-CORRECTED'])->assertSessionHasNoErrors();
+    $this->patch(route('administration.orders.shipment.reference.update', $order), ['tracking_reference' => 'LBC-COD-CORRECTED'])
+        ->assertSessionHasErrors(['tracking_reference' => 'The LBC tracking number is read-only once assigned.']);
+    expect($order->refresh()->shipment->getAttributes())->toBe($deliveredSnapshot);
     $this->get(route('administration.orders.show', $order))->assertInertia(fn (Assert $page) => $page
         ->where('order.payment.can_confirm_cod_collection', true)->where('order.allowed_status_transitions', [])
         ->where('order.payment.status.label', 'COD — Awaiting Collection'));

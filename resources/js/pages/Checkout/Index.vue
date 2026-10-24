@@ -1,4 +1,5 @@
 <script setup>
+import { formatCalendarDate } from '@/lib/dateTime';
 import FileInput from '@/components/FileInput.vue';
 import PageHeader from '@/components/PageHeader.vue';
 import { Form, Head, Link } from '@inertiajs/vue3';
@@ -63,10 +64,8 @@ const selectedQuote = computed(() =>
                 (quote) => quote.destination === deliveryDestination.value,
             ),
 );
-const dateFormatter = new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium' });
-
 function formatDeliveryDate(value) {
-    return dateFormatter.format(new Date(`${value}T00:00:00`));
+    return formatCalendarDate(value);
 }
 
 const availablePaymentMethods = computed(() =>

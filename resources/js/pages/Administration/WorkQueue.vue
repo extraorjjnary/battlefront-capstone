@@ -4,7 +4,7 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 import WorkQueueController from '@/actions/App/Http/Controllers/Administration/WorkQueueController';
 import { Button } from '@/components/ui/button';
-import { formatDateTime } from '@/lib/dateTime';
+import { formatAgeDays, formatDateTime } from '@/lib/dateTime';
 
 const props = defineProps({
     entries: { type: Object, required: true },
@@ -139,7 +139,7 @@ defineOptions({
                     </p>
                     <p class="text-muted-foreground mt-1 text-xs">
                         Opened {{ formatDateTime(entry.created_at) }} ·
-                        {{ entry.age_days }} days old
+                        {{ formatAgeDays(entry.age_days) }}
                     </p>
                 </div>
                 <Link

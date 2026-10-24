@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ref, reactive, watch } from 'vue';
-import { formatDateTime } from '@/lib/dateTime';
+import { formatAgeDays, formatDateTime } from '@/lib/dateTime';
 
 const requestReasonCode = ref('');
 
@@ -540,7 +540,8 @@ defineOptions({
                             · {{ entry.condition }}
                         </p>
                         <p class="mt-1 text-sm">
-                            {{ entry.reason }} · {{ entry.age_days }} days old
+                            {{ entry.reason }} ·
+                            {{ formatAgeDays(entry.age_days) }}
                         </p>
                     </div>
                     <span class="text-sm font-semibold capitalize">{{
@@ -603,7 +604,8 @@ defineOptions({
                             v-if="entry.resolution_summary"
                             class="whitespace-pre-wrap"
                         >
-                            Customer note: {{ entry.resolution_summary }}
+                            Internal resolution record:
+                            {{ entry.resolution_summary }}
                         </p>
                         <p v-if="entry.resolution_reference">
                             Internal reference:
@@ -823,21 +825,6 @@ defineOptions({
                                 resolutionTypes[entry.id] !== 'refund'
                             "
                         >
-                            <Label :for="`resolution-summary-${entry.id}`"
-                                >Details shown to customer</Label
-                            >
-                            <Input
-                                :id="`resolution-summary-${entry.id}`"
-                                name="resolution_summary"
-                                required
-                                minlength="5"
-                                maxlength="2000"
-                            />
-                            <InputError
-                                :message="
-                                    errors.resolution_summary || errors.summary
-                                "
-                            />
                             <Label :for="`resolution-reference-${entry.id}`"
                                 >Internal reference (optional)</Label
                             >

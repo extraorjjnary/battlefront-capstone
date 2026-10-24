@@ -360,12 +360,21 @@ test('supervisors with no other eligible handler can claim without a redundant a
 });
 
 test('pending cancellation hides claim and assignment controls and rejection restores them', async (t) => {
-    const view = orderHarness(t, {
-        assigned_handler_id: null,
-        assigned_handler_name: null,
-        cancellation: { status: { value: 'requested', label: 'Cancellation requested' } },
-    }, { assignOrders: true });
-    assert.doesNotMatch(await view.html(), /Claim order|Assign handler|Reassign handler/);
+    const view = orderHarness(
+        t,
+        {
+            assigned_handler_id: null,
+            assigned_handler_name: null,
+            cancellation: {
+                status: { value: 'requested', label: 'Cancellation requested' },
+            },
+        },
+        { assignOrders: true },
+    );
+    assert.doesNotMatch(
+        await view.html(),
+        /Claim order|Assign handler|Reassign handler/,
+    );
     view.props.order.cancellation.status.value = 'rejected';
     const html = await view.html();
     assert.match(html, /Claim order/);
@@ -374,17 +383,26 @@ test('pending cancellation hides claim and assignment controls and rejection res
 
 test('stale claim and reassignment callbacks cannot submit after a cancellation hold arrives', async (t) => {
     for (const assigned of [false, true]) {
-        const view = orderHarness(t, {
-            assigned_handler_id: assigned ? 2 : null,
-            assigned_handler_name: assigned ? 'Assigned Staff' : null,
-        }, { assignOrders: true });
+        const view = orderHarness(
+            t,
+            {
+                assigned_handler_id: assigned ? 2 : null,
+                assigned_handler_name: assigned ? 'Assigned Staff' : null,
+            },
+            { assignOrders: true },
+        );
         await view.html();
         const form = findElement(view.tree(), 'form');
         view.forms[0].handler_id = 3;
-        view.props.order.cancellation = { status: { value: 'requested', label: 'Cancellation requested' } };
+        view.props.order.cancellation = {
+            status: { value: 'requested', label: 'Cancellation requested' },
+        };
         form.props.onSubmit({ preventDefault() {} });
         assert.equal(view.submissions.length, 0);
-        assert.doesNotMatch(await view.html(), /Claim order|Assign handler|Reassign handler/);
+        assert.doesNotMatch(
+            await view.html(),
+            /Claim order|Assign handler|Reassign handler/,
+        );
     }
 });
 

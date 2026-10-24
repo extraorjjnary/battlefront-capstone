@@ -329,6 +329,7 @@ class OrderProcessingService
 
         return $order->fulfillment_method === FulfillmentMethod::Delivery
             && $shipment !== null
+            && blank($shipment->tracking_reference)
             && $this->paymentAllowsFulfillment($order)
             && in_array($shipment->status, [ShipmentStatus::HandedToLbc, ShipmentStatus::InTransit, ShipmentStatus::OutForDelivery, ShipmentStatus::Delivered], strict: true)
             && ($order->status === OrderStatus::Processing
@@ -372,6 +373,9 @@ class OrderProcessingService
                 if ($status !== ShipmentStatus::HandedToLbc) {
                     throw ValidationException::withMessages(['tracking_reference' => 'A reference may first be entered when handing the shipment to LBC.']);
                 }
+                if (filled($shipment->tracking_reference)) {
+                    throw ValidationException::withMessages(['tracking_reference' => 'The LBC tracking number is read-only once assigned.']);
+                }
                 $changes['tracking_reference'] = $this->normalizeTrackingReference($trackingReference);
             }
 
@@ -395,6 +399,10 @@ class OrderProcessingService
             $this->authorizeHandler($lockedOrder, $actor);
             $shipment = $lockedOrder->shipment()->lockForUpdate()->first();
             $lockedOrder->setRelation('shipment', $shipment);
+
+            if ($shipment !== null && filled($shipment->tracking_reference)) {
+                throw ValidationException::withMessages(['tracking_reference' => 'The LBC tracking number is read-only once assigned.']);
+            }
 
             if (! $this->canUpdateShipmentReference($lockedOrder) || $shipment === null) {
                 throw ValidationException::withMessages(['tracking_reference' => 'References can only be maintained for eligible shipments handed to LBC.']);

@@ -66,7 +66,6 @@ class CustomerReturnController extends Controller
             'supplier_id' => ['required_if:disposition,supplier_return', 'prohibited_if:decision,reject', 'nullable', 'integer', Rule::exists('suppliers', 'id')],
             'inspection_confirmed' => ['sometimes', 'required_if:disposition,restock', 'accepted'],
             'resolution_type' => ['required_if:decision,accept', 'prohibited_if:decision,reject', 'nullable', Rule::in(['refund', 'replacement', 'repair', 'other'])],
-            'resolution_summary' => ['required_if:resolution_type,replacement,repair,other', 'prohibited_if:decision,reject', 'nullable', 'string', 'min:5', 'max:2000'],
             'resolution_reference' => ['prohibited_if:decision,reject', 'nullable', 'string', 'max:255'],
             'inspection_notes' => ['required_if:disposition,restock', 'prohibited_if:decision,reject', 'nullable', 'string', 'min:5', 'max:2000'],
             'public_feedback' => ['nullable', 'string', 'min:5', 'max:2000'],
@@ -75,7 +74,6 @@ class CustomerReturnController extends Controller
         $resolution = ['public_feedback' => isset($validated['public_feedback']) ? (string) $validated['public_feedback'] : null];
         if ($accept) {
             $resolution['type'] = (string) $validated['resolution_type'];
-            $resolution['summary'] = isset($validated['resolution_summary']) ? (string) $validated['resolution_summary'] : null;
             $resolution['reference'] = isset($validated['resolution_reference']) ? (string) $validated['resolution_reference'] : null;
             $resolution['inspection_notes'] = isset($validated['inspection_notes']) ? (string) $validated['inspection_notes'] : null;
         }

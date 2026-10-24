@@ -116,7 +116,7 @@ class HandleCustomerReturn
             $approvedAmount = $this->decimal($approvedAmount);
             Validator::make($resolution, [
                 'type' => [$accept ? 'required' : 'prohibited', Rule::in(['refund', 'replacement', 'repair', 'other'])],
-                'summary' => ['required_if:type,replacement,repair,other', Rule::requiredIf($accept && ($resolution['type'] ?? null) === 'refund' && bccomp($approvedAmount, '0.00', 2) > 0 && bccomp($approvedAmount, $maximum, 2) < 0), 'nullable', 'string', 'min:5', 'max:2000'],
+                'summary' => ['nullable', 'string', 'min:5', 'max:2000'],
                 'reference' => ['nullable', 'string', 'max:255'],
                 'inspection_notes' => [$accept && $disposition === 'restock' ? 'required' : 'nullable', 'string', 'min:5', 'max:2000'],
                 'public_feedback' => ['nullable', 'string', 'min:5', 'max:2000'],

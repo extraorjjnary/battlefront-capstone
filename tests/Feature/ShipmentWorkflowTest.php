@@ -361,7 +361,7 @@ test('operational ETA is persisted at preparation and survives later time and co
         ->toThrow(DomainException::class, 'The operational shipment estimate cannot be changed.');
 });
 
-test('real references may be supplied at handoff and corrected or cleared without changing milestones', function () {
+test('real references supplied at handoff cannot be replaced or cleared', function () {
     $order = shipmentWorkflowOrder();
     advanceShipmentForTest($order, ShipmentStatus::ReadyForDispatch);
     $administrator = User::factory()->administrator()->create();
@@ -373,16 +373,18 @@ test('real references may be supplied at handoff and corrected or cleared withou
         ->assertSessionHasNoErrors();
     expect($order->refresh()->shipment->tracking_reference)->toBe('REAL-REFERENCE');
     $handoff = $order->shipment->handed_to_carrier_at->toDateTimeString();
+    $this->get(route('administration.orders.show', $order))->assertInertia(fn (Assert $page) => $page
+        ->where('order.shipment_actions.can_update_reference', false));
 
-    $this->patch(route('administration.orders.shipment.reference.update', $order), ['tracking_reference' => 'CORRECTED'])->assertSessionHasNoErrors();
-    expect($order->refresh()->shipment)->tracking_reference->toBe('CORRECTED')->status->toBe(ShipmentStatus::HandedToLbc);
+    $this->patch(route('administration.orders.shipment.reference.update', $order), ['tracking_reference' => 'CORRECTED'])->assertSessionHasErrors('tracking_reference');
+    expect($order->refresh()->shipment)->tracking_reference->toBe('REAL-REFERENCE')->status->toBe(ShipmentStatus::HandedToLbc);
     expect($order->shipment->handed_to_carrier_at->toDateTimeString())->toBe($handoff);
-    $this->patch(route('administration.orders.shipment.reference.update', $order), ['tracking_reference' => '  '])->assertSessionHasNoErrors();
-    expect($order->refresh()->shipment->tracking_reference)->toBeNull();
+    $this->patch(route('administration.orders.shipment.reference.update', $order), ['tracking_reference' => '  '])->assertSessionHasErrors('tracking_reference');
+    expect($order->refresh()->shipment->tracking_reference)->toBe('REAL-REFERENCE');
 
     advanceShipmentForTest($order, ShipmentStatus::Delivered);
-    $this->patch(route('administration.orders.shipment.reference.update', $order), ['tracking_reference' => 'REAL-LATE-REFERENCE'])->assertSessionHasNoErrors();
-    expect($order->refresh()->shipment)->tracking_reference->toBe('REAL-LATE-REFERENCE')->status->toBe(ShipmentStatus::Delivered);
+    $this->patch(route('administration.orders.shipment.reference.update', $order), ['tracking_reference' => 'REAL-LATE-REFERENCE'])->assertSessionHasErrors('tracking_reference');
+    expect($order->refresh()->shipment)->tracking_reference->toBe('REAL-REFERENCE')->status->toBe(ShipmentStatus::Delivered);
     $this->assertDatabaseCount('sales', 1);
 });
 
@@ -747,4 +749,34 @@ test('manual COD delivery still waits for explicit collection confirmation', fun
     expect($order->sale)->amount->toBe('100.00');
     expect($inventory->refresh()->quantity)->toBe(5);
     $this->assertDatabaseCount('sales', 1);
+});
+
+test('a missing LBC reference may be assigned once after handoff', function () {
+    $order = shipmentWorkflowOrder();
+    advanceShipmentForTest($order, ShipmentStatus::HandedToLbc);
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+    $staleOrder = $order->fresh();
+
+    $this->actingAs($administrator)->patch(route('administration.orders.shipment.reference.update', $order), ['tracking_reference' => ' LATE-REFERENCE '])->assertRedirect()->assertSessionHasNoErrors();
+    expect($order->refresh()->shipment->tracking_reference)->toBe('LATE-REFERENCE');
+    expect(fn () => app(OrderProcessingService::class)->updateShipmentReference($staleOrder, 'REPLACEMENT', actor: $administrator))
+        ->toThrow(ValidationException::class, 'The LBC tracking number is read-only once assigned.');
+    expect($order->fresh()->shipment->tracking_reference)->toBe('LATE-REFERENCE');
+});
+
+test('handoff cannot replace a reference already assigned to a manual shipment', function () {
+    $order = shipmentWorkflowOrder();
+    advanceShipmentForTest($order, ShipmentStatus::ReadyForDispatch);
+    $order->shipment->update(['tracking_reference' => 'ASSIGNED-REFERENCE']);
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)->patch(route('administration.orders.shipment.status.update', $order), [
+        'status' => 'handed_to_lbc', 'tracking_reference' => 'REPLACEMENT',
+    ])->assertSessionHasErrors('tracking_reference');
+
+    expect($order->refresh()->shipment)->tracking_reference->toBe('ASSIGNED-REFERENCE')->status->toBe(ShipmentStatus::ReadyForDispatch);
 });

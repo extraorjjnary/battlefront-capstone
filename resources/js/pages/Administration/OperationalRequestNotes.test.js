@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { renderToString } from '@vue/server-renderer';
 import * as Vue from 'vue';
+import { formatAgeDays } from '../../lib/dateTime.js';
 import { compileSkeletonTestComponent } from '../../lib/skeletonTestHelpers.js';
 
 function findNode(node, predicate) {
@@ -146,7 +147,7 @@ function harness(t, pageName, pageProps = {}) {
                     cancelPendingSearch() {},
                 }),
             },
-            '@/lib/dateTime': { formatDateTime: () => 'Today' },
+            '@/lib/dateTime': { formatAgeDays, formatDateTime: () => 'Today' },
         },
         {
             get(target, key) {

@@ -74,7 +74,7 @@ test('acceptance requires an explicit resolution and valid monetary outcome', fu
     'zero monetary' => [['type' => 'refund'], '0.00', 'approved_amount'],
     'negative monetary' => [['type' => 'refund'], '-1.00', 'approved_amount'],
     'excessive monetary' => [['type' => 'refund'], '100.01', 'approved_amount'],
-    'undocumented repair' => [['type' => 'repair'], '0.00', 'summary'],
+    'invalid repair summary' => [['type' => 'repair', 'summary' => 'bad'], '0.00', 'summary'],
     'paid repair' => [['type' => 'repair', 'summary' => 'Repair and original item handback'], '10.00', 'approved_amount'],
 ]);
 
@@ -265,15 +265,17 @@ test('only the payment recorder adds proof before independent final verification
     expect(DB::table('administration_evidence')->where('subject_type', 'refund_payment')->count())->toBe(2);
 })->with(['verified', 'voided']);
 
-test('customer resolution summaries are public but references and review evidence stay private', function () {
+test('saved customer resolution summaries stay hidden with references and review evidence', function () {
     [$order, $item] = refinementPurchase();
     $request = app(HandleCustomerReturnRequest::class)->submit($order->user, $order->id, ['order_item_id' => $item->id, 'quantity' => 1, 'reason_code' => 'defective']);
     $staff = refinementEmployee();
     $id = app(HandleCustomerReturnRequest::class)->receive($staff, $request->id, 'opened', photos: [UploadedFile::fake()->image('receipt.jpg')]);
     app(HandleCustomerReturn::class)->decide($id, refinementEmployee('manager'), true, 'return_to_customer', '0.00', 'PRIVATE INSPECTION NOTES', resolution: ['type' => 'repair', 'summary' => 'Repair and return original hardware', 'reference' => 'PRIVATE REFERENCE', 'public_feedback' => 'Repair approved after inspection']);
     $this->withToken($order->user->createToken('Phone')->plainTextToken)->getJson(route('api.v1.orders.return-requests.show', [$order, $request]))
-        ->assertJsonPath('data.return_decision', 'accepted')->assertJsonPath('data.resolution.status', 'pending')
+        ->assertJsonPath('data.return_decision', 'accepted')->assertJsonPath('data.resolution.status', 'pending')->assertJsonPath('data.resolution.summary', null)->assertDontSee('Repair and return original hardware')
         ->assertJsonPath('data.feedback', 'Repair approved after inspection')->assertDontSee('PRIVATE');
+    $this->actingAs($order->user)->get(route('orders.show', $order))->assertInertia(fn (Assert $page) => $page
+        ->where('order.return_requests.0.resolution.summary', null));
     app(HandleCustomerReturn::class)->completeResolution($id, $staff, 'PRIVATE HANDOVER RECEIPT', true);
     $this->getJson(route('api.v1.orders.return-requests.show', [$order, $request]))->assertJsonPath('data.resolution.status', 'completed')->assertDontSee('PRIVATE');
 });
@@ -321,15 +323,11 @@ test('IT and customers cannot confirm nonmonetary fulfillment', function (string
     $this->assertDatabaseHas('customer_return_resolutions', ['customer_return_id' => $id, 'completed_at' => null]);
 })->with(['it', 'customer']);
 
-test('partial monetary refunds require an explanation before changing inventory or finances', function () {
+test('partial monetary refunds can be approved without a customer resolution summary', function () {
     [$id, $order, $item, $stock, $receiver, $reviewer] = refinementReceived();
     $payload = ['decision' => 'accept', 'resolution_type' => 'refund', 'approved_amount' => '35.25',
         'disposition' => 'restock', 'inspection_confirmed' => true, 'inspection_notes' => 'Unopened spare part checked fit for sale', 'reason' => 'Partial amount agreed'];
-    $this->actingAs($reviewer)->post(route('administration.customer-returns.decide', $id), $payload)->assertSessionHasErrors('summary');
-    $this->assertDatabaseHas('customer_returns', ['id' => $id, 'status' => 'pending']);
-    $this->assertDatabaseCount('customer_refunds', 0);
-    expect($stock->refresh()->quarantined_quantity)->toBe(1);
-    $this->post(route('administration.customer-returns.decide', $id), [...$payload, 'resolution_summary' => 'Customer agreed to retain the accessory value'])->assertSessionHasNoErrors();
+    $this->actingAs($reviewer)->post(route('administration.customer-returns.decide', $id), $payload)->assertSessionHasNoErrors();
     $this->assertDatabaseHas('customer_refunds', ['customer_return_id' => $id, 'approved_amount' => '35.25']);
 });
 
@@ -404,3 +402,15 @@ test('partial recorded payments leave the exact unrecorded amount available only
     $this->actingAs(refinementEmployee('owner'))->get(route('administration.customer-returns.index', ['case' => $id]))->assertOk()->assertInertia(fn (Assert $page) => $page
         ->where('returns.data.0.unrecorded_refund_amount', '60.05')->where('returns.data.0.can_record_payment', false));
 });
+
+test('manual return outcomes can be approved without a customer resolution summary', function (string $outcome) {
+    [$id, $order, $item, $stock, $receiver, $reviewer] = refinementReceived();
+
+    $this->actingAs($reviewer)->post(route('administration.customer-returns.decide', $id), [
+        'decision' => 'accept', 'resolution_type' => $outcome, 'approved_amount' => '0.00',
+        'disposition' => $outcome === 'replacement' ? 'write_off' : 'return_to_customer', 'reason' => 'Outcome agreed after inspection',
+    ])->assertRedirect()->assertSessionHasNoErrors();
+
+    $this->assertDatabaseHas('customer_return_resolutions', ['customer_return_id' => $id, 'type' => $outcome, 'summary' => 'Outcome agreed after inspection']);
+    $this->assertDatabaseHas('customer_returns', ['id' => $id, 'status' => 'accepted']);
+})->with(['repair', 'replacement', 'other']);

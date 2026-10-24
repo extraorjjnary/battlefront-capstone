@@ -74,8 +74,11 @@ const cancellationPending = computed(
     () => props.order.cancellation?.status.value === 'requested',
 );
 const canClaim = computed(
-    () => unfinished.value && !cancellationPending.value &&
-        !props.order.assigned_handler_id && page.props.auth.can?.processOrders === true,
+    () =>
+        unfinished.value &&
+        !cancellationPending.value &&
+        !props.order.assigned_handler_id &&
+        page.props.auth.can?.processOrders === true,
 );
 const availableHandlers = computed(() =>
     props.handler_options.filter((handler) =>
@@ -88,7 +91,10 @@ const handlerAction = computed(() =>
     props.order.assigned_handler_id ? 'Reassign handler' : 'Assign handler',
 );
 const canAssign = computed(
-    () => unfinished.value && !cancellationPending.value && page.props.auth.can?.assignOrders === true,
+    () =>
+        unfinished.value &&
+        !cancellationPending.value &&
+        page.props.auth.can?.assignOrders === true,
 );
 const validHandlerSelection = computed(() =>
     availableHandlers.value.some(
@@ -558,10 +564,7 @@ defineOptions({
                     {{ handlerNotice }}
                 </p>
             </div>
-            <form
-                v-if="canClaim"
-                @submit.prevent="submitClaim"
-            >
+            <form v-if="canClaim" @submit.prevent="submitClaim">
                 <Button
                     type="submit"
                     variant="outline"
@@ -1079,7 +1082,8 @@ defineOptions({
                         <div
                             v-if="
                                 order.shipment_actions.next_status.value ===
-                                'handed_to_lbc'
+                                    'handed_to_lbc' &&
+                                !order.shipment.tracking_reference
                             "
                             class="grid gap-2"
                         >
@@ -1156,8 +1160,8 @@ defineOptions({
                             maxlength="255"
                         />
                         <p class="text-muted-foreground text-xs">
-                            Enter only a supplied reference. Clear the field to
-                            remove an incorrect value.
+                            Enter only a supplied reference. Once saved, the LBC
+                            tracking number cannot be changed.
                         </p>
                         <InputError
                             :message="
