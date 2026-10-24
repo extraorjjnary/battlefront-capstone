@@ -521,12 +521,21 @@ defineOptions({
                                     <InputError :message="errors.reason_code" />
                                     <Label
                                         :for="`reason-${product.inventory.id}`"
-                                        >Notes (Optional)</Label
+                                        >{{
+                                            requestReasonCodes[product.id] ===
+                                            'other'
+                                                ? 'Additional notes (required)'
+                                                : 'Additional notes (optional)'
+                                        }}</Label
                                     >
                                     <Input
                                         class="min-h-11"
                                         :id="`reason-${product.inventory.id}`"
                                         name="reason"
+                                        :required="
+                                            requestReasonCodes[product.id] ===
+                                            'other'
+                                        "
                                         minlength="5"
                                         maxlength="2000"
                                     />
@@ -737,12 +746,21 @@ defineOptions({
                                     </select>
                                     <InputError :message="errors.reason_code" />
                                     <Label :for="`opening-reason-${product.id}`"
-                                        >Notes</Label
+                                        >{{
+                                            requestReasonCodes[product.id] ===
+                                            'other'
+                                                ? 'Additional notes (required)'
+                                                : 'Additional notes (optional)'
+                                        }}</Label
                                     >
                                     <Input
                                         class="min-h-11"
                                         :id="`opening-reason-${product.id}`"
                                         name="reason"
+                                        :required="
+                                            requestReasonCodes[product.id] ===
+                                            'other'
+                                        "
                                         minlength="5"
                                         maxlength="2000"
                                     />

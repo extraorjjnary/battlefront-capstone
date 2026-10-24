@@ -288,9 +288,14 @@ defineOptions({
                     <option value="other">Other</option>
                 </select>
                 <label class="max-w-full min-w-0 text-sm sm:col-span-2"
-                    >Notes (Optional)<Input
+                    >{{
+                        requestReasonCodes[entry.id] === 'other'
+                            ? 'Additional notes (required)'
+                            : 'Additional notes (optional)'
+                    }}<Input
                         class="min-h-11"
                         name="reason"
+                        :required="requestReasonCodes[entry.id] === 'other'"
                         minlength="5"
                         maxlength="2000"
                 /></label>

@@ -26,6 +26,7 @@ const modules = {
     '@/components/ui/button': { Button: primitive },
     '@/components/ui/label': { Label: primitive },
     '@/components/InputError.vue': { default: primitive },
+    '@/components/FileInput.vue': { default: primitive },
 };
 function load(file, inlineTemplate = true, dependencies = {}) {
     const { descriptor } = parse(
@@ -85,6 +86,7 @@ test('partial refund preserves decimal typing and resets to full or zero when it
 
 test('clear selection empties the pending file input and resets its selection state', () => {
     const selections = [];
+    let cleared = false;
     const state = load('./EvidenceFileInput.vue', false).setup(
         { label: 'Inspection evidence' },
         {
@@ -94,10 +96,14 @@ test('clear selection empties the pending file input and resets its selection st
             },
         },
     );
-    state.input.value = { value: 'C:/fakepath/mistaken.jpg' };
+    state.input.value = {
+        clear() {
+            cleared = true;
+        },
+    };
     state.selected.value = true;
     state.clearSelection();
-    assert.equal(state.input.value.value, '');
+    assert.equal(cleared, true);
     assert.equal(state.selected.value, false);
     assert.deepEqual(selections, [[]]);
 });

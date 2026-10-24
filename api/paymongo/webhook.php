@@ -1,4 +1,5 @@
 <?php
+
 header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -9,7 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $rawBody = file_get_contents('php://input');
 
-if (!$rawBody) {
+if (! $rawBody) {
     http_response_code(400);
     echo json_encode(['error' => 'Empty payload']);
     exit;
