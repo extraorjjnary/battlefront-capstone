@@ -414,3 +414,50 @@ test('manual return outcomes can be approved without a customer resolution summa
     $this->assertDatabaseHas('customer_return_resolutions', ['customer_return_id' => $id, 'type' => $outcome, 'summary' => 'Outcome agreed after inspection']);
     $this->assertDatabaseHas('customer_returns', ['id' => $id, 'status' => 'accepted']);
 })->with(['repair', 'replacement', 'other']);
+
+test('return decision preserves conditional HTTP validation without changing the case', function (array $payload, array $fields) {
+    [$id, $order, $item, $stock, $receiver, $reviewer] = refinementReceived();
+
+    $this->actingAs($reviewer)->post(route('administration.customer-returns.decide', $id), [
+        'decision' => 'reject', 'reason' => 'Reviewed actual returned item', ...$payload,
+    ])->assertSessionHasErrors($fields);
+
+    $this->assertDatabaseHas('customer_returns', ['id' => $id, 'status' => 'pending']);
+    $this->assertDatabaseCount('customer_refunds', 0);
+    $this->assertDatabaseCount('customer_return_resolutions', 0);
+    expect($stock->refresh()->quarantined_quantity)->toBe(1);
+})->with([
+    'acceptance requires outcome and amount' => [['decision' => 'accept'], ['disposition', 'approved_amount', 'resolution_type']],
+    'reject prohibits disposition' => [['disposition' => 'write_off'], ['disposition']],
+    'reject prohibits amount' => [['approved_amount' => '1.00'], ['approved_amount']],
+    'reject prohibits supplier' => [['supplier_id' => 1], ['supplier_id']],
+    'reject prohibits outcome' => [['resolution_type' => 'repair'], ['resolution_type']],
+    'reject prohibits reference' => [['resolution_reference' => 'CASE-1'], ['resolution_reference']],
+    'reject prohibits inspection notes' => [['inspection_notes' => 'Item inspected today'], ['inspection_notes']],
+    'present inspection confirmation must be accepted' => [['inspection_confirmed' => false], ['inspection_confirmed']],
+    'supplier return requires supplier' => [[
+        'decision' => 'accept', 'disposition' => 'supplier_return', 'approved_amount' => '0.00', 'resolution_type' => 'repair',
+    ], ['supplier_id']],
+    'restock requires inspection notes' => [[
+        'decision' => 'accept', 'disposition' => 'restock', 'approved_amount' => '100.00', 'resolution_type' => 'refund',
+        'inspection_confirmed' => true,
+    ], ['inspection_notes']],
+]);
+
+test('order detail preserves return totals and permission based profitability visibility', function () {
+    [$id, $order, $item, $stock, $receiver, $reviewer] = refinementReceived();
+    app(HandleCustomerReturn::class)->decide($id, $reviewer, true, 'write_off', '100.00', 'Returned product written off',
+        resolution: ['type' => 'refund']);
+
+    $this->actingAs($reviewer)->get(route('administration.orders.show', $order))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('handler_options', [])
+            ->where('order.profitability', [
+                'sales_returns' => '100',
+                'cost_of_goods_sold' => '0.00',
+                'gross_profit' => null,
+                'available' => false,
+            ]));
+    $this->actingAs($receiver)->get(route('administration.orders.show', $order))
+        ->assertInertia(fn (Assert $page) => $page->missing('order.profitability'));
+});

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Administration;
 use App\Actions\Inventory\HandleCustomerReturn;
 use App\Actions\Inventory\HandleCustomerReturnRequest;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Administration\DecideCustomerReturnRequest;
 use App\Models\OrderItem;
 use App\Services\AdministrationEvidenceService;
 use App\Services\CustomerReturnReviewService;
@@ -56,20 +57,9 @@ class CustomerReturnController extends Controller
         return to_route('administration.customer-returns.index', ['case' => $returnId]);
     }
 
-    public function decide(Request $request, int $customerReturn, HandleCustomerReturn $returns): RedirectResponse
+    public function decide(DecideCustomerReturnRequest $request, int $customerReturn, HandleCustomerReturn $returns): RedirectResponse
     {
-        $validated = $request->validate([
-            'decision' => ['required', Rule::in(['accept', 'reject'])],
-            'reason' => ['required', 'string', 'min:5', 'max:2000'],
-            'disposition' => ['required_if:decision,accept', 'prohibited_if:decision,reject', 'nullable', Rule::in(['restock', 'write_off', 'supplier_return', 'return_to_customer'])],
-            'approved_amount' => ['required_if:decision,accept', 'prohibited_if:decision,reject', 'nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
-            'supplier_id' => ['required_if:disposition,supplier_return', 'prohibited_if:decision,reject', 'nullable', 'integer', Rule::exists('suppliers', 'id')],
-            'inspection_confirmed' => ['sometimes', 'required_if:disposition,restock', 'accepted'],
-            'resolution_type' => ['required_if:decision,accept', 'prohibited_if:decision,reject', 'nullable', Rule::in(['refund', 'replacement', 'repair', 'other'])],
-            'resolution_reference' => ['prohibited_if:decision,reject', 'nullable', 'string', 'max:255'],
-            'inspection_notes' => ['required_if:disposition,restock', 'prohibited_if:decision,reject', 'nullable', 'string', 'min:5', 'max:2000'],
-            'public_feedback' => ['nullable', 'string', 'min:5', 'max:2000'],
-        ]);
+        $validated = $request->validated();
         $accept = $validated['decision'] === 'accept';
         $resolution = ['public_feedback' => isset($validated['public_feedback']) ? (string) $validated['public_feedback'] : null];
         if ($accept) {

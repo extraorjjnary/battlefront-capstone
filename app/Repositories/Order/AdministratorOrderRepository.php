@@ -3,10 +3,14 @@
 namespace App\Repositories\Order;
 
 use App\Enums\OrderStatus;
+use App\Enums\UserRole;
 use App\Models\Order;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class AdministratorOrderRepository
 {
@@ -50,6 +54,44 @@ class AdministratorOrderRepository
                 ->orderBy('id'),
             'items.product:id,name,brand,image_path',
         ]);
+    }
+
+    /**
+     * @return array{has_sale: bool, sales_returns: string, cost_recovered: string}
+     */
+    public function profitabilityInputs(Order $order): array
+    {
+        $orderHasSale = DB::table('sales')->where('order_id', $order->id)->exists();
+        $salesReturns = (string) DB::table('customer_return_items as return_items')
+            ->join('order_items', 'order_items.id', '=', 'return_items.order_item_id')
+            ->where('order_items.order_id', $order->id)->sum('return_items.sales_return_amount');
+        $costRecovered = (string) DB::table('customer_return_items as return_items')
+            ->join('order_items', 'order_items.id', '=', 'return_items.order_item_id')
+            ->where('order_items.order_id', $order->id)->sum('return_items.cost_recovered_amount');
+
+        return ['has_sale' => $orderHasSale, 'sales_returns' => $salesReturns, 'cost_recovered' => $costRecovered];
+    }
+
+    /**
+     * @return EloquentCollection<int, User>|array{}
+     */
+    public function handlerOptions(Order $order): EloquentCollection|array
+    {
+        return $order->status === OrderStatus::Completed || $order->status === OrderStatus::Cancelled
+            ? []
+            : User::query()->where('role', UserRole::Administrator->value)
+                ->where('is_active', true)
+                ->whereIn('administration_role_id', DB::table('administration_role_permissions as grants')
+                    ->join('administration_permissions as permissions', 'permissions.id', '=', 'grants.administration_permission_id')
+                    ->join('administration_roles as roles', 'roles.id', '=', 'grants.administration_role_id')
+                    ->where('permissions.code', 'orders.process')->where('roles.code', '!=', 'it')
+                    ->select('grants.administration_role_id'))
+                ->orderBy('name')->get(['id', 'name']);
+    }
+
+    public function assignedHandlerName(Order $order): ?string
+    {
+        return $order->assigned_handler_id === null ? null : User::query()->whereKey($order->assigned_handler_id)->value('name');
     }
 
     /**

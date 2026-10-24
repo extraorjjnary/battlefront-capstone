@@ -357,3 +357,23 @@ test('rejecting cancellation restores claiming and supervisor assignment without
 
     expect($order->fresh()->assigned_handler_id)->toBe($target->id);
 })->with([false, true]);
+
+test('order detail preserves eligible handler options and assigned names', function (OrderStatus $status) {
+    $owner = orderHandlerActor('owner');
+    $owner->update(['name' => 'Zoe Owner']);
+    $staff = orderHandlerActor('staff');
+    $staff->update(['name' => 'Amy Staff']);
+    $inactive = orderHandlerActor('staff');
+    $inactive->is_active = false;
+    $inactive->save();
+    orderHandlerActor('it');
+    $order = Order::factory()->create(['status' => $status, 'assigned_handler_id' => $staff->id]);
+    $expectedOptions = in_array($status, [OrderStatus::Completed, OrderStatus::Cancelled], true)
+        ? []
+        : [['id' => $staff->id, 'name' => 'Amy Staff'], ['id' => $owner->id, 'name' => 'Zoe Owner']];
+
+    $this->actingAs($owner)->get(route('administration.orders.show', $order))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('handler_options', $expectedOptions)
+            ->where('order.assigned_handler_name', 'Amy Staff'));
+})->with(OrderStatus::cases());
