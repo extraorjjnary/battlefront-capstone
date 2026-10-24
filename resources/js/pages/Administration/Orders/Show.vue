@@ -14,7 +14,7 @@ import {
     Truck,
     UserRound,
 } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import OrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
 import OrderHandlerController from '@/actions/App/Http/Controllers/Administration/OrderHandlerController';
 import CustomerReturnController from '@/actions/App/Http/Controllers/Administration/CustomerReturnController';
@@ -26,6 +26,7 @@ import OrderShipmentStatusController from '@/actions/App/Http/Controllers/Admini
 import OrderShipmentReferenceController from '@/actions/App/Http/Controllers/Administration/OrderShipmentReferenceController';
 import InputError from '@/components/InputError.vue';
 import ShipmentTracking from '@/components/ShipmentTracking.vue';
+import OrderCancellationPanel from '@/components/OrderCancellationPanel.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -61,7 +62,7 @@ const props = defineProps({
 });
 
 const handlerForm = useForm({
-    handler_id: props.order.assigned_handler_id ?? '',
+    handler_id: '',
 });
 const claimForm = useForm({});
 const page = usePage();
@@ -69,20 +70,65 @@ const canProcess = computed(() => props.order.can_process === true);
 const unfinished = computed(
     () => !['completed', 'cancelled'].includes(props.order.status.value),
 );
+const cancellationPending = computed(
+    () => props.order.cancellation?.status.value === 'requested',
+);
+const canClaim = computed(
+    () => unfinished.value && !cancellationPending.value &&
+        !props.order.assigned_handler_id && page.props.auth.can?.processOrders === true,
+);
+const availableHandlers = computed(() =>
+    props.handler_options.filter((handler) =>
+        props.order.assigned_handler_id
+            ? handler.id !== props.order.assigned_handler_id
+            : handler.id !== page.props.auth.user.id,
+    ),
+);
+const handlerAction = computed(() =>
+    props.order.assigned_handler_id ? 'Reassign handler' : 'Assign handler',
+);
+const canAssign = computed(
+    () => unfinished.value && !cancellationPending.value && page.props.auth.can?.assignOrders === true,
+);
+const validHandlerSelection = computed(() =>
+    availableHandlers.value.some(
+        (handler) => String(handler.id) === String(handlerForm.handler_id),
+    ),
+);
 const handlerNotice = computed(() => {
-    if (!unfinished.value) {
-        return '';
+    if (props.order.cancellation?.status.value === 'requested') {
+        return 'Order handling is paused for cancellation review.';
     }
-    if (!props.order.assigned_handler_id) {
-        return 'Claim this order or assign a handler before processing it.';
-    }
-    if (canProcess.value) {
-        return 'You are responsible for processing this order.';
-    }
-    return page.props.auth.can?.assignOrders
-        ? 'Only the assigned handler can process this order. Reassign it explicitly to yourself or another eligible handler to change responsibility.'
-        : 'Only the assigned handler can process this order. You can view its details.';
+    return '';
 });
+
+watch(
+    () => [props.order.id, props.order.assigned_handler_id],
+    () => {
+        handlerForm.reset();
+        handlerForm.clearErrors();
+    },
+);
+
+function submitHandler() {
+    if (
+        !canAssign.value ||
+        !validHandlerSelection.value ||
+        handlerForm.processing
+    ) {
+        return;
+    }
+    handlerForm.patch(OrderHandlerController.assign(props.order.id), {
+        onSuccess: () => handlerForm.reset(),
+    });
+}
+
+function submitClaim() {
+    if (!canClaim.value || claimForm.processing) {
+        return;
+    }
+    claimForm.post(OrderHandlerController.claim(props.order.id));
+}
 
 const selectedOrderStatus = ref('');
 const orderConfirmationOpen = ref(false);
@@ -432,6 +478,13 @@ defineOptions({
     <main
         class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
     >
+        <OrderCancellationPanel
+            v-if="order.cancellation"
+            :order-id="order.id"
+            :cancellation="order.cancellation"
+            :payment-method="order.payment.method.value"
+            administration
+        />
         <section class="border-border bg-card relative overflow-hidden border">
             <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
             <div
@@ -483,10 +536,20 @@ defineOptions({
             class="border-border bg-card flex flex-wrap items-end gap-4 border p-5"
         >
             <div class="min-w-48 flex-1">
-                <p class="font-semibold">Assigned handler</p>
-                <p class="text-muted-foreground mt-1 text-sm">
-                    {{ order.assigned_handler_name ?? 'Unassigned' }}
-                    <span v-if="canProcess"> (you)</span>
+                <p class="font-semibold">
+                    {{
+                        order.assigned_handler_id
+                            ? `Handled by ${order.assigned_handler_name}`
+                            : 'Unassigned'
+                    }}
+                </p>
+                <p
+                    v-if="
+                        unfinished && order.assigned_handler_id && !canProcess
+                    "
+                    class="text-muted-foreground mt-1 text-sm"
+                >
+                    View only
                 </p>
                 <p
                     v-if="handlerNotice"
@@ -496,14 +559,8 @@ defineOptions({
                 </p>
             </div>
             <form
-                v-if="
-                    page.props.auth.can?.processOrders &&
-                    !order.assigned_handler_id &&
-                    !['completed', 'cancelled'].includes(order.status.value)
-                "
-                @submit.prevent="
-                    claimForm.post(OrderHandlerController.claim(order.id))
-                "
+                v-if="canClaim"
+                @submit.prevent="submitClaim"
             >
                 <Button
                     type="submit"
@@ -514,24 +571,20 @@ defineOptions({
                 <InputError :message="claimForm.errors.handler" />
             </form>
             <form
-                v-if="
-                    handler_options.length && page.props.auth.can?.assignOrders
-                "
-                class="flex items-end gap-2"
-                @submit.prevent="
-                    handlerForm.patch(OrderHandlerController.assign(order.id))
-                "
+                v-if="availableHandlers.length && canAssign"
+                class="flex w-full flex-wrap items-end gap-2 sm:w-auto"
+                @submit.prevent="submitHandler"
             >
-                <div>
-                    <Label for="assigned-handler">Assign handler</Label>
+                <div class="min-w-0 flex-1 sm:flex-none">
+                    <Label for="assigned-handler">{{ handlerAction }}</Label>
                     <select
                         id="assigned-handler"
                         v-model="handlerForm.handler_id"
-                        class="border-input bg-background mt-1 block h-9 min-w-44 border px-2 text-sm"
+                        class="border-input bg-background mt-1 block h-9 w-full min-w-0 border px-2 text-sm sm:w-44"
                     >
-                        <option value="">Select staff</option>
+                        <option value="">Select handler</option>
                         <option
-                            v-for="handler in handler_options"
+                            v-for="handler in availableHandlers"
                             :key="handler.id"
                             :value="handler.id"
                         >
@@ -541,10 +594,8 @@ defineOptions({
                 </div>
                 <Button
                     type="submit"
-                    :disabled="
-                        !handlerForm.handler_id || handlerForm.processing
-                    "
-                    >Assign</Button
+                    :disabled="!validHandlerSelection || handlerForm.processing"
+                    >{{ handlerAction }}</Button
                 >
                 <InputError
                     :message="
@@ -1022,16 +1073,8 @@ defineOptions({
                     aria-label="Shipment actions"
                 >
                     <h2 class="font-semibold">Manual shipment actions</h2>
-                    <p
-                        v-if="!canProcess && unfinished"
-                        class="text-muted-foreground text-sm"
-                    >
-                        {{ handlerNotice }}
-                    </p>
                     <template
-                        v-else-if="
-                            canProcess && order.shipment_actions?.next_status
-                        "
+                        v-if="canProcess && order.shipment_actions?.next_status"
                     >
                         <div
                             v-if="
@@ -1072,6 +1115,7 @@ defineOptions({
                     </template>
                     <p
                         v-else-if="
+                            canProcess &&
                             ['pending', 'processing'].includes(
                                 order.status.value,
                             ) &&
@@ -1087,7 +1131,10 @@ defineOptions({
                                 : 'Verify payment and move the order to Processing before advancing shipment milestones.'
                         }}
                     </p>
-                    <p v-else class="text-muted-foreground text-sm">
+                    <p
+                        v-else-if="canProcess || !unfinished"
+                        class="text-muted-foreground text-sm"
+                    >
                         Shipment progression is closed for this order.
                     </p>
                     <InputError :message="shipmentStatusForm.errors.status" />
@@ -1269,7 +1316,10 @@ defineOptions({
                             Update order status
                         </Button>
                     </div>
-                    <p v-else class="text-muted-foreground mt-4 text-sm">
+                    <p
+                        v-else-if="canProcess || !unfinished"
+                        class="text-muted-foreground mt-4 text-sm"
+                    >
                         <template
                             v-if="
                                 ['completed', 'cancelled'].includes(
@@ -1279,9 +1329,6 @@ defineOptions({
                         >
                             This order is in a terminal state and cannot be
                             changed.
-                        </template>
-                        <template v-else-if="!canProcess">
-                            {{ handlerNotice }}
                         </template>
                         <template
                             v-else-if="order.payment.can_confirm_cod_collection"
@@ -1899,7 +1946,18 @@ defineOptions({
                     </div>
                     <div v-else class="mt-4 grid gap-3">
                         <p class="text-muted-foreground text-sm">
-                            <template v-if="order.status.value === 'cancelled'">
+                            <template
+                                v-if="
+                                    order.cancellation?.status.value ===
+                                    'requested'
+                                "
+                            >
+                                Payment review is paused until the cancellation
+                                request is decided.
+                            </template>
+                            <template
+                                v-else-if="order.status.value === 'cancelled'"
+                            >
                                 Cancelled orders cannot accept payment
                                 decisions. Any recorded payment remains
                                 unchanged.
