@@ -4,6 +4,7 @@ namespace App\Actions\Inventory;
 
 use App\Models\Product;
 use App\Models\User;
+use App\Support\OperationalRequestReason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -27,6 +28,8 @@ class RequestInventoryAdjustment
                     throw ValidationException::withMessages(['replacement' => 'This request cannot be replaced.']);
                 }
             }
+
+            OperationalRequestReason::validateStockAdjustment($reasonCode ?? 'other', $observed, $targetQuantity);
 
             if ($inventory !== null && $observed === $targetQuantity) {
                 throw ValidationException::withMessages(['quantity' => 'The requested quantity must differ from the current quantity.']);

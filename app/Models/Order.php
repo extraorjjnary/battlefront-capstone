@@ -10,6 +10,7 @@ use App\Enums\PaymentStatus;
 use App\Enums\ShipmentStatus;
 use App\Enums\ShippingProfile;
 use App\Enums\UserRole;
+use Carbon\CarbonImmutable;
 use Database\Factories\OrderFactory;
 use DomainException;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -50,6 +51,7 @@ use Illuminate\Support\Carbon;
  * @property PaymentRejectionReason|null $payment_rejection_reason
  * @property string|null $payment_rejection_note
  * @property Carbon $created_at
+ * @property CarbonImmutable|null $pickup_handed_over_at
  * @property-read string $reference
  * @property-read User $user
  * @property-read Collection<int, OrderItem> $items
@@ -187,6 +189,9 @@ class Order extends Model
     protected static function booted(): void
     {
         static::updating(function (Order $order): void {
+            if ($order->getRawOriginal('pickup_handed_over_at') !== null && $order->isDirty('pickup_handed_over_at')) {
+                throw new DomainException('Actual pickup handover timestamps cannot be changed.');
+            }
             if ($order->getRawOriginal('product_subtotal') !== null && $order->isDirty([
                 'user_id', 'fulfillment_method', 'delivery_address', 'delivery_quote_metadata', 'hosted_payment_method',
                 'product_subtotal', 'total_amount', 'delivery_destination', 'delivery_base_fee',
@@ -236,6 +241,7 @@ class Order extends Model
             'delivery_quote_metadata' => 'array',
             'total_amount' => 'decimal:2',
             'status' => OrderStatus::class,
+            'pickup_handed_over_at' => 'immutable_datetime',
             'payment_status' => PaymentStatus::class,
             'payment_method' => PaymentMethod::class,
             'payment_rejection_reason' => PaymentRejectionReason::class,

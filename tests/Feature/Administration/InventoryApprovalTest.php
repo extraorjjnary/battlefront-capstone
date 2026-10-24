@@ -9,6 +9,95 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia;
 
+test('reason based increases and decreases require independent approval and preserve quarantine and ledger entries', function (string $code, int $target, ?string $notes, int $delta, string $role) {
+    $staff = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
+    $reviewer = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', $role)->value('id'),
+    ]);
+    $inventory = Product::factory()->available()->create()->inventory;
+    $inventory->forceFill(['quantity' => 10, 'quarantined_quantity' => 3])->save();
+
+    $this->actingAs($staff)->patch(route('administration.inventory.update', $inventory), [
+        'quantity' => $target, 'reorder_level' => $inventory->reorder_level, 'reason_code' => $code, 'reason' => $notes,
+    ])->assertSessionHasNoErrors();
+
+    $requestId = DB::table('inventory_adjustment_requests')->value('id');
+    $this->assertDatabaseHas('inventories', ['id' => $inventory->id, 'quantity' => 10, 'quarantined_quantity' => 3]);
+    $this->assertDatabaseCount('inventory_movements', 0);
+    $this->assertDatabaseHas('audit_logs', ['action' => 'inventory.adjustment.requested', 'subject_id' => $requestId, 'actor_id' => $staff->id]);
+
+    $this->actingAs($reviewer)->post(route('administration.inventory-adjustments.decide', $requestId), [
+        'decision' => 'approve', 'reason' => 'Shelf count independently verified',
+    ])->assertSessionHasNoErrors();
+
+    $this->assertDatabaseHas('inventories', ['id' => $inventory->id, 'quantity' => $target, 'quarantined_quantity' => 3]);
+    $this->assertDatabaseHas('inventory_adjustment_requests', ['id' => $requestId, 'status' => 'approved', 'reason_code' => $code, 'reviewer_id' => $reviewer->id]);
+    $this->assertDatabaseHas('inventory_movements', [
+        'reference_type' => 'inventory_adjustment_request', 'reference_id' => $requestId,
+        'sellable_before' => 10, 'sellable_delta' => $delta, 'sellable_after' => $target,
+        'quarantined_before' => 3, 'quarantined_delta' => 0, 'quarantined_after' => 3,
+    ]);
+    $this->assertDatabaseHas('audit_logs', ['action' => 'inventory.adjustment.approved', 'subject_id' => $requestId, 'actor_id' => $reviewer->id]);
+})->with([
+    'found' => ['found_stock', 12, null, 2],
+    'loss' => ['theft_loss', 8, 'Two units missing after investigation', -2],
+    'loss without notes' => ['theft_loss', 8, null, -2],
+    'other without notes' => ['other', 12, null, 2],
+    'count increase' => ['count_error', 12, null, 2],
+    'count decrease' => ['count_error', 8, null, -2],
+    'receiving increase' => ['receiving_error', 12, null, 2],
+    'receiving decrease' => ['receiving_error', 8, null, -2],
+    'unit increase' => ['unit_of_measure_error', 12, null, 2],
+    'unit decrease' => ['unit_of_measure_error', 8, null, -2],
+])->with(['manager', 'owner']);
+
+test('approval enforces stock direction while accepting older requests without notes', function (string $code, int $target, string $notes, ?string $field) {
+    $requester = User::factory()->administrator()->create();
+    $reviewer = User::factory()->administrator()->create();
+    $inventory = Product::factory()->available()->create()->inventory;
+    $inventory->forceFill(['quantity' => 10, 'quarantined_quantity' => 3])->save();
+    $id = DB::table('inventory_adjustment_requests')->insertGetId([
+        'product_id' => $inventory->product_id, 'requester_id' => $requester->id,
+        'observed_quantity' => 10, 'target_quantity' => $target, 'reason_code' => $code, 'reason' => $notes,
+        'status' => 'pending', 'created_at' => now(), 'updated_at' => now(),
+    ]);
+    $beforeAudit = DB::table('audit_logs')->count();
+
+    $response = $this->actingAs($reviewer)->post(route('administration.inventory-adjustments.decide', $id), [
+        'decision' => 'approve', 'reason' => 'Independent review of old request',
+    ]);
+
+    if ($field === null) {
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('inventory_adjustment_requests', ['id' => $id, 'status' => 'approved']);
+        $this->assertDatabaseHas('inventories', ['id' => $inventory->id, 'quantity' => 8, 'quarantined_quantity' => 3]);
+        $this->assertDatabaseHas('inventory_movements', ['reference_id' => $id, 'reference_type' => 'inventory_adjustment_request', 'sellable_delta' => -2]);
+        $this->assertDatabaseHas('audit_logs', ['subject_id' => $id, 'action' => 'inventory.adjustment.approved']);
+
+        return;
+    }
+    $response->assertSessionHasErrors($field);
+
+    $this->assertDatabaseHas('inventory_adjustment_requests', ['id' => $id, 'status' => 'pending']);
+    $this->assertDatabaseHas('inventories', ['id' => $inventory->id, 'quantity' => 10, 'quarantined_quantity' => 3]);
+    $this->assertDatabaseCount('inventory_movements', 0);
+    $this->assertDatabaseCount('audit_logs', $beforeAudit);
+
+    $this->actingAs($reviewer)->post(route('administration.inventory-adjustments.decide', $id), [
+        'decision' => 'reject', 'reason' => 'Withdraw and resubmit through the correct workflow',
+    ])->assertSessionHasNoErrors();
+    $this->assertDatabaseHas('inventory_adjustment_requests', ['id' => $id, 'status' => 'rejected']);
+})->with([
+    'found decrease' => ['found_stock', 8, 'Shelf count checked', 'decision'],
+    'loss increase' => ['theft_loss', 12, 'Shelf count checked', 'decision'],
+    'loss without explanation' => ['theft_loss', 8, '', null],
+    'loss with old default label' => ['theft_loss', 8, 'Theft or loss', null],
+    'physical loss with old default label' => ['theft_loss', 8, 'Physical sellable stock count: Theft or loss', null],
+    'damage' => ['damage', 8, 'Damaged units found', 'reason_code'],
+]);
+
 test('ordinary product editing cannot overwrite sellable or quarantined quantities', function () {
     $product = Product::factory()->available()->create();
     $inventory = $product->inventory;
@@ -60,7 +149,11 @@ test('inventory adjustment requests can be searched by product, requester, or re
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->where('filters.q', 'Search adjustment product')
             ->where('requests.total', 1)
-            ->where('requests.data.0.id', $requestId));
+            ->where('requests.data.0.id', $requestId)
+            ->where('requests.data.0.current_quantity', 0)
+            ->where('requests.data.0.observed_quantity', 1)
+            ->where('requests.data.0.target_quantity', 2)
+            ->where('requests.data.0.replacement_id', null));
 });
 
 test('a physical stock count creates a separate approved adjustment request', function () {
@@ -255,6 +348,13 @@ test('a requester can withdraw and replace a pending stock request without chang
     $this->assertDatabaseHas('inventory_adjustment_requests', ['id' => $firstId, 'status' => 'withdrawn']);
     $this->assertDatabaseHas('inventory_adjustment_requests', ['replaces_request_id' => $firstId, 'target_quantity' => $initial + 3, 'status' => 'pending']);
     expect($product->inventory->fresh()->quantity)->toBe($initial);
+
+    $replacementId = DB::table('inventory_adjustment_requests')->where('replaces_request_id', $firstId)->value('id');
+    $this->get(route('administration.inventory-adjustments.index', ['case' => $firstId]))
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('requests.total', 1)->where('requests.data.0.id', $firstId)
+            ->where('requests.data.0.replacement_id', $replacementId)
+            ->where('requests.data.0.current_quantity', $initial));
 });
 
 test('opening stock stays unavailable until a second person approves it', function () {

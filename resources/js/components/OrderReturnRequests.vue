@@ -6,6 +6,8 @@ import {
     withdraw,
 } from '@/actions/App/Http/Controllers/CustomerReturnRequestController';
 import InputError from '@/components/InputError.vue';
+import ReturnInstructions from '@/components/ReturnInstructions.vue';
+import { show as showRefundProof } from '@/routes/orders/refund-payments/proof';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -33,12 +35,32 @@ const form = useForm({
     reason: '',
 });
 const withdrawalForm = useForm({});
+const refundPayments = computed(
+    () =>
+        props.order.refund_payments ??
+        props.order.return_requests?.flatMap(
+            (entry) => entry.refund?.payments ?? [],
+        ) ??
+        [],
+);
+const awaitingReceipt = computed(() =>
+    props.order.return_requests?.some(
+        (entry) => entry.status.value === 'submitted',
+    ),
+);
 const eligibleItems = computed(() =>
     props.order.items.filter((item) => item.can_request),
 );
 const selectedItem = computed(() =>
     eligibleItems.value.find((item) => item.id === Number(form.order_item_id)),
 );
+
+const outcomeLabels = {
+    repair: 'Repair',
+    replacement: 'Replacement',
+    other: 'Other outcome',
+};
+const outcomeStatusLabels = { pending: 'Pending', completed: 'Completed' };
 
 function requestReturn() {
     if (!props.order.can_request_return || form.processing) return;
@@ -82,32 +104,117 @@ function submitWithdrawal() {
 
 <template>
     <section
-        v-if="order.can_request_return || order.return_requests?.length"
+        v-if="
+            order.can_request_return ||
+            order.return_requests?.length ||
+            refundPayments.length
+        "
         aria-labelledby="return-requests-heading"
-        class="surface-panel border-border bg-card space-y-4 border p-5 sm:p-6"
+        class="min-w-0 space-y-4"
     >
         <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="space-y-1">
                 <h2 id="return-requests-heading" class="text-xl font-semibold">
                     Returns and refunds
                 </h2>
-                <p class="text-muted-foreground text-sm">
-                    Requests are reviewed manually after Battlefront receives
-                    the item. Submitting a request does not guarantee approval
-                    or a refund.
-                </p>
             </div>
             <Button
                 v-if="order.can_request_return"
                 type="button"
                 @click="requestReturn"
-                >Request Return/Refund</Button
+                >Request a return</Button
             >
         </div>
+        <p class="text-muted-foreground text-sm">
+            We review requests after receiving the item. Approval and refunds
+            are not guaranteed.
+        </p>
+        <ReturnInstructions
+            v-if="awaitingReceipt && order.return_instructions"
+            :instructions="order.return_instructions"
+        />
+        <p
+            v-if="
+                order.return_eligibility?.window_approved &&
+                order.return_eligibility.deadline_passed
+            "
+            class="text-muted-foreground text-sm"
+        >
+            The change-of-mind period has ended. Other concerns can still be
+            submitted for review.
+        </p>
+        <details class="border-border border-t pt-3 text-sm">
+            <summary
+                class="focus-visible:ring-ring min-h-11 cursor-pointer content-center font-medium focus-visible:ring-2 focus-visible:outline-none"
+            >
+                Return details
+            </summary>
+            <div
+                v-if="order.return_eligibility"
+                class="text-muted-foreground mt-2 space-y-2"
+            >
+                <p v-if="order.return_eligibility.received_at">
+                    Received
+                    {{ formatDateTime(order.return_eligibility.received_at) }}
+                    ({{
+                        order.return_eligibility.receipt_source === 'pickup'
+                            ? 'pickup'
+                            : 'delivery'
+                    }}).
+                </p>
+                <p v-else>
+                    Receipt date unconfirmed. We will review eligibility.
+                </p>
+                <p v-if="!order.return_eligibility.window_approved">
+                    The proposed {{ order.return_eligibility.window_days }}-day
+                    change-of-mind limit awaits store approval and is not
+                    active.
+                </p>
+                <p v-if="order.return_eligibility.deadline_at">
+                    {{
+                        order.return_eligibility.window_approved
+                            ? 'Change-of-mind deadline'
+                            : 'Proposed change-of-mind deadline'
+                    }}:
+                    {{ formatDateTime(order.return_eligibility.deadline_at) }}.
+                </p>
+
+                <p
+                    v-if="
+                        order.return_eligibility.window_approved &&
+                        !order.return_eligibility.deadline_passed &&
+                        order.return_eligibility.remaining_seconds !== null
+                    "
+                >
+                    {{
+                        Math.ceil(
+                            order.return_eligibility.remaining_seconds / 3600,
+                        )
+                    }}
+                    hours left for change-of-mind requests.
+                </p>
+                <p>
+                    Faults, damage, wrong items, description issues, and other
+                    concerns are reviewed individually.
+                </p>
+            </div>
+            <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                <p
+                    v-for="item in order.items"
+                    :key="`balance-${item.id}`"
+                    class="text-muted-foreground text-sm"
+                >
+                    {{ item.product.name }}:
+                    {{ item.remaining_returnable ?? 0 }} of
+                    {{ item.quantity }} units available to request, subject to
+                    review.
+                </p>
+            </div>
+        </details>
         <article
             v-for="entry in order.return_requests"
             :key="entry.id"
-            class="border-border space-y-2 border-t pt-4"
+            class="surface-card border-border bg-card min-w-0 space-y-3 border p-4 sm:p-5"
         >
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -115,7 +222,9 @@ function submitWithdrawal() {
                         {{ entry.product.name }} · {{ entry.quantity }}
                         {{ entry.quantity === 1 ? 'unit' : 'units' }}
                     </h3>
-                    <p class="text-sm font-medium">{{ entry.status.label }}</p>
+                    <p class="text-muted-foreground mt-1 text-sm font-medium">
+                        {{ entry.status.label }}
+                    </p>
                 </div>
                 <Button
                     v-if="entry.can_withdraw"
@@ -141,30 +250,139 @@ function submitWithdrawal() {
                 {{ entry.reason }}
             </p>
             <p v-if="entry.received_at" class="text-muted-foreground text-sm">
-                Item received {{ formatDateTime(entry.received_at) }}
+                Item received
+                {{ formatDateTime(entry.received_at) }}
             </p>
             <p v-if="entry.feedback" class="text-sm">{{ entry.feedback }}</p>
-            <dl v-if="entry.refund" class="grid gap-2 text-sm sm:grid-cols-3">
+            <p
+                v-if="entry.return_decision === 'accepted'"
+                class="text-sm font-medium"
+            >
+                Return accepted
+            </p>
+            <div
+                v-if="entry.resolution && entry.resolution.type !== 'refund'"
+                class="space-y-1 text-sm"
+            >
+                <p v-if="entry.resolution.type === 'unknown'">
+                    Outcome not recorded. Contact Battlefront for an update.
+                </p>
+                <template v-else>
+                    <p>
+                        {{
+                            outcomeLabels[entry.resolution.type] ??
+                            entry.resolution.type
+                        }}:
+                        {{
+                            outcomeStatusLabels[entry.resolution.status] ??
+                            entry.resolution.status
+                        }}
+                    </p>
+                    <p
+                        v-if="entry.resolution.summary"
+                        class="whitespace-pre-wrap"
+                    >
+                        {{ entry.resolution.summary }}
+                    </p>
+                    <p v-if="entry.resolution.completed_at">
+                        Completed
+                        {{ formatDateTime(entry.resolution.completed_at) }}
+                    </p>
+                </template>
+            </div>
+            <p
+                v-if="entry.eligibility_path === 'manual_review'"
+                class="text-muted-foreground text-sm"
+            >
+                Eligibility needs review.
+            </p>
+            <p v-if="entry.refund" class="text-sm">
+                {{
+                    entry.status.value === 'refunded'
+                        ? 'Refund completed through confirmed payments.'
+                        : entry.refund.payment_recorded
+                          ? 'Payment recorded. Awaiting full payment confirmation.'
+                          : 'No refund payment recorded yet.'
+                }}
+            </p>
+            <p
+                v-if="
+                    entry.resolution?.type === 'refund' &&
+                    entry.resolution.summary
+                "
+                class="text-sm whitespace-pre-wrap"
+            >
+                Refund note: {{ entry.resolution.summary }}
+            </p>
+            <dl
+                v-if="entry.refund"
+                class="border-border grid gap-3 border-t pt-3 text-sm sm:grid-cols-3"
+            >
                 <div>
-                    <dt class="text-muted-foreground">Approved refund</dt>
+                    <dt class="text-muted-foreground">Approved</dt>
                     <dd>{{ formatCurrency(entry.refund.approved_amount) }}</dd>
                 </div>
                 <div>
-                    <dt class="text-muted-foreground">
-                        Verified refund payments
-                    </dt>
+                    <dt class="text-muted-foreground">Confirmed paid</dt>
                     <dd>
-                        {{ formatCurrency(entry.refund.verified_paid_amount) }}
+                        {{
+                            formatCurrency(
+                                entry.refund.confirmed_paid_amount ??
+                                    entry.refund.verified_paid_amount,
+                            )
+                        }}
                     </dd>
                 </div>
                 <div>
-                    <dt class="text-muted-foreground">
-                        Awaiting verified payment
-                    </dt>
+                    <dt class="text-muted-foreground">Awaiting confirmation</dt>
                     <dd>{{ formatCurrency(entry.refund.remaining_amount) }}</dd>
                 </div>
             </dl>
         </article>
+        <div
+            v-if="refundPayments.length"
+            class="border-border space-y-3 border-t pt-3"
+        >
+            <h3 class="font-semibold">Refund payments</h3>
+            <div
+                v-for="payment in refundPayments"
+                :key="payment.id"
+                class="space-y-1 text-sm"
+            >
+                <p>
+                    {{
+                        payment.payment_method === 'cash'
+                            ? 'Cash refund confirmed'
+                            : 'Refund payment confirmed'
+                    }}
+                    · {{ formatCurrency(payment.amount) }} ·
+                    {{ formatDateTime(payment.paid_at) }}
+                </p>
+                <a
+                    v-if="payment.proof"
+                    :href="
+                        showRefundProof({
+                            order: order.id,
+                            payment: payment.id,
+                            evidence: payment.proof.id,
+                        }).url
+                    "
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-primary-ink inline-flex min-h-11 items-center underline underline-offset-4"
+                    >View payment proof</a
+                >
+                <p
+                    v-else-if="
+                        payment.payment_method !== 'cash' &&
+                        payment.confirmation_method === 'approver'
+                    "
+                >
+                    Payment proof is unavailable. Contact Battlefront for
+                    assistance.
+                </p>
+            </div>
+        </div>
 
         <Dialog v-model:open="open">
             <DialogContent class="max-h-[90dvh] overflow-y-auto">
@@ -172,13 +390,17 @@ function submitWithdrawal() {
                     <DialogTitle>{{
                         confirming
                             ? 'Confirm return request'
-                            : 'Request Return/Refund'
+                            : 'Request a return'
                     }}</DialogTitle>
                     <DialogDescription
                         >Order {{ order.reference }}. Select one purchased item
                         per request.</DialogDescription
                     >
                 </DialogHeader>
+                <ReturnInstructions
+                    v-if="order.return_instructions"
+                    :instructions="order.return_instructions"
+                />
                 <form
                     class="space-y-4"
                     @submit.prevent="
@@ -245,15 +467,30 @@ function submitWithdrawal() {
                                     ) in order.return_reason_options"
                                     :key="code"
                                     :value="code"
+                                    :disabled="
+                                        order.return_eligibility?.reasons[code]
+                                            ?.can_request === false
+                                    "
                                 >
                                     {{ label }}
                                 </option>
                             </select>
                             <InputError :message="form.errors.reason_code" />
+                            <p
+                                v-if="
+                                    order.return_eligibility?.reasons[
+                                        form.reason_code
+                                    ]?.manual_review
+                                "
+                                class="text-muted-foreground text-sm"
+                            >
+                                We will review eligibility. Approval, refunds,
+                                and other outcomes are not guaranteed.
+                            </p>
                         </div>
                         <div class="space-y-2">
                             <Label for="return-notes"
-                                >Additional notes
+                                >Notes
                                 {{
                                     form.reason_code === 'other'
                                         ? '(required)'
@@ -290,7 +527,7 @@ function submitWithdrawal() {
                         <p>
                             Battlefront must receive and inspect the item before
                             deciding your request. A refund is completed only
-                            after payment verification.
+                            after payment confirmation.
                         </p>
                     </div>
                     <DialogFooter class="gap-2">

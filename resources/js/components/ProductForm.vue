@@ -5,6 +5,7 @@ import { computed, onBeforeUnmount, ref } from 'vue';
 import CategoryController from '@/actions/App/Http/Controllers/Administration/CategoryController';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import InputError from '@/components/InputError.vue';
+import FileInput from '@/components/FileInput.vue';
 import { formatCurrency } from '@/lib/currency';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -386,7 +387,7 @@ function firstTagError(errors) {
                     <Label for="image">Product image</Label>
                     <div class="grid gap-4 sm:grid-cols-[1fr_7rem]">
                         <div>
-                            <Input
+                            <FileInput
                                 id="image"
                                 name="image"
                                 type="file"

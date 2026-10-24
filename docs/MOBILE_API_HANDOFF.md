@@ -1079,15 +1079,15 @@ Representative create/detail response:
 
 An empty list returns `{"data":[]}`. Lists are unpaginated, newest request first. `GET /orders/{order}` adds `can_request_return`, `return_reason_options` (code-to-label object), and `return_requests` containing the same resources. Each purchased item adds `remaining_returnable` and `can_request`; respect both because an open request can block new submission even with remaining units. Existing order/payment status values remain unchanged.
 
-| `status.value`      | Label / meaning                                                                      |
-| ------------------- | ------------------------------------------------------------------------------------ |
-| `submitted`         | Request submitted / Awaiting item receipt; no physical return or inventory change    |
-| `withdrawn`         | Withdrawn; history retained                                                          |
-| `under_review`      | Item received / Under review; Staff has recorded actual receipt                      |
-| `approved`          | Approved; no positive approved refund exists                                         |
-| `rejected`          | Rejected; safe feedback distinguishes awaiting collection from handed back           |
-| `refund_processing` | Refund processing; positive refund approved, not fully verified                      |
-| `refunded`          | Refund completed; latest verified payment records cover the positive approved refund |
+| `status.value`      | Label / meaning                                                                   |
+| ------------------- | --------------------------------------------------------------------------------- |
+| `submitted`         | Request submitted / Awaiting item receipt; no physical return or inventory change |
+| `withdrawn`         | Withdrawn; history retained                                                       |
+| `under_review`      | Item received / Under review; Staff has recorded actual receipt                   |
+| `approved`          | Approved; no positive approved refund exists                                      |
+| `rejected`          | Rejected; safe feedback distinguishes awaiting collection from handed back        |
+| `refund_processing` | Refund processing; positive refund approved, not fully confirmed                  |
+| `refunded`          | Refund completed; confirmed payment records cover the positive approved refund    |
 
 For positive approved refunds, `refund` has decimal-string peso amounts. Example partial progress:
 
@@ -1104,7 +1104,7 @@ For positive approved refunds, `refund` has decimal-string peso amounts. Example
 }
 ```
 
-On full verification the status becomes `{"value":"refunded","label":"Refund completed"}` and `remaining_amount` becomes `"0.00"`. Recorded, disputed, or voided payments do not establish completion. Approval does not pay a refund. Internal notes, employee identities, evidence paths, audit records, and payment references are excluded.
+On full payment confirmation the status becomes `{"value":"refunded","label":"Refund completed"}` and `remaining_amount` becomes `"0.00"`. New payments are confirmed by the Manager or Owner who approved the return; a second administrator is not required. Historical unreviewed, disputed, or voided payments do not establish completion. Approval alone does not pay a refund. Internal notes, employee identities, storage paths, audit records, and payment references are excluded.
 
 Errors retain native Laravel envelopes: missing/invalid bearer token **401**, administrator identity **403**, foreign/missing orders/items/requests **404**, invalid input or lifecycle/quantity conflict **422**, existing API rate limit **429**. For example, a repeated request returns:
 
@@ -1119,4 +1119,111 @@ Errors retain native Laravel envelopes: missing/invalid bearer token **401**, ad
 
 Render field errors instead of parsing the summary message. Repeated withdrawal/receipt conflicts use `errors.return_request`. This API has no idempotency-key contract: after an uncertain response, retrieve request history before retrying.
 
-The separate Expo repository must add the completed-order action, single-item form, quantity bounds, optional/Other notes, confirmation before submission, history/status, and pre-receipt withdrawal confirmation. Disable repeated taps while requests are in flight and refresh order details after mutations. Display the manual-review notice without adding return deadlines, approval promises, pickup scheduling, or refund guarantees. Native UI and device/LAN integration were not implemented in this Laravel repository.
+The separate Expo repository must add the completed-order action, single-item form, quantity bounds, optional/Other notes, confirmation before submission, history/status, and pre-receipt withdrawal confirmation. Disable repeated taps while requests are in flight and refresh order details after mutations. Display manual-review notices and the server-supplied proposed/approved eligibility metadata described below, without adding approval promises, pickup scheduling, or refund guarantees. Native UI and device/LAN integration were not implemented in this Laravel repository.
+
+### Return workflow refinements
+
+The endpoints and creation payload above remain unchanged. Order detail now additionally supplies `return_eligibility`:
+
+```json
+{
+    "received_at": "2026-10-23T06:30:00+00:00",
+    "receipt_source": "delivery",
+    "deadline_at": "2026-10-30T06:30:00+00:00",
+    "window_days": 7,
+    "window_approved": false,
+    "policy_status": "proposed",
+    "deadline_passed": false,
+    "remaining_seconds": 604800,
+    "timezone": "Asia/Manila",
+    "reasons": {
+        "changed_mind": { "can_request": true, "manual_review": true },
+        "defective": { "can_request": true, "manual_review": true }
+    }
+}
+```
+
+The example shows two reason entries; the actual map includes all existing reason codes. Eligibility still requires the owning customer's completed order with a recorded sale, remaining units, and no open request. Each item additionally supplies `purchased_quantity`, `returned_quantity` (physically received/accepted or awaiting rejected-item handback), and `pending_request_quantity`; `remaining_returnable` retains its quantity-balance meaning.
+
+`received_at` here means the customer's **original purchase receipt**: recorded delivery or actual pickup handover. A missing receipt yields null receipt/deadline/remaining seconds and requires manual confirmation. Display times in the supplied business timezone. The proposed seven-day duration means exactly 168 elapsed hours; equality at the deadline is allowed.
+
+The configurable policy remains disabled until Battlefront approval (`BATTLEFRONT_RETURN_WINDOW_APPROVED=false`; duration `BATTLEFRONT_RETURN_WINDOW_DAYS=7`). While proposed, deadlines are informational and must be labeled proposed. Once approved, only `changed_mind` expires automatically; other existing reasons, including defect or warranty concerns explained through Other, use manual assessment without guarantees of entitlement. An expired Changed mind submission returns native 422 `errors.reason_code`. Do not turn this into a blanket rejection of defect/remedy concerns.
+
+Requests snapshot `eligibility_path` (`discretionary`, `manual_review`, or null for older records), `eligibility_receipt_at`, and `eligibility_deadline_at`. A request submitted legitimately remains valid for receipt/review after expiry; later requests use the original purchase receipt/deadline. Withdrawal remains available only before physical return receipt.
+
+Request resources now add `return_decision` (`pending`, `accepted`, `rejected`) and nullable `resolution`. Existing top-level status values are preserved; `approved` is labeled **Return accepted**. A repair example:
+
+```json
+{
+    "return_decision": "accepted",
+    "status": { "value": "approved", "label": "Return accepted" },
+    "resolution": {
+        "type": "repair",
+        "status": "pending",
+        "summary": "Repair and return the original hardware",
+        "completed_at": null
+    },
+    "refund": null
+}
+```
+
+Resolution types are `refund`, `replacement`, `repair`, `other`, or `unknown` for an accepted legacy outcome without an authoritative resolution/refund. Nonmonetary resolutions remain pending until authorized actual fulfillment; completion returns `status=completed` and its recorded timestamp. Their private references and completion notes are excluded. Legacy unknown outcomes are not reconstructed or marked fulfilled.
+
+A monetary resolution stays pending until sufficient confirmed payments; its completion timestamp is null because completion is derived from payment reviews. Existing positive legacy refund records remain authoritative without creating new historical resolution records. `refund` retains approved/verified/remaining amounts and `payment_recorded` (boolean), and adds `confirmed_paid_amount` and `payments` as described below. Display **Return accepted**, **Refund approved**, payment progress, and completion distinctly. The overall refund status stays `refund_processing` until confirmed payments cover the approved amount. Customer feedback comes from explicitly public review feedback or a generated safe explanation, never internal inspection notes.
+
+### Confirmed refund payments and customer proof
+
+The original approving Manager OR Owner confirms each new actual payment; no second administrator is required. Noncash payments require one image snapshot, while cash requires confirmation of actual handover and no snapshot. These changes are administration web-only. Historical payment reviews remain unchanged; old pending payments are not automatically confirmed.
+
+`GET /orders/{order}` adds `data.refund_payments`, including confirmed payments for Staff-assisted returns without a customer request. Each request's `refund.payments` contains the same entries for that return. `refund.confirmed_paid_amount` is the confirmed total; `verified_paid_amount` remains a compatibility alias for that total. Example:
+
+```json
+{
+    "confirmed_paid_amount": "40.00",
+    "verified_paid_amount": "40.00",
+    "payments": [
+        {
+            "id": 23,
+            "amount": "40.00",
+            "payment_method": "gcash",
+            "paid_at": "2026-10-23T08:30:00+00:00",
+            "confirmation_method": "approver",
+            "proof": {
+                "id": 41,
+                "url": "/api/v1/orders/7/refund-payments/23/proof/41"
+            }
+        }
+    ]
+}
+```
+
+`confirmation_method` is `approver` for new confirmed payments or `legacy_review` for historical verified payments. `proof` is null for cash, legacy/private attachments, or an unavailable file. Never infer that a missing proof means another payment is due.
+
+`GET /api/v1/orders/{order}/refund-payments/{payment}/proof/{evidence}` streams JPEG/PNG/WebP image bytes, not a JSON envelope. Send the customer's Sanctum bearer token in the Authorization header; never put tokens in URLs. The response is private with `Cache-Control: private, no-store`. Missing authentication returns 401; foreign, unavailable, or unshareable proof returns 404. Only explicitly shared new payment proof is accessible; inspection photos and historical private evidence remain private.
+
+When confirmed payments cover the approved refund, the existing notification feed receives `refund.completed` with an order-details link. The separate Expo client needs a confirmed-payment list and authenticated image viewing on that order page. Retain the existing partial-payment status until the remaining balance is zero.
+
+Existing request `received_at` continues to mean **Battlefront received the returned item**, distinct from the original purchase receipt in `return_eligibility`. Native clients should use the added metadata for reason availability, remaining quantity, proposed/active deadline wording, and nonmonetary resolution progress. Administration, evidence, review, actual fulfillment, and payment verification remain web-only.
+
+### Return instructions and Staff receipt photos
+
+`GET /orders/{order}` additionally returns `data.return_instructions`; customer web receives the same object as `order.return_instructions`. Request creation, listing, status and withdrawal payloads/endpoints remain unchanged.
+
+```json
+{
+    "return_instructions": {
+        "label": "Return instructions",
+        "branch": {
+            "name": "Battlefront Computer Trading",
+            "city": "Sagay City",
+            "address": "A, E Marañon St., Brgy. Poblacion II, Sagay City, Negros Occidental (beside LBC Sagay City), Sagay, Philippines 6122",
+            "contact_number": "0938 647 6046"
+        },
+        "message": "Pack securely, including opened items, and include your order/request number. Use original packaging if available. Contact us before courier shipping (e.g. LBC) to confirm delivery and charges. Returns require inspection and approval."
+    }
+}
+```
+
+The destination uses the current published operational branch record; do not hardcode this example in Expo. `branch` is null when no published operational branch with an address is available. Display **Contact Battlefront to confirm the return address.** in that case. A missing phone is null and should be hidden. The destination is Battlefront's store; “beside LBC” is its landmark. These instructions do not assign courier charges, guarantee approval, or make original packaging mandatory.
+
+Display the compact notice in the return form and once in the order's return section while a request awaits physical receipt. Staff now supplies mandatory product photos when recording actual receipt through the web application. Customers do not upload these Staff inspection photos, and the mobile API does not receive or expose their private paths. Manager/Owner views product evidence read-only; refund-payment proof retains its separate recording and verification workflow. Expo should render this added metadata; the native interface remains work for the separate repository.

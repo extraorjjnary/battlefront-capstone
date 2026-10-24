@@ -1,5 +1,7 @@
 <script setup>
 import PageHeader from '@/components/PageHeader.vue';
+import StockAdjustmentSummary from '@/components/administration/StockAdjustmentSummary.vue';
+import DamageReportController from '@/actions/App/Http/Controllers/Administration/DamageReportController';
 import { Form, Head, Link, usePage } from '@inertiajs/vue3';
 import InventoryAdjustmentController from '@/actions/App/Http/Controllers/Administration/InventoryAdjustmentController';
 import InventoryController from '@/actions/App/Http/Controllers/Administration/InventoryController';
@@ -11,6 +13,7 @@ import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
 import { ref, watch } from 'vue';
 
 const requestReasonCodes = ref({});
+const requestedQuantities = ref({});
 
 const props = defineProps({
     requests: { type: Object, required: true },
@@ -96,9 +99,7 @@ defineOptions({
                                 ? 'Physical count submitted by'
                                 : 'Stock change requested by'
                         }}
-                        {{ entry.requester_name }} · Current
-                        {{ entry.observed_quantity }} → Requested
-                        {{ entry.target_quantity }}
+                        {{ entry.requester_name }}
                     </p>
                     <p class="mt-2 text-sm">{{ entry.reason }}</p>
                     <p
@@ -129,6 +130,24 @@ defineOptions({
                 </div>
                 <span class="text-sm capitalize">{{ entry.status }}</span>
             </div>
+            <StockAdjustmentSummary
+                :current-quantity="
+                    entry.status === 'pending'
+                        ? entry.current_quantity
+                        : entry.observed_quantity
+                "
+                :requested-quantity="entry.target_quantity"
+            />
+            <p
+                v-if="
+                    entry.status === 'pending' &&
+                    entry.current_quantity !== entry.observed_quantity
+                "
+                class="text-destructive text-sm"
+            >
+                Stock was {{ entry.observed_quantity }} units when requested.
+                Stock changed after this request; submit a new request.
+            </p>
             <Form
                 v-if="
                     entry.status === 'pending' &&
@@ -152,7 +171,11 @@ defineOptions({
                     minlength="5"
                     maxlength="2000"
                 />
-                <InputError :message="errors.reason || errors.decision" />
+                <InputError
+                    :message="
+                        errors.reason || errors.reason_code || errors.decision
+                    "
+                />
                 <div class="flex gap-2">
                     <Button
                         class="min-h-11"
@@ -220,7 +243,17 @@ defineOptions({
                         min="0"
                         required
                         :default-value="entry.target_quantity"
+                        @update:model-value="
+                            requestedQuantities[entry.id] = $event
+                        "
                 /></label>
+                <StockAdjustmentSummary
+                    class="sm:col-span-2"
+                    :current-quantity="entry.current_quantity"
+                    :requested-quantity="
+                        requestedQuantities[entry.id] ?? entry.target_quantity
+                    "
+                />
                 <label
                     v-if="entry.initial_reorder_level !== null"
                     class="max-w-full min-w-0 text-sm"
@@ -239,7 +272,6 @@ defineOptions({
                     class="border-input bg-background focus-visible:ring-ring min-h-11 max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
                 >
                     <option value="">Select a reason</option>
-                    <option value="damage">Damage</option>
                     <option value="theft_loss">Theft or loss</option>
                     <option value="found_stock">Found stock</option>
                     <option value="count_error">Count correction</option>
@@ -256,17 +288,20 @@ defineOptions({
                     <option value="other">Other</option>
                 </select>
                 <label class="max-w-full min-w-0 text-sm sm:col-span-2"
-                    >{{
-                        requestReasonCodes[entry.id] === 'other'
-                            ? 'Additional notes (required)'
-                            : 'Additional notes (optional)'
-                    }}<Input
+                    >Notes (Optional)<Input
                         class="min-h-11"
                         name="reason"
-                        :required="requestReasonCodes[entry.id] === 'other'"
                         minlength="5"
                         maxlength="2000"
                 /></label>
+                <p class="text-muted-foreground text-sm sm:col-span-2">
+                    For damaged stock, use
+                    <Link
+                        :href="DamageReportController.index()"
+                        class="text-primary-ink underline"
+                        >Damage Reports</Link
+                    >.
+                </p>
                 <Button class="min-h-11" type="submit" :disabled="processing"
                     >Send new request</Button
                 >

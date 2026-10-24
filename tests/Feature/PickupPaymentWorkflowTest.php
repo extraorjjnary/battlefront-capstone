@@ -40,7 +40,7 @@ test('Cash and Card pickup can be processed unpaid and confirmed exactly once wi
         ->where('order.allowed_status_transitions', [
             ['value' => 'processing', 'label' => 'Processing'], ['value' => 'cancelled', 'label' => 'Cancelled'],
         ]));
-    $this->patch(route('administration.orders.status.update', $order), ['status' => 'processing'])->assertSessionHasNoErrors();
+    $this->patch(route('administration.orders.status.update', $order), ['status' => 'processing', 'products_handed_over_confirmed' => false])->assertSessionHasNoErrors();
     expect($order->refresh())->status->toBe(OrderStatus::Processing)->payment_status->toBe(PaymentStatus::Pending);
     $this->assertDatabaseCount('sales', 0);
     $this->assertDatabaseCount('notifications', 0);
@@ -68,6 +68,43 @@ test('Cash and Card pickup can be processed unpaid and confirmed exactly once wi
         ->assertJsonPath('data.status.value', 'completed')->assertJsonPath('data.status.label', 'Picked up / Completed')
         ->assertJsonPath('data.payment.status.value', 'verified')->assertJsonPath('data.payment.notice', 'Battlefront has confirmed your payment and completed pickup.');
 })->with([PaymentMethod::Cash, PaymentMethod::CardAtStore]);
+
+test('wallet pickup processes without handover but completion still requires actual handover', function (PaymentMethod $method) {
+    $order = pickupPaymentOrder($method, payment: PaymentStatus::Verified);
+    $handler = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $handler->id;
+    $order->save();
+    $this->actingAs($handler)->patch(route('administration.orders.status.update', $order), [
+        'status' => 'processing', 'products_handed_over_confirmed' => false,
+    ])->assertSessionHasNoErrors();
+    expect($order->refresh()->status)->toBe(OrderStatus::Processing);
+    $this->patch(route('administration.orders.status.update', $order), [
+        'status' => 'completed', 'products_handed_over_confirmed' => false,
+    ])->assertSessionHasErrors('products_handed_over_confirmed');
+    expect($order->refresh()->status)->toBe(OrderStatus::Processing);
+    expect($order->pickup_handed_over_at)->toBeNull();
+    $this->assertDatabaseCount('sales', 0);
+    $this->patch(route('administration.orders.status.update', $order), [
+        'status' => 'completed', 'products_handed_over_confirmed' => true,
+    ])->assertSessionHasNoErrors();
+    expect($order->refresh()->status)->toBe(OrderStatus::Completed);
+    expect($order->pickup_handed_over_at)->not->toBeNull();
+    $this->assertDatabaseCount('sales', 1);
+})->with([PaymentMethod::GCash, PaymentMethod::Maya]);
+
+test('cancelling an order does not require product handover', function () {
+    $order = pickupPaymentOrder(PaymentMethod::Cash);
+    $handler = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $handler->id;
+    $order->save();
+    $this->actingAs($handler)->patch(route('administration.orders.status.update', $order), [
+        'status' => 'cancelled', 'products_handed_over_confirmed' => false,
+    ])->assertSessionHasNoErrors();
+    expect($order->refresh()->status)->toBe(OrderStatus::Cancelled);
+    expect($order->pickup_handed_over_at)->toBeNull();
+    expect(Inventory::sole()->quantity)->toBe(10);
+    $this->assertDatabaseCount('sales', 0);
+});
 
 test('pickup confirmation requires both payment receipt and product handover', function (array $payload, array $fields) {
     $order = pickupPaymentOrder(PaymentMethod::CardAtStore, OrderStatus::Processing);
@@ -230,7 +267,7 @@ test('prepaid pickup continues requiring verified payment before processing and 
     $service = app(OrderProcessingService::class);
     if ($payment === PaymentStatus::Verified) {
         $service->updateStatus($order, OrderStatus::Processing);
-        $service->updateStatus($order, OrderStatus::Completed);
+        $service->updateStatus($order, OrderStatus::Completed, productsHandedOver: true);
         expect($order->refresh()->status)->toBe(OrderStatus::Completed);
         $this->assertDatabaseCount('sales', 1);
     } else {

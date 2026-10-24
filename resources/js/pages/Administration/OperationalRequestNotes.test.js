@@ -90,6 +90,7 @@ function harness(t, pageName) {
         paymentEvidence: {},
         refundPayments: {},
         selected_order: { id: 1, reference: 'BF-000001', items: [] },
+        can_receive_returns: true,
         low_stock_count: 0,
         out_of_stock_count: 0,
     });
@@ -239,21 +240,36 @@ for (const [pageName, controller, method, id, reasonCode] of requestForms) {
         const current = () => app.form(controller, method, id);
         assert.ok(field(current(), 'reason_code').props.required !== undefined);
         assert.equal(field(current(), 'reason').props.required, false);
-        assert.match(html, /Additional notes \(optional\)/);
+        assert.match(
+            html,
+            pageName === 'CustomerReturns'
+                ? /Notes \(optional\)/
+                : /Additional notes \(optional\)/,
+        );
 
         selectReason(current(), 'other');
         html = await app.html();
         assert.equal(field(current(), 'reason').props.required, true);
         assert.equal(field(current(), 'reason').props.minlength, '5');
         assert.equal(field(current(), 'reason').props.maxlength, '2000');
-        assert.match(html, /Additional notes \(required\)/);
+        assert.match(
+            html,
+            pageName === 'CustomerReturns'
+                ? /Notes \(required\)/
+                : /Additional notes \(required\)/,
+        );
 
         selectReason(current(), reasonCode);
         html = await app.html();
         assert.equal(field(current(), 'reason').props.required, false);
         assert.equal(field(current(), 'reason').props.minlength, '5');
         assert.equal(field(current(), 'reason').props.maxlength, '2000');
-        assert.doesNotMatch(html, /Additional notes \(required\)/);
+        assert.doesNotMatch(
+            html,
+            pageName === 'CustomerReturns'
+                ? /Notes \(required\)/
+                : /Additional notes \(required\)/,
+        );
     });
 }
 

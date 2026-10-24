@@ -185,6 +185,78 @@ function orderProps(overrides = {}) {
     };
 }
 
+test('pending order processing submits without product handover', () => {
+    const { component, submissions } = loadPage(
+        '../Administration/Orders/Show.vue',
+    );
+    const state = component.setup(
+        orderProps({
+            can_process: true,
+            assigned_handler_id: 9,
+            allowed_status_transitions: [
+                { value: 'processing', label: 'Processing' },
+            ],
+        }),
+        { expose() {} },
+    );
+    state.selectOrderStatus('processing');
+    state.requestOrderStatusUpdate();
+    assert.equal(submissions.length, 1);
+    assert.equal(state.orderStatusForm.status, 'processing');
+    assert.equal(state.orderStatusForm.products_handed_over_confirmed, false);
+    assert.equal(state.orderConfirmationOpen.value, false);
+});
+
+test('order handover validation errors remain visible outside the closed completion dialog', async () => {
+    const loaded = loadPage('../Administration/Orders/Show.vue', true);
+    const setup = loaded.component.setup;
+    loaded.component.setup = (props, context) => {
+        const render = setup(props, context);
+        loaded.forms.find(
+            (form) =>
+                'status' in form && 'products_handed_over_confirmed' in form,
+        ).errors.products_handed_over_confirmed =
+            'Confirm actual product handover before completing pickup.';
+        return render;
+    };
+    const props = orderProps({
+        can_process: true,
+        assigned_handler_id: 9,
+        allowed_status_transitions: [
+            { value: 'processing', label: 'Processing' },
+        ],
+    });
+    delete props.isConfirmation;
+    const html = await renderToString(Vue.h(loaded.component, props));
+    assert.match(
+        html,
+        /Confirm actual product handover before completing pickup/,
+    );
+});
+
+test('wallet pickup completion requires explicit actual handover', () => {
+    const { component, submissions } = loadPage(
+        '../Administration/Orders/Show.vue',
+    );
+    const state = component.setup(
+        orderProps({
+            can_process: true,
+            assigned_handler_id: 9,
+            status: { value: 'processing', label: 'Processing' },
+            allowed_status_transitions: [
+                { value: 'completed', label: 'Completed' },
+            ],
+        }),
+        { expose() {} },
+    );
+    state.orderStatusForm.status = 'completed';
+    state.submitOrderStatus();
+    assert.equal(submissions.length, 0);
+    state.orderStatusForm.products_handed_over_confirmed = true;
+    state.submitOrderStatus();
+    assert.equal(submissions.length, 1);
+});
+
 test('customer detail shows cancellation only for server-eligible orders', async () => {
     const eligible = loadPage('./Show.vue', true);
     const html = await renderToString(Vue.h(eligible.component, orderProps()));

@@ -4,6 +4,7 @@ import { Form, Head, Link, usePage } from '@inertiajs/vue3';
 import DamageReportController from '@/actions/App/Http/Controllers/Administration/DamageReportController';
 import AdministrationEvidenceController from '@/actions/App/Http/Controllers/Administration/AdministrationEvidenceController';
 import InputError from '@/components/InputError.vue';
+import FileInput from '@/components/FileInput.vue';
 import SearchableProductSelect from '@/components/administration/SearchableProductSelect.vue';
 import SearchField from '@/components/SearchField.vue';
 import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
@@ -241,7 +242,7 @@ defineOptions({
                     class="flex max-w-full min-w-0 flex-wrap items-end gap-2"
                 >
                     <label class="max-w-full min-w-0 text-sm"
-                        >Photos or documents<input
+                        >Photos or documents<FileInput
                             name="files[]"
                             type="file"
                             multiple

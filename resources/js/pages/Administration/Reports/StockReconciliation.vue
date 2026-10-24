@@ -1,5 +1,7 @@
 <script setup>
 import PageHeader from '@/components/PageHeader.vue';
+import StockAdjustmentSummary from '@/components/administration/StockAdjustmentSummary.vue';
+import DamageReportController from '@/actions/App/Http/Controllers/Administration/DamageReportController';
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import StockReconciliationController from '@/actions/App/Http/Controllers/Administration/StockReconciliationController';
 import InventoryController from '@/actions/App/Http/Controllers/Administration/InventoryController';
@@ -8,7 +10,9 @@ import { Form } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
-import { watch } from 'vue';
+import { ref, watch } from 'vue';
+
+const requestedQuantities = ref({});
 
 const props = defineProps({
     inventories: { type: Object, required: true },
@@ -203,6 +207,14 @@ defineOptions({
                                     v-slot="{ errors, processing }"
                                     class="mt-2 grid max-w-full min-w-0 min-w-56 gap-2"
                                 >
+                                    <StockAdjustmentSummary
+                                        :current-quantity="item.sellable"
+                                        :requested-quantity="
+                                            requestedQuantities[
+                                                item.inventory_id
+                                            ] ?? item.sellable
+                                        "
+                                    />
                                     <input
                                         type="hidden"
                                         name="observed_quantity"
@@ -216,6 +228,11 @@ defineOptions({
                                             min="0"
                                             required
                                             :default-value="item.sellable"
+                                            @update:model-value="
+                                                requestedQuantities[
+                                                    item.inventory_id
+                                                ] = $event
+                                            "
                                     /></label>
                                     <label class="max-w-full min-w-0 text-xs"
                                         >Count reason<select
@@ -225,9 +242,6 @@ defineOptions({
                                         >
                                             <option value="">
                                                 Select a reason
-                                            </option>
-                                            <option value="damage">
-                                                Damage
                                             </option>
                                             <option value="theft_loss">
                                                 Theft or loss
@@ -250,15 +264,24 @@ defineOptions({
                                         </select></label
                                     >
                                     <label class="max-w-full min-w-0 text-xs"
-                                        >Count notes<Input
+                                        >Notes (Optional)<Input
                                             aria-label="Notes"
                                             class="min-h-11"
                                             name="reason"
-                                            required
                                             minlength="5"
                                             maxlength="2000"
                                             placeholder="Who counted and when"
                                     /></label>
+                                    <p class="text-muted-foreground text-xs">
+                                        For damaged stock, use
+                                        <Link
+                                            :href="
+                                                DamageReportController.index()
+                                            "
+                                            class="text-primary-ink underline"
+                                            >Damage Reports</Link
+                                        >.
+                                    </p>
                                     <Button
                                         class="min-h-11"
                                         type="submit"

@@ -419,6 +419,7 @@ test('administrators can apply approved order status transitions', function (
         ->from(route('administration.orders.show', $order))
         ->patch(route('administration.orders.status.update', $order), [
             'status' => $nextStatus->value,
+            'products_handed_over_confirmed' => $nextStatus === OrderStatus::Completed,
         ]);
 
     $response
@@ -481,6 +482,7 @@ test('completing an eligible order records one authoritative sale without changi
     $response = $this->actingAs($administrator)
         ->patch(route('administration.orders.status.update', $order), [
             'status' => OrderStatus::Completed->value,
+            'products_handed_over_confirmed' => true,
         ]);
 
     $response
@@ -511,10 +513,12 @@ test('repeated completion processing cannot create duplicate sales', function ()
     $this->actingAs($administrator)
         ->patch(route('administration.orders.status.update', $order), [
             'status' => OrderStatus::Completed->value,
+            'products_handed_over_confirmed' => true,
         ])
         ->assertSessionHasNoErrors();
     $this->patch(route('administration.orders.status.update', $order), [
         'status' => OrderStatus::Completed->value,
+        'products_handed_over_confirmed' => true,
     ])->assertSessionHasErrors([
         'status' => 'This order cannot move to the selected status.',
     ]);
@@ -537,7 +541,7 @@ test('completion failure rolls back both the order status and sale', function ()
     );
 
     try {
-        expect(fn () => app(OrderProcessingService::class)->updateStatus($order, OrderStatus::Completed))
+        expect(fn () => app(OrderProcessingService::class)->updateStatus($order, OrderStatus::Completed, productsHandedOver: true))
             ->toThrow(RuntimeException::class, 'Forced sale recording failure.');
     } finally {
         Event::forget('eloquent.created: '.Sale::class);
@@ -665,6 +669,7 @@ test('pending or rejected prepaid payment blocks order processing and completion
         ->from(route('administration.orders.show', $order))
         ->patch(route('administration.orders.status.update', $order), [
             'status' => $nextStatus->value,
+            'products_handed_over_confirmed' => $nextStatus === OrderStatus::Completed,
         ]);
 
     $response
@@ -711,6 +716,7 @@ test('administrators cannot apply unapproved order status transitions', function
         ->from(route('administration.orders.show', $order))
         ->patch(route('administration.orders.status.update', $order), [
             'status' => $nextStatus->value,
+            'products_handed_over_confirmed' => $nextStatus === OrderStatus::Completed,
         ]);
 
     $response

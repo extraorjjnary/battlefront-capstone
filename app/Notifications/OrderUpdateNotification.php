@@ -28,6 +28,7 @@ class OrderUpdateNotification extends Notification
             'order.placed' => 'New customer order',
             'payment.proof_submitted' => 'Payment proof awaiting review',
             'payment.verified' => 'Payment verified',
+            'refund.completed' => 'Refund completed',
             'payment.rejected' => 'Payment rejected',
             'order.cancelled' => 'Order cancelled',
             'shipment.manual_created' => 'Delivery arrangement recorded',

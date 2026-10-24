@@ -19,12 +19,12 @@ const dialog = {
     },
 };
 
-function loadComponent(inlineTemplate = false) {
+function loadComponent(
+    inlineTemplate = false,
+    file = './OrderReturnRequests.vue',
+) {
     const { descriptor } = parse(
-        readFileSync(
-            new URL('./OrderReturnRequests.vue', import.meta.url),
-            'utf8',
-        ),
+        readFileSync(new URL(file, import.meta.url), 'utf8'),
     );
     const script = compileScript(descriptor, {
         id: 'return-request-test',
@@ -86,6 +86,17 @@ function loadComponent(inlineTemplate = false) {
         '@/components/ui/label': { Label: primitive },
         '@/components/ui/spinner': { Spinner: primitive },
         '@/components/InputError.vue': { default: primitive },
+        '@/routes/orders/refund-payments/proof': {
+            show: ({ order, payment, evidence }) => ({
+                url: `/orders/${order}/refund-payments/${payment}/proof/${evidence}`,
+            }),
+        },
+        '@/components/ReturnInstructions.vue': {
+            default:
+                file === './OrderReturnRequests.vue'
+                    ? loadComponent(true, './ReturnInstructions.vue').component
+                    : primitive,
+        },
         '@/lib/currency': { formatCurrency },
         '@/lib/dateTime': { formatDateTime },
     };
@@ -105,6 +116,7 @@ function order(overrides = {}) {
             {
                 id: 8,
                 product: { name: 'Purchased monitor' },
+                quantity: 2,
                 can_request: true,
                 remaining_returnable: 2,
             },
@@ -178,10 +190,10 @@ test('server-ineligible orders cannot open or submit a return request', async ()
             order: order({ can_request_return: false }),
         }),
     );
-    assert.doesNotMatch(html, /Request Return\/Refund/);
+    assert.doesNotMatch(html, /Request a return/);
 });
 
-test('customer progress renders verified refund amounts and escapes customer notes', async () => {
+test('customer progress renders verified refund amounts and public refund explanations while escaping notes', async () => {
     const { component } = loadComponent(true);
     const html = await renderToString(
         Vue.createSSRApp(component, {
@@ -201,9 +213,16 @@ test('customer progress renders verified refund amounts and escapes customer not
                         submitted_at: '2026-10-23T00:00:00Z',
                         can_withdraw: false,
                         feedback: 'Your return has been approved.',
+                        resolution: {
+                            type: 'refund',
+                            status: 'pending',
+                            summary:
+                                'Partial refund agreed for the returned component.',
+                        },
                         refund: {
                             approved_amount: '100.00',
                             verified_paid_amount: '40.00',
+                            payment_recorded: true,
                             remaining_amount: '60.00',
                         },
                     },
@@ -212,9 +231,223 @@ test('customer progress renders verified refund amounts and escapes customer not
         }),
     );
     assert.match(html, /Refund processing/);
-    assert.match(html, /Verified refund payments/);
+    assert.match(html, /Confirmed paid/);
+    assert.match(
+        html,
+        /Refund note: Partial refund agreed for the returned component/,
+    );
     assert.match(html, /40\.00/);
     assert.match(html, /60\.00/);
     assert.doesNotMatch(html, /Refund completed|Withdraw request|<script>/);
     assert.match(html, /&lt;script&gt;/);
+});
+
+test('receipt eligibility labels the proposed policy and keeps manual review available after expiry', async () => {
+    const { component } = loadComponent(true);
+    const html = await renderToString(
+        Vue.createSSRApp(component, {
+            order: order({
+                return_eligibility: {
+                    received_at: '2026-10-23T06:30:00Z',
+                    receipt_source: 'delivery',
+                    deadline_at: '2026-10-30T06:30:00Z',
+                    window_days: 7,
+                    window_approved: true,
+                    deadline_passed: true,
+                    remaining_seconds: 0,
+                },
+            }),
+        }),
+    );
+    assert.match(html, /Received/);
+    assert.match(html, /change-of-mind period has ended/);
+    assert.match(html, /can still be submitted for review/);
+    assert.match(html, /2 of/);
+});
+
+test('nonmonetary acceptance shows pending repair without claiming fulfillment or payment', async () => {
+    const { component } = loadComponent(true);
+    const html = await renderToString(
+        Vue.createSSRApp(component, {
+            order: order({
+                return_requests: [
+                    {
+                        id: 1,
+                        product: { name: 'Original hardware' },
+                        quantity: 1,
+                        status: { value: 'approved', label: 'Return accepted' },
+                        return_decision: 'accepted',
+                        reason_label: 'Defective',
+                        submitted_at: '2026-10-23T06:30:00Z',
+                        can_withdraw: false,
+                        resolution: {
+                            type: 'repair',
+                            status: 'pending',
+                            summary: 'Repair the original hardware',
+                            completed_at: null,
+                        },
+                        refund: null,
+                    },
+                ],
+            }),
+        }),
+    );
+    assert.match(html, /Repair: Pending/);
+    assert.match(html, /Repair the original hardware/);
+    assert.doesNotMatch(html, /Refund completed|Confirmed paid|Completed/);
+});
+
+test('fully verified refunds display completion without asking customers to await verification', async () => {
+    const { component } = loadComponent(true);
+    const html = await renderToString(
+        Vue.createSSRApp(component, {
+            order: order({
+                return_requests: [
+                    {
+                        id: 1,
+                        product: { name: 'Returned hardware' },
+                        quantity: 1,
+                        status: {
+                            value: 'refunded',
+                            label: 'Refund completed',
+                        },
+                        return_decision: 'accepted',
+                        reason_label: 'Defective',
+                        submitted_at: '2026-10-23T06:30:00Z',
+                        can_withdraw: false,
+                        resolution: {
+                            type: 'refund',
+                            status: 'completed',
+                            completed_at: null,
+                        },
+                        refund: {
+                            approved_amount: '100.00',
+                            verified_paid_amount: '100.00',
+                            remaining_amount: '0.00',
+                            payment_recorded: true,
+                        },
+                    },
+                ],
+            }),
+        }),
+    );
+    assert.match(html, /Refund completed through confirmed payments/);
+    assert.doesNotMatch(
+        html,
+        /Awaiting full payment confirmation|No refund payment recorded yet/,
+    );
+});
+
+test('awaiting receipt shows one compact notice using the server return destination', async () => {
+    const { component } = loadComponent(true);
+    const instructions = {
+        label: 'Return instructions',
+        branch: {
+            name: 'Battlefront Computer Trading',
+            city: 'Sagay City',
+            address: 'Verified Sagay return address',
+            contact_number: '0938 647 6046',
+        },
+        message:
+            'Pack securely. Contact us before courier shipping (e.g. LBC).',
+    };
+    const html = await renderToString(
+        Vue.createSSRApp(component, {
+            order: order({
+                return_instructions: instructions,
+                return_requests: [
+                    {
+                        id: 1,
+                        product: { name: 'Returned monitor' },
+                        quantity: 1,
+                        status: {
+                            value: 'submitted',
+                            label: 'Awaiting receipt',
+                        },
+                        reason_label: 'Defective',
+                        submitted_at: '2026-10-23T06:30:00Z',
+                        can_withdraw: true,
+                    },
+                ],
+            }),
+        }),
+    );
+    assert.equal(
+        (html.match(/aria-label="Return instructions"/g) ?? []).length,
+        1,
+    );
+    assert.match(html, /Verified Sagay return address/);
+    assert.match(html, /0938 647 6046/);
+    assert.match(html, /Contact us before courier shipping/);
+});
+
+test('return notice uses a safe fallback without inventing a missing address', async () => {
+    const { component } = loadComponent(true, './ReturnInstructions.vue');
+    const html = await renderToString(
+        Vue.createSSRApp(component, {
+            instructions: {
+                label: 'Return instructions',
+                branch: null,
+                message: 'Returns require inspection and approval.',
+            },
+        }),
+    );
+    assert.match(html, /Contact Battlefront to confirm the return address/);
+    assert.doesNotMatch(html, /undefined|null|0938/);
+});
+
+test('Staff-assisted refund proof remains visible without any customer request entries', async () => {
+    const { component } = loadComponent(true);
+    const html = await renderToString(
+        Vue.createSSRApp(component, {
+            order: order({
+                can_request_return: false,
+                return_requests: [],
+                refund_payments: [
+                    {
+                        id: 3,
+                        amount: '100.00',
+                        payment_method: 'gcash',
+                        paid_at: '2026-10-23T06:30:00Z',
+                        confirmation_method: 'approver',
+                        proof: { id: 4 },
+                    },
+                ],
+            }),
+        }),
+    );
+    assert.match(html, /View payment proof/);
+    assert.match(html, /\/orders\/7\/refund-payments\/3\/proof\/4/);
+    assert.doesNotMatch(html, /Request a return|independently verified/);
+});
+
+test('proposed return limits stay inactive and supporting details remain available', async () => {
+    const { component } = loadComponent(true);
+    const html = await renderToString(
+        Vue.createSSRApp(component, {
+            order: order({
+                return_eligibility: {
+                    received_at: null,
+                    deadline_at: null,
+                    window_days: 7,
+                    window_approved: false,
+                    deadline_passed: false,
+                    remaining_seconds: null,
+                },
+            }),
+        }),
+    );
+
+    assert.match(
+        html,
+        /<details\b[^>]*>\s*<summary[^>]*>\s*Return details\s*<\/summary>/,
+    );
+    assert.match(html, /Receipt date unconfirmed/);
+    assert.match(
+        html,
+        /7-day change-of-mind limit awaits store approval and is not active/,
+    );
+    assert.match(html, /2 of 2 units available to request, subject to review/);
+    assert.match(html, /Approval and refunds are not guaranteed/);
+    assert.doesNotMatch(html, /period has ended/);
 });

@@ -29,14 +29,20 @@ const { isCurrentOrParentUrl, isCurrentUrl } = useCurrentUrl();
                               )
                             : isCurrentUrl(item.href)
                     "
-                    :tooltip="item.title"
+                    :tooltip="
+                        item.pendingCount > 0
+                            ? `${item.title}, ${item.pendingCount} pending actions`
+                            : item.title
+                    "
                 >
                     <Link
                         :href="item.href"
                         :aria-label="
                             item.badgeCount !== undefined
                                 ? `${item.title}, ${item.badgeCount} ${item.badgeCount === 1 ? 'unit' : 'units'} in cart`
-                                : undefined
+                                : item.pendingCount > 0
+                                  ? `${item.title}, ${item.pendingCount} pending ${item.pendingCount === 1 ? 'action' : 'actions'}`
+                                  : undefined
                         "
                     >
                         <span
@@ -62,7 +68,18 @@ const { isCurrentOrParentUrl, isCurrentUrl } = useCurrentUrl();
                             </span>
                         </span>
                         <component :is="item.icon" v-else aria-hidden="true" />
-                        <span>{{ item.title }}</span>
+                        <span class="min-w-0 truncate">{{ item.title }}</span>
+                        <span
+                            v-if="item.pendingCount > 0"
+                            data-slot="pending-actions-badge"
+                            aria-hidden="true"
+                            class="bg-primary text-primary-foreground ml-auto flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold tabular-nums group-data-[collapsible=icon]:hidden"
+                            >{{
+                                item.pendingCount > 99
+                                    ? '99+'
+                                    : item.pendingCount
+                            }}</span
+                        >
                     </Link>
                 </SidebarMenuButton>
             </SidebarMenuItem>

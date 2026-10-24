@@ -18,8 +18,39 @@ class AdministrationWorkQueue
      */
     public function paginate(User $actor, array $filters = []): LengthAwarePaginator
     {
+        $query = $this->query($actor);
+
+        if ($query === null) {
+            return new LengthAwarePaginator([], 0, 25);
+        }
+
+        return $query
+            ->when($filters['kind'] ?? null, fn (Builder $query, string $kind): Builder => $query->where('kind', $kind))
+            ->when($filters['responsible'] ?? null, fn (Builder $query, string $responsible): Builder => $query->where('responsible_name', 'like', '%'.$responsible.'%'))
+            ->when($filters['older_than'] ?? null, fn (Builder $query, int $days): Builder => $query->where('created_at', '<', now()->subDays($days)))
+            ->orderBy('created_at')->orderBy('kind')->orderBy('id')
+            ->paginate(25)->withQueryString()
+            ->through(fn (stdClass $entry): array => $this->present($entry));
+    }
+
+    /** @return array<string, int> */
+    public function counts(User $actor): array
+    {
+        return $this->query($actor)?->select('kind')->selectRaw('count(*) as total')
+            ->groupBy('kind')->pluck('total', 'kind')
+            ->map(fn (mixed $total): int => (int) $total)->all() ?? [];
+    }
+
+    private function query(User $actor): ?Builder
+    {
         $queries = [];
-        if ($actor->can('orders.view') && $actor->can('returns.request')) {
+        if ($actor->can('orders.view') && $actor->can('returns.dispatch')) {
+            $queries[] = DB::table('customer_return_resolutions as work')
+                ->select('work.id', 'work.customer_return_id as case_id', 'work.created_at')
+                ->selectRaw("null as responsible_name, null as responsible_active, 'pending' as status, 'customer_resolution' as kind")
+                ->where('work.type', '<>', 'refund')->whereNull('work.completed_at');
+        }
+        if (app(AdministrationEvidenceService::class)->canReceiveCustomerReturn($actor)) {
             $queries[] = DB::table('customer_return_requests as work')
                 ->select('work.id', 'work.id as case_id', 'work.created_at')
                 ->selectRaw("null as responsible_name, null as responsible_active, 'submitted' as status, 'customer_request' as kind")
@@ -52,14 +83,14 @@ class AdministrationWorkQueue
         if ($actor->can('orders.view') && $actor->can('returns.dispatch')) {
             $queries[] = $this->entries('customer_returns as work', 'customer_handover', 'rejected_pending_handover');
         }
-        if ($actor->can('orders.view') && $actor->can('returns.record_payment')) {
+        if ($actor->can('orders.view') && $actor->can('returns.record_payment') && $actor->can('returns.approve')) {
             $queries[] = DB::table('customer_refunds as work')
                 ->join('customer_returns as returns', 'returns.id', '=', 'work.customer_return_id')
                 ->leftJoin('users', 'users.id', '=', 'work.approved_by')
                 ->select('work.id', 'work.customer_return_id as case_id', 'work.created_at', 'users.name as responsible_name')
                 ->selectRaw('null as responsible_active')
                 ->selectRaw("'unpaid' as status, 'refund' as kind")
-                ->whereColumn('work.paid_amount', '<', 'work.approved_amount');
+                ->where('work.approved_by', $actor->id)->whereColumn('work.paid_amount', '<', 'work.approved_amount');
         }
         if ($actor->can('orders.view') && $actor->can('returns.reconcile')) {
             $queries[] = DB::table('customer_refund_payments as work')
@@ -92,7 +123,7 @@ class AdministrationWorkQueue
         }
 
         if ($queries === []) {
-            return new LengthAwarePaginator([], 0, 25);
+            return null;
         }
 
         $combined = array_shift($queries);
@@ -100,13 +131,7 @@ class AdministrationWorkQueue
             $combined->unionAll($query);
         }
 
-        return DB::query()->fromSub($combined, 'work_queue')
-            ->when($filters['kind'] ?? null, fn (Builder $query, string $kind): Builder => $query->where('kind', $kind))
-            ->when($filters['responsible'] ?? null, fn (Builder $query, string $responsible): Builder => $query->where('responsible_name', 'like', '%'.$responsible.'%'))
-            ->when($filters['older_than'] ?? null, fn (Builder $query, int $days): Builder => $query->where('created_at', '<', now()->subDays($days)))
-            ->orderBy('created_at')->orderBy('kind')->orderBy('id')
-            ->paginate(25)->withQueryString()
-            ->through(fn (stdClass $entry): array => $this->present($entry));
+        return DB::query()->fromSub($combined, 'work_queue');
     }
 
     /** @param string|list<string> $statuses */
@@ -136,6 +161,7 @@ class AdministrationWorkQueue
             },
             'customer_handover' => ['Hand goods back to customer', 'administration.customer-returns.index'],
             'customer_request' => ['Confirm physical receipt of customer request', 'administration.customer-returns.index'],
+            'customer_resolution' => ['Confirm actual customer resolution fulfillment', 'administration.customer-returns.index'],
             'refund' => ['Record outstanding refund payment', 'administration.customer-returns.index'],
             'refund_reconciliation' => ['Reconcile refund payment', 'administration.customer-returns.index'],
             'customer_return' => ['Review customer return', 'administration.customer-returns.index'],

@@ -24,6 +24,7 @@ class OrderStatusController extends Controller
             $order,
             OrderStatus::from($request->validated('status')),
             actor: $request->user(),
+            productsHandedOver: $request->boolean('products_handed_over_confirmed'),
         );
 
         Inertia::flash('toast', [

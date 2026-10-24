@@ -5,12 +5,15 @@ namespace App\Services;
 use App\Enums\UserRole;
 use App\Models\User;
 use App\Notifications\TeamAccessChanged;
+use App\Repositories\Administration\TeamRepository;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class TeamAccessService
 {
+    public function __construct(private readonly TeamRepository $directory) {}
+
     /**
      * @param  array{name: string, email: string, password: string, role: string}  $attributes
      */
@@ -217,5 +220,43 @@ class TeamAccessService
                 ->where('is_active', true)->get()
                 ->each(fn (User $owner) => $owner->notify(new TeamAccessChanged($action, $actor->name, $subjectId)));
         });
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function page(User $actor, array $filters): array
+    {
+        $directory = $this->directory;
+        $isOwner = $actor->administrationRoleCode() === 'owner';
+        $users = $directory->users($filters);
+        $userIds = array_map('intval', array_values($users->getCollection()->modelKeys()));
+        $assignedOrderCounts = $directory->assignedOrderCounts($userIds);
+        $assignedOrders = $actor->can('orders.view') ? $directory->assignedOrders($userIds) : collect();
+        $users->through(fn (User $user): array => [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->administrationRoleCode(),
+            'can_edit' => $isOwner || in_array($user->administrationRoleCode(), ['staff', 'manager'], true),
+            'is_active' => $user->is_active,
+            'open_order_count' => (int) ($assignedOrderCounts[$user->id] ?? 0),
+            'open_order_ids' => $assignedOrders[$user->id] ?? [],
+        ]);
+
+        return [
+            'users' => $users,
+            'filters' => $filters,
+            'canViewOrders' => $actor->can('orders.view'),
+            'canAssignOrders' => $actor->can('orders.assign'),
+            'availableRoles' => $isOwner ? ['staff', 'manager', 'owner', 'it'] : ['staff', 'manager'],
+            'canManagePermissions' => $actor->can('permissions.manage'),
+            'defaultPermissions' => $actor->can('permissions.manage') ? config('administration.default_permissions') : [],
+            'staffAllowedPermissions' => $actor->can('permissions.manage') ? config('administration.staff_allowed_permissions') : [],
+            'permissions' => $actor->can('permissions.manage') ? $directory->permissions() : [],
+            'grants' => $actor->can('permissions.manage') ? $directory->grants() : [],
+            'roleVersions' => $actor->can('permissions.manage') ? $directory->roleVersions() : [],
+        ];
     }
 }

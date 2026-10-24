@@ -2,6 +2,7 @@
 
 use App\Enums\UserRole;
 use App\Models\Inventory;
+use App\Models\Order;
 use App\Models\User;
 use App\Notifications\TeamAccessChanged;
 use App\Services\Notifications\NotificationHistory;
@@ -9,6 +10,23 @@ use App\Services\TeamAccessService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
+
+test('team directory keeps open order counts and the first five integer order identifiers', function () {
+    $owner = User::factory()->administrator()->create();
+    $staff = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
+    $orders = Order::factory()->count(7)->create(['assigned_handler_id' => $staff->id, 'created_at' => '2026-10-01 08:00:00']);
+    Order::factory()->create(['assigned_handler_id' => $staff->id, 'status' => 'completed']);
+    $expectedIds = $orders->take(5)->pluck('id')->all();
+
+    $this->actingAs($owner)->get(route('administration.team.index', ['q' => $staff->email]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('users.total', 1)
+            ->where('users.data.0.id', $staff->id)
+            ->where('users.data.0.open_order_count', 7)
+            ->where('users.data.0.open_order_ids', $expectedIds));
+});
 
 test('team access notifications contain the audit event for owners', function () {
     $owner = User::factory()->administrator()->create();
@@ -243,7 +261,9 @@ test('default permissions are available only to the owner', function (string $ro
     if ($role === 'it') {
         $response->assertInertia(fn (Assert $page) => $page
             ->where('canManagePermissions', false)->where('defaultPermissions', [])
-            ->where('staffAllowedPermissions', []));
+            ->where('staffAllowedPermissions', [])
+            ->where('permissions', [])->where('grants', [])->where('roleVersions', [])
+            ->where('availableRoles', ['staff', 'manager']));
     } else {
         $response->assertForbidden();
     }

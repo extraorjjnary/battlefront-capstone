@@ -11,6 +11,13 @@ return [
 
     'timezone' => 'Asia/Manila',
 
+    'returns' => [
+        // Proposed discretionary policy; enable only after Battlefront approval.
+        'window_days' => (int) env('BATTLEFRONT_RETURN_WINDOW_DAYS', 7),
+        'window_approved' => (bool) env('BATTLEFRONT_RETURN_WINDOW_APPROVED', false),
+        'discretionary_reasons' => ['changed_mind'],
+    ],
+
     /** Legacy bootstrap defaults; published branch information is database-backed. */
     'operating_hours' => '8:00 AM–6:00 PM',
 

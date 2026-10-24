@@ -1,4 +1,5 @@
 <script setup>
+import FileInput from '@/components/FileInput.vue';
 import PageHeader from '@/components/PageHeader.vue';
 import { Form, Head, Link } from '@inertiajs/vue3';
 import {
@@ -863,7 +864,7 @@ defineOptions({
 
                             <div class="grid gap-2">
                                 <Label for="payment-proof">Payment proof</Label>
-                                <Input
+                                <FileInput
                                     :key="paymentProofKey"
                                     id="payment-proof"
                                     name="payment_proof"

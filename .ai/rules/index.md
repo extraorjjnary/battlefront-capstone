@@ -1,38 +1,38 @@
 # Project Rules Index
 
 
-
 | Applies to | Rule file |
 | --- | --- |
 | app/Actions/Product/** | .ai/rules/actions-product.md |
+| app/Models/Product.php,app/Http/Controllers/Administration/ProductController.php,app/Http/Requests/Administration/SaveProductRequest.php | .ai/rules/administration.md |
 | app/Actions/{Inventory,Order}/**,app/Services/Order/**,app/Http/Controllers/Administration/Order*,resources/js/pages/Administration/Orders/** | .ai/rules/administration-orders.md |
 | app/Http/{Requests,Controllers}/Administration/SalesReport*,resources/js/pages/Administration/Reports/** | .ai/rules/administration-reports.md |
-| app/Models/Product.php,app/Http/Controllers/Administration/ProductController.php,app/Http/Requests/Administration/SaveProductRequest.php | .ai/rules/administration.md |
 | routes/api.php,app/Http/Controllers/Api/**,config/sanctum.php | .ai/rules/api.md |
 | app/**,database/**,resources/js/** | .ai/rules/app-js.md |
-| app/Models/** | .ai/rules/app-models.md |
 | app/Http/Controllers/**,app/Actions/**,app/Services/**,app/Repositories/** | .ai/rules/application-architecture.md |
+| app/Models/** | .ai/rules/app-models.md |
 | app/Models/User.php,config/fortify.php,routes/**,app/Providers/FortifyServiceProvider.php,resources/js/pages/{auth,settings,Administration/Customers}/**,tests/Feature/{Auth,Settings,Administration}/** | .ai/rules/auth-settings-administration.md |
 | app/Models/Branch.php,app/Services/BranchDirectory.php,app/Http/Requests/Administration/*Branch*,database/seeders/BranchSeeder.php,config/battlefront.php,resources/js/pages/**/Branches/** | .ai/rules/branches.md |
-| app/Actions/{Cart,Checkout}/**,app/Services/Cart/**,app/Http/Controllers/*Checkout*,app/Http/Requests/ValidateCheckoutRequest.php,resources/js/pages/{Cart,Checkout}/**/*.vue | .ai/rules/cart-checkout.md |
 | app/Actions/Cart/**,app/Services/Cart/** | .ai/rules/cart.md |
+| app/Actions/{Cart,Checkout}/**,app/Services/Cart/**,app/Http/Controllers/*Checkout*,app/Http/Requests/ValidateCheckoutRequest.php,resources/js/pages/{Cart,Checkout}/**/*.vue | .ai/rules/cart-checkout.md |
 | resources/js/{pages/Cart,components/cart}/**/*.vue | .ai/rules/cartcomponents-cart.md |
 | resources/js/components/catalog/StockAvailability.vue | .ai/rules/catalog.md |
-| app/Actions/Chatbot/**,app/Services/Chatbot/**,app/Http/Requests/Administration/*ChatbotKnowledge*.php,resources/js/pages/Administration/ChatbotKnowledge/**,database/seeders/DevelopmentChatbotKnowledgeSeeder.php | .ai/rules/chatbot-knowledge-seeders.md |
-| app/Actions/Chatbot/**,app/Http/Controllers/Administration/ChatbotKnowledgeController.php,resources/js/pages/Administration/ChatbotKnowledge/** | .ai/rules/chatbot-knowledge.md |
 | app/{Ai,Services/Chatbot}/** | .ai/rules/chatbot.md |
+| app/Actions/Chatbot/**,app/Http/Controllers/Administration/ChatbotKnowledgeController.php,resources/js/pages/Administration/ChatbotKnowledge/** | .ai/rules/chatbot-knowledge.md |
+| app/Actions/Chatbot/**,app/Services/Chatbot/**,app/Http/Requests/Administration/*ChatbotKnowledge*.php,resources/js/pages/Administration/ChatbotKnowledge/**,database/seeders/DevelopmentChatbotKnowledgeSeeder.php | .ai/rules/chatbot-knowledge-seeders.md |
+| config/battlefront.php,app/Http/Controllers/CheckoutController.php,resources/js/pages/Checkout/** | .ai/rules/checkout.md |
 | app/Actions/Checkout/**,app/Http/Requests/ValidateCheckoutRequest.php,resources/js/pages/Checkout/** | .ai/rules/checkout-http-requests-js-pages-checkout.md |
 | app/Services/Order/**,app/Actions/{Checkout,Order}/**,app/Models/Product.php,config/battlefront.php | .ai/rules/checkout-order-models.md |
 | app/Services/Order/**,app/Enums/PaymentMethod.php,app/Models/Order.php,app/Http/Controllers/Administration/Order*,resources/js/pages/{Checkout,Orders,Administration/Orders}/** | .ai/rules/checkout-orders-administration-orders.md |
-| config/battlefront.php,app/Http/Controllers/CheckoutController.php,resources/js/pages/Checkout/** | .ai/rules/checkout.md |
-| database/seeders/DevelopmentHistoricalSalesSeeder.php,app/Console/Commands/ResetDevCommand.php,database/seeders/DevelopmentCustomerSeeder.php | .ai/rules/commands-seeders.md |
 | database/seeders/DevelopmentHistoricalSalesSeeder.php,app/Console/Commands/ResetDevCommand.php, database/seeders/DevelopmentCustomerSeeder.php,app/Console/Commands/ResetDevCommand.php, database/seeders/DatabaseSeeder.php,app/Console/Commands/ResetDevCommand.php | .ai/rules/commands.md |
+| database/seeders/DevelopmentHistoricalSalesSeeder.php,app/Console/Commands/ResetDevCommand.php,database/seeders/DevelopmentCustomerSeeder.php | .ai/rules/commands-seeders.md |
+| database/seeders/**,app/Http/Controllers/BranchController.php,resources/js/components/BranchMap.vue | .ai/rules/components.md |
 | app/Models/Inventory.php,app/Repositories/Inventory/**,app/Actions/Chatbot/Context/ResolveProductContext.php,resources/js/components/catalog/StockAvailability.vue | .ai/rules/components-catalog.md |
 | app/Actions/Chatbot/**,app/Services/Chatbot/**,resources/js/components/chatbot/** | .ai/rules/components-chatbot.md |
-| database/seeders/**,app/Http/Controllers/BranchController.php,resources/js/components/BranchMap.vue | .ai/rules/components.md |
 | resources/js/composables/useNotificationPolling* | .ai/rules/composables.md |
-| app/Services/Order/**,app/Http/Controllers/**/*Order*,resources/js/pages/**/Orders/** | .ai/rules/controllers-js-pages-orders.md |
 | routes/**,app/Http/Controllers/** | .ai/rules/controllers.md |
+| app/Services/AdministrationEvidenceService.php,app/Http/Controllers/Administration/CustomerReturnController.php | .ai/rules/controllers-administration.md |
+| app/Services/Order/**,app/Http/Controllers/**/*Order*,resources/js/pages/**/Orders/** | .ai/rules/controllers-js-pages-orders.md |
 | app/Http/Controllers/{DashboardController,ProductCatalogController}.php,resources/js/pages/{Dashboard,Products}/** | .ai/rules/dashboard-products.md |
 | app/Services/Order/PsgcDeliveryLocations.php,app/Http/Requests/ValidateCheckoutRequest.php,app/Actions/Checkout/**,resources/js/pages/Checkout/**,app/Http/Resources/Api/V1/CheckoutResource.php,resources/data/psgc-delivery*.json | .ai/rules/data.md |
 | app/Actions/Forecasting/** | .ai/rules/forecasting.md |
@@ -40,27 +40,30 @@
 | app/Http/Controllers/** | .ai/rules/http-controllers.md |
 | app/Services/Order/**,app/Services/CustomerOrderPresenter.php,app/Http/Requests/ValidateCheckoutRequest.php,config/battlefront.php,resources/js/pages/Checkout/**,docs/*API*,docs/PSGC_DELIVERY_DATA.md | .ai/rules/http-requests-js-pages-checkout.md |
 | app/Services/Dashboard/**,app/Repositories/Inventory/** | .ai/rules/inventory.md |
+| app/Actions/Inventory/HandleCustomerReturn*.php,app/Services/CustomerReturn*.php | .ai/rules/inventory-services.md |
+| config/**,app/Models/Branch.php,resources/js/** | .ai/rules/js.md |
 | app/Http/Controllers/BranchController.php,resources/js/pages/Branches/**,resources/js/components/BranchMap.vue | .ai/rules/js-components.md |
+| app/Actions/Order/**,app/Services/Order/**,app/Http/Controllers/Administration/Order*,resources/js/pages/Administration/Orders/** | .ai/rules/js-pages-administration-orders.md |
 | app/Actions/{Checkout,Order}/**,app/Http/Requests/ValidateCheckoutRequest.php,app/Services/DeliveryQuotePresenter.php,resources/js/pages/Checkout/** | .ai/rules/js-pages-checkout.md |
 | app/Actions/Order/**,app/Services/Order/**,app/Http/Controllers/**/*Order*,resources/js/pages/**/Orders/** | .ai/rules/js-pages-orders.md |
-| config/**,app/Models/Branch.php,resources/js/** | .ai/rules/js.md |
 | resources/js/pages/Administration/Forecasting.vue,resources/js/lib/forecastUnits.js | .ai/rules/lib.md |
-| app/Models/{Order,Shipment}.php,app/Services/Order/**,database/factories/{Order,Shipment}Factory.php,database/migrations/*delivery_snapshots*,database/migrations/*shipments* | .ai/rules/migrations-migrations.md |
 | database/migrations/** | .ai/rules/migrations.md |
+| app/Models/{Order,Shipment}.php,app/Services/Order/**,database/factories/{Order,Shipment}Factory.php,database/migrations/*delivery_snapshots*,database/migrations/*shipments* | .ai/rules/migrations-migrations.md |
+| database/migrations/**,app/Models/** | .ai/rules/models.md |
 | app/{Models/User.php,Services/TeamAccessService.php,Console/Commands/AssignAdministrationRole.php},database/seeders/DatabaseSeeder.php | .ai/rules/models-commands-seeders.md |
-| app/Services/Order/**,app/Models/Shipment.php,resources/js/pages/**/Orders/** | .ai/rules/models-js-pages-orders.md |
 | config/**,database/seeders/**,app/Models/Branch.php,resources/js/** | .ai/rules/models-js.md |
+| app/Services/Order/**,app/Models/Shipment.php,resources/js/pages/**/Orders/** | .ai/rules/models-js-pages-orders.md |
 | app/Models/**,database/migrations/**, app/Models/{Order,OrderItem}.php,database/migrations/*_create_order*_table.php, app/Models/Order.php,database/migrations/*development_fixture_key*,tests/LegacyQuarterlySalesFixtures.php | .ai/rules/models-migrations.md |
 | app/Models/Product.php,app/Repositories/Catalog/** | .ai/rules/models-repositories-catalog.md |
-| database/migrations/**,app/Models/** | .ai/rules/models.md |
-| resources/js/lib/orderStatus.js,resources/js/pages/{Administration/Orders,Orders}/** | .ai/rules/orders-orders.md |
+| app/Services/CustomerReturnEligibility.php,app/Actions/Inventory/HandleCustomerReturnRequest.php,app/Services/Order/**,app/Models/Order.php,config/battlefront.php | .ai/rules/order-models.md |
 | app/Http/Controllers/OrderController.php,resources/js/pages/Orders/** | .ai/rules/orders.md |
-| app/Http/Controllers/Administration/OrderController.php,resources/js/pages/Administration/Orders/Index.vue | .ai/rules/pages-administration-orders.md |
+| resources/js/lib/orderStatus.js,resources/js/pages/{Administration/Orders,Orders}/** | .ai/rules/orders-orders.md |
+| resources/js/app.js,resources/js/pages/** | .ai/rules/pages.md |
 | app/{Models/User.php,Services/TeamAccessService.php,Http/Controllers/Administration/TeamController.php},database/**,resources/js/pages/Administration/Team.vue | .ai/rules/pages-administration.md |
+| app/Http/Controllers/Administration/OrderController.php,resources/js/pages/Administration/Orders/Index.vue | .ai/rules/pages-administration-orders.md |
 | app/Actions/{Cart,Checkout,Order,Inventory}/**,app/Services/{Cart,Order}/**,app/Http/Controllers/OrderController.php,resources/js/pages/Checkout/** | .ai/rules/pages-checkout.md |
 | app/Models/Order.php,app/Http/Controllers/OrderController.php,resources/js/pages/Orders/** | .ai/rules/pages-orders.md |
 | app/Http/Requests/Settings/ProfileUpdateRequest.php,app/Support/PhilippineMobileNumber.php,resources/js/pages/settings/Profile.vue,resources/js/pages/Checkout/Index.vue | .ai/rules/pages-settings-js-pages-checkout.md |
-| resources/js/app.js,resources/js/pages/** | .ai/rules/pages.md |
 | app/Services/RealCatalogImportService.php,app/Services/CatalogShippingClassification.php,app/Actions/Product/** | .ai/rules/product.md |
 | app/Models/{Product,Category}.php,database/migrations/**,app/Actions/{Product,Category}/**,resources/js/pages/Administration/{Products,Categories}/** | .ai/rules/products-categories.md |
 | routes/web.php,app/Providers/AppServiceProvider.php,resources/js/pages/Administration/Products/**,resources/js/components/CatalogNavigation.vue | .ai/rules/products-js-components.md |
@@ -71,11 +74,9 @@
 | app/Services/Order/**,app/Actions/Checkout/**,app/Http/Requests/ValidateCheckoutRequest.php,config/battlefront.php,resources/js/pages/Checkout/**,docs/*API*,docs/PSGC_DELIVERY_DATA.md | .ai/rules/requests-js-pages-checkout.md |
 | routes/api.php,app/Http/Controllers/Api/**,app/Http/Resources/** | .ai/rules/resources.md |
 | app/Actions/Chatbot/**,database/seeders/DevelopmentChatbotKnowledgeSeeder.php | .ai/rules/seeders.md |
-| app/Services/Chatbot/** | .ai/rules/services-chatbot.md |
 | app/Console/Commands/**,app/Services/RealCatalogImportService.php,database/PrepareCatalogImageManifest.ps1 | .ai/rules/services.md |
-| app/Services/Order/PsgcDeliveryLocations.php,app/Http/Requests/Settings/ProfileUpdateRequest.php,app/Models/User.php,resources/js/components/DeliveryAddressFields.vue,resources/js/pages/settings/Profile.vue,resources/js/pages/Checkout/Index.vue | .ai/rules/settings-js-pages-checkout.md |
+| app/Services/Chatbot/** | .ai/rules/services-chatbot.md |
 | routes/settings.php,app/Http/Controllers/Settings/**,resources/js/pages/settings/** | .ai/rules/settings.md |
+| app/Services/Order/PsgcDeliveryLocations.php,app/Http/Requests/Settings/ProfileUpdateRequest.php,app/Models/User.php,resources/js/components/DeliveryAddressFields.vue,resources/js/pages/settings/Profile.vue,resources/js/pages/Checkout/Index.vue | .ai/rules/settings-js-pages-checkout.md |
 | tests/** | .ai/rules/tests.md |
 | app/Services/Notifications/**,app/Services/Order/**,app/Actions/Order/**,app/Jobs/**,app/Http/Controllers/**/*Notification*,app/Http/Controllers/Api/V1/PushDeviceController.php | .ai/rules/v1.md |
-| app/Actions/Inventory/HandleCustomerReturn*.php,app/Services/CustomerReturn*.php                                                                                                                                                                                      | .ai/rules/inventory-services.md                    |
-| app/Actions/Order/**,app/Services/Order/**,app/Http/Controllers/Administration/Order*,resources/js/pages/Administration/Orders/**                                                                                                                                     | .ai/rules/js-pages-administration-orders.md        |

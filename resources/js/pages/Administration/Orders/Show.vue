@@ -94,7 +94,10 @@ const pickupConfirmationForm = useForm({
     payment_received_confirmed: false,
     products_handed_over_confirmed: false,
 });
-const orderStatusForm = useForm({ status: '' });
+const orderStatusForm = useForm({
+    status: '',
+    products_handed_over_confirmed: false,
+});
 const manualShipmentDialogOpen = ref(false);
 const manualShipmentForm = useForm({
     arrangement_confirmed: false,
@@ -248,6 +251,13 @@ function requestOrderStatusUpdate() {
 
 function submitOrderStatus() {
     if (!canProcess.value) {
+        return;
+    }
+    if (
+        orderStatusForm.status === 'completed' &&
+        props.order.fulfillment.value === 'pickup' &&
+        !orderStatusForm.products_handed_over_confirmed
+    ) {
         return;
     }
     orderStatusForm.submit(OrderStatusController.update(props.order.id), {
@@ -1239,6 +1249,12 @@ defineOptions({
                             <InputError
                                 :message="orderStatusForm.errors.status"
                             />
+                            <InputError
+                                :message="
+                                    orderStatusForm.errors
+                                        .products_handed_over_confirmed
+                                "
+                            />
                         </div>
                         <Button
                             type="button"
@@ -1310,6 +1326,28 @@ defineOptions({
                                     }}
                                 </p>
                             </div>
+                            <label
+                                v-if="
+                                    selectedOrderStatus === 'completed' &&
+                                    order.fulfillment.value === 'pickup'
+                                "
+                                class="flex items-start gap-2 text-sm"
+                            >
+                                <input
+                                    v-model="
+                                        orderStatusForm.products_handed_over_confirmed
+                                    "
+                                    type="checkbox"
+                                />
+                                I confirm that the products were physically
+                                handed over to the customer.
+                            </label>
+                            <InputError
+                                :message="
+                                    orderStatusForm.errors
+                                        .products_handed_over_confirmed
+                                "
+                            />
                             <DialogFooter class="mt-6 gap-2">
                                 <DialogClose as-child>
                                     <Button

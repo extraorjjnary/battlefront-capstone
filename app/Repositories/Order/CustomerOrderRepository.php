@@ -59,6 +59,7 @@ class CustomerOrderRepository
                 'payment_proof_path',
                 'payment_rejection_reason',
                 'payment_rejection_note',
+                'pickup_handed_over_at',
                 'created_at',
             ])
             ->with([

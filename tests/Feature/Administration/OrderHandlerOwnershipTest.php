@@ -55,10 +55,11 @@ function orderHandlerOperation(string $operation): array
         'manual' => ['shipment.manual.store', 'post', ['carrier' => 'lbc', 'arrangement_confirmed' => true]],
         'shipment', 'delivered' => ['shipment.status.update', 'patch', ['status' => $operation === 'shipment' ? 'preparing' : 'delivered']],
         'reference' => ['shipment.reference.update', 'patch', ['tracking_reference' => 'CORRECTED-REFERENCE']],
+        'complete' => ['status.update', 'patch', ['status' => 'completed', 'products_handed_over_confirmed' => true]],
         'pickup' => ['pickup-confirmation.store', 'post', ['payment_received_confirmed' => true, 'products_handed_over_confirmed' => true]],
         'cod' => ['cod-collection.store', 'post', ['cod_collection_confirmed' => true]],
         default => ['status.update', 'patch', ['status' => match ($operation) {
-            'complete' => 'completed', 'cancel' => 'cancelled', default => 'processing',
+            'cancel' => 'cancelled', default => 'processing',
         }]],
     };
 

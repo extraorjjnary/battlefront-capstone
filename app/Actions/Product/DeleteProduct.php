@@ -41,6 +41,12 @@ class DeleteProduct
 
     private function hasOutstandingOperations(Product $product): bool
     {
+        if (DB::table('customer_return_resolutions as resolutions')
+            ->join('customer_return_items as items', 'items.customer_return_id', '=', 'resolutions.customer_return_id')
+            ->join('order_items', 'order_items.id', '=', 'items.order_item_id')
+            ->where('order_items.product_id', $product->id)->where('resolutions.type', '<>', 'refund')->whereNull('resolutions.completed_at')->exists()) {
+            return true;
+        }
         if (DB::table('customer_return_requests as requests')
             ->join('order_items', 'order_items.id', '=', 'requests.order_item_id')
             ->where('order_items.product_id', $product->id)->whereNull('requests.customer_return_id')->whereNull('requests.withdrawn_at')->exists()) {
