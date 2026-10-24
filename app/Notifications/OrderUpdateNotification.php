@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Enums\UserRole;
 use App\Events\OrderNotificationOccurred;
+use App\Models\User;
 use Illuminate\Notifications\Notification;
 
 class OrderUpdateNotification extends Notification
@@ -19,11 +20,12 @@ class OrderUpdateNotification extends Notification
         return ['database'];
     }
 
-    /** @return array{version: int, event: string, audience: string, title: string, body: string, order_id: int, order_reference: string, occurred_at: string, cancellation_initiator?: string} */
-    public function toDatabase(object $notifiable): array
+    /** @return array<string, mixed> */
+    public function toDatabase(User $notifiable): array
     {
         $audience = $this->audience->value ?? $this->event->audience();
         $initiator = $this->event->cancellationInitiator ?? null;
+        $context = $this->event->context ?? [];
         $title = match ($this->event->kind) {
             'order.placed' => 'New customer order',
             'payment.proof_submitted' => 'Payment proof awaiting review',
@@ -32,6 +34,25 @@ class OrderUpdateNotification extends Notification
             'cancellation.requested' => 'Cancellation requested',
             'cancellation.approved' => 'Cancellation approved',
             'cancellation.rejected' => 'Cancellation request rejected',
+            'order.handler.assigned' => (int) $notifiable->id === ($context['handler_id'] ?? null) ? 'Order assigned to you' : 'Order responsibility transferred',
+            'customer_return.requested' => 'Return request awaiting receipt',
+            'customer_return.received' => $audience === 'customer' ? 'Returned item received' : 'Return awaiting review',
+            'customer_return.accepted' => 'Return approved',
+            'customer_return.rejected' => 'Return rejected',
+            'customer_return.resolution_completed' => 'Return resolution completed',
+            'customer_return.handed_back' => 'Returned item handed back',
+            'inventory.adjustment.requested' => 'Stock request awaiting review',
+            'inventory.adjustment.approved' => 'Stock request approved',
+            'inventory.adjustment.rejected' => 'Stock request rejected',
+            'damage.reported' => 'Damage report awaiting review',
+            'damage.decided' => 'Damage disposition recorded',
+            'supplier_return.requested' => 'Supplier return awaiting review',
+            'supplier_return.approved' => 'Supplier return approved for dispatch',
+            'supplier_return.rejected' => 'Supplier return rejected',
+            'supplier_return.rejected_follow_up' => 'Supplier return needs follow-up',
+            'supplier_return.dispatched' => 'Supplier acknowledgment required',
+            'supplier_return.closed' => 'Supplier return awaiting resolution',
+            'supplier_return.resolved', 'supplier_return.follow_up_resolved' => 'Supplier return resolved',
             'payment.rejected' => 'Payment rejected',
             'order.cancelled' => 'Order cancelled',
             'shipment.manual_created' => 'Delivery arrangement recorded',
@@ -47,6 +68,24 @@ class OrderUpdateNotification extends Notification
         $body = $audience === 'administrator'
             ? 'Open order '.$this->event->orderReference.' to review the next action.'
             : 'There is an update for order '.$this->event->orderReference.'. Open your order for details.';
+
+        if ($audience === 'customer') {
+            $body = match ($this->event->kind) {
+                'customer_return.received' => 'We received your returned item. Your return is awaiting review.',
+                'customer_return.accepted' => 'Your return was approved. Open your order for the agreed resolution.',
+                'customer_return.rejected' => 'Your return was rejected. Open your order for the decision details.',
+                'customer_return.resolution_completed' => 'Your approved return resolution is complete. Open your order for details.',
+                'cancellation.requested' => 'We received your cancellation request. Order handling is paused while it is reviewed.',
+                'cancellation.approved' => 'Your cancellation was approved. Open your order for details.',
+                'cancellation.rejected' => 'Your cancellation request was rejected. Open your order for the decision details.',
+                'refund.completed' => 'Your approved refund is fully confirmed. Open your order for payment details and available proof.',
+                default => $body,
+            };
+            if (($context['refund_processing'] ?? false) && in_array($this->event->kind, ['cancellation.approved', 'customer_return.accepted'], true)) {
+                $title = 'Refund processing';
+                $body = ($this->event->kind === 'cancellation.approved' ? 'Your cancellation' : 'Your return').' was approved. Your refund is awaiting payment confirmation.';
+            }
+        }
 
         if ($this->event->kind === 'order.cancelled' && $initiator !== null) {
             if ($initiator === UserRole::Customer && $audience === 'administrator') {
@@ -71,6 +110,26 @@ class OrderUpdateNotification extends Notification
             'order_reference' => $this->event->orderReference,
             'occurred_at' => $this->event->occurredAt,
         ];
+
+        if ($audience === 'administrator' && isset($context['subject_id'])) {
+            $type = match (true) {
+                str_starts_with($this->event->kind, 'inventory.adjustment.') => 'stock_adjustment',
+                str_starts_with($this->event->kind, 'damage.') => 'damage_report',
+                str_starts_with($this->event->kind, 'supplier_return.') => 'supplier_return',
+                $this->event->kind === 'customer_return.requested' => 'customer_return_request',
+                str_starts_with($this->event->kind, 'customer_return.') => 'customer_return',
+                default => null,
+            };
+            if ($type !== null) {
+                $data['subject'] = ['type' => $type, 'id' => $context['subject_id']];
+                $data['body'] = 'Open the case to review this update and any next action.';
+            }
+        }
+        if ($this->event->kind === 'order.handler.assigned') {
+            $data['body'] = (int) $notifiable->id === ($context['handler_id'] ?? null)
+                ? 'You are now responsible for order '.$this->event->orderReference.'. Open it to review the next action.'
+                : 'Responsibility for order '.$this->event->orderReference.' has been transferred to another handler.';
+        }
 
         if ($this->event->kind === 'order.cancelled' && $initiator !== null) {
             $data['cancellation_initiator'] = $initiator->value;

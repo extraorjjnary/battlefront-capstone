@@ -125,7 +125,7 @@ class OrderProcessingService
                 'amount_received' => $amount, 'decision_note' => trim($note), 'reviewed_at' => now(), 'updated_at' => now(),
             ]);
             if ($approve) {
-                $this->transitionLockedOrder($lockedOrder, OrderStatus::Cancelled, $shipment, cancellationInitiator: UserRole::Customer, actor: $actor);
+                $this->transitionLockedOrder($lockedOrder, OrderStatus::Cancelled, $shipment, cancellationInitiator: UserRole::Customer, actor: $actor, notifyCancellation: false);
                 if (bccomp($refund, '0.00', 2) > 0) {
                     DB::table('customer_refunds')->insert([
                         'cancellation_request_id' => $request->id, 'approved_by' => $actor->id,
@@ -137,7 +137,9 @@ class OrderProcessingService
                 'request_id' => $request->id, 'amount_received' => $amount, 'refund_amount' => $refund,
                 'account_checked' => true, 'decision_note' => trim($note),
             ], $actor);
-            $this->notifications->afterCommit($lockedOrder, $approve ? 'cancellation.approved' : 'cancellation.rejected');
+            $this->notifications->afterCommit($lockedOrder, $approve ? 'cancellation.approved' : 'cancellation.rejected', context: [
+                'refund_processing' => $approve && bccomp($refund, '0.00', 2) > 0,
+            ]);
 
             return $lockedOrder->refresh();
         }, attempts: 3);
@@ -432,6 +434,7 @@ class OrderProcessingService
         UserRole $cancellationInitiator = UserRole::Administrator,
         ?User $actor = null,
         bool $productsHandedOver = false,
+        bool $notifyCancellation = true,
     ): void {
         if ($status === OrderStatus::Completed && $order->fulfillment_method === FulfillmentMethod::Pickup && ! $productsHandedOver) {
             throw ValidationException::withMessages(['products_handed_over_confirmed' => 'Confirm actual product handover before completing pickup.']);
@@ -471,7 +474,7 @@ class OrderProcessingService
         }
         $order->update(['status' => $status]);
         $this->auditOrderChange($order, 'order.status.updated', ['before' => $previousStatus, 'after' => $status->value], $actor);
-        if ($status === OrderStatus::Cancelled) {
+        if ($status === OrderStatus::Cancelled && $notifyCancellation) {
             $this->notifications->afterCommit($order, 'order.cancelled', $cancellationInitiator);
         }
         if ($status === OrderStatus::Completed) {

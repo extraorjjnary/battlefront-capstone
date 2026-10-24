@@ -6,6 +6,7 @@ use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\ApprovalMonitor;
+use App\Services\Notifications\OrderNotificationPublisher;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -36,6 +37,7 @@ class HandleDamage
             ]);
             $this->movement($inventory, $reporter, 'damage_hold', 'damage_report', $id, $beforeSellable, $beforeHeld);
             $this->audit($reporter, 'damage.reported', $id, ['product_id' => $product->id, 'quantity' => $quantity], $reason);
+            app(OrderNotificationPublisher::class)->operationalAfterCommit('damage.reported', $id, $reporter->id, $reporter->id);
 
             return $id;
         }, attempts: 3);
@@ -83,7 +85,7 @@ class HandleDamage
                 if ($supplierId === null || ! DB::table('suppliers')->where('id', $supplierId)->where('is_active', true)->exists()) {
                     throw ValidationException::withMessages(['supplier_id' => 'Select an active supplier.']);
                 }
-                DB::table('supplier_returns')->insert([
+                $supplierReturnId = DB::table('supplier_returns')->insertGetId([
                     'supplier_id' => $supplierId,
                     'product_id' => $report->product_id,
                     'requester_id' => $reviewer->id,
@@ -95,6 +97,7 @@ class HandleDamage
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
+                app(OrderNotificationPublisher::class)->operationalAfterCommit('supplier_return.requested', $supplierReturnId, $reviewer->id, $reviewer->id);
             } else {
                 throw ValidationException::withMessages(['decision' => 'Unknown damage disposition.']);
             }
@@ -108,6 +111,7 @@ class HandleDamage
             ]);
             $this->audit($reviewer, 'damage.decided', $damageId, ['disposition' => $disposition, 'requester_id' => $report->requester_id], $reason);
             app(ApprovalMonitor::class)->afterApproval($reviewer, (int) $report->requester_id);
+            app(OrderNotificationPublisher::class)->operationalAfterCommit('damage.decided', $damageId, (int) $report->requester_id, $reviewer->id);
         }, attempts: 3);
     }
 

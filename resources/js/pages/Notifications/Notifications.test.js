@@ -99,6 +99,16 @@ function loadNotificationComponent(
                 order: (id) => ({
                     url: `${administrator ? '/administration' : ''}/orders/${id}`,
                 }),
+                destination: (notification) =>
+                    notification.subject
+                        ? {
+                              url: `/administration/${notification.subject.type === 'stock_adjustment' ? 'inventory-adjustments' : 'customer-returns'}?case=${notification.subject.id}`,
+                          }
+                        : notification.order
+                          ? {
+                                url: `${administrator ? '/administration' : ''}/orders/${notification.order.id}`,
+                            }
+                          : null,
             }),
         },
         '@/composables/useNotificationPolling': {
@@ -171,7 +181,7 @@ test('administrator empty history explains operational events and disables read 
 
     assert.match(html, /<h1[^>]*>Notifications<\/h1>/);
     assert.match(html, /0 unread/);
-    assert.match(html, /New orders and submitted wallet proofs/);
+    assert.match(html, /Orders, requests, decisions, and operational updates/);
     assert.match(html, /disabled/);
 });
 
@@ -333,4 +343,124 @@ test('bell retains cached entries during refresh and displays errors without a s
     assert.match(html, /role="alert"[\s\S]*Unable to refresh notifications/);
     assert.match(html, /Payment verified/);
     assert.doesNotMatch(html, /list-skeleton/);
+});
+
+for (const administrator of [false, true]) {
+    test(`${administrator ? 'administrator' : 'customer'} bell marks all read using shared server state and prevents duplicate submissions`, async () => {
+        const summary = Vue.ref({
+            unread_count: 2,
+            recent: [notificationFixture()],
+        });
+        const requests = [];
+        const options = {
+            administrator,
+            summary,
+            router: { patch: (...args) => requests.push(args) },
+        };
+        const component = loadNotificationComponent(
+            '../../components/NotificationBell.vue',
+            options,
+        );
+        const render = () => renderToString(Vue.h(component));
+        const exposed = loadNotificationComponent(
+            '../../components/NotificationBell.vue',
+            { ...options, inlineTemplate: false },
+        );
+        const bell = exposed.setup({}, { expose() {} });
+
+        assert.match(await render(), /Mark all as read/);
+        bell.markAllRead();
+        bell.markAllRead();
+        assert.equal(requests.length, 1);
+        assert.equal(
+            requests[0][0].url,
+            `${administrator ? '/administration' : ''}/notifications/read-all`,
+        );
+        assert.equal(requests[0][2].preserveScroll, true);
+        assert.equal(requests[0][2].preserveState, true);
+        assert.equal(bell.markingAllRead.value, true);
+
+        summary.value = {
+            unread_count: 0,
+            recent: [notificationFixture({ is_read: true })],
+        };
+        requests[0][2].onFinish();
+        assert.equal(bell.markingAllRead.value, false);
+        const html = await render();
+        assert.match(html, /Notifications, 0 unread/);
+        assert.match(html, /Read/);
+        assert.doesNotMatch(html, /Mark all as read|>Unread</);
+        assert.match(html, /View all notifications/);
+        bell.markAllRead();
+        assert.equal(requests.length, 1);
+    });
+}
+
+test('failed dropdown read-all retains unread state and allows retry', () => {
+    const requests = [];
+    const component = loadNotificationComponent(
+        '../../components/NotificationBell.vue',
+        {
+            unread: 1,
+            recent: [notificationFixture()],
+            inlineTemplate: false,
+            router: { patch: (...args) => requests.push(args) },
+        },
+    );
+    const bell = component.setup({}, { expose() {} });
+
+    bell.markAllRead();
+    requests[0][2].onError();
+    requests[0][2].onFinish();
+
+    assert.equal(bell.summary.value.unread_count, 1);
+    assert.equal(bell.summary.value.recent[0].is_read, false);
+    assert.match(bell.readError.value, /could not be saved/);
+    assert.equal(bell.markingAllRead.value, false);
+    bell.markAllRead();
+    assert.equal(requests.length, 2);
+    assert.equal(bell.readError.value, '');
+});
+
+test('operational history and dropdown entries open their case after individual read', async () => {
+    const entry = notificationFixture({
+        order: null,
+        subject: { type: 'stock_adjustment', id: 7 },
+    });
+    let readRequest;
+    let destination;
+    const options = {
+        administrator: true,
+        recent: [entry],
+        router: {
+            patch: (...args) => {
+                readRequest = args;
+            },
+            visit: (route) => {
+                destination = route.url;
+            },
+        },
+    };
+    const component = loadNotificationComponent(
+        '../../components/NotificationBell.vue',
+        { ...options, inlineTemplate: false },
+    );
+    const bell = component.setup({}, { expose() {} });
+
+    bell.openNotification(entry);
+    assert.equal(destination, undefined);
+    readRequest[2].onSuccess();
+    assert.equal(destination, '/administration/inventory-adjustments?case=7');
+
+    const history = loadNotificationComponent('./Index.vue', options);
+    const html = await renderToString(
+        Vue.h(history, {
+            notifications: { data: [entry], current_page: 1, last_page: 1 },
+        }),
+    );
+    assert.match(
+        html,
+        /href="\/administration\/inventory-adjustments\?case=7"/,
+    );
+    assert.match(html, /View case #7/);
 });

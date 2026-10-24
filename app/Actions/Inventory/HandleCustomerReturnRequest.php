@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\User;
 use App\Services\AdministrationEvidenceService;
 use App\Services\CustomerReturnEligibility;
+use App\Services\Notifications\OrderNotificationPublisher;
 use App\Support\OperationalRequestReason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -59,6 +60,9 @@ class HandleCustomerReturnRequest
                 'eligibility_receipt_at' => $window['received_at'], 'eligibility_deadline_at' => $window['deadline_at'],
             ]);
             $this->audit($customer, $request, 'submitted');
+            app(OrderNotificationPublisher::class)->afterCommit($order, 'customer_return.requested', context: [
+                'subject_id' => $request->id,
+            ]);
 
             return $request;
         }, attempts: 3);

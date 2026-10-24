@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Enums\UserRole;
 use App\Models\Order;
 use App\Models\User;
+use App\Services\Notifications\OrderNotificationPublisher;
 use App\Services\Order\OrderProcessingService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -32,7 +33,13 @@ class AssignOrderHandler
                 throw ValidationException::withMessages(['handler' => 'Choose an active administrator who can process orders.']);
             }
 
+            $before = $locked->assigned_handler_id;
             $this->assignLocked($locked, $actor, $handler);
+            if (! $claimOnly && $before !== $handler->id) {
+                app(OrderNotificationPublisher::class)->afterCommit($locked, 'order.handler.assigned', context: [
+                    'handler_id' => $handler->id, 'previous_handler_id' => $before, 'actor_id' => $actor->id,
+                ]);
+            }
         }, attempts: 3);
     }
 

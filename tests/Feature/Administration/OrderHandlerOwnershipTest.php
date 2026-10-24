@@ -10,6 +10,7 @@ use App\Models\OrderItem;
 use App\Models\Shipment;
 use App\Models\User;
 use App\Services\Order\OrderProcessingService;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -121,6 +122,8 @@ test('stale processing models cannot bypass a committed reassignment', function 
     app(AssignOrderHandler::class)->execute($order, $manager, $current->id);
     $processing = app(OrderProcessingService::class);
     $before = $order->fresh()->getAttributes();
+    $this->assertDatabaseCount('notifications', 3);
+    $notificationsBefore = DatabaseNotification::query()->orderBy('id')->get()->toArray();
     $attempt = fn () => match ($operation) {
         'verify', 'reject' => $processing->updatePaymentStatus($stale, PaymentStatus::Verified, actor: $former),
         'manual' => $processing->createManualShipment($stale, 'lbc', null, null, null, true, actor: $former),
@@ -135,7 +138,7 @@ test('stale processing models cannot bypass a committed reassignment', function 
     expect($order->fresh()->getAttributes())->toBe($before);
     $this->assertDatabaseCount('audit_logs', 2);
     $this->assertDatabaseCount('sales', 0);
-    $this->assertDatabaseCount('notifications', 0);
+    expect(DatabaseNotification::query()->orderBy('id')->get()->toArray())->toBe($notificationsBefore);
 })->with('handler operations');
 
 test('all eligible roles must claim before processing and cannot claim someone elses order', function (string $role) {

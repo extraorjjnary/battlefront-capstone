@@ -76,6 +76,7 @@ class CustomerRefundPaymentService
                 if (bccomp($decimalAmount, bcsub($approved, $paid, 2), 2) > 0) {
                     throw ValidationException::withMessages(['amount' => 'Payment exceeds the unpaid approved refund.']);
                 }
+                $previousConfirmed = $this->confirmedTotal($refundId);
                 $paymentId = DB::table('customer_refund_payments')->insertGetId([
                     'customer_refund_id' => $refundId, 'recorded_by' => $actor->id, 'amount' => $decimalAmount,
                     'payment_method' => $method, 'external_reference' => $reference, 'submission_key' => $submissionKey, 'paid_at' => now(),
@@ -94,16 +95,7 @@ class CustomerRefundPaymentService
                 ]);
                 $this->audit($actor, 'customer_refund.paid', $paymentId, ['amount' => $decimalAmount, 'method' => $method,
                     'confirmation_method' => 'approver', 'customer_visible_proof' => $prepared !== []], null, 'refund_payment');
-                $confirmed = DB::table('customer_refund_payments as payments')
-                    ->join('customer_refund_payment_reviews as reviews', 'reviews.customer_refund_payment_id', '=', 'payments.id')
-                    ->where('payments.customer_refund_id', $refundId)->where('reviews.decision', 'verified')
-                    ->whereRaw('reviews.id = (select max(latest.id) from customer_refund_payment_reviews as latest where latest.customer_refund_payment_id = payments.id)')
-                    ->orderBy('payments.id')->lockForUpdate()->get(['payments.amount'])
-                    ->reduce(fn (string $total, object $payment): string => bcadd($this->decimal($total), $this->decimal((string) $payment->amount), 2), '0.00');
-                if (bccomp($this->decimal((string) $confirmed), $approved, 2) >= 0) {
-                    $orderId = $cancellation ? $order->id : DB::table('customer_returns')->where('id', $refund->customer_return_id)->value('order_id');
-                    app(OrderNotificationPublisher::class)->afterCommit(Order::query()->whereKey($orderId)->firstOrFail(), 'refund.completed');
-                }
+                $this->notifyCompletionAfterCommit($refundId, $previousConfirmed);
 
                 return true;
             }, attempts: 3);
@@ -114,6 +106,30 @@ class CustomerRefundPaymentService
             $evidence->discardPreparedFiles($prepared);
             throw $exception;
         }
+    }
+
+    public function confirmedTotal(int $refundId): string
+    {
+        return DB::table('customer_refund_payments as payments')
+            ->join('customer_refund_payment_reviews as reviews', 'reviews.customer_refund_payment_id', '=', 'payments.id')
+            ->where('payments.customer_refund_id', $refundId)->where('reviews.decision', 'verified')
+            ->whereRaw('reviews.id = (select max(latest.id) from customer_refund_payment_reviews as latest where latest.customer_refund_payment_id = payments.id)')
+            ->orderBy('payments.id')->lockForUpdate()->get(['payments.amount'])
+            ->reduce(fn (string $total, object $payment): string => bcadd($total, $this->decimal((string) $payment->amount), 2), '0.00');
+    }
+
+    public function notifyCompletionAfterCommit(int $refundId, string $previousConfirmed): void
+    {
+        $refund = DB::table('customer_refunds')->where('id', $refundId)->firstOrFail();
+        $approved = $this->decimal((string) $refund->approved_amount);
+        if (bccomp($approved, '0.00', 2) <= 0 || bccomp($this->decimal($previousConfirmed), $approved, 2) >= 0
+            || bccomp($this->decimal($this->confirmedTotal($refundId)), $approved, 2) < 0) {
+            return;
+        }
+        $orderId = $refund->cancellation_request_id !== null
+            ? DB::table('order_cancellation_requests')->where('id', $refund->cancellation_request_id)->value('order_id')
+            : DB::table('customer_returns')->where('id', $refund->customer_return_id)->value('order_id');
+        app(OrderNotificationPublisher::class)->afterCommit(Order::query()->where('id', $orderId)->firstOrFail(), 'refund.completed');
     }
 
     /**
