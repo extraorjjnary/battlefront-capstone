@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Repositories\Order\AdministratorOrderRepository;
 use App\Services\DeliveryQuotePresenter;
 use App\Services\Order\OrderProcessingService;
+use App\Services\OrderCancellationPresenter;
 use App\Services\ShipmentPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -56,6 +57,7 @@ class OrderController extends Controller
                     'operational_label' => $this->fulfillmentOperationalLabel($order),
                 ],
                 'status' => $this->statusData($order->status),
+                'cancellation' => app(OrderCancellationPresenter::class)->summary($order),
                 'payment' => [
                     'method' => [
                         'value' => $order->payment_method->value,
@@ -176,6 +178,7 @@ class OrderController extends Controller
                         ->select('grants.administration_role_id'))
                     ->orderBy('name')->get(['id', 'name']),
             'order' => [
+                'cancellation' => app(OrderCancellationPresenter::class)->detail($order, $request->user()),
                 'id' => $order->id,
                 'reference' => $order->reference,
                 'handler_required' => $order->handler_required,

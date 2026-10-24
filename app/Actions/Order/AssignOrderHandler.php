@@ -6,11 +6,14 @@ use App\Enums\OrderStatus;
 use App\Enums\UserRole;
 use App\Models\Order;
 use App\Models\User;
+use App\Services\Order\OrderProcessingService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class AssignOrderHandler
 {
+    public function __construct(private readonly OrderProcessingService $processing) {}
+
     public function execute(Order $order, User $actor, int $handlerId, bool $claimOnly = false): void
     {
         DB::transaction(function () use ($order, $actor, $handlerId, $claimOnly): void {
@@ -19,6 +22,7 @@ class AssignOrderHandler
             if (in_array($locked->status, [OrderStatus::Completed, OrderStatus::Cancelled], true)) {
                 throw ValidationException::withMessages(['handler' => 'Completed or cancelled orders cannot be reassigned.']);
             }
+            $this->processing->assertNoCancellationReview($locked, 'handler');
             if ($claimOnly && ($locked->assigned_handler_id !== null || $handlerId !== $actor->id)) {
                 throw ValidationException::withMessages(['handler' => 'Only an unassigned order may be claimed for yourself.']);
             }

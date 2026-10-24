@@ -19,6 +19,7 @@ use App\Services\Notifications\OrderNotificationPublisher;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -33,9 +34,113 @@ class OrderProcessingService
     public function canCustomerCancel(Order $order): bool
     {
         return $order->status === OrderStatus::Pending
+            && ! $this->hasCancellationHold($order)
             && $order->payment_status === PaymentStatus::Pending
             && (! $order->payment_method->requiresPaymentProof() || $order->payment_proof_path === null)
             && ($order->shipment === null || $order->shipment->status === ShipmentStatus::AwaitingPreparation);
+    }
+
+    public function hasCancellationHold(Order $order): bool
+    {
+        return $order->cancellationRequest?->status === 'pending';
+    }
+
+    public function assertNoCancellationReview(Order $order, string $errorField = 'status'): void
+    {
+        $request = DB::table('order_cancellation_requests')->where('order_id', $order->id)->lockForUpdate()->first();
+        if ($request?->status === 'pending') {
+            throw ValidationException::withMessages([$errorField => 'Cancellation requested. Order handling is paused until review is complete.']);
+        }
+    }
+
+    public function canRequestCancellation(Order $order): bool
+    {
+        return $this->eligibleWalletCancellation($order) && $order->cancellationRequest === null;
+    }
+
+    private function eligibleWalletCancellation(Order $order): bool
+    {
+        return $order->status === OrderStatus::Pending
+            && $order->payment_method->requiresPaymentProof()
+            && $order->payment_proof_path !== null
+            && ($order->shipment === null || $order->shipment->status === ShipmentStatus::AwaitingPreparation);
+    }
+
+    public function requestCancellation(User $customer, int $orderId, ?string $note = null): Order
+    {
+        abort_unless($customer->role === UserRole::Customer, 403);
+        Validator::make(['customer_note' => $note], ['customer_note' => ['nullable', 'string', 'max:1000']])->validate();
+
+        return DB::transaction(function () use ($customer, $orderId, $note): Order {
+            $order = $customer->orders()->whereKey($orderId)->lockForUpdate()->firstOrFail();
+            $order->setRelation('shipment', $order->shipment()->lockForUpdate()->first());
+            $existing = DB::table('order_cancellation_requests')->where('order_id', $order->id)->lockForUpdate()->first();
+            if (! $this->eligibleWalletCancellation($order) || $existing !== null) {
+                throw ValidationException::withMessages(['status' => 'Cancellation requests require a Pending GCash/Maya order with submitted proof, no preparation, and no earlier request.']);
+            }
+            DB::table('order_cancellation_requests')->insert([
+                'order_id' => $order->id, 'customer_note' => filled($note) ? trim($note) : null,
+                'status' => 'pending', 'created_at' => now(), 'updated_at' => now(),
+            ]);
+            $this->auditOrderChange($order, 'order.cancellation_requested', ['customer_note' => $note], $customer);
+            $this->notifications->afterCommit($order, 'cancellation.requested');
+
+            return $order->refresh();
+        }, attempts: 3);
+    }
+
+    public function canReviewCancellation(User $actor): bool
+    {
+        return in_array($actor->administrationRoleCode(), ['manager', 'owner'], true)
+            && $actor->hasAdministrationPermission('orders.view')
+            && $actor->hasAdministrationPermission('returns.approve');
+    }
+
+    public function reviewCancellation(Order $order, User $actor, bool $approve, string $received, string $note, bool $accountChecked): Order
+    {
+        abort_unless($this->canReviewCancellation($actor), 403);
+        Validator::make(['amount_received' => $received, 'decision_note' => $note, 'account_checked' => $accountChecked], [
+            'amount_received' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
+            'decision_note' => ['required', 'string', 'min:5', 'max:2000'],
+            'account_checked' => ['required', 'accepted'],
+        ])->validate();
+
+        if (! is_numeric($received)) {
+            throw ValidationException::withMessages(['amount_received' => 'Enter a valid amount received.']);
+        }
+
+        return DB::transaction(function () use ($order, $actor, $approve, $received, $note): Order {
+            $lockedOrder = Order::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
+            abort_unless($this->canReviewCancellation($actor->fresh()), 403);
+            $shipment = $lockedOrder->shipment()->lockForUpdate()->first();
+            $lockedOrder->setRelation('shipment', $shipment);
+            $request = DB::table('order_cancellation_requests')->where('order_id', $lockedOrder->id)->lockForUpdate()->first();
+            if ($request?->status !== 'pending' || ! $this->eligibleWalletCancellation($lockedOrder)) {
+                throw ValidationException::withMessages(['status' => 'This cancellation request is no longer eligible for review.']);
+            }
+            $amount = bcadd($received, '0.00', 2);
+            $refund = $approve && bccomp($amount, $lockedOrder->total_amount, 2) > 0 ? $lockedOrder->total_amount : ($approve ? $amount : '0.00');
+            DB::table('order_cancellation_requests')->where('id', $request->id)->update([
+                'status' => $approve ? 'approved' : 'rejected', 'reviewed_by' => $actor->id,
+                'amount_received' => $amount, 'decision_note' => trim($note), 'reviewed_at' => now(), 'updated_at' => now(),
+            ]);
+            if ($approve) {
+                $this->transitionLockedOrder($lockedOrder, OrderStatus::Cancelled, $shipment, cancellationInitiator: UserRole::Customer, actor: $actor);
+                if (bccomp($refund, '0.00', 2) > 0) {
+                    DB::table('customer_refunds')->insert([
+                        'cancellation_request_id' => $request->id, 'approved_by' => $actor->id,
+                        'approved_amount' => $refund, 'paid_amount' => '0.00', 'created_at' => now(), 'updated_at' => now(),
+                    ]);
+                }
+            }
+            $this->auditOrderChange($lockedOrder, $approve ? 'order.cancellation_approved' : 'order.cancellation_rejected', [
+                'request_id' => $request->id, 'amount_received' => $amount, 'refund_amount' => $refund,
+                'account_checked' => true, 'decision_note' => trim($note),
+            ], $actor);
+            $this->notifications->afterCommit($lockedOrder, $approve ? 'cancellation.approved' : 'cancellation.rejected');
+
+            return $lockedOrder->refresh();
+        }, attempts: 3);
     }
 
     public function cancelForCustomer(User $customer, int $orderId): Order
@@ -44,6 +149,7 @@ class OrderProcessingService
             $order = $customer->orders()->whereKey($orderId)->lockForUpdate()->firstOrFail();
             $shipment = $order->shipment()->lockForUpdate()->first();
             $order->setRelation('shipment', $shipment);
+            $this->assertNoCancellationReview($order);
 
             if (! $this->canCustomerCancel($order)) {
                 throw ValidationException::withMessages([
@@ -99,6 +205,10 @@ class OrderProcessingService
     /** @return list<OrderStatus> */
     public function allowedOrderTransitions(Order $order): array
     {
+        if ($this->hasCancellationHold($order)) {
+            return [];
+        }
+
         return array_values(array_filter($order->status->allowedTransitions(), function (OrderStatus $status) use ($order): bool {
             if ($status === OrderStatus::Completed && ($order->shipment !== null || $order->payment_method === PaymentMethod::Cod || $order->payment_method->isPayAtPickup())) {
                 return false;
@@ -116,7 +226,8 @@ class OrderProcessingService
 
     public function nextShipmentStatus(Order $order): ?ShipmentStatus
     {
-        if ($order->fulfillment_method !== FulfillmentMethod::Delivery
+        if ($this->hasCancellationHold($order)
+            || $order->fulfillment_method !== FulfillmentMethod::Delivery
             || $order->status !== OrderStatus::Processing
             || ! $this->paymentAllowsFulfillment($order)) {
             return null;
@@ -127,7 +238,8 @@ class OrderProcessingService
 
     public function canCreateManualShipment(Order $order): bool
     {
-        return $order->fulfillment_method === FulfillmentMethod::Delivery
+        return ! $this->hasCancellationHold($order)
+            && $order->fulfillment_method === FulfillmentMethod::Delivery
             && ($order->delivery_quote_metadata['pricing_status'] ?? null) === 'not_configured'
             && $order->delivery_fee === '0.00'
             && $order->product_subtotal !== null
@@ -569,6 +681,7 @@ class OrderProcessingService
     public function canProcess(Order $order, User $actor): bool
     {
         return $actor->hasAdministrationPermission('orders.process')
+            && ! $this->hasCancellationHold($order)
             && $order->assigned_handler_id === $actor->id;
     }
 
@@ -579,8 +692,9 @@ class OrderProcessingService
     private function authorizeHandler(Order $order, ?User $actor): void
     {
         if ($actor !== null) {
-            abort_unless($this->canProcess($order, $actor), 403, 'Only the assigned handler may process this order. Refresh the order to review its current handler.');
+            abort_unless($actor->hasAdministrationPermission('orders.process') && $order->assigned_handler_id === $actor->id, 403, 'Only the assigned handler may process this order. Refresh the order to review its current handler.');
         }
+        $this->assertNoCancellationReview($order);
     }
 
     /** @param array<string, mixed> $changes */

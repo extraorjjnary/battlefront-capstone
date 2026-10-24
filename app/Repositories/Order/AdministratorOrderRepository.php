@@ -28,7 +28,7 @@ class AdministratorOrderRepository
                 'id', 'user_id', 'recipient_name', 'fulfillment_method',
                 'total_amount', 'status', 'payment_status', 'payment_method', 'created_at',
             ])
-            ->with(['user:id,name,email', 'shipment:id,order_id,status'])
+            ->with(['user:id,name,email', 'shipment:id,order_id,status', 'cancellationRequest.refund'])
             ->withCount('items')
             ->withSum('items as total_quantity', 'quantity')
             ->orderByDesc('created_at')
@@ -42,6 +42,7 @@ class AdministratorOrderRepository
     public function loadDetails(Order $order): Order
     {
         return $order->load([
+            'cancellationRequest.refund',
             'shipment',
             'user:id,name,email',
             'items' => fn ($query) => $query

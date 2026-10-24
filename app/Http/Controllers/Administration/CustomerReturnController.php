@@ -106,10 +106,11 @@ class CustomerReturnController extends Controller
             'amount' => ['required', 'numeric', 'decimal:0,2', 'gt:0', 'max:9999999999.99'],
             'payment_method' => ['required', Rule::in(['cash', 'gcash', 'maya', 'bank_transfer', 'other'])],
             'submission_key' => ['required', 'uuid'],
+            'external_reference' => ['nullable', 'string', 'max:255'],
             'payment_confirmed' => ['required', 'accepted'],
             'proof' => ['required_unless:payment_method,cash', 'prohibited_if:payment_method,cash', 'nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'extensions:jpg,jpeg,png,webp', 'max:5120'],
         ]);
-        $returns->recordPayment($refund, $request->user(), (string) $validated['amount'], $validated['payment_method'], $validated['submission_key'], $request->boolean('payment_confirmed'), $validated['proof'] ?? null);
+        $returns->recordPayment($refund, $request->user(), (string) $validated['amount'], $validated['payment_method'], $validated['submission_key'], $request->boolean('payment_confirmed'), $validated['proof'] ?? null, $validated['external_reference'] ?? null);
 
         return back();
     }

@@ -20,6 +20,8 @@ const taskLabels = {
     customer_handover: 'Return to customer',
     refund: 'Refund payment',
     refund_reconciliation: 'Refund review',
+    cancellation_review: 'Cancellation review',
+    cancellation_refund: 'Cancellation refund',
     order: 'Order',
 };
 const kind = ref(props.filters.kind ?? 'all');
@@ -83,6 +85,12 @@ defineOptions({
                     </option>
                     <option value="refund">Refund payment</option>
                     <option value="refund_reconciliation">Refund review</option>
+                    <option value="cancellation_review">
+                        Cancellation review
+                    </option>
+                    <option value="cancellation_refund">
+                        Cancellation refund
+                    </option>
                     <option value="order">Order</option>
                 </select></label
             >

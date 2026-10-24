@@ -1949,6 +1949,54 @@
                             "body": "{\n  \"data\": {\n    \"id\": 1,\n    \"reference\": \"BF-000001\",\n    \"created_at\": \"2026-10-01T08:00:00+00:00\",\n    \"status\": {\n      \"value\": \"pending\",\n      \"label\": \"Pending\"\n    },\n    \"recipient\": {\n      \"name\": \"Example Customer\",\n      \"contact_number\": \"EXAMPLE\"\n    },\n    \"fulfillment\": {\n      \"value\": \"pickup\",\n      \"label\": \"Pickup\",\n      \"delivery_address\": null,\n      \"delivery_destination\": null\n    },\n    \"payment\": {\n      \"method\": {\n        \"value\": \"cash\",\n        \"label\": \"Cash (Pay at Pickup)\",\n        \"description\": \"Pay cash when collecting your products at the store. No advance payment or uploaded proof is required.\"\n      },\n      \"status\": {\n        \"value\": \"pending\",\n        \"label\": \"Pending\"\n      },\n      \"proof_submitted\": false,\n      \"notice\": \"Pay cash when collecting your products at the store. No advance payment or uploaded proof is required. Battlefront confirms payment and product handover together to complete pickup.\",\n      \"rejection\": null,\n      \"can_resubmit_proof\": false\n    },\n    \"items\": [\n      {\n        \"id\": 1,\n        \"product\": {\n          \"id\": 1,\n          \"name\": \"Example Mouse\",\n          \"brand\": null,\n          \"image_url\": null\n        },\n        \"quantity\": 2,\n        \"unit_price\": \"100.00\",\n        \"line_total\": \"200.00\"\n      }\n    ],\n    \"item_count\": 1,\n    \"total_quantity\": 2,\n    \"total\": \"200.00\",\n    \"product_subtotal\": \"200.00\",\n    \"delivery_fee\": \"0.00\",\n    \"delivery_quote\": null,\n    \"shipment\": null\n  }\n}"
                         }
                     ]
+                },
+                {
+                    "name": "Request cancellation review ? Pending wallet order",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/orders/{{order_id}}/cancellation-requests",
+                            "host": ["{{base_url}}"],
+                            "path": [
+                                "orders",
+                                "{{order_id}}",
+                                "cancellation-requests"
+                            ]
+                        },
+                        "description": "One request per own Pending GCash/Maya order with submitted proof, before preparation. Pauses handling until Manager/Owner review of the actual transaction. Returns the existing order detail envelope with cancellation status. Refresh before retrying an uncertain result. Run only against disposable data.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"customer_note\": \"Please cancel this Pending wallet order.\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test(\"Cancellation request accepted\", function () { pm.response.to.have.status(200); });",
+                                    "pm.test(\"Order remains Pending under cancellation review\", function () { const data = pm.response.json().data; pm.expect(data.status.value).to.eql(\"pending\"); pm.expect(data.cancellation.status.value).to.eql(\"requested\"); pm.expect(data.can_request_cancellation).to.eql(false); });"
+                                ]
+                            }
+                        }
+                    ],
+                    "response": []
                 }
             ]
         },

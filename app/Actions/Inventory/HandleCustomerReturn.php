@@ -10,8 +10,8 @@ use App\Models\OrderItem;
 use App\Models\User;
 use App\Services\AdministrationEvidenceService;
 use App\Services\ApprovalMonitor;
+use App\Services\CustomerRefundPaymentService;
 use App\Services\CustomerReturnEligibility;
-use App\Services\Notifications\OrderNotificationPublisher;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +23,8 @@ use Throwable;
 
 class HandleCustomerReturn
 {
+    public function __construct(private readonly CustomerRefundPaymentService $payments) {}
+
     /** @param array<array-key, mixed> $photos */
     public function receive(User $actor, int $orderItemId, int $quantity, string $condition, string $reason, string $reasonCode, ?int $convertingRequest = null, array $photos = []): int
     {
@@ -292,73 +294,9 @@ class HandleCustomerReturn
         }, attempts: 3);
     }
 
-    public function recordPayment(int $refundId, User $actor, string $amount, string $method, string $submissionKey, bool $paymentConfirmed = false, ?UploadedFile $proof = null): void
+    public function recordPayment(int $refundId, User $actor, string $amount, string $method, string $submissionKey, bool $paymentConfirmed = false, ?UploadedFile $proof = null, ?string $externalReference = null): void
     {
-        abort_unless($actor->hasAdministrationPermission('returns.record_payment') && $actor->hasAdministrationPermission('returns.approve'), 403);
-        Validator::make(['amount' => $amount, 'method' => $method, 'submission_key' => $submissionKey, 'payment_confirmed' => $paymentConfirmed, 'proof' => $proof], [
-            'amount' => ['required', 'numeric', 'decimal:0,2', 'gt:0', 'max:9999999999.99'],
-            'method' => ['required', Rule::in(['cash', 'gcash', 'maya', 'bank_transfer', 'other'])],
-            'submission_key' => ['required', 'uuid'], 'payment_confirmed' => ['required', 'accepted'],
-            'proof' => ['required_unless:method,cash', 'prohibited_if:method,cash', 'nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'extensions:jpg,jpeg,png,webp', 'max:5120'],
-        ])->validate();
-        $evidence = app(AdministrationEvidenceService::class);
-        $prepared = $proof === null ? [] : $evidence->prepareProductPhotos([$proof]);
-        try {
-            $created = DB::transaction(function () use ($refundId, $actor, $amount, $method, $submissionKey, $prepared, $evidence): bool {
-                $refund = DB::table('customer_refunds')->where('id', $refundId)->lockForUpdate()->firstOrFail();
-                abort_unless((int) $refund->approved_by === $actor->id, 403);
-                $existing = DB::table('customer_refund_payments')->where('submission_key', $submissionKey)->lockForUpdate()->first();
-                if ($existing !== null) {
-                    if ((int) $existing->customer_refund_id !== $refundId || (int) $existing->recorded_by !== $actor->id || $existing->payment_method !== $method
-                        || bccomp($this->decimal($existing->amount), $this->decimal($amount), 2) !== 0) {
-                        throw ValidationException::withMessages(['submission_key' => 'This payment submission has already been used. Refresh the return.']);
-                    }
-
-                    return false;
-                }
-                $approved = $this->decimal($refund->approved_amount);
-                $paid = $this->decimal($refund->paid_amount);
-                $decimalAmount = $this->decimal($amount);
-                if (bccomp($decimalAmount, bcsub($approved, $paid, 2), 2) > 0) {
-                    throw ValidationException::withMessages(['amount' => 'Payment exceeds the unpaid approved refund.']);
-                }
-                $paymentId = DB::table('customer_refund_payments')->insertGetId([
-                    'customer_refund_id' => $refundId, 'recorded_by' => $actor->id, 'amount' => $decimalAmount,
-                    'payment_method' => $method, 'external_reference' => null, 'submission_key' => $submissionKey, 'paid_at' => now(),
-                ]);
-                if ($prepared !== []) {
-                    $evidence->attachCustomerPaymentProof($actor, $paymentId, $prepared);
-                }
-                DB::table('customer_refund_payment_reviews')->insert([
-                    'customer_refund_payment_id' => $paymentId, 'reviewed_by' => $actor->id, 'decision' => 'verified',
-                    'confirmation_method' => 'approver', 'reason' => $method === 'cash' ? 'Cash handed to the customer, confirmed by the return approver.' : 'Payment sent with customer-visible proof, confirmed by the return approver.',
-                    'created_at' => now(),
-                ]);
-                DB::table('customer_refunds')->where('id', $refundId)->update([
-                    'paid_amount' => bcadd($paid, $decimalAmount, 2), 'recorded_by' => $actor->id,
-                    'payment_method' => $method, 'external_reference' => null, 'paid_at' => now(), 'updated_at' => now(),
-                ]);
-                $this->audit($actor, 'customer_refund.paid', $paymentId, ['amount' => $decimalAmount, 'method' => $method,
-                    'confirmation_method' => 'approver', 'customer_visible_proof' => $prepared !== []], null, 'refund_payment');
-                $confirmed = DB::table('customer_refund_payments as payments')
-                    ->join('customer_refund_payment_reviews as reviews', 'reviews.customer_refund_payment_id', '=', 'payments.id')
-                    ->where('payments.customer_refund_id', $refundId)->where('reviews.decision', 'verified')
-                    ->whereRaw('reviews.id = (select max(latest.id) from customer_refund_payment_reviews as latest where latest.customer_refund_payment_id = payments.id)')
-                    ->sum('payments.amount');
-                if (bccomp($this->decimal((string) $confirmed), $approved, 2) >= 0) {
-                    $orderId = DB::table('customer_returns')->where('id', $refund->customer_return_id)->value('order_id');
-                    app(OrderNotificationPublisher::class)->afterCommit(Order::query()->whereKey($orderId)->firstOrFail(), 'refund.completed');
-                }
-
-                return true;
-            }, attempts: 3);
-            if (! $created) {
-                $evidence->discardPreparedFiles($prepared);
-            }
-        } catch (Throwable $exception) {
-            $evidence->discardPreparedFiles($prepared);
-            throw $exception;
-        }
+        $this->payments->recordPayment($refundId, $actor, $amount, $method, $submissionKey, $paymentConfirmed, $proof, $externalReference);
     }
 
     public function reviewPayment(int $paymentId, User $reviewer, string $decision, string $reason): void

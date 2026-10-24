@@ -143,6 +143,12 @@ class Order extends Model
         return $this->hasOne(Shipment::class);
     }
 
+    /** @return HasOne<OrderCancellationRequest, $this> */
+    public function cancellationRequest(): HasOne
+    {
+        return $this->hasOne(OrderCancellationRequest::class);
+    }
+
     public function paymentStatusLabel(): string
     {
         return $this->payment_method === PaymentMethod::Cod

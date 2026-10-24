@@ -2,14 +2,19 @@
 
 use App\Actions\Inventory\HandleCustomerReturn;
 use App\Actions\Inventory\HandleCustomerReturnRequest;
+use App\Actions\Order\AssignOrderHandler;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
+use App\Enums\ShipmentStatus;
 use App\Models\CustomerReturnRequest;
 use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Shipment;
 use App\Models\User;
 use App\Services\AdministrationEvidenceService;
+use App\Services\CustomerRefundPaymentService;
+use App\Services\Order\OrderProcessingService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -89,6 +94,13 @@ function startReturnWorker(array $connection, int $orderId, int $itemId, int $ac
             try {
                 $requests = app(HandleCustomerReturnRequest::class);
                 match ($operation) {
+                    'cancellation_request' => app(OrderProcessingService::class)->requestCancellation($actor, $orderId),
+                    'claim_order' => app(AssignOrderHandler::class)->execute(Order::query()->findOrFail($orderId), $actor, $actor->id, claimOnly: true),
+                    'assign_handler' => app(AssignOrderHandler::class)->execute(Order::query()->findOrFail($orderId), $actor, $actor->id),
+                    'cancellation_approve', 'cancellation_reject' => app(OrderProcessingService::class)->reviewCancellation(Order::query()->findOrFail($orderId), $actor, $operation === 'cancellation_approve', '100.00', 'Actual wallet transaction checked.', true),
+                    'process_order' => app(OrderProcessingService::class)->updateStatus(Order::query()->findOrFail($orderId), OrderStatus::Processing, $actor),
+                    'prepare_shipment' => app(OrderProcessingService::class)->updateShipmentStatus(Order::query()->findOrFail($orderId), ShipmentStatus::Preparing, actor: $actor),
+                    'cancellation_pay', 'cancellation_pay_full' => app(CustomerRefundPaymentService::class)->recordPayment($returnId, $actor, $operation === 'cancellation_pay_full' ? '60.00' : '40.25', 'gcash', $paymentKey, true, UploadedFile::fake()->image('cancellation-payment.jpg'), $operation === 'cancellation_pay_full' ? $paymentKey : 'WALLET-TRANSFER-001'),
                     'submit' => $requests->submit($actor, $orderId, ['order_item_id' => $itemId, 'quantity' => 1, 'reason_code' => 'defective']),
                     'withdraw' => $requests->withdraw($actor, $orderId, $requestId),
                     'receive' => $requests->receive($actor, $requestId, 'opened', [UploadedFile::fake()->image('receipt.jpg')]),
@@ -336,3 +348,116 @@ test('concurrent partial refund submissions with one token create one payment an
         rmdir($barrier);
     }
 })->with(['cash', 'gcash']);
+
+test('MySQL cancellation races preserve the winning state and exactly once stock restoration', function (string $firstOperation, string $secondOperation, string $expectedStatus, int $expectedStock, int $expectedRefunds) {
+    $manager = User::factory()->administrator()->create();
+    $order = Order::factory()->withDeliverySnapshot()->create(['payment_status' => 'verified', 'assigned_handler_id' => in_array($secondOperation, ['claim_order', 'assign_handler'], true) ? null : $manager->id]);
+    Shipment::factory()->for($order)->create();
+    $stock = Inventory::factory()->create(['quantity' => 3]);
+    $item = OrderItem::factory()->for($order)->for($stock->product)->create(['quantity' => 2, 'price_at_time' => '50.00']);
+    $processing = app(OrderProcessingService::class);
+    if (str_starts_with($firstOperation, 'cancellation_a') || $firstOperation === 'cancellation_reject') {
+        $processing->requestCancellation($order->user, $order->id);
+    }
+    $barrier = storage_path('framework/testing/returns-'.bin2hex(random_bytes(6)));
+    mkdir($barrier, 0777, true);
+    $first = $second = null;
+    try {
+        $connection = config('database.connections.mysql');
+        $first = startReturnWorker($connection, $order->id, $item->id, $firstOperation === 'cancellation_request' ? $order->user_id : $manager->id, null, $firstOperation, $barrier);
+        waitForReturnWorker(fn (): bool => is_file($barrier.'/locked'));
+        $second = startReturnWorker($connection, $order->id, $item->id, $secondOperation === 'cancellation_request' ? $order->user_id : $manager->id, null, $secondOperation);
+        waitForReturnWorker(fn (): bool => (int) DB::connection('return_mysql_server')->selectOne(<<<'SQL'
+            SELECT COUNT(*) AS blocked
+            FROM performance_schema.data_lock_waits AS waits
+            JOIN performance_schema.data_locks AS locks ON waits.BLOCKING_ENGINE_LOCK_ID = locks.ENGINE_LOCK_ID
+            WHERE locks.OBJECT_SCHEMA = ? AND locks.OBJECT_NAME = 'orders'
+            SQL, [$this->returnDatabase])->blocked > 0);
+        file_put_contents($barrier.'/release', 'release');
+        foreach ([$first, $second] as $index => $worker) {
+            $worker->wait();
+            expect($worker->getExitCode())->toBe(0, $worker->getErrorOutput());
+            $result = json_decode($worker->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+            expect($result['successful'])->toBeTrue();
+            expect(unserialize($result['result']))->toBe($index === 0 ? 'accepted' : 'rejected');
+        }
+        expect($order->fresh()->status->value)->toBe($expectedStatus);
+        expect($stock->fresh()->quantity)->toBe($expectedStock);
+        if (in_array($secondOperation, ['claim_order', 'assign_handler'], true)) {
+            expect($order->fresh()->assigned_handler_id)->toBeNull();
+        }
+        $this->assertDatabaseCount('customer_refunds', $expectedRefunds);
+        $this->assertDatabaseCount('sales', 0);
+    } finally {
+        file_put_contents($barrier.'/release', 'release');
+        $first?->stop();
+        $second?->stop();
+        foreach (['locked', 'release'] as $name) {
+            if (is_file($barrier.'/'.$name)) {
+                unlink($barrier.'/'.$name);
+            }
+        }
+        rmdir($barrier);
+    }
+})->with([
+    'request wins processing' => ['cancellation_request', 'process_order', 'pending', 3, 0],
+    'request blocks claiming' => ['cancellation_request', 'claim_order', 'pending', 3, 0],
+    'request blocks assignment' => ['cancellation_request', 'assign_handler', 'pending', 3, 0],
+    'processing wins request' => ['process_order', 'cancellation_request', 'processing', 3, 0],
+    'request blocks preparation' => ['cancellation_request', 'prepare_shipment', 'pending', 3, 0],
+    'duplicate approval' => ['cancellation_approve', 'cancellation_approve', 'cancelled', 5, 1],
+    'approval wins rejection' => ['cancellation_approve', 'cancellation_reject', 'cancelled', 5, 1],
+    'rejection wins approval' => ['cancellation_reject', 'cancellation_approve', 'pending', 3, 0],
+]);
+
+test('MySQL concurrent cancellation transfers cannot duplicate a token or transaction reference or exceed the balance', function (bool $sameToken, bool $overpayment) {
+    $manager = User::factory()->administrator()->create();
+    $order = Order::factory()->withDeliverySnapshot()->create();
+    $stock = Inventory::factory()->create(['quantity' => 3]);
+    $item = OrderItem::factory()->for($order)->for($stock->product)->create(['quantity' => 2, 'price_at_time' => '50.00']);
+    $processing = app(OrderProcessingService::class);
+    $processing->requestCancellation($order->user, $order->id);
+    $processing->reviewCancellation($order, $manager, true, '100.00', 'Actual transaction confirmed.', true);
+    $refundId = (int) DB::table('customer_refunds')->sole()->id;
+    $key = (string) Str::uuid();
+    $barrier = storage_path('framework/testing/returns-'.bin2hex(random_bytes(6)));
+    mkdir($barrier, 0777, true);
+    $first = $second = null;
+    try {
+        $connection = config('database.connections.mysql');
+        $operation = $overpayment ? 'cancellation_pay_full' : 'cancellation_pay';
+        $first = startReturnWorker($connection, $order->id, $item->id, $manager->id, null, $operation, $barrier, $refundId, $key);
+        waitForReturnWorker(fn (): bool => is_file($barrier.'/locked'));
+        $second = startReturnWorker($connection, $order->id, $item->id, $manager->id, null, $operation, returnId: $refundId, paymentKey: $sameToken ? $key : (string) Str::uuid());
+        waitForReturnWorker(fn (): bool => (int) DB::connection('return_mysql_server')->selectOne(<<<'SQL'
+            SELECT COUNT(*) AS blocked
+            FROM performance_schema.data_lock_waits AS waits
+            JOIN performance_schema.data_locks AS locks ON waits.BLOCKING_ENGINE_LOCK_ID = locks.ENGINE_LOCK_ID
+            WHERE locks.OBJECT_SCHEMA = ? AND locks.OBJECT_NAME = 'orders'
+            SQL, [$this->returnDatabase])->blocked > 0);
+        file_put_contents($barrier.'/release', 'release');
+        foreach ([$first, $second] as $index => $worker) {
+            $worker->wait();
+            expect($worker->getExitCode())->toBe(0, $worker->getErrorOutput());
+            $result = json_decode($worker->getOutput(), true, flags: JSON_THROW_ON_ERROR);
+            expect($result['successful'])->toBeTrue();
+            expect(unserialize($result['result']))->toBe($index === 0 || $sameToken ? 'accepted' : 'rejected');
+        }
+        $this->assertDatabaseCount('customer_refund_payments', 1);
+        $this->assertDatabaseCount('customer_refund_payment_reviews', 1);
+        $this->assertDatabaseCount('administration_evidence', 1);
+        $this->assertDatabaseHas('customer_refunds', ['id' => $refundId, 'paid_amount' => $overpayment ? '60.00' : '40.25']);
+        expect(Storage::disk('local')->allFiles())->toHaveCount(1);
+        expect($stock->fresh()->quantity)->toBe(5);
+    } finally {
+        file_put_contents($barrier.'/release', 'release');
+        $first?->stop();
+        $second?->stop();
+        foreach (['locked', 'release'] as $name) {
+            if (is_file($barrier.'/'.$name)) {
+                unlink($barrier.'/'.$name);
+            }
+        }
+        rmdir($barrier);
+    }
+})->with(['same token' => [true, false], 'same transfer' => [false, false], 'excess competing transfers' => [false, true]]);

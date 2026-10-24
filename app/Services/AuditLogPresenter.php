@@ -11,6 +11,7 @@ use App\Enums\ShipmentStatus;
 use App\Enums\UserRole;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use stdClass;
 
@@ -97,9 +98,20 @@ class AuditLogPresenter
             'supplier_return' => route('administration.supplier-returns.index', ['case' => $subjectId]),
             'customer_return' => route('administration.customer-returns.index', ['case' => $subjectId]),
             'customer_return_request' => route('administration.customer-returns.index', ['request_id' => $subjectId]),
-            'refund_payment' => route('administration.customer-returns.index', ['payment_id' => $subjectId]),
+            'refund_payment' => $this->refundPaymentUrl($subjectId),
             default => null,
         };
+    }
+
+    private function refundPaymentUrl(int $paymentId): string
+    {
+        $orderId = DB::table('customer_refund_payments as payments')
+            ->join('customer_refunds as refunds', 'refunds.id', '=', 'payments.customer_refund_id')
+            ->join('order_cancellation_requests as cancellations', 'cancellations.id', '=', 'refunds.cancellation_request_id')
+            ->where('payments.id', $paymentId)->value('cancellations.order_id');
+
+        return $orderId === null ? route('administration.customer-returns.index', ['payment_id' => $paymentId])
+            : route('administration.orders.show', $orderId);
     }
 
     /**

@@ -21,6 +21,7 @@ class CustomerOrderPresenter
         private readonly CustomerReturnEligibility $returnEligibility,
         private readonly CustomerReturnRequestPresenter $returnRequests,
         private readonly BranchDirectory $branches,
+        private readonly OrderCancellationPresenter $cancellations,
     ) {}
 
     /**
@@ -31,6 +32,7 @@ class CustomerOrderPresenter
     public function summary(Order $order): array
     {
         return [
+            'cancellation' => $this->cancellations->summary($order),
             'id' => $order->id,
             'reference' => $order->reference,
             'created_at' => $order->created_at->toIso8601String(),
@@ -68,6 +70,8 @@ class CustomerOrderPresenter
 
         return [
             'can_request_return' => $returnItems->contains(fn (array $item): bool => $item['can_request']),
+            'can_request_cancellation' => $this->orderProcessingService->canRequestCancellation($order),
+            'cancellation' => $this->cancellations->detail($order),
             'return_reason_options' => OperationalRequestReason::customerReturnOptions(),
             'return_requests' => $this->returnRequests->forOrder($order, $refundPayments),
             'refund_payments' => array_merge([], ...array_values($refundPayments)),
@@ -135,6 +139,12 @@ class CustomerOrderPresenter
      */
     private function paymentNotice(Order $order): string
     {
+        if ($this->orderProcessingService->hasCancellationHold($order)) {
+            return 'Cancellation requested. Order handling and payment-proof changes are paused for review.';
+        }
+        if ($order->status === OrderStatus::Cancelled && $order->cancellationRequest !== null) {
+            return 'This order is cancelled. The original payment remains recorded separately; see the cancellation refund status.';
+        }
         if ($order->status === OrderStatus::Cancelled) {
             return 'This order is cancelled. Cancellation does not refund or reverse any recorded payment.';
         }
@@ -223,7 +233,8 @@ class CustomerOrderPresenter
      */
     private function canResubmitPaymentProof(Order $order): bool
     {
-        return $order->payment_method->requiresPaymentProof()
+        return ! $this->orderProcessingService->hasCancellationHold($order)
+            && $order->payment_method->requiresPaymentProof()
             && $order->payment_status === PaymentStatus::Rejected
             && ! in_array($order->status, [OrderStatus::Completed, OrderStatus::Cancelled], strict: true);
     }

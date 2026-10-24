@@ -73,6 +73,7 @@ class RefundPeriodReport
     private function refundQuery(array $filters): Builder
     {
         return DB::table('customer_refunds as refunds')
+            ->whereNotNull('refunds.customer_return_id')
             ->when($filters['product_id'] !== null || $filters['category_id'] !== null,
                 fn (Builder $query): Builder => $query->whereExists(fn (Builder $items): Builder => $items
                     ->selectRaw('1')

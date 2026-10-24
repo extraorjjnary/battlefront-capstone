@@ -26,6 +26,9 @@ final readonly class OrderNotificationOccurred implements ShouldDispatchAfterCom
     /** @return list<UserRole> */
     public function audiences(): array
     {
+        if ($this->kind === 'cancellation.requested') {
+            return [UserRole::Customer, UserRole::Administrator];
+        }
         if ($this->kind === 'order.cancelled' && ($this->cancellationInitiator ?? null) === UserRole::Customer) {
             return [UserRole::Customer, UserRole::Administrator];
         }

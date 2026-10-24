@@ -22,7 +22,7 @@ class CustomerOrderRepository
                 'payment_method',
                 'created_at',
             ])
-            ->with('shipment:id,order_id,status')
+            ->with(['shipment:id,order_id,status', 'cancellationRequest.refund'])
             ->withCount('items')
             ->withSum('items as total_quantity', 'quantity')
             ->orderByDesc('created_at')
@@ -62,6 +62,7 @@ class CustomerOrderRepository
                 'created_at',
             ])
             ->with([
+                'cancellationRequest.refund',
                 'shipment',
                 'items' => fn ($query) => $query
                     ->select(['id', 'order_id', 'product_id', 'quantity', 'price_at_time', 'product_name_at_time'])

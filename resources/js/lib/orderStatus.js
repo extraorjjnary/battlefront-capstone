@@ -12,5 +12,16 @@ const orderStatusBadgeClasses = {
 };
 
 export function orderStatusBadgeClass(status) {
-    return orderStatusBadgeClasses[status] ?? '';
+    const cancellationAliases = {
+        requested: 'pending',
+        refund_processing: 'processing',
+        refunded: 'verified',
+    };
+    return orderStatusBadgeClasses[cancellationAliases[status] ?? status] ?? '';
+}
+
+export function orderDisplayStatus(order) {
+    return order.cancellation?.status.value === 'rejected'
+        ? order.status
+        : (order.cancellation?.status ?? order.status);
 }

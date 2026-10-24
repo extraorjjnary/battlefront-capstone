@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Services\Order\OrderProcessingService;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -44,6 +45,22 @@ class AdministrationWorkQueue
     private function query(User $actor): ?Builder
     {
         $queries = [];
+
+        if (app(OrderProcessingService::class)->canReviewCancellation($actor)) {
+            $queries[] = DB::table('order_cancellation_requests as work')
+                ->select('work.id', 'work.order_id as case_id', 'work.created_at')
+                ->selectRaw('null as responsible_name, null as responsible_active')
+                ->addSelect('work.status')->selectRaw("'cancellation_review' as kind")
+                ->where('work.status', 'pending');
+            if ($actor->can('returns.record_payment')) {
+                $queries[] = DB::table('customer_refunds as work')
+                    ->join('order_cancellation_requests as cancellations', 'cancellations.id', '=', 'work.cancellation_request_id')
+                    ->join('users', 'users.id', '=', 'work.approved_by')
+                    ->select('work.id', 'cancellations.order_id as case_id', 'work.created_at', 'users.name as responsible_name')
+                    ->selectRaw("null as responsible_active, 'unpaid' as status, 'cancellation_refund' as kind")
+                    ->where('work.approved_by', $actor->id)->whereColumn('work.paid_amount', '<', 'work.approved_amount');
+            }
+        }
         if ($actor->can('orders.view') && $actor->can('returns.dispatch')) {
             $queries[] = DB::table('customer_return_resolutions as work')
                 ->select('work.id', 'work.customer_return_id as case_id', 'work.created_at')
@@ -118,6 +135,8 @@ class AdministrationWorkQueue
                 ->select('work.id', 'work.id as case_id', 'work.created_at', 'users.name as responsible_name', 'users.is_active as responsible_active', 'work.status')
                 ->selectRaw("'order' as kind")
                 ->whereIn('work.status', ['pending', 'processing'])
+                ->whereNotExists(fn (Builder $query) => $query->selectRaw('1')->from('order_cancellation_requests as cancellation')
+                    ->whereColumn('cancellation.order_id', 'work.id')->where('cancellation.status', 'pending'))
                 ->when(! $actor->can('orders.assign'), fn (Builder $query) => $query->where(fn (Builder $query) => $query
                     ->whereNull('work.assigned_handler_id')->orWhere('users.is_active', true)));
         }
@@ -150,6 +169,8 @@ class AdministrationWorkQueue
     private function present(stdClass $entry): array
     {
         [$action, $route] = match ($entry->kind) {
+            'cancellation_review' => ['Review cancellation request', 'administration.orders.show'],
+            'cancellation_refund' => ['Record cancellation refund', 'administration.orders.show'],
             'stock_adjustment' => ['Review stock request', 'administration.inventory-adjustments.index'],
             'damage' => ['Decide damage disposition', 'administration.damage-reports.index'],
             'supplier_return' => match ($entry->status) {
@@ -179,7 +200,7 @@ class AdministrationWorkQueue
             'responsible_name' => $entry->responsible_name === null ? 'Unassigned' : ($entry->responsible_active !== null && ! (bool) $entry->responsible_active ? $entry->responsible_name.' (inactive)' : $entry->responsible_name),
             'reference' => $entry->kind === 'order' ? sprintf('BF-%06d', $id) : strtoupper(str_replace('_', ' ', $entry->kind)).' #'.$id,
             'required_action' => $action,
-            'href' => $route === 'administration.orders.show' ? route($route, $id) : route($route, [
+            'href' => $route === 'administration.orders.show' ? route($route, $entry->case_id) : route($route, [
                 ...($entry->kind === 'customer_request' ? ['request_id' => $id] : ['case' => $entry->case_id ?? $id]),
                 ...($entry->kind === 'refund_reconciliation' ? ['payment_id' => $id] : []),
             ]).($entry->kind === 'refund_reconciliation' ? '#refund-payment-'.$id : ''),

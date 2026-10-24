@@ -107,6 +107,12 @@ function loadPage(path, inlineTemplate = false) {
             '@/lib/currency': { formatCurrency },
             '@/lib/dateTime': { formatDateTime },
             '@/lib/orderStatus': { orderStatusBadgeClass },
+            '@/routes/orders/cancellation-requests': {
+                store: (id) => ({
+                    url: `/orders/${id}/cancellation-requests`,
+                    method: 'post',
+                }),
+            },
             '@/actions/App/Http/Controllers/Administration/OrderStatusController':
                 {
                     default: {
@@ -146,6 +152,8 @@ function orderProps(overrides = {}) {
             reference: 'BF-000007',
             created_at: '2026-10-12T08:00:00Z',
             can_cancel: true,
+            can_process: true,
+            assigned_handler_id: 9,
             status: { value: 'pending', label: 'Pending' },
             recipient: { name: 'Customer', contact_number: '09171234567' },
             customer: { name: 'Customer', email: 'customer@example.com' },
@@ -181,6 +189,45 @@ function orderProps(overrides = {}) {
         },
     };
 }
+
+test('wallet cancellation requests use their review endpoint and prevent stale or duplicate submissions', async () => {
+    const scope = Vue.effectScope();
+    try {
+        const loaded = loadPage('./Show.vue');
+        const props = Vue.reactive(
+            orderProps({ can_cancel: false, can_request_cancellation: true }),
+        );
+        const page = scope.run(() =>
+            loaded.component.setup(props, { expose() {} }),
+        );
+        page.requestCancellation();
+        assert.equal(page.cancellationOpen.value, true);
+        page.submitCancellation();
+        assert.deepEqual(loaded.submissions[0].target, {
+            url: '/orders/7/cancellation-requests',
+            method: 'post',
+        });
+        page.submitCancellation();
+        assert.equal(loaded.submissions.length, 1);
+        loaded.submissions[0].options.onSuccess();
+        assert.equal(page.cancellationOpen.value, false);
+        loaded.forms[1].processing = false;
+        props.order.can_request_cancellation = false;
+        page.requestCancellation();
+        assert.equal(page.cancellationOpen.value, false);
+    } finally {
+        scope.stop();
+    }
+    const loaded = loadPage('./Show.vue', true);
+    const html = await renderToString(
+        Vue.h(
+            loaded.component,
+            orderProps({ can_cancel: false, can_request_cancellation: true }),
+        ),
+    );
+    assert.match(html, /Request cancellation/);
+    assert.doesNotMatch(html, /Confirm cancellation/);
+});
 
 test('pending order processing submits without product handover', () => {
     const { component, submissions } = loadPage(
