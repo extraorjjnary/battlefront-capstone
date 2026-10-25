@@ -51,6 +51,7 @@ use App\Http\Controllers\DeliveryQuoteController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\NotificationController as CustomerNotificationController;
 use App\Http\Controllers\OrderCancellationController;
+use App\Http\Controllers\OrderCancellationRequestController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderPaymentProofController as CustomerOrderPaymentProofController;
 use App\Http\Controllers\OrderPaymentRetryController;
@@ -142,6 +143,8 @@ Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {
         ->whereNumber(['order', 'returnRequest'])->name('orders.return-requests.withdraw');
     Route::post('orders', [OrderController::class, 'store'])
         ->name('orders.store');
+    Route::post('orders/{order}/cancellation-requests', OrderCancellationRequestController::class)
+        ->whereNumber('order')->name('orders.cancellation-requests.store');
     Route::post('orders/{order}/cancel', OrderCancellationController::class)
         ->whereNumber('order')
         ->name('orders.cancel.store');
@@ -254,6 +257,8 @@ Route::middleware(['auth', 'can:access-administration'])
             ->middleware('can:returns.dispatch')->name('customer-returns.handover');
         Route::post('customer-returns/{customerReturn}/resolution-completion', [CustomerReturnController::class, 'completeResolution'])
             ->whereNumber('customerReturn')->middleware(['can:orders.view', 'can:returns.dispatch'])->name('customer-returns.resolution-completion');
+        Route::patch('orders/{order}/cancellation-request', [App\Http\Controllers\Administration\OrderCancellationRequestController::class, 'update'])
+            ->whereNumber('order')->middleware(['can:orders.view', 'can:returns.approve'])->name('orders.cancellation-request.update');
         Route::post('customer-refunds/{refund}/payments', [CustomerReturnController::class, 'recordPayment'])
             ->middleware('can:returns.record_payment')->name('customer-refunds.payments.store');
         Route::post('customer-refund-payments/{payment}/review', [CustomerReturnController::class, 'reviewPayment'])

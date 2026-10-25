@@ -51,19 +51,6 @@ const approvedAmount = computed(() =>
                 ><input v-model="partial" type="checkbox" />Partial
                 refund</label
             >
-            <template v-if="partial">
-                <Label>Reason shown to customer</Label>
-                <Input
-                    name="resolution_summary"
-                    aria-label="Partial refund explanation"
-                    required
-                    minlength="5"
-                    maxlength="2000"
-                />
-                <InputError
-                    :message="errors.resolution_summary || errors.summary"
-                />
-            </template>
         </template>
         <p v-else class="text-muted-foreground text-sm">
             No refund for this outcome.

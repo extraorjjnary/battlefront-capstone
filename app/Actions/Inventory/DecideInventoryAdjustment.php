@@ -6,6 +6,7 @@ use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\ApprovalMonitor;
+use App\Services\Notifications\OrderNotificationPublisher;
 use App\Support\OperationalRequestReason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -83,6 +84,7 @@ class DecideInventoryAdjustment
             if ($approve) {
                 app(ApprovalMonitor::class)->afterApproval($reviewer, (int) $request->requester_id);
             }
+            app(OrderNotificationPublisher::class)->operationalAfterCommit($approve ? 'inventory.adjustment.approved' : 'inventory.adjustment.rejected', $requestId, (int) $request->requester_id, $reviewer->id);
         }, attempts: 3);
     }
 }

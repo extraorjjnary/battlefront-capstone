@@ -13,6 +13,7 @@ use Illuminate\Support\Collection;
  * @phpstan-type NotificationView array{
  *     id: string, event: mixed, title: mixed, body: mixed, occurred_at: mixed,
  *     created_at: string|null, read_at: string|null, is_read: bool,
+ *     subject?: array{type: string, id: int},
  *     order: array{id: int, reference: string, web_url: string, api_url: string|null,
  *         deep_link: array{screen: string, order_id: int}|null}|null
  * }
@@ -24,7 +25,15 @@ class NotificationHistory
     {
         return $user->notifications()->getQuery()
             ->where('data->audience', $user->isAdministrator() ? 'administrator' : 'customer')
-            ->when($user->isAdministrator() && ! $user->hasAdministrationPermission('orders.view'), fn (Builder $query): Builder => $query->whereRaw('1 = 0'));
+            ->when($user->isAdministrator(), fn (Builder $query): Builder => $query->where(function (Builder $query) use ($user): void {
+                $query->whereRaw('1 = 0');
+                if ($user->hasAdministrationPermission('orders.view')) {
+                    $query->orWhereNotIn('data->event', NotificationRecipients::INVENTORY_EVENTS);
+                }
+                if ($user->hasAdministrationPermission('inventory.view')) {
+                    $query->orWhereIn('data->event', NotificationRecipients::INVENTORY_EVENTS);
+                }
+            }));
     }
 
     public function unreadCount(User $user): int
@@ -88,7 +97,7 @@ class NotificationHistory
     {
         $data = $notification->data;
 
-        return [
+        $view = [
             'id' => $notification->id,
             'event' => $data['event'],
             'title' => $data['title'],
@@ -117,5 +126,12 @@ class NotificationHistory
                 'deep_link' => $user->isAdministrator() ? null : ['screen' => 'order_detail', 'order_id' => $order->id],
             ],
         ];
+
+        if ($user->isAdministrator() && app(NotificationRecipients::class)->canView($user, $data['event'])
+            && in_array($data['subject']['type'] ?? null, ['stock_adjustment', 'damage_report', 'supplier_return', 'customer_return', 'customer_return_request'], true)) {
+            $view['subject'] = ['type' => $data['subject']['type'], 'id' => (int) $data['subject']['id']];
+        }
+
+        return $view;
     }
 }

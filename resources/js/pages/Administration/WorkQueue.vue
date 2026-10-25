@@ -4,7 +4,7 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import { ref, watch } from 'vue';
 import WorkQueueController from '@/actions/App/Http/Controllers/Administration/WorkQueueController';
 import { Button } from '@/components/ui/button';
-import { formatDateTime } from '@/lib/dateTime';
+import { formatAgeDays, formatDateTime } from '@/lib/dateTime';
 
 const props = defineProps({
     entries: { type: Object, required: true },
@@ -20,6 +20,8 @@ const taskLabels = {
     customer_handover: 'Return to customer',
     refund: 'Refund payment',
     refund_reconciliation: 'Refund review',
+    cancellation_review: 'Cancellation review',
+    cancellation_refund: 'Cancellation refund',
     order: 'Order',
 };
 const kind = ref(props.filters.kind ?? 'all');
@@ -83,6 +85,12 @@ defineOptions({
                     </option>
                     <option value="refund">Refund payment</option>
                     <option value="refund_reconciliation">Refund review</option>
+                    <option value="cancellation_review">
+                        Cancellation review
+                    </option>
+                    <option value="cancellation_refund">
+                        Cancellation refund
+                    </option>
                     <option value="order">Order</option>
                 </select></label
             >
@@ -131,7 +139,7 @@ defineOptions({
                     </p>
                     <p class="text-muted-foreground mt-1 text-xs">
                         Opened {{ formatDateTime(entry.created_at) }} ·
-                        {{ entry.age_days }} days old
+                        {{ formatAgeDays(entry.age_days) }}
                     </p>
                 </div>
                 <Link

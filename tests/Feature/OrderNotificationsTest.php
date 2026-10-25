@@ -103,7 +103,7 @@ test('replacement proof notifies administrators once and later rejection remains
 
 test('shipment milestones create meaningful customer history while reference edits remain silent', function () {
     $order = Order::factory()->withDeliverySnapshot()->create(['status' => OrderStatus::Processing, 'payment_status' => PaymentStatus::Verified]);
-    Shipment::factory()->for($order)->create();
+    Shipment::factory()->for($order)->withHandoffDetails($order->total_amount)->create();
     $service = app(OrderProcessingService::class);
 
     foreach ([ShipmentStatus::Preparing, ShipmentStatus::ReadyForDispatch, ShipmentStatus::HandedToLbc, ShipmentStatus::InTransit, ShipmentStatus::OutForDelivery, ShipmentStatus::Delivered] as $status) {

@@ -5,6 +5,7 @@ namespace App\Actions\Inventory;
 use App\Models\Inventory;
 use App\Models\User;
 use App\Services\ApprovalMonitor;
+use App\Services\Notifications\OrderNotificationPublisher;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -39,6 +40,7 @@ class HandleSupplierReturn
             ]);
             $this->movement($inventory, $requester, 'supplier_return_hold', $id, $beforeSellable, $beforeHeld);
             $this->audit($requester, 'supplier_return.requested', $id, ['quantity' => $quantity, 'supplier_id' => $supplierId], $reason);
+            app(OrderNotificationPublisher::class)->operationalAfterCommit('supplier_return.requested', $id, $requester->id, $requester->id);
 
             return $id;
         }, attempts: 3);
@@ -84,6 +86,8 @@ class HandleSupplierReturn
             if ($approve) {
                 app(ApprovalMonitor::class)->afterApproval($reviewer, (int) $return->requester_id);
             }
+            $kind = $approve ? 'supplier_return.approved' : (($return->damage_report_id !== null || $return->customer_return_item_id !== null) ? 'supplier_return.rejected_follow_up' : 'supplier_return.rejected');
+            app(OrderNotificationPublisher::class)->operationalAfterCommit($kind, $id, (int) $return->requester_id, $reviewer->id, $reviewer->id);
         }, attempts: 3);
     }
 
@@ -112,6 +116,7 @@ class HandleSupplierReturn
                 'updated_at' => now(),
             ]);
             $this->audit($actor, 'supplier_return.dispatched', $id, ['external_reference' => $externalReference], null);
+            app(OrderNotificationPublisher::class)->operationalAfterCommit('supplier_return.dispatched', $id, (int) $return->requester_id, $actor->id, (int) $return->reviewer_id);
         }, attempts: 3);
     }
 
@@ -131,6 +136,7 @@ class HandleSupplierReturn
                 'updated_at' => now(),
             ]);
             $this->audit($actor, 'supplier_return.closed', $id, ['external_reference' => $externalReference], null);
+            app(OrderNotificationPublisher::class)->operationalAfterCommit('supplier_return.closed', $id, (int) $return->requester_id, $actor->id, (int) $return->reviewer_id);
         }, attempts: 3);
     }
 
@@ -186,6 +192,7 @@ class HandleSupplierReturn
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
+                app(OrderNotificationPublisher::class)->operationalAfterCommit('supplier_return.requested', $newId, $actor->id, $actor->id);
             } else {
                 $beforeSellable = $inventory->quantity;
                 $beforeHeld = $inventory->quarantined_quantity;
@@ -206,6 +213,9 @@ class HandleSupplierReturn
                 'decision' => $decision,
                 'next_supplier_return_id' => $newId,
             ], $reason);
+            if ($decision !== 'retry') {
+                app(OrderNotificationPublisher::class)->operationalAfterCommit('supplier_return.follow_up_resolved', $id, (int) $return->requester_id, $actor->id);
+            }
         }, attempts: 3);
     }
 
@@ -235,6 +245,7 @@ class HandleSupplierReturn
                 'outcome' => $outcome,
                 'external_reference' => $externalReference,
             ], $notes);
+            app(OrderNotificationPublisher::class)->operationalAfterCommit('supplier_return.resolved', $id, (int) $return->requester_id, $actor->id);
         }, attempts: 3);
     }
 

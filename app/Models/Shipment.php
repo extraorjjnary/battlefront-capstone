@@ -27,20 +27,20 @@ use Illuminate\Support\Carbon;
  * @property string|null $tracking_reference
  * @property string|null $booking_source
  * @property string|null $booking_reference
- * @property string|null $carrier_cod_collected_amount
+ * @property numeric-string|null $carrier_cod_collected_amount
  * @property string|null $carrier_cod_collection_reference
  * @property Carbon|null $carrier_cod_collected_at
- * @property string|null $carrier_cod_remitted_amount
+ * @property numeric-string|null $carrier_cod_remitted_amount
  * @property string|null $carrier_cod_remittance_reference
  * @property Carbon|null $carrier_cod_remitted_at
  * @property int|null $package_count
- * @property string|null $package_weight_kg
- * @property string|null $package_length_cm
- * @property string|null $package_width_cm
- * @property string|null $package_height_cm
- * @property string|null $declared_value
+ * @property numeric-string|null $package_weight_kg
+ * @property numeric-string|null $package_length_cm
+ * @property numeric-string|null $package_width_cm
+ * @property numeric-string|null $package_height_cm
+ * @property numeric-string|null $declared_value
  * @property string|null $handoff_mode
- * @property string|null $actual_carrier_cost
+ * @property numeric-string|null $actual_carrier_cost
  * @property string|null $carrier_cost_reference
  * @property Carbon|null $carrier_cost_recorded_at
  * @property string|null $shipment_exception_code

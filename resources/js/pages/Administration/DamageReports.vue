@@ -1,4 +1,5 @@
 <script setup>
+import { formatAgeDays } from '@/lib/dateTime';
 import PageHeader from '@/components/PageHeader.vue';
 import { Form, Head, Link, usePage } from '@inertiajs/vue3';
 import DamageReportController from '@/actions/App/Http/Controllers/Administration/DamageReportController';
@@ -202,7 +203,7 @@ defineOptions({
                 <p class="text-sm">
                     Stock: {{ damageProgress(report) }} ·
                     {{ report.held_quantity }} units held ·
-                    {{ report.age_days }} days old
+                    {{ formatAgeDays(report.age_days) }}
                 </p>
                 <p
                     v-if="report.inspection_overdue"

@@ -41,6 +41,22 @@ class ShipmentFactory extends Factory
         ];
     }
 
+    /**
+     * Supply the package snapshot required before a fixture can reach carrier handoff.
+     */
+    public function withHandoffDetails(string $declaredValue): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'package_count' => 1,
+            'package_weight_kg' => '1.000',
+            'package_length_cm' => '10.00',
+            'package_width_cm' => '10.00',
+            'package_height_cm' => '10.00',
+            'declared_value' => $declaredValue,
+            'handoff_mode' => 'branch_dropoff',
+        ]);
+    }
+
     /** @return DeliveryQuote */
     private function quoteForOrder(int $orderId): array
     {

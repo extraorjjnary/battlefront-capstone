@@ -10,8 +10,10 @@ use App\Models\OrderItem;
 use App\Models\Shipment;
 use App\Models\User;
 use App\Services\Order\OrderProcessingService;
+use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -36,7 +38,7 @@ function orderHandlerOperation(string $operation): array
         default => Order::factory()->paidWithGCash(),
     };
     $order = $factory->create([
-        'status' => in_array($operation, ['complete', 'shipment', 'reference', 'delivered', 'pickup', 'cod'], true) ? OrderStatus::Processing : OrderStatus::Pending,
+        'status' => in_array($operation, ['complete', 'manual', 'shipment', 'reference', 'delivered', 'pickup', 'cod'], true) ? OrderStatus::Processing : OrderStatus::Pending,
         'payment_status' => in_array($operation, ['verify', 'reject', 'pickup', 'cod'], true) ? PaymentStatus::Pending : PaymentStatus::Verified,
         'handler_required' => false,
     ]);
@@ -103,7 +105,13 @@ test('the assigned handler can perform each eligible processing action', functio
     expect(DB::table('audit_logs')->where('subject_id', $order->id)->where('actor_id', $actor->id)->count())->toBeGreaterThan(0);
     expect(Inventory::sole()->quantity)->toBe($operation === 'cancel' ? 9 : 7);
     expect($order->fresh()->assigned_handler_id)->toBe($actor->id);
-    if (in_array($operation, ['complete', 'delivered', 'pickup', 'cod'], true)) {
+    if ($operation === 'cod') {
+        expect($order->fresh()->status)->toBe(OrderStatus::Processing);
+        expect($order->fresh()->payment_status)->toBe(PaymentStatus::Pending);
+        $this->assertDatabaseCount('sales', 0);
+    }
+
+    if (in_array($operation, ['complete', 'delivered', 'pickup'], true)) {
         expect($order->fresh()->status)->toBe(OrderStatus::Completed);
         expect($order->sale()->sole()->handler_id)->toBe($actor->id);
         $this->assertDatabaseCount('sales', 1);
@@ -120,6 +128,8 @@ test('stale processing models cannot bypass a committed reassignment', function 
     app(AssignOrderHandler::class)->execute($order, $manager, $current->id);
     $processing = app(OrderProcessingService::class);
     $before = $order->fresh()->getAttributes();
+    $this->assertDatabaseCount('notifications', 3);
+    $notificationsBefore = DatabaseNotification::query()->orderBy('id')->get()->toArray();
     $attempt = fn () => match ($operation) {
         'verify', 'reject' => $processing->updatePaymentStatus($stale, PaymentStatus::Verified, actor: $former),
         'manual' => $processing->createManualShipment($stale, 'lbc', null, null, null, true, actor: $former),
@@ -134,7 +144,7 @@ test('stale processing models cannot bypass a committed reassignment', function 
     expect($order->fresh()->getAttributes())->toBe($before);
     $this->assertDatabaseCount('audit_logs', 2);
     $this->assertDatabaseCount('sales', 0);
-    $this->assertDatabaseCount('notifications', 0);
+    expect(DatabaseNotification::query()->orderBy('id')->get()->toArray())->toBe($notificationsBefore);
 })->with('handler operations');
 
 test('all eligible roles must claim before processing and cannot claim someone elses order', function (string $role) {
@@ -238,12 +248,76 @@ test('supervisors cannot assign an ineligible handler', function (string $eligib
         $target->is_active = false;
         $target->save();
     }
+    if ($eligibility === 'permission revoked') {
+        DB::table('administration_role_permissions')->where('administration_role_id', $target->administration_role_id)
+            ->where('administration_permission_id', DB::table('administration_permissions')->where('code', 'orders.process')->value('id'))->delete();
+    }
     $order = Order::factory()->create();
 
     $this->actingAs($supervisor)->patch(route('administration.orders.handler.update', $order), ['handler_id' => $target->id])->assertSessionHasErrors('handler');
     expect($order->fresh()->assigned_handler_id)->toBeNull();
     $this->assertDatabaseCount('audit_logs', 0);
-})->with(['customer', 'it', 'inactive']);
+})->with(['customer', 'it', 'inactive', 'permission revoked']);
+
+test('assignment immediately allows the new handler to process without claiming', function (string $role) {
+    [$order, $route, $method, $payload] = orderHandlerOperation('process');
+    $supervisor = orderHandlerActor($role);
+    $handler = orderHandlerActor('staff');
+
+    $this->actingAs($supervisor)->patch(route('administration.orders.handler.update', $order), ['handler_id' => $handler->id])->assertSessionHasNoErrors();
+    $this->actingAs($handler)->get(route('administration.orders.show', $order))
+        ->assertInertia(fn (Assert $page) => $page->where('order.can_process', true));
+    $this->{$method}(route($route, $order), $payload)->assertSessionHasNoErrors();
+
+    expect($order->fresh()->status)->toBe(OrderStatus::Processing);
+    expect($order->fresh()->assigned_handler_id)->toBe($handler->id);
+    $this->assertDatabaseHas('audit_logs', [
+        'actor_id' => $supervisor->id,
+        'action' => 'order.handler.assigned',
+        'subject_id' => $order->id,
+        'changes' => json_encode(['before' => null, 'after' => $handler->id], JSON_THROW_ON_ERROR),
+    ]);
+    $this->assertDatabaseCount('audit_logs', 2);
+    $this->assertDatabaseCount('sales', 0);
+    expect(Inventory::sole()->quantity)->toBe(7);
+})->with(['manager', 'owner']);
+
+test('IT cannot claim assign or process even when recorded as the handler', function () {
+    [$order, $route, $method, $payload] = orderHandlerOperation('process');
+    $it = orderHandlerActor('it');
+    $target = orderHandlerActor('staff');
+
+    $this->actingAs($it)->post(route('administration.orders.claim', $order))->assertForbidden();
+    $this->patch(route('administration.orders.handler.update', $order), ['handler_id' => $target->id])->assertForbidden();
+    $this->assertDatabaseHas('orders', ['id' => $order->id, 'assigned_handler_id' => null]);
+
+    $order->assigned_handler_id = $it->id;
+    $order->save();
+    $before = $order->fresh()->getAttributes();
+    $this->{$method}(route($route, $order), $payload)->assertForbidden();
+
+    expect($order->fresh()->getAttributes())->toBe($before);
+    $this->assertDatabaseCount('audit_logs', 0);
+    $this->assertDatabaseCount('sales', 0);
+    $this->assertDatabaseCount('notifications', 0);
+    expect(Inventory::sole()->quantity)->toBe(7);
+});
+
+test('a stale claim cannot replace an established handler or create another audit record', function () {
+    $order = Order::factory()->create();
+    $stale = $order->fresh();
+    $first = orderHandlerActor('staff');
+    $second = orderHandlerActor('manager');
+    $assignment = app(AssignOrderHandler::class);
+    $assignment->execute($order, $first, $first->id, claimOnly: true);
+
+    expect(fn () => $assignment->execute($stale, $second, $second->id, claimOnly: true))->toThrow(ValidationException::class);
+
+    $this->assertDatabaseHas('orders', ['id' => $order->id, 'assigned_handler_id' => $first->id]);
+    $this->assertDatabaseHas('audit_logs', ['actor_id' => $first->id, 'action' => 'order.handler.assigned', 'subject_id' => $order->id]);
+    $this->assertDatabaseCount('audit_logs', 1);
+    $this->assertDatabaseCount('notifications', 0);
+});
 
 test('terminal orders cannot be claimed or reassigned', function (string $status) {
     $owner = orderHandlerActor('owner');
@@ -254,3 +328,58 @@ test('terminal orders cannot be claimed or reassigned', function (string $status
     expect($order->fresh()->assigned_handler_id)->toBeNull();
     $this->assertDatabaseCount('audit_logs', 0);
 })->with(['completed', 'cancelled']);
+
+test('pending cancellation prevents every permitted role from claiming or assigning an order', function (string $role, bool $assigned) {
+    $actor = orderHandlerActor($role);
+    $previousHandler = $assigned ? orderHandlerActor('staff')->id : null;
+    $order = Order::factory()->paidWithGCash()->create(['assigned_handler_id' => $previousHandler]);
+    $stale = $order->fresh();
+    app(OrderProcessingService::class)->requestCancellation($order->user, $order->id);
+    $auditCount = DB::table('audit_logs')->count();
+
+    $this->actingAs($actor)->post(route('administration.orders.claim', $order))->assertSessionHasErrors('handler');
+    if ($role !== 'staff') {
+        $this->patch(route('administration.orders.handler.update', $order), ['handler_id' => $actor->id])->assertSessionHasErrors('handler');
+        expect(fn () => app(AssignOrderHandler::class)->execute($stale, $actor, $actor->id))->toThrow(ValidationException::class);
+    }
+
+    expect($order->fresh()->assigned_handler_id)->toBe($previousHandler);
+    $this->assertDatabaseCount('audit_logs', $auditCount);
+})->with(['staff', 'manager', 'owner'])->with([false, true]);
+
+test('rejecting cancellation restores claiming and supervisor assignment without changing prior responsibility', function (bool $assign) {
+    $actor = orderHandlerActor('manager');
+    $target = orderHandlerActor('staff');
+    $order = Order::factory()->paidWithGCash()->create();
+    $processing = app(OrderProcessingService::class);
+    $processing->requestCancellation($order->user, $order->id);
+    $processing->reviewCancellation($order, $actor, false, '0.00', 'Cancellation rejected after checking the actual wallet.', true);
+
+    if ($assign) {
+        $this->actingAs($actor)->patch(route('administration.orders.handler.update', $order), ['handler_id' => $target->id])->assertSessionHasNoErrors();
+    } else {
+        $this->actingAs($target)->post(route('administration.orders.claim', $order))->assertSessionHasNoErrors();
+    }
+
+    expect($order->fresh()->assigned_handler_id)->toBe($target->id);
+})->with([false, true]);
+
+test('order detail preserves eligible handler options and assigned names', function (OrderStatus $status) {
+    $owner = orderHandlerActor('owner');
+    $owner->update(['name' => 'Zoe Owner']);
+    $staff = orderHandlerActor('staff');
+    $staff->update(['name' => 'Amy Staff']);
+    $inactive = orderHandlerActor('staff');
+    $inactive->is_active = false;
+    $inactive->save();
+    orderHandlerActor('it');
+    $order = Order::factory()->create(['status' => $status, 'assigned_handler_id' => $staff->id]);
+    $expectedOptions = in_array($status, [OrderStatus::Completed, OrderStatus::Cancelled], true)
+        ? []
+        : [['id' => $staff->id, 'name' => 'Amy Staff'], ['id' => $owner->id, 'name' => 'Zoe Owner']];
+
+    $this->actingAs($owner)->get(route('administration.orders.show', $order))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('handler_options', $expectedOptions)
+            ->where('order.assigned_handler_name', 'Amy Staff'));
+})->with(OrderStatus::cases());

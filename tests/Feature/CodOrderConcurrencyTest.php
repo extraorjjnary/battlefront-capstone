@@ -123,11 +123,11 @@ function startCodWorker(Closure $task): Process
     return $process;
 }
 
-test('real MySQL overlap serializes delivery and COD collection without duplicate sales', function (string $firstOperation, string $secondOperation, ShipmentStatus $initial, array $expectedOutcomes, int $expectedSales) {
+test('real MySQL overlap serializes delivery and COD collection without duplicate sales', function (string $firstOperation, string $secondOperation, ShipmentStatus $initial, array $expectedOutcomes) {
     expect(DB::connection('mysql')->selectOne('SELECT @@session.time_zone AS timezone')->timezone)->toBe('+00:00');
 
     $order = Order::factory()->cashOnDelivery()->create(['status' => OrderStatus::Processing]);
-    Shipment::factory()->for($order)->create(['status' => $initial, 'delivered_at' => $initial === ShipmentStatus::Delivered ? now() : null]);
+    Shipment::factory()->for($order)->withHandoffDetails($order->total_amount)->create(['status' => $initial, 'delivered_at' => $initial === ShipmentStatus::Delivered ? now() : null]);
     $stock = Inventory::factory()->create(['quantity' => 8]);
     OrderItem::factory()->for($order)->create(['product_id' => $stock->product_id, 'quantity' => 2, 'price_at_time' => '50.00']);
     $connection = config('database.connections.mysql');
@@ -159,16 +159,18 @@ test('real MySQL overlap serializes delivery and COD collection without duplicat
             $outcomes[] = unserialize($result['result']);
         }
         expect($outcomes)->toBe($expectedOutcomes);
-        $this->assertDatabaseCount('sales', $expectedSales);
+        $this->assertDatabaseCount('sales', 0);
         expect($order->refresh()->shipment->status)->toBe(ShipmentStatus::Delivered);
-        expect($order->payment_status)->toBe($expectedSales === 1 ? PaymentStatus::Verified : PaymentStatus::Pending);
-        expect($order->status)->toBe($expectedSales === 1 ? OrderStatus::Completed : OrderStatus::Processing);
-        expect($order->user->notifications()->where('data->event', 'payment.verified')->count())->toBe($expectedSales);
+        expect($order->payment_status)->toBe(PaymentStatus::Pending);
+        expect($order->status)->toBe(OrderStatus::Processing);
+        expect($order->user->notifications()->where('data->event', 'payment.verified')->count())->toBe(0);
         expect($stock->refresh()->quantity)->toBe(8);
-        if ($expectedSales === 0) {
+        if ($order->shipment->carrier_cod_collected_at === null) {
             app(OrderProcessingService::class)->confirmCodCollection($order, true);
         }
         expect(fn () => app(OrderProcessingService::class)->confirmCodCollection($order, true))->toThrow(ValidationException::class);
+        app(OrderProcessingService::class)->confirmCodRemittance($order, true, 'LBC-REMITTANCE-REFERENCE');
+        expect($order->refresh())->payment_status->toBe(PaymentStatus::Verified)->status->toBe(OrderStatus::Completed);
         $this->assertDatabaseCount('sales', 1);
     } finally {
         file_put_contents($releasePath, 'release');
@@ -182,9 +184,9 @@ test('real MySQL overlap serializes delivery and COD collection without duplicat
         rmdir($barrier);
     }
 })->with([
-    'delivery obtains the lock first' => ['delivered', 'confirm', ShipmentStatus::OutForDelivery, ['accepted', 'accepted'], 1],
-    'premature confirmation obtains the lock first' => ['confirm', 'delivered', ShipmentStatus::OutForDelivery, ['rejected', 'accepted'], 0],
-    'two confirmations overlap' => ['confirm', 'confirm', ShipmentStatus::Delivered, ['accepted', 'rejected'], 1],
+    'delivery obtains the lock first' => ['delivered', 'confirm', ShipmentStatus::OutForDelivery, ['accepted', 'accepted']],
+    'premature confirmation obtains the lock first' => ['confirm', 'delivered', ShipmentStatus::OutForDelivery, ['rejected', 'accepted']],
+    'two confirmations overlap' => ['confirm', 'confirm', ShipmentStatus::Delivered, ['accepted', 'rejected']],
 ]);
 
 test('MySQL COD migration preserves existing rows and enforces canonical delivery-only payment values', function () {
@@ -205,7 +207,7 @@ test('MySQL COD migration preserves existing rows and enforces canonical deliver
     expect(fn () => $migration->down())->toThrow(RuntimeException::class, 'Cannot roll back payment methods while COD orders exist.');
 });
 
-test('real MySQL overlap serializes handler claims reassignment and completion', function (string $firstOperation, string $secondOperation, int $expectedSales) {
+test('real MySQL overlap serializes handler claims reassignment and COD collection', function (string $firstOperation, string $secondOperation) {
     $manager = User::factory()->administrator()->create();
     $handlers = User::factory()->administrator()->count(2)->create([
         'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
@@ -215,7 +217,7 @@ test('real MySQL overlap serializes handler claims reassignment and completion',
         'status' => OrderStatus::Processing,
         'assigned_handler_id' => $firstOperation === 'claim' ? null : $original->id,
     ]);
-    Shipment::factory()->for($order)->create(['status' => ShipmentStatus::Delivered, 'delivered_at' => now()]);
+    Shipment::factory()->for($order)->withHandoffDetails($order->total_amount)->create(['status' => ShipmentStatus::Delivered, 'delivered_at' => now()]);
     $stock = Inventory::factory()->create(['quantity' => 7]);
     OrderItem::factory()->for($order)->create(['product_id' => $stock->product_id, 'quantity' => 2, 'price_at_time' => '50.00']);
     $connection = config('database.connections.mysql');
@@ -251,18 +253,19 @@ test('real MySQL overlap serializes handler claims reassignment and completion',
             expect($result['successful'])->toBeTrue();
             $outcomes[] = unserialize($result['result']);
         }
-        expect($outcomes)->toBe(['accepted', 'rejected']);
-        expect($order->refresh()->assigned_handler_id)->toBe($firstOperation === 'assign' ? $replacement->id : $original->id);
+        expect($outcomes)->toBe($firstOperation === 'confirm' ? ['accepted', 'accepted'] : ['accepted', 'rejected']);
+        expect($order->refresh()->assigned_handler_id)->toBe($firstOperation === 'claim' ? $original->id : $replacement->id);
         expect($stock->refresh()->quantity)->toBe(7);
-        $this->assertDatabaseCount('sales', $expectedSales);
-        $this->assertDatabaseCount('audit_logs', $expectedSales === 1 ? 2 : 1);
-        expect($order->user->notifications()->where('data->event', 'payment.verified')->count())->toBe($expectedSales);
-        if ($firstOperation === 'assign') {
-            app(OrderProcessingService::class)->confirmCodCollection($order, true, actor: $replacement);
-            expect($order->sale()->sole()->handler_id)->toBe($replacement->id);
-        } elseif ($expectedSales === 1) {
-            expect($order->sale()->sole()->handler_id)->toBe($original->id);
+        $this->assertDatabaseCount('sales', 0);
+        expect($order->user->notifications()->where('data->event', 'payment.verified')->count())->toBe(0);
+        $currentHandler = User::query()->findOrFail($order->assigned_handler_id);
+        if ($order->shipment->carrier_cod_collected_at === null) {
+            app(OrderProcessingService::class)->confirmCodCollection($order, true, actor: $currentHandler);
         }
+        app(OrderProcessingService::class)->confirmCodRemittance($order, true, 'LBC-REMITTANCE-REFERENCE', actor: $currentHandler);
+        expect($order->sale()->sole()->handler_id)->toBe($currentHandler->id);
+        $this->assertDatabaseCount('sales', 1);
+        $this->assertSame(5, DB::table('audit_logs')->where('subject_type', 'order')->where('subject_id', $order->id)->count());
     } finally {
         file_put_contents($releasePath, 'release');
         $first?->stop();
@@ -275,7 +278,7 @@ test('real MySQL overlap serializes handler claims reassignment and completion',
         rmdir($barrier);
     }
 })->with([
-    'competing claims' => ['claim', 'claim', 0],
-    'reassignment wins before former handler confirms collection' => ['assign', 'confirm', 0],
-    'completion wins before reassignment' => ['confirm', 'assign', 1],
+    'competing claims' => ['claim', 'claim'],
+    'reassignment wins before former handler confirms collection' => ['assign', 'confirm'],
+    'collection wins before reassignment' => ['confirm', 'assign'],
 ]);

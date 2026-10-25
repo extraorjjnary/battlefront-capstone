@@ -22,7 +22,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 function shipmentWorkflowOrder(OrderStatus $status = OrderStatus::Processing, PaymentStatus $payment = PaymentStatus::Verified): Order
 {
     $order = Order::factory()->withDeliverySnapshot('Bacolod City')->create(['status' => $status, 'payment_status' => $payment]);
-    Shipment::factory()->for($order)->create();
+    Shipment::factory()->for($order)->withHandoffDetails($order->total_amount)->create();
     $product = Product::factory()->create();
     Inventory::factory()->for($product)->create(['quantity' => 5]);
     OrderItem::factory()->for($order)->for($product)->create(['quantity' => 2, 'price_at_time' => '50.00']);
@@ -74,6 +74,19 @@ function manualShipmentPayload(array $overrides = []): array
         'arrangement_confirmed' => true,
         'carrier' => 'lbc',
     ], $overrides);
+}
+
+function recordManualShipmentOperationsForTest(Order $order, User $actor): void
+{
+    app(OrderProcessingService::class)->updateShipmentOperations($order, [
+        'package_count' => '1',
+        'package_weight_kg' => '1.000',
+        'package_length_cm' => '10.00',
+        'package_width_cm' => '10.00',
+        'package_height_cm' => '10.00',
+        'declared_value' => $order->total_amount,
+        'handoff_mode' => 'branch_dropoff',
+    ], $actor);
 }
 
 test('administrators advance the full manual lifecycle and complete one sale without deducting stock', function () {
@@ -361,7 +374,7 @@ test('operational ETA is persisted at preparation and survives later time and co
         ->toThrow(DomainException::class, 'The operational shipment estimate cannot be changed.');
 });
 
-test('real references may be supplied at handoff and corrected or cleared without changing milestones', function () {
+test('real references supplied at handoff cannot be replaced or cleared', function () {
     $order = shipmentWorkflowOrder();
     advanceShipmentForTest($order, ShipmentStatus::ReadyForDispatch);
     $administrator = User::factory()->administrator()->create();
@@ -373,16 +386,18 @@ test('real references may be supplied at handoff and corrected or cleared withou
         ->assertSessionHasNoErrors();
     expect($order->refresh()->shipment->tracking_reference)->toBe('REAL-REFERENCE');
     $handoff = $order->shipment->handed_to_carrier_at->toDateTimeString();
+    $this->get(route('administration.orders.show', $order))->assertInertia(fn (Assert $page) => $page
+        ->where('order.shipment_actions.can_update_reference', false));
 
-    $this->patch(route('administration.orders.shipment.reference.update', $order), ['tracking_reference' => 'CORRECTED'])->assertSessionHasNoErrors();
-    expect($order->refresh()->shipment)->tracking_reference->toBe('CORRECTED')->status->toBe(ShipmentStatus::HandedToLbc);
+    $this->patch(route('administration.orders.shipment.reference.update', $order), ['tracking_reference' => 'CORRECTED'])->assertSessionHasErrors('tracking_reference');
+    expect($order->refresh()->shipment)->tracking_reference->toBe('REAL-REFERENCE')->status->toBe(ShipmentStatus::HandedToLbc);
     expect($order->shipment->handed_to_carrier_at->toDateTimeString())->toBe($handoff);
-    $this->patch(route('administration.orders.shipment.reference.update', $order), ['tracking_reference' => '  '])->assertSessionHasNoErrors();
-    expect($order->refresh()->shipment->tracking_reference)->toBeNull();
+    $this->patch(route('administration.orders.shipment.reference.update', $order), ['tracking_reference' => '  '])->assertSessionHasErrors('tracking_reference');
+    expect($order->refresh()->shipment->tracking_reference)->toBe('REAL-REFERENCE');
 
     advanceShipmentForTest($order, ShipmentStatus::Delivered);
-    $this->patch(route('administration.orders.shipment.reference.update', $order), ['tracking_reference' => 'REAL-LATE-REFERENCE'])->assertSessionHasNoErrors();
-    expect($order->refresh()->shipment)->tracking_reference->toBe('REAL-LATE-REFERENCE')->status->toBe(ShipmentStatus::Delivered);
+    $this->patch(route('administration.orders.shipment.reference.update', $order), ['tracking_reference' => 'REAL-LATE-REFERENCE'])->assertSessionHasErrors('tracking_reference');
+    expect($order->refresh()->shipment)->tracking_reference->toBe('REAL-REFERENCE')->status->toBe(ShipmentStatus::Delivered);
     $this->assertDatabaseCount('sales', 1);
 });
 
@@ -453,8 +468,44 @@ test('customer mobile API has no shipment mutation endpoint', function (string $
     expect($order->refresh()->shipment->getAttributes())->toBe($before);
 })->with(['status', 'reference']);
 
+test('manual arrangement availability follows wallet processing and preserves pending COD', function (PaymentMethod $method, OrderStatus $status, PaymentStatus $paymentStatus, bool $eligible) {
+    $order = unconfiguredShipmentTestOrder($method, $status, $paymentStatus);
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+    $this->actingAs($administrator);
+
+    $this->get(route('administration.orders.show', $order))
+        ->assertInertia(fn (Assert $page) => $page->where('order.can_create_manual_shipment', $eligible));
+
+    $before = $order->refresh()->getAttributes();
+    $response = $this->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload());
+
+    if ($eligible) {
+        $response->assertRedirect()->assertSessionHasNoErrors();
+        expect($order->refresh()->shipment)->arrangement_type->toBe(ShipmentArrangement::Manual);
+        expect($order->user->notifications()->count())->toBe(1);
+    } else {
+        $response->assertSessionHasErrors('carrier');
+        expect($order->refresh()->shipment)->toBeNull();
+        expect($order->user->notifications()->count())->toBe(0);
+    }
+
+    expect($order->getAttributes())->toBe($before);
+    $this->assertDatabaseCount('sales', 0);
+})->with([
+    'pending GCash awaiting verification' => [PaymentMethod::GCash, OrderStatus::Pending, PaymentStatus::Pending, false],
+    'pending GCash already verified' => [PaymentMethod::GCash, OrderStatus::Pending, PaymentStatus::Verified, false],
+    'processing GCash' => [PaymentMethod::GCash, OrderStatus::Processing, PaymentStatus::Verified, true],
+    'pending Maya awaiting verification' => [PaymentMethod::Maya, OrderStatus::Pending, PaymentStatus::Pending, false],
+    'pending Maya already verified' => [PaymentMethod::Maya, OrderStatus::Pending, PaymentStatus::Verified, false],
+    'processing Maya' => [PaymentMethod::Maya, OrderStatus::Processing, PaymentStatus::Verified, true],
+    'pending COD' => [PaymentMethod::Cod, OrderStatus::Pending, PaymentStatus::Pending, true],
+    'processing COD' => [PaymentMethod::Cod, OrderStatus::Processing, PaymentStatus::Pending, true],
+]);
+
 test('administrators register a manual shipment without changing commercial snapshots', function () {
-    $order = unconfiguredShipmentTestOrder();
+    $order = unconfiguredShipmentTestOrder(status: OrderStatus::Processing, paymentStatus: PaymentStatus::Verified);
     $administrator = User::factory()->administrator()->create();
     $originalCommercialSnapshot = [
         $order->product_subtotal,
@@ -536,7 +587,7 @@ test('manual shipment setup rejects duplicate and ineligible orders without side
         'configured delivery' => Order::factory()->withDeliverySnapshot()->create(),
         'legacy delivery' => Order::factory()->delivery()->create(),
         'pickup' => Order::factory()->create(),
-        'duplicate' => unconfiguredShipmentTestOrder(),
+        'duplicate' => unconfiguredShipmentTestOrder(status: OrderStatus::Processing, paymentStatus: PaymentStatus::Verified),
         'rejected payment' => unconfiguredShipmentTestOrder(
             paymentMethod: PaymentMethod::GCash,
             paymentStatus: PaymentStatus::Rejected,
@@ -572,7 +623,7 @@ test('manual shipment setup rejects duplicate and ineligible orders without side
 ]);
 
 test('manual shipment input requires explicit LBC confirmation and complete valid estimates', function (array $overrides, string $field) {
-    $order = unconfiguredShipmentTestOrder();
+    $order = unconfiguredShipmentTestOrder(status: OrderStatus::Processing, paymentStatus: PaymentStatus::Verified);
 
     $administrator = User::factory()->administrator()->create();
     $order->assigned_handler_id = $administrator->id;
@@ -595,7 +646,7 @@ test('manual shipment input requires explicit LBC confirmation and complete vali
 ]);
 
 test('manual shipment registration is administrator-only', function (string $access) {
-    $order = unconfiguredShipmentTestOrder();
+    $order = unconfiguredShipmentTestOrder(status: OrderStatus::Processing, paymentStatus: PaymentStatus::Verified);
     $response = $this->post(
         route('administration.orders.shipment.manual.store', $order),
         manualShipmentPayload(),
@@ -627,6 +678,55 @@ test('manual shipment registration is administrator-only', function (string $acc
     $this->assertDatabaseCount('shipments', 0);
 })->with(['guest', 'customer', 'administrator']);
 
+test('unconfigured delivery cannot complete without a delivered manual shipment', function (PaymentMethod $method, ?ShipmentStatus $milestone) {
+    $order = unconfiguredShipmentTestOrder(
+        paymentMethod: $method,
+        status: OrderStatus::Processing,
+        paymentStatus: $method === PaymentMethod::Cod ? PaymentStatus::Pending : PaymentStatus::Verified,
+    );
+    $inventory = Inventory::factory()->create(['quantity' => 5]);
+    OrderItem::factory()->for($order)->for($inventory->product)->create([
+        'quantity' => 2,
+        'price_at_time' => '50.00',
+    ]);
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+    $this->actingAs($administrator);
+
+    if ($milestone !== null) {
+        $this->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload())
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+        $order->refresh()->shipment->update(['status' => $milestone]);
+    }
+
+    $before = $order->refresh()->getAttributes();
+    $shipmentBefore = $order->shipment?->getAttributes();
+    $notificationCount = $order->user->notifications()->count();
+
+    expect(app(OrderProcessingService::class)->allowedOrderTransitions($order))
+        ->not->toContain(OrderStatus::Completed);
+
+    $this->patch(route('administration.orders.status.update', $order), ['status' => 'completed'])
+        ->assertSessionHasErrors('status');
+
+    expect($order->refresh()->getAttributes())->toBe($before);
+    expect($order->shipment?->getAttributes())->toBe($shipmentBefore);
+    expect($inventory->refresh()->quantity)->toBe(5);
+    expect($order->user->notifications()->count())->toBe($notificationCount);
+    $this->assertDatabaseCount('sales', 0);
+})->with([PaymentMethod::GCash, PaymentMethod::Maya, PaymentMethod::Cod])->with([
+    'no shipment' => [null],
+    'awaiting preparation' => [ShipmentStatus::AwaitingPreparation],
+    'preparing' => [ShipmentStatus::Preparing],
+    'ready for dispatch' => [ShipmentStatus::ReadyForDispatch],
+    'handed to LBC' => [ShipmentStatus::HandedToLbc],
+    'in transit' => [ShipmentStatus::InTransit],
+    'out for delivery' => [ShipmentStatus::OutForDelivery],
+    'cancelled shipment' => [ShipmentStatus::Cancelled],
+]);
+
 test('manual GCash and Maya shipments require verified payment and complete once', function (PaymentMethod $method) {
     Storage::fake('local');
     $order = unconfiguredShipmentTestOrder($method);
@@ -642,14 +742,9 @@ test('manual GCash and Maya shipments require verified payment and complete once
 
     $this->actingAs($administrator);
 
-    $this->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload([
-        'eta_min_days' => 1,
-        'eta_max_days' => 3,
-    ]))->assertSessionHasNoErrors();
-
     $this->patch(route('administration.orders.shipment.status.update', $order), ['status' => 'preparing'])
         ->assertSessionHasErrors('status');
-    expect($order->refresh()->shipment)->status->toBe(ShipmentStatus::AwaitingPreparation);
+    expect($order->refresh()->shipment)->toBeNull();
     $this->assertDatabaseCount('sales', 0);
 
     $this->patch(route('administration.orders.payment-status.update', $order), [
@@ -658,6 +753,11 @@ test('manual GCash and Maya shipments require verified payment and complete once
     ])->assertSessionHasNoErrors();
     $this->patch(route('administration.orders.status.update', $order), ['status' => 'processing'])
         ->assertSessionHasNoErrors();
+    $this->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload([
+        'eta_min_days' => 1,
+        'eta_max_days' => 3,
+    ]))->assertSessionHasNoErrors();
+    recordManualShipmentOperationsForTest($order, $administrator);
     $this->patch(route('administration.orders.status.update', $order), ['status' => 'completed'])
         ->assertSessionHasErrors('status');
     expect($order->refresh()->shipment)->status->toBe(ShipmentStatus::AwaitingPreparation);
@@ -694,6 +794,7 @@ test('manual shipment cancellation is blocked after handoff to LBC', function ()
     $this->actingAs($administrator);
     $this->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload())
         ->assertSessionHasNoErrors();
+    recordManualShipmentOperationsForTest($order, $administrator);
     foreach (['preparing', 'ready_for_dispatch', 'handed_to_lbc'] as $status) {
         $this->patch(route('administration.orders.shipment.status.update', $order), ['status' => $status])
             ->assertSessionHasNoErrors();
@@ -725,6 +826,7 @@ test('manual COD delivery still waits for explicit collection confirmation', fun
     $this->actingAs($administrator);
     $this->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload())
         ->assertSessionHasNoErrors();
+    recordManualShipmentOperationsForTest($order, $administrator);
     $this->patch(route('administration.orders.status.update', $order), ['status' => 'processing'])
         ->assertSessionHasNoErrors();
 
@@ -742,9 +844,46 @@ test('manual COD delivery still waits for explicit collection confirmation', fun
         'cod_collection_confirmed' => true,
     ])->assertSessionHasNoErrors();
 
+    expect($order->refresh())->status->toBe(OrderStatus::Processing)
+        ->payment_status->toBe(PaymentStatus::Pending);
+    $this->post(route('administration.orders.cod-remittance.store', $order), [
+        'cod_remittance_confirmed' => true,
+        'carrier_cod_remittance_reference' => 'LBC-REMITTANCE-REFERENCE',
+    ])->assertSessionHasNoErrors();
+
     expect($order->refresh())->status->toBe(OrderStatus::Completed)
         ->payment_status->toBe(PaymentStatus::Verified);
     expect($order->sale)->amount->toBe('100.00');
     expect($inventory->refresh()->quantity)->toBe(5);
     $this->assertDatabaseCount('sales', 1);
+});
+
+test('a missing LBC reference may be assigned once after handoff', function () {
+    $order = shipmentWorkflowOrder();
+    advanceShipmentForTest($order, ShipmentStatus::HandedToLbc);
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+    $staleOrder = $order->fresh();
+
+    $this->actingAs($administrator)->patch(route('administration.orders.shipment.reference.update', $order), ['tracking_reference' => ' LATE-REFERENCE '])->assertRedirect()->assertSessionHasNoErrors();
+    expect($order->refresh()->shipment->tracking_reference)->toBe('LATE-REFERENCE');
+    expect(fn () => app(OrderProcessingService::class)->updateShipmentReference($staleOrder, 'REPLACEMENT', actor: $administrator))
+        ->toThrow(ValidationException::class, 'The LBC tracking number is read-only once assigned.');
+    expect($order->fresh()->shipment->tracking_reference)->toBe('LATE-REFERENCE');
+});
+
+test('handoff cannot replace a reference already assigned to a manual shipment', function () {
+    $order = shipmentWorkflowOrder();
+    advanceShipmentForTest($order, ShipmentStatus::ReadyForDispatch);
+    $order->shipment->update(['tracking_reference' => 'ASSIGNED-REFERENCE']);
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)->patch(route('administration.orders.shipment.status.update', $order), [
+        'status' => 'handed_to_lbc', 'tracking_reference' => 'REPLACEMENT',
+    ])->assertSessionHasErrors('tracking_reference');
+
+    expect($order->refresh()->shipment)->tracking_reference->toBe('ASSIGNED-REFERENCE')->status->toBe(ShipmentStatus::ReadyForDispatch);
 });

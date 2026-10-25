@@ -4,7 +4,7 @@ import test from 'node:test';
 import { compileScript, parse } from '@vue/compiler-sfc';
 import { renderToString } from '@vue/server-renderer';
 import * as Vue from 'vue';
-import { formatDateTime } from '../lib/dateTime.js';
+import { formatAgeDays, formatDateTime } from '../lib/dateTime.js';
 
 const primitive = {
     render() {
@@ -26,7 +26,7 @@ const modules = {
     '@/components/ui/button': { Button: primitive },
     '@/components/ui/label': { Label: primitive },
     '@/components/InputError.vue': { default: primitive },
-    '@/components/FileInput.vue': { default: primitive },
+    '@/components/FileInput.vue': { default: input },
 };
 function load(file, inlineTemplate = true, dependencies = {}) {
     const { descriptor } = parse(
@@ -58,6 +58,7 @@ test('full refund is prefilled from the server item value with no shipping addit
     assert.match(html, /name="approved_amount" value="2999\.90"/);
     assert.match(html, /Shipping is not included/);
     assert.match(html, /Partial refund/);
+    assert.doesNotMatch(html, /resolution_summary|Partial refund explanation/);
     assert.doesNotMatch(html, /type="number"/);
 });
 
@@ -185,7 +186,7 @@ function returnsPage(inlineTemplate = true, submissions = []) {
                 clearSearch() {},
             }),
         },
-        '@/lib/dateTime': { formatDateTime },
+        '@/lib/dateTime': { formatAgeDays, formatDateTime },
     });
 }
 async function pageHtml(overrides = {}) {
@@ -362,4 +363,10 @@ test('compact refund summary keeps confirmed amounts separate from pending recor
     }
     assert.doesNotMatch(html, /name="amount"/);
     assert.match(html, /Only the return approver/);
+});
+
+test('new returns show a readable age without a customer resolution summary input', async () => {
+    const html = await pageHtml({ age_days: 0, status: 'pending' });
+    assert.match(html, /Less than a day old/);
+    assert.doesNotMatch(html, /0 days old|name="resolution_summary"/);
 });

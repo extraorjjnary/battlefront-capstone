@@ -26,7 +26,7 @@ function mobileCheckoutData(array $cartItemIds, array $overrides = []): array
 }
 
 beforeEach(function () {
-    Storage::fake('local');
+    $this->fakeIsolatedStorage('local');
     $this->customer = User::factory()->customer()->create([
         'default_delivery_address' => 'Saved address',
         'default_delivery_contact_number' => '+639171234567',
@@ -118,6 +118,24 @@ test('mobile checkout returns native required-field validation', function () {
         ->assertJsonValidationErrors(['recipient_name', 'contact_number', 'fulfillment_method', 'payment_method'])
         ->assertJsonStructure(['message', 'errors']);
     $this->assertDatabaseCount('orders', 0);
+    expect($this->stock->refresh()->quantity)->toBe(5);
+});
+
+test('mobile checkout preserves its coverage fixture when another test resets the local fake', function () {
+    $coveragePath = config('forecasting.development_manifest');
+    $coverageContents = '{"version":2,"products":{}}';
+    $checkoutDisk = Storage::disk('local');
+    expect($checkoutDisk->put($coveragePath, $coverageContents))->toBeTrue();
+
+    Storage::fake('local');
+    Storage::set('local', $checkoutDisk);
+
+    $this->post('/api/v1/orders', mobileCheckoutData([$this->cartItem->id], ['contact_number' => 'invalid']))
+        ->assertUnprocessable()->assertJsonValidationErrors('contact_number');
+
+    expect($checkoutDisk->get($coveragePath))->toBe($coverageContents);
+    $this->assertDatabaseCount('orders', 0);
+    $this->assertModelExists($this->cartItem);
     expect($this->stock->refresh()->quantity)->toBe(5);
 });
 

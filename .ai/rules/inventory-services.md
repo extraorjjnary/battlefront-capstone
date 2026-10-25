@@ -1,6 +1,7 @@
 ---
 paths:
     - 'app/Actions/Inventory/HandleCustomerReturn*.php,app/Services/CustomerReturn*.php'
+    - 'app/Actions/Inventory/HandleCustomerReturn.php,app/Services/CustomerReturnRequestPresenter.php'
 ---
 
 # Inventory Services
@@ -24,3 +25,7 @@ Both receipt entry points converge on HandleCustomerReturn: prepare validated ph
 ## Confirm new refunds through one approving Manager or Owner
 
 Supersedes independent verification for NEW refund payments only: the original approver, with returns.approve and returns.record_payment, confirms actual payment. Store the authoritative verified review with confirmation_method=approver atomically with payment and proof; new noncash payments require one customer-visible image, cash requires actual handover confirmation without proof. A UUID submission_key prevents duplicate processing. Preserve legacy independent reviews and pending/disputed payments without retroactive confirmation. Customer completion derives from latest confirmed/verified payment totals, never approval alone; present these totals as confirmed.
+
+## Keep internal resolution records when removing the public summary input
+
+For new return approvals without a supplied summary, persist the required internal decision reason as the resolution summary. This preserves the existing database constraint requiring documentation for nonmonetary resolutions. Keep all resolution summaries hidden from customer output, including old rows; no database constraint removal or historical backfill is needed.

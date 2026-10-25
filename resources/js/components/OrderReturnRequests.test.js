@@ -193,7 +193,7 @@ test('server-ineligible orders cannot open or submit a return request', async ()
     assert.doesNotMatch(html, /Request a return/);
 });
 
-test('customer progress renders verified refund amounts and public refund explanations while escaping notes', async () => {
+test('customer progress renders verified refund amounts and hides saved summaries while escaping notes', async () => {
     const { component } = loadComponent(true);
     const html = await renderToString(
         Vue.createSSRApp(component, {
@@ -232,9 +232,9 @@ test('customer progress renders verified refund amounts and public refund explan
     );
     assert.match(html, /Refund processing/);
     assert.match(html, /Confirmed paid/);
-    assert.match(
+    assert.doesNotMatch(
         html,
-        /Refund note: Partial refund agreed for the returned component/,
+        /Partial refund agreed for the returned component/,
     );
     assert.match(html, /40\.00/);
     assert.match(html, /60\.00/);
@@ -293,7 +293,7 @@ test('nonmonetary acceptance shows pending repair without claiming fulfillment o
         }),
     );
     assert.match(html, /Repair: Pending/);
-    assert.match(html, /Repair the original hardware/);
+    assert.doesNotMatch(html, /Repair the original hardware/);
     assert.doesNotMatch(html, /Refund completed|Confirmed paid|Completed/);
 });
 

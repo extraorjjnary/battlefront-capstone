@@ -4,6 +4,7 @@ namespace App\Actions\Inventory;
 
 use App\Models\Product;
 use App\Models\User;
+use App\Services\Notifications\OrderNotificationPublisher;
 use App\Support\OperationalRequestReason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -58,6 +59,8 @@ class RequestInventoryAdjustment
                 'changes' => json_encode(['observed_quantity' => $observed, 'target_quantity' => $targetQuantity, 'replaces_request_id' => $replacesRequestId], JSON_THROW_ON_ERROR),
                 'created_at' => now(),
             ]);
+
+            app(OrderNotificationPublisher::class)->operationalAfterCommit('inventory.adjustment.requested', $id, $requester->id, $requester->id);
 
             return $id;
         }, attempts: 3);

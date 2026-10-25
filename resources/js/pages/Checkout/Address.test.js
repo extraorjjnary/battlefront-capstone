@@ -558,8 +558,9 @@ test('COD checkout displays the server quote total with collection guidance and 
         const html = await renderToString(root());
         assert.match(html, /Total COD amount payable/);
         assert.match(html, /180\.00/);
-        assert.match(html, /Payment will\s+be collected upon delivery/);
-        assert.match(html, /does\s+not book or approve COD with LBC/);
+        assert.match(html, /LBC collects the full amount at delivery/);
+        assert.match(html, /records payment after LBC remits the full order amount/);
+        assert.match(html, /checkout does not create an LBC booking/);
         assert.match(html, /not official LBC quotations/);
         assert.doesNotMatch(html, /name="payment_proof"/);
         assert.doesNotMatch(html, /receiving account/);

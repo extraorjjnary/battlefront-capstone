@@ -20,14 +20,23 @@ class InventoryAdjustmentController extends Controller
 {
     public function index(Request $request, InventoryRepository $inventory): Response
     {
-        $filters = $request->validate(['q' => ['nullable', 'string', 'max:100']]);
+        $filters = $request->validate([
+            'q' => ['nullable', 'string', 'max:100'],
+            'view' => ['nullable', Rule::in(['to_review', 'mine', 'all'])],
+        ]);
         $case = $request->validate(['case' => ['nullable', 'integer', 'min:1']])['case'] ?? null;
-        $requests = $inventory->paginateAdjustments($filters, $case);
+        $user = $request->user();
+        $canViewAllRequests = in_array($user->administrationRoleCode(), ['manager', 'owner'], true);
+        $filters['view'] = $canViewAllRequests
+            ? ($filters['view'] ?? ($case === null ? 'to_review' : 'all'))
+            : 'mine';
+        $requests = $inventory->paginateAdjustments($filters, $case, $user->id, $user->hasAdministrationPermission('inventory.approve'));
 
         return Inertia::render('Administration/InventoryAdjustments', [
             'requests' => $requests,
             'selected_case' => $case,
-            'filters' => ['q' => $filters['q'] ?? null],
+            'filters' => ['q' => $filters['q'] ?? null, 'view' => $filters['view']],
+            'can_view_all_requests' => $canViewAllRequests,
         ]);
     }
 

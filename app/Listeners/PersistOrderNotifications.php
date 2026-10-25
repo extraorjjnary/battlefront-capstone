@@ -7,9 +7,9 @@ use App\Events\OrderNotificationOccurred;
 use App\Jobs\SendExpoNotification;
 use App\Models\NotificationPushDelivery;
 use App\Models\PushDevice;
-use App\Models\User;
 use App\Notifications\OrderUpdateNotification;
 use App\Services\Notifications\NotificationFailureReporter;
+use App\Services\Notifications\NotificationRecipients;
 use App\Services\Notifications\PushDeviceService;
 use Illuminate\Support\Facades\Bus;
 use Ramsey\Uuid\Uuid;
@@ -17,7 +17,7 @@ use Throwable;
 
 class PersistOrderNotifications
 {
-    public function __construct(private readonly PushDeviceService $devices) {}
+    public function __construct(private readonly PushDeviceService $devices, private readonly NotificationRecipients $recipients) {}
 
     public function handle(OrderNotificationOccurred $event): void
     {
@@ -28,9 +28,7 @@ class PersistOrderNotifications
 
     private function persistForAudience(OrderNotificationOccurred $event, UserRole $audience): void
     {
-        $recipients = User::query()->where('role', $audience)
-            ->when($audience === UserRole::Customer, fn ($query) => $query->whereKey($event->customerId))
-            ->lazyById();
+        $recipients = $this->recipients->forEvent($event, $audience);
 
         foreach ($recipients as $recipient) {
             $notification = $recipient->notifications()->firstOrCreate(

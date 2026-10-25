@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/select';
 import { formatCurrency } from '@/lib/currency';
 import { formatDateTime } from '@/lib/dateTime';
-import { orderStatusBadgeClass } from '@/lib/orderStatus';
+import { orderDisplayStatus, orderStatusBadgeClass } from '@/lib/orderStatus';
 
 const props = defineProps({
     orders: { type: Object, required: true },
@@ -405,10 +405,12 @@ defineOptions({
                             <Badge
                                 variant="outline"
                                 :class="
-                                    orderStatusBadgeClass(order.status.value)
+                                    orderStatusBadgeClass(
+                                        orderDisplayStatus(order).value,
+                                    )
                                 "
                             >
-                                {{ order.status.label }}
+                                {{ orderDisplayStatus(order).label }}
                             </Badge>
                         </div>
                         <div

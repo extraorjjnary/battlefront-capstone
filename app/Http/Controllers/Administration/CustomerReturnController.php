@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Administration;
 use App\Actions\Inventory\HandleCustomerReturn;
 use App\Actions\Inventory\HandleCustomerReturnRequest;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Administration\DecideCustomerReturnRequest;
 use App\Models\OrderItem;
 use App\Services\AdministrationEvidenceService;
 use App\Services\CustomerReturnReviewService;
@@ -56,26 +57,13 @@ class CustomerReturnController extends Controller
         return to_route('administration.customer-returns.index', ['case' => $returnId]);
     }
 
-    public function decide(Request $request, int $customerReturn, HandleCustomerReturn $returns): RedirectResponse
+    public function decide(DecideCustomerReturnRequest $request, int $customerReturn, HandleCustomerReturn $returns): RedirectResponse
     {
-        $validated = $request->validate([
-            'decision' => ['required', Rule::in(['accept', 'reject'])],
-            'reason' => ['required', 'string', 'min:5', 'max:2000'],
-            'disposition' => ['required_if:decision,accept', 'prohibited_if:decision,reject', 'nullable', Rule::in(['restock', 'write_off', 'supplier_return', 'return_to_customer'])],
-            'approved_amount' => ['required_if:decision,accept', 'prohibited_if:decision,reject', 'nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
-            'supplier_id' => ['required_if:disposition,supplier_return', 'prohibited_if:decision,reject', 'nullable', 'integer', Rule::exists('suppliers', 'id')],
-            'inspection_confirmed' => ['sometimes', 'required_if:disposition,restock', 'accepted'],
-            'resolution_type' => ['required_if:decision,accept', 'prohibited_if:decision,reject', 'nullable', Rule::in(['refund', 'replacement', 'repair', 'other'])],
-            'resolution_summary' => ['required_if:resolution_type,replacement,repair,other', 'prohibited_if:decision,reject', 'nullable', 'string', 'min:5', 'max:2000'],
-            'resolution_reference' => ['prohibited_if:decision,reject', 'nullable', 'string', 'max:255'],
-            'inspection_notes' => ['required_if:disposition,restock', 'prohibited_if:decision,reject', 'nullable', 'string', 'min:5', 'max:2000'],
-            'public_feedback' => ['nullable', 'string', 'min:5', 'max:2000'],
-        ]);
+        $validated = $request->validated();
         $accept = $validated['decision'] === 'accept';
         $resolution = ['public_feedback' => isset($validated['public_feedback']) ? (string) $validated['public_feedback'] : null];
         if ($accept) {
             $resolution['type'] = (string) $validated['resolution_type'];
-            $resolution['summary'] = isset($validated['resolution_summary']) ? (string) $validated['resolution_summary'] : null;
             $resolution['reference'] = isset($validated['resolution_reference']) ? (string) $validated['resolution_reference'] : null;
             $resolution['inspection_notes'] = isset($validated['inspection_notes']) ? (string) $validated['inspection_notes'] : null;
         }
@@ -106,10 +94,11 @@ class CustomerReturnController extends Controller
             'amount' => ['required', 'numeric', 'decimal:0,2', 'gt:0', 'max:9999999999.99'],
             'payment_method' => ['required', Rule::in(['cash', 'gcash', 'maya', 'bank_transfer', 'other'])],
             'submission_key' => ['required', 'uuid'],
+            'external_reference' => ['nullable', 'string', 'max:255'],
             'payment_confirmed' => ['required', 'accepted'],
             'proof' => ['required_unless:payment_method,cash', 'prohibited_if:payment_method,cash', 'nullable', 'file', 'image', 'mimes:jpg,jpeg,png,webp', 'extensions:jpg,jpeg,png,webp', 'max:5120'],
         ]);
-        $returns->recordPayment($refund, $request->user(), (string) $validated['amount'], $validated['payment_method'], $validated['submission_key'], $request->boolean('payment_confirmed'), $validated['proof'] ?? null);
+        $returns->recordPayment($refund, $request->user(), (string) $validated['amount'], $validated['payment_method'], $validated['submission_key'], $request->boolean('payment_confirmed'), $validated['proof'] ?? null, $validated['external_reference'] ?? null);
 
         return back();
     }

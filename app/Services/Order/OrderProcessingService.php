@@ -19,8 +19,10 @@ use App\Models\User;
 use App\Services\Notifications\OrderNotificationPublisher;
 use App\Services\PayMongo\CloseHostedCheckout;
 use Carbon\CarbonImmutable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -42,9 +44,115 @@ class OrderProcessingService
 
         return $gatewayFlowCanClose
             && $order->status === OrderStatus::Pending
+            && ! $this->hasCancellationHold($order)
             && $order->payment_status === PaymentStatus::Pending
             && (! $order->payment_method->requiresPaymentProof() || $order->payment_proof_path === null)
             && ($order->shipment === null || $order->shipment->status === ShipmentStatus::AwaitingPreparation);
+    }
+
+    public function hasCancellationHold(Order $order): bool
+    {
+        return $order->cancellationRequest?->status === 'pending';
+    }
+
+    public function assertNoCancellationReview(Order $order, string $errorField = 'status'): void
+    {
+        $request = DB::table('order_cancellation_requests')->where('order_id', $order->id)->lockForUpdate()->first();
+        if ($request?->status === 'pending') {
+            throw ValidationException::withMessages([$errorField => 'Cancellation requested. Order handling is paused until review is complete.']);
+        }
+    }
+
+    public function canRequestCancellation(Order $order): bool
+    {
+        return $this->eligibleWalletCancellation($order) && $order->cancellationRequest === null;
+    }
+
+    private function eligibleWalletCancellation(Order $order): bool
+    {
+        return $order->status === OrderStatus::Pending
+            && $order->payment_method->requiresPaymentProof()
+            && $order->payment_proof_path !== null
+            && ($order->shipment === null || $order->shipment->status === ShipmentStatus::AwaitingPreparation);
+    }
+
+    public function requestCancellation(User $customer, int $orderId, ?string $note = null): Order
+    {
+        abort_unless($customer->role === UserRole::Customer, 403);
+        Validator::make(['customer_note' => $note], ['customer_note' => ['nullable', 'string', 'max:1000']])->validate();
+
+        return DB::transaction(function () use ($customer, $orderId, $note): Order {
+            $order = $customer->orders()->whereKey($orderId)->lockForUpdate()->firstOrFail();
+            $order->setRelation('shipment', $order->shipment()->lockForUpdate()->first());
+            $existing = DB::table('order_cancellation_requests')->where('order_id', $order->id)->lockForUpdate()->first();
+            if (! $this->eligibleWalletCancellation($order) || $existing !== null) {
+                throw ValidationException::withMessages(['status' => 'Cancellation requests require a Pending GCash/Maya order with submitted proof, no preparation, and no earlier request.']);
+            }
+            DB::table('order_cancellation_requests')->insert([
+                'order_id' => $order->id, 'customer_note' => filled($note) ? trim($note) : null,
+                'status' => 'pending', 'created_at' => now(), 'updated_at' => now(),
+            ]);
+            $this->auditOrderChange($order, 'order.cancellation_requested', ['customer_note' => $note], $customer);
+            $this->notifications->afterCommit($order, 'cancellation.requested');
+
+            return $order->refresh();
+        }, attempts: 3);
+    }
+
+    public function canReviewCancellation(User $actor): bool
+    {
+        return in_array($actor->administrationRoleCode(), ['manager', 'owner'], true)
+            && $actor->hasAdministrationPermission('orders.view')
+            && $actor->hasAdministrationPermission('returns.approve');
+    }
+
+    public function reviewCancellation(Order $order, User $actor, bool $approve, string $received, string $note, bool $accountChecked): Order
+    {
+        abort_unless($this->canReviewCancellation($actor), 403);
+        Validator::make(['amount_received' => $received, 'decision_note' => $note, 'account_checked' => $accountChecked], [
+            'amount_received' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
+            'decision_note' => ['required', 'string', 'min:5', 'max:2000'],
+            'account_checked' => ['required', 'accepted'],
+        ])->validate();
+
+        if (! is_numeric($received)) {
+            throw ValidationException::withMessages(['amount_received' => 'Enter a valid amount received.']);
+        }
+
+        return DB::transaction(function () use ($order, $actor, $approve, $received, $note): Order {
+            $lockedOrder = Order::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
+            abort_unless($this->canReviewCancellation($actor->fresh()), 403);
+            $shipment = $lockedOrder->shipment()->lockForUpdate()->first();
+            $lockedOrder->setRelation('shipment', $shipment);
+            $request = DB::table('order_cancellation_requests')->where('order_id', $lockedOrder->id)->lockForUpdate()->first();
+            if ($request?->status !== 'pending' || ! $this->eligibleWalletCancellation($lockedOrder)) {
+                throw ValidationException::withMessages(['status' => 'This cancellation request is no longer eligible for review.']);
+            }
+            $amount = bcadd($received, '0.00', 2);
+            $refund = $approve && bccomp($amount, $lockedOrder->total_amount, 2) > 0 ? $lockedOrder->total_amount : ($approve ? $amount : '0.00');
+            DB::table('order_cancellation_requests')->where('id', $request->id)->update([
+                'status' => $approve ? 'approved' : 'rejected', 'reviewed_by' => $actor->id,
+                'amount_received' => $amount, 'decision_note' => trim($note), 'reviewed_at' => now(), 'updated_at' => now(),
+            ]);
+            if ($approve) {
+                $this->transitionLockedOrder($lockedOrder, OrderStatus::Cancelled, $shipment, cancellationInitiator: UserRole::Customer, actor: $actor, notifyCancellation: false);
+                if (bccomp($refund, '0.00', 2) > 0) {
+                    DB::table('customer_refunds')->insert([
+                        'cancellation_request_id' => $request->id, 'approved_by' => $actor->id,
+                        'approved_amount' => $refund, 'paid_amount' => '0.00', 'created_at' => now(), 'updated_at' => now(),
+                    ]);
+                }
+            }
+            $this->auditOrderChange($lockedOrder, $approve ? 'order.cancellation_approved' : 'order.cancellation_rejected', [
+                'request_id' => $request->id, 'amount_received' => $amount, 'refund_amount' => $refund,
+                'account_checked' => true, 'decision_note' => trim($note),
+            ], $actor);
+            $this->notifications->afterCommit($lockedOrder, $approve ? 'cancellation.approved' : 'cancellation.rejected', context: [
+                'refund_processing' => $approve && bccomp($refund, '0.00', 2) > 0,
+            ]);
+
+            return $lockedOrder->refresh();
+        }, attempts: 3);
     }
 
     public function cancelForCustomer(User $customer, int $orderId): Order
@@ -61,6 +169,7 @@ class OrderProcessingService
             $order = $customer->orders()->whereKey($orderId)->lockForUpdate()->firstOrFail();
             $shipment = $order->shipment()->lockForUpdate()->first();
             $order->setRelation('shipment', $shipment);
+            $this->assertNoCancellationReview($order);
 
             if (! $this->canCustomerCancel($order)) {
                 throw ValidationException::withMessages([
@@ -114,7 +223,7 @@ class OrderProcessingService
             if ($status === OrderStatus::Completed && $lockedOrder->payment_method->isPayAtPickup()) {
                 throw ValidationException::withMessages(['status' => 'Use Confirm Payment & Complete Pickup after receiving payment and handing over the products.']);
             }
-            if ($status === OrderStatus::Completed && ($shipment !== null || $lockedOrder->payment_method === PaymentMethod::Cod)) {
+            if ($status === OrderStatus::Completed && ($shipment !== null || $this->requiresManualShipment($lockedOrder) || $lockedOrder->payment_method === PaymentMethod::Cod)) {
                 throw ValidationException::withMessages(['status' => $lockedOrder->payment_method === PaymentMethod::Cod
                     ? 'Complete COD delivery through Confirm COD Collection after the Delivered milestone.'
                     : 'Complete delivery through the shipment Delivered milestone.']);
@@ -128,8 +237,12 @@ class OrderProcessingService
     /** @return list<OrderStatus> */
     public function allowedOrderTransitions(Order $order): array
     {
+        if ($this->hasCancellationHold($order)) {
+            return [];
+        }
+
         return array_values(array_filter($order->status->allowedTransitions(), function (OrderStatus $status) use ($order): bool {
-            if ($status === OrderStatus::Completed && ($order->shipment !== null || $order->payment_method === PaymentMethod::Cod || $order->payment_method->isPayAtPickup())) {
+            if ($status === OrderStatus::Completed && ($order->shipment !== null || $this->requiresManualShipment($order) || $order->payment_method === PaymentMethod::Cod || $order->payment_method->isPayAtPickup())) {
                 return false;
             }
 
@@ -149,7 +262,8 @@ class OrderProcessingService
 
     public function nextShipmentStatus(Order $order): ?ShipmentStatus
     {
-        if ($order->fulfillment_method !== FulfillmentMethod::Delivery
+        if ($this->hasCancellationHold($order)
+            || $order->fulfillment_method !== FulfillmentMethod::Delivery
             || $order->status !== OrderStatus::Processing
             || ! $this->paymentAllowsFulfillment($order)) {
             return null;
@@ -158,14 +272,22 @@ class OrderProcessingService
         return $order->shipment?->status->next();
     }
 
-    public function canCreateManualShipment(Order $order): bool
+    private function requiresManualShipment(Order $order): bool
     {
         return $order->fulfillment_method === FulfillmentMethod::Delivery
-            && ($order->delivery_quote_metadata['pricing_status'] ?? null) === 'not_configured'
+            && ($order->delivery_quote_metadata['pricing_status'] ?? null) === 'not_configured';
+    }
+
+    public function canCreateManualShipment(Order $order): bool
+    {
+        return ! $this->hasCancellationHold($order)
+            && $this->requiresManualShipment($order)
             && $order->delivery_fee === '0.00'
             && $order->product_subtotal !== null
             && bccomp($order->total_amount, $order->product_subtotal, 2) === 0
             && in_array($order->status, [OrderStatus::Pending, OrderStatus::Processing], strict: true)
+            && (! in_array($order->payment_method, [PaymentMethod::GCash, PaymentMethod::Maya], strict: true)
+                || $order->status === OrderStatus::Processing)
             && $order->payment_status !== PaymentStatus::Rejected
             && $order->shipment === null;
     }
@@ -251,11 +373,11 @@ class OrderProcessingService
 
             if ($shipment->handed_to_carrier_at !== null && $shipment->package_count !== null && (
                 (string) $shipment->package_count !== (string) $operations['package_count']
-                || bccomp((string) $shipment->package_weight_kg, (string) $operations['package_weight_kg'], 3) !== 0
-                || bccomp((string) $shipment->package_length_cm, (string) $operations['package_length_cm'], 2) !== 0
-                || bccomp((string) $shipment->package_width_cm, (string) $operations['package_width_cm'], 2) !== 0
-                || bccomp((string) $shipment->package_height_cm, (string) $operations['package_height_cm'], 2) !== 0
-                || bccomp((string) $shipment->declared_value, (string) $operations['declared_value'], 2) !== 0
+                || bccomp($this->decimalString($shipment->package_weight_kg), $this->decimalString($operations['package_weight_kg']), 3) !== 0
+                || bccomp($this->decimalString($shipment->package_length_cm), $this->decimalString($operations['package_length_cm']), 2) !== 0
+                || bccomp($this->decimalString($shipment->package_width_cm), $this->decimalString($operations['package_width_cm']), 2) !== 0
+                || bccomp($this->decimalString($shipment->package_height_cm), $this->decimalString($operations['package_height_cm']), 2) !== 0
+                || bccomp($this->decimalString($shipment->declared_value), $this->decimalString($operations['declared_value']), 2) !== 0
                 || $shipment->handoff_mode !== $operations['handoff_mode']
             )) {
                 throw ValidationException::withMessages([
@@ -264,17 +386,17 @@ class OrderProcessingService
             }
 
             $shipment->package_count = (int) $operations['package_count'];
-            $shipment->package_weight_kg = (string) $operations['package_weight_kg'];
-            $shipment->package_length_cm = (string) $operations['package_length_cm'];
-            $shipment->package_width_cm = (string) $operations['package_width_cm'];
-            $shipment->package_height_cm = (string) $operations['package_height_cm'];
-            $shipment->declared_value = (string) $operations['declared_value'];
+            $shipment->package_weight_kg = $this->decimalString($operations['package_weight_kg']);
+            $shipment->package_length_cm = $this->decimalString($operations['package_length_cm']);
+            $shipment->package_width_cm = $this->decimalString($operations['package_width_cm']);
+            $shipment->package_height_cm = $this->decimalString($operations['package_height_cm']);
+            $shipment->declared_value = $this->decimalString($operations['declared_value']);
             $shipment->handoff_mode = (string) $operations['handoff_mode'];
 
             $carrierCost = $operations['actual_carrier_cost'] ?? null;
             if ($carrierCost !== null) {
                 if ($shipment->carrier_cost_recorded_at !== null && (
-                    bccomp($shipment->actual_carrier_cost, (string) $carrierCost, 2) !== 0
+                    bccomp($this->decimalString($shipment->actual_carrier_cost), $this->decimalString($carrierCost), 2) !== 0
                     || $shipment->carrier_cost_reference !== trim((string) $operations['carrier_cost_reference'])
                 )) {
                     throw ValidationException::withMessages([
@@ -283,9 +405,9 @@ class OrderProcessingService
                 }
 
                 if ($shipment->carrier_cost_recorded_at === null) {
-                    $shipment->actual_carrier_cost = (string) $carrierCost;
+                    $shipment->actual_carrier_cost = $this->decimalString($carrierCost);
                     $shipment->carrier_cost_reference = trim((string) $operations['carrier_cost_reference']);
-                    $shipment->carrier_cost_recorded_at = now();
+                    $shipment->carrier_cost_recorded_at = Carbon::now();
                 }
             }
 
@@ -298,14 +420,14 @@ class OrderProcessingService
                 if ($exceptionChanged) {
                     $shipment->shipment_exception_code = (string) $exceptionCode;
                     $shipment->shipment_exception_note = $exceptionNote;
-                    $shipment->shipment_exception_reported_at = now();
+                    $shipment->shipment_exception_reported_at = Carbon::now();
                     $shipment->shipment_exception_resolved_at = null;
                 }
             }
 
             if ($shipment->shipment_exception_reported_at !== null && filter_var($operations['shipment_exception_resolved'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
                 if ($shipment->shipment_exception_resolved_at === null) {
-                    $shipment->shipment_exception_resolved_at = now();
+                    $shipment->shipment_exception_resolved_at = Carbon::now();
                 }
             }
 
@@ -404,6 +526,7 @@ class OrderProcessingService
 
         return $order->fulfillment_method === FulfillmentMethod::Delivery
             && $shipment !== null
+            && blank($shipment->tracking_reference)
             && $this->paymentAllowsFulfillment($order)
             && in_array($shipment->status, [ShipmentStatus::HandedToLbc, ShipmentStatus::InTransit, ShipmentStatus::OutForDelivery, ShipmentStatus::Delivered], strict: true)
             && ($order->status === OrderStatus::Processing
@@ -461,6 +584,9 @@ class OrderProcessingService
                 if ($status !== ShipmentStatus::HandedToLbc) {
                     throw ValidationException::withMessages(['tracking_reference' => 'A reference may first be entered when handing the shipment to LBC.']);
                 }
+                if (filled($shipment->tracking_reference)) {
+                    throw ValidationException::withMessages(['tracking_reference' => 'The LBC tracking number is read-only once assigned.']);
+                }
                 $changes['tracking_reference'] = $this->normalizeTrackingReference($trackingReference);
             }
 
@@ -484,6 +610,10 @@ class OrderProcessingService
             $this->authorizeHandler($lockedOrder, $actor);
             $shipment = $lockedOrder->shipment()->lockForUpdate()->first();
             $lockedOrder->setRelation('shipment', $shipment);
+
+            if ($shipment !== null && filled($shipment->tracking_reference)) {
+                throw ValidationException::withMessages(['tracking_reference' => 'The LBC tracking number is read-only once assigned.']);
+            }
 
             if (! $this->canUpdateShipmentReference($lockedOrder) || $shipment === null) {
                 throw ValidationException::withMessages(['tracking_reference' => 'References can only be maintained for eligible shipments handed to LBC.']);
@@ -513,6 +643,7 @@ class OrderProcessingService
         UserRole $cancellationInitiator = UserRole::Administrator,
         ?User $actor = null,
         bool $productsHandedOver = false,
+        bool $notifyCancellation = true,
     ): void {
         if ($status === OrderStatus::Completed && $order->fulfillment_method === FulfillmentMethod::Pickup && ! $productsHandedOver) {
             throw ValidationException::withMessages(['products_handed_over_confirmed' => 'Confirm actual product handover before completing pickup.']);
@@ -531,6 +662,11 @@ class OrderProcessingService
         if (($status === OrderStatus::Processing && ! $this->paymentAllowsFulfillment($order))
             || ($status === OrderStatus::Completed && $order->payment_status !== PaymentStatus::Verified)) {
             throw ValidationException::withMessages(['status' => 'Verify payment before processing or completing this order.']);
+        }
+
+        if ($status === OrderStatus::Completed && $this->requiresManualShipment($order)
+            && ($shipment === null || $shipment->arrangement_type !== ShipmentArrangement::Manual || $shipment->status !== ShipmentStatus::Delivered)) {
+            throw ValidationException::withMessages(['status' => 'Confirm the delivery arrangement and reach the shipment Delivered milestone before completing this order.']);
         }
 
         if ($status === OrderStatus::Completed && $shipment !== null && $shipment->status !== ShipmentStatus::Delivered) {
@@ -552,7 +688,7 @@ class OrderProcessingService
         }
         $order->update(['status' => $status]);
         $this->auditOrderChange($order, 'order.status.updated', ['before' => $previousStatus, 'after' => $status->value], $actor);
-        if ($status === OrderStatus::Cancelled) {
+        if ($status === OrderStatus::Cancelled && $notifyCancellation) {
             $this->notifications->afterCommit($order, 'order.cancelled', $cancellationInitiator);
         }
         if ($status === OrderStatus::Completed) {
@@ -810,7 +946,7 @@ class OrderProcessingService
                 ]);
             }
 
-            if (bccomp((string) $shipment->carrier_cod_collected_amount, $lockedOrder->total_amount, 2) !== 0) {
+            if (bccomp($this->decimalString($shipment->carrier_cod_collected_amount), $lockedOrder->total_amount, 2) !== 0) {
                 throw ValidationException::withMessages([
                     'cod_remittance_confirmed' => 'The recorded carrier collection does not match the saved order total. Reconcile the discrepancy before recording remittance.',
                 ]);
@@ -839,9 +975,24 @@ class OrderProcessingService
         }, attempts: 3);
     }
 
+    /**
+     * Keep validated decimal input and stored decimal snapshots in BCMath's numeric-string domain.
+     *
+     * @return numeric-string
+     */
+    private function decimalString(mixed $value): string
+    {
+        if ((! is_string($value) && ! is_int($value)) || ! is_numeric($value)) {
+            throw new \LogicException('A required decimal value is missing or invalid.');
+        }
+
+        return (string) $value;
+    }
+
     public function canProcess(Order $order, User $actor): bool
     {
         return $actor->hasAdministrationPermission('orders.process')
+            && ! $this->hasCancellationHold($order)
             && $order->assigned_handler_id === $actor->id;
     }
 
@@ -852,8 +1003,9 @@ class OrderProcessingService
     private function authorizeHandler(Order $order, ?User $actor): void
     {
         if ($actor !== null) {
-            abort_unless($this->canProcess($order, $actor), 403, 'Only the assigned handler may process this order. Refresh the order to review its current handler.');
+            abort_unless($actor->hasAdministrationPermission('orders.process') && $order->assigned_handler_id === $actor->id, 403, 'Only the assigned handler may process this order. Refresh the order to review its current handler.');
         }
+        $this->assertNoCancellationReview($order);
     }
 
     /** @param array<string, mixed> $changes */

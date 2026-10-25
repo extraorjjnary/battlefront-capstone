@@ -19,13 +19,17 @@ const props = defineProps({
     requests: { type: Object, required: true },
     selected_case: { type: Number, default: null },
     filters: Object,
+    can_view_all_requests: { type: Boolean, default: false },
 });
 const page = usePage();
 const { search, isSearching, clearSearch } = useDebouncedSearch({
     initialSearch: props.filters?.q,
     currentSearch: () => props.filters?.q,
     route: InventoryAdjustmentController.index,
-    query: () => ({ case: props.selected_case ?? undefined }),
+    query: () => ({
+        case: props.selected_case ?? undefined,
+        view: props.filters?.view,
+    }),
 });
 watch(
     () => props.filters?.q,
@@ -54,7 +58,14 @@ defineOptions({
         <p v-if="selected_case" class="text-sm">
             Showing stock request #{{ selected_case }} ·
             <Link
-                :href="InventoryAdjustmentController.index()"
+                :href="
+                    InventoryAdjustmentController.index({
+                        query: {
+                            view: filters?.view,
+                            q: filters?.q || undefined,
+                        },
+                    })
+                "
                 class="text-primary underline"
                 >Show all</Link
             >
@@ -68,6 +79,40 @@ defineOptions({
                 ></template
             >
         </PageHeader>
+        <nav
+            v-if="can_view_all_requests"
+            aria-label="Stock request filters"
+            class="flex flex-wrap gap-2"
+        >
+            <Button
+                v-for="filter in [
+                    { value: 'to_review', label: 'To Review' },
+                    { value: 'mine', label: 'My Requests' },
+                    { value: 'all', label: 'All' },
+                ]"
+                :key="filter.value"
+                :variant="
+                    filters?.view === filter.value ? 'secondary' : 'ghost'
+                "
+                as-child
+            >
+                <Link
+                    :href="
+                        InventoryAdjustmentController.index({
+                            query: {
+                                view: filter.value,
+                                q: filters?.q || undefined,
+                            },
+                        })
+                    "
+                    :aria-current="
+                        filters?.view === filter.value ? 'page' : undefined
+                    "
+                    preserve-scroll
+                    >{{ filter.label }}</Link
+                >
+            </Button>
+        </nav>
         <SearchField
             id="adjustment-search"
             v-model="search"
@@ -128,7 +173,11 @@ defineOptions({
                         Decision: {{ entry.decision_reason }}
                     </p>
                 </div>
-                <span class="text-sm capitalize">{{ entry.status }}</span>
+                <span class="text-muted-foreground text-sm capitalize">{{
+                    entry.status === 'pending'
+                        ? 'Awaiting approval'
+                        : entry.status
+                }}</span>
             </div>
             <StockAdjustmentSummary
                 :current-quantity="

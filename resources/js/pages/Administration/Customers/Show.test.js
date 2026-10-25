@@ -96,7 +96,7 @@ async function renderPurchases(capabilities, status = 'completed') {
 
 for (const viewOrders of [true, false]) {
     for (const requestReturns of [true, false]) {
-        test(`purchase actions respect order=${viewOrders} and return=${requestReturns} permissions`, async () => {
+        test(`customer record actions respect order=${viewOrders} and return=${requestReturns} permissions`, async () => {
             const html = await renderPurchases({ viewOrders, requestReturns });
             assert.match(html, /BF-000001/);
             assert.equal(
@@ -105,7 +105,7 @@ for (const viewOrders of [true, false]) {
             );
             assert.equal(
                 html.includes('Record return'),
-                viewOrders && requestReturns,
+                false,
             );
         });
     }

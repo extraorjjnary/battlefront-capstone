@@ -7,6 +7,7 @@ use App\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\User;
 use App\Services\Notifications\OrderNotificationPublisher;
+use App\Services\Order\OrderProcessingService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -28,6 +29,8 @@ class ResubmitPaymentProof
                     ->whereBelongsTo($customer)
                     ->lockForUpdate()
                     ->firstOrFail();
+
+                app(OrderProcessingService::class)->assertNoCancellationReview($lockedOrder);
 
                 if (! $lockedOrder->payment_method->requiresPaymentProof()) {
                     throw ValidationException::withMessages([

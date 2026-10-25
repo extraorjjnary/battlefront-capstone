@@ -237,6 +237,15 @@ test('verified shipment delivery records the product subtotal while preserving p
 
     $processing->updatePaymentStatus($order, PaymentStatus::Verified);
     $processing->updateStatus($order, OrderStatus::Processing);
+    $processing->updateShipmentOperations($order, [
+        'package_count' => '1',
+        'package_weight_kg' => '1.000',
+        'package_length_cm' => '10.00',
+        'package_width_cm' => '10.00',
+        'package_height_cm' => '10.00',
+        'declared_value' => $order->total_amount,
+        'handoff_mode' => 'branch_dropoff',
+    ], $handler);
     foreach ([ShipmentStatus::Preparing, ShipmentStatus::ReadyForDispatch, ShipmentStatus::HandedToLbc, ShipmentStatus::InTransit, ShipmentStatus::OutForDelivery, ShipmentStatus::Delivered] as $status) {
         $processing->updateShipmentStatus($order, $status);
     }

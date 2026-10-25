@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { renderToString } from '@vue/server-renderer';
 import * as Vue from 'vue';
+import { formatAgeDays } from '../../lib/dateTime.js';
 import { compileSkeletonTestComponent } from '../../lib/skeletonTestHelpers.js';
 
 function findNode(node, predicate) {
@@ -23,7 +24,7 @@ function findNode(node, predicate) {
     }
 }
 
-function harness(t, pageName) {
+function harness(t, pageName, pageProps = {}) {
     const forms = new Map();
     const page = {
         props: {
@@ -93,6 +94,7 @@ function harness(t, pageName) {
         can_receive_returns: true,
         low_stock_count: 0,
         out_of_stock_count: 0,
+        ...pageProps,
     });
     const primitive = {
         render() {
@@ -153,7 +155,7 @@ function harness(t, pageName) {
                     cancelPendingSearch() {},
                 }),
             },
-            '@/lib/dateTime': { formatDateTime: () => 'Today' },
+            '@/lib/dateTime': { formatAgeDays, formatDateTime: () => 'Today' },
         },
         {
             get(target, key) {
@@ -296,6 +298,38 @@ for (const [pageName, controller, method] of [
         }
     });
 }
+
+test('stock request filters are hidden from staff', async (t) => {
+    const app = harness(t, 'InventoryAdjustments');
+
+    const html = await app.html();
+
+    assert.doesNotMatch(html, /aria-label="Stock request filters"/);
+});
+
+test('stock request reviewers see three filters with the selected view marked', async (t) => {
+    const app = harness(t, 'InventoryAdjustments', {
+        can_view_all_requests: true,
+        filters: { view: 'mine' },
+    });
+
+    const html = await app.html();
+
+    assert.match(html, /aria-label="Stock request filters"/);
+    assert.match(html, />To Review</);
+    assert.match(html, /aria-current="page"[^>]*>My Requests</);
+    assert.match(html, />All</);
+});
+
+test('pending stock requests show Awaiting approval while withdrawn statuses stay unchanged', async (t) => {
+    const app = harness(t, 'InventoryAdjustments');
+
+    const html = await app.html();
+
+    assert.equal((html.match(/>Awaiting approval<\/span>/g) ?? []).length, 1);
+    assert.equal((html.match(/>withdrawn<\/span>/g) ?? []).length, 3);
+    assert.doesNotMatch(html, />pending<\/span>/);
+});
 
 test('opening-stock replacement shows the Initial receipt label for its existing reason code', async (t) => {
     const app = harness(t, 'InventoryAdjustments');

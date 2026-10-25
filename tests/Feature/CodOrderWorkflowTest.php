@@ -31,7 +31,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 function codWorkflowOrder(ShipmentStatus $milestone = ShipmentStatus::AwaitingPreparation, OrderStatus $status = OrderStatus::Pending): Order
 {
     $order = Order::factory()->cashOnDelivery()->create(['status' => $status]);
-    Shipment::factory()->for($order)->create([
+    Shipment::factory()->for($order)->withHandoffDetails($order->total_amount)->create([
         'status' => $milestone,
         'delivered_at' => $milestone === ShipmentStatus::Delivered ? now() : null,
     ]);
@@ -163,7 +163,7 @@ test('the shared service refuses unquoted COD placement even with otherwise vali
     expect(Inventory::sole()->quantity)->toBe(5);
 });
 
-test('COD progresses through all shipment milestones unpaid and confirms collection exactly once', function () {
+test('COD progresses through shipment milestones and separates collection from remittance', function () {
     $this->travelTo('2026-10-12 09:00:00');
     $order = codWorkflowOrder();
     $administrator = User::factory()->administrator()->create();
@@ -202,12 +202,23 @@ test('COD progresses through all shipment milestones unpaid and confirms collect
         expect($order->shipment->getAttribute($field))->toBe($shipmentSnapshot[$field]);
     }
     $deliveredSnapshot = $order->shipment->getAttributes();
-    $this->patch(route('administration.orders.shipment.reference.update', $order), ['tracking_reference' => 'LBC-COD-CORRECTED'])->assertSessionHasNoErrors();
+    $this->patch(route('administration.orders.shipment.reference.update', $order), ['tracking_reference' => 'LBC-COD-CORRECTED'])
+        ->assertSessionHasErrors(['tracking_reference' => 'The LBC tracking number is read-only once assigned.']);
+    expect($order->refresh()->shipment->getAttributes())->toBe($deliveredSnapshot);
     $this->get(route('administration.orders.show', $order))->assertInertia(fn (Assert $page) => $page
         ->where('order.payment.can_confirm_cod_collection', true)->where('order.allowed_status_transitions', [])
         ->where('order.payment.status.label', 'COD — Awaiting Collection'));
     $this->post(route('administration.orders.cod-collection.store', $order), ['cod_collection_confirmed' => true])
-        ->assertSessionHasNoErrors()->assertInertiaFlash('toast.message', 'COD collection confirmed. Order completed and sale recorded.');
+        ->assertSessionHasNoErrors()->assertInertiaFlash('toast.message', 'LBC COD collection recorded. The order remains unpaid until remittance is reconciled.');
+
+    expect($order->refresh())->status->toBe(OrderStatus::Processing)->payment_status->toBe(PaymentStatus::Pending);
+    expect($order->shipment)->carrier_cod_collected_amount->toBe('180.00')->carrier_cod_collected_at->not->toBeNull();
+    expect($order->sale)->toBeNull();
+    $this->assertDatabaseCount('sales', 0);
+    $this->post(route('administration.orders.cod-remittance.store', $order), [
+        'cod_remittance_confirmed' => true,
+        'carrier_cod_remittance_reference' => 'LBC-REMITTANCE-REFERENCE',
+    ])->assertSessionHasNoErrors()->assertInertiaFlash('toast.message', 'LBC COD remittance reconciled. Order completed and sale recorded.');
 
     expect($order->refresh())->status->toBe(OrderStatus::Completed)->payment_status->toBe(PaymentStatus::Verified);
     expect($order->sale)->amount->toBe('100.00')->sale_date->toDateString()->toBe('2026-10-12');
@@ -301,13 +312,14 @@ test('ordinary payment decisions and order completion cannot bypass COD collecti
     $this->assertDatabaseCount('notifications', 0);
 })->with(['verified', 'rejected', 'completed']);
 
-test('sale recording failure rolls back COD verification completion and notifications while preserving delivery', function () {
+test('sale recording failure rolls back COD remittance while preserving recorded collection and delivery', function () {
     $order = codWorkflowOrder(ShipmentStatus::Delivered, OrderStatus::Processing);
+    app(OrderProcessingService::class)->confirmCodCollection($order, true);
     $shipment = $order->shipment->getAttributes();
     Event::listen('eloquent.created: '.Sale::class, fn (): never => throw new RuntimeException('Sale failure.'));
 
     try {
-        expect(fn () => app(OrderProcessingService::class)->confirmCodCollection($order, true))->toThrow(RuntimeException::class, 'Sale failure.');
+        expect(fn () => app(OrderProcessingService::class)->confirmCodRemittance($order, true, 'LBC-REMITTANCE-REFERENCE'))->toThrow(RuntimeException::class, 'Sale failure.');
     } finally {
         Event::forget('eloquent.created: '.Sale::class);
     }
@@ -330,6 +342,9 @@ test('collection rechecks persisted shipment state and rejects stale duplicate c
     expect(fn () => $processing->confirmCodCollection($order, true))->toThrow(ValidationException::class);
     expect(fn () => $processing->updateShipmentStatus($stale, ShipmentStatus::Delivered))->toThrow(ValidationException::class);
 
+    expect($order->refresh())->payment_status->toBe(PaymentStatus::Pending)->status->toBe(OrderStatus::Processing);
+    $this->assertDatabaseCount('sales', 0);
+    $processing->confirmCodRemittance($order, true, 'LBC-REMITTANCE-REFERENCE');
     $this->assertDatabaseCount('sales', 1);
     expect($order->refresh())->payment_status->toBe(PaymentStatus::Verified)->status->toBe(OrderStatus::Completed);
 });
@@ -337,20 +352,24 @@ test('collection rechecks persisted shipment state and rejects stale duplicate c
 test('customer web mobile and chatbot present delivered unpaid COD accurately then show verified completion', function () {
     $order = codWorkflowOrder(ShipmentStatus::Delivered, OrderStatus::Processing);
     $this->actingAs($order->user)->get(route('orders.show', $order))->assertInertia(fn (Assert $page) => $page
-        ->where('order.status.value', 'processing')->where('order.status.label', 'Delivered — awaiting COD confirmation')
+        ->where('order.status.value', 'processing')->where('order.status.label', 'Delivered — awaiting COD collection')
         ->where('order.payment.status.value', 'pending')->where('order.payment.proof_submitted', false)->where('order.can_cancel', false));
-    $this->get(route('orders.index'))->assertInertia(fn (Assert $page) => $page->where('orders.data.0.status.label', 'Delivered — awaiting COD confirmation'));
+    $this->get(route('orders.index'))->assertInertia(fn (Assert $page) => $page->where('orders.data.0.status.label', 'Delivered — awaiting COD collection'));
     $this->withToken($order->user->createToken('Phone')->plainTextToken)->getJson('/api/v1/orders/'.$order->id)
         ->assertJsonPath('data.shipment.status.value', 'delivered')->assertJsonPath('data.payment.status.label', 'COD — Awaiting Collection');
     expect(app(ResolveOrderContext::class)->execute($order->user, 'COD payment for '.$order->reference)['orders'][0]['payment']['status']['label'])
         ->toBe('COD — Awaiting Collection');
-    expect(app(DashboardService::class)->customer($order->user)['latest_order']['status']['label'])->toBe('Delivered — awaiting COD confirmation');
+    expect(app(DashboardService::class)->customer($order->user)['latest_order']['status']['label'])->toBe('Delivered — awaiting COD collection');
 
     app(OrderProcessingService::class)->confirmCodCollection($order, true);
 
+    $this->getJson('/api/v1/orders/'.$order->id)->assertJsonPath('data.status.value', 'processing')
+        ->assertJsonPath('data.payment.status.value', 'pending');
+    app(OrderProcessingService::class)->confirmCodRemittance($order, true, 'LBC-REMITTANCE-REFERENCE');
+
     $this->getJson('/api/v1/orders/'.$order->id)->assertJsonPath('data.status.value', 'completed')
         ->assertJsonPath('data.status.label', 'Delivered / Completed')->assertJsonPath('data.payment.status.value', 'verified')
-        ->assertJsonPath('data.payment.notice', 'Battlefront has manually confirmed that LBC collected your COD payment.');
+        ->assertJsonPath('data.payment.notice', 'Battlefront has manually reconciled the LBC COD remittance for your order.');
 });
 
 test('COD enters the payment attention queue and sales reporting only at the appropriate milestones', function () {
@@ -374,6 +393,11 @@ test('COD enters the payment attention queue and sales reporting only at the app
     expect($monthly->aggregateProduct($productId, $months))->toBe([]);
 
     $processing->confirmCodCollection($order, true);
+
+    expect($dashboard->administration($administrator)['needs_attention']['pending_payment_reviews'])->toBe(1);
+    expect((int) $reports->summary(['2026-10-01', '2026-11-01'], null, null)->total_sales)->toBe(0);
+    expect($monthly->aggregateProduct($productId, $months))->toBe([]);
+    $processing->confirmCodRemittance($order, true, 'LBC-REMITTANCE-REFERENCE');
 
     expect($dashboard->administration($administrator)['needs_attention']['pending_payment_reviews'])->toBe(0);
     $summary = $reports->summary(['2026-10-01', '2026-11-01'], null, null);
@@ -447,12 +471,13 @@ test('COD completion cannot bypass collection when a shipment is missing even if
     $this->assertDatabaseCount('sales', 0);
 });
 
-test('COD sale date follows collection confirmation rather than the recorded delivery date', function () {
+test('COD sale date follows remittance confirmation rather than collection or delivery date', function () {
     $this->travelTo('2026-09-30 12:00:00');
     $order = codWorkflowOrder(ShipmentStatus::Delivered, OrderStatus::Processing);
+    app(OrderProcessingService::class)->confirmCodCollection($order, true);
     $this->travelTo('2026-10-01 12:00:00');
 
-    app(OrderProcessingService::class)->confirmCodCollection($order, true);
+    app(OrderProcessingService::class)->confirmCodRemittance($order, true, 'LBC-REMITTANCE-REFERENCE');
 
     expect($order->refresh()->shipment->delivered_at->toDateString())->toBe('2026-09-30');
     expect($order->sale->sale_date->toDateString())->toBe('2026-10-01');

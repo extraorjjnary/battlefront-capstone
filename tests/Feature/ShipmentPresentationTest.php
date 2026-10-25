@@ -16,7 +16,7 @@ function shipmentPresentationOrder(): Order
     $order = Order::factory()->withDeliverySnapshot('Bacolod City')->create([
         'status' => OrderStatus::Processing, 'payment_status' => PaymentStatus::Verified,
     ]);
-    Shipment::factory()->for($order)->create(['created_at' => '2026-10-08 08:00:00']);
+    Shipment::factory()->for($order)->withHandoffDetails($order->total_amount)->create(['created_at' => '2026-10-08 08:00:00']);
 
     return $order->refresh();
 }
@@ -133,7 +133,11 @@ test('cancelled delivery presents a terminal status and retains recorded milesto
     $this->actingAs($administrator)
         ->get(route('administration.orders.show', $order))->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->where('order.shipment_actions', ['next_status' => null, 'can_update_reference' => false])
+            ->where('order.shipment_actions', [
+                'next_status' => null,
+                'can_update_reference' => false,
+                'can_simulate_local_lbc_booking' => false,
+            ])
             ->where('order.allowed_status_transitions', []));
 });
 

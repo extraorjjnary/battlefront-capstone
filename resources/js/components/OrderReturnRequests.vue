@@ -278,12 +278,6 @@ function submitWithdrawal() {
                             entry.resolution.status
                         }}
                     </p>
-                    <p
-                        v-if="entry.resolution.summary"
-                        class="whitespace-pre-wrap"
-                    >
-                        {{ entry.resolution.summary }}
-                    </p>
                     <p v-if="entry.resolution.completed_at">
                         Completed
                         {{ formatDateTime(entry.resolution.completed_at) }}
@@ -304,15 +298,6 @@ function submitWithdrawal() {
                           ? 'Payment recorded. Awaiting full payment confirmation.'
                           : 'No refund payment recorded yet.'
                 }}
-            </p>
-            <p
-                v-if="
-                    entry.resolution?.type === 'refund' &&
-                    entry.resolution.summary
-                "
-                class="text-sm whitespace-pre-wrap"
-            >
-                Refund note: {{ entry.resolution.summary }}
             </p>
             <dl
                 v-if="entry.refund"

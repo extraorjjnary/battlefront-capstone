@@ -74,8 +74,8 @@ function markRead(id = null) {
                     <p class="text-muted-foreground mt-2 text-sm">
                         {{
                             isAdministrator
-                                ? 'New orders and submitted wallet proofs will appear here.'
-                                : 'Updates will appear here when payment or shipment milestones are recorded.'
+                                ? 'Orders, requests, decisions, and operational updates will appear here.'
+                                : 'Order, payment, shipment, return, and refund updates will appear here.'
                         }}
                     </p>
                 </div>
@@ -160,11 +160,16 @@ function markRead(id = null) {
                             >
                         </div>
                         <Link
-                            v-if="notification.order"
-                            :href="navigation.order(notification.order.id)"
+                            v-if="navigation.destination(notification)"
+                            :href="navigation.destination(notification)"
                             class="text-primary-ink focus-visible:ring-ring mt-3 inline-flex items-center gap-2 rounded-sm text-sm font-medium focus-visible:ring-2"
                         >
-                            View {{ notification.order.reference }}
+                            View
+                            {{
+                                notification.subject
+                                    ? `case #${notification.subject.id}`
+                                    : notification.order.reference
+                            }}
                             <ArrowRight class="size-4" aria-hidden="true" />
                         </Link>
                     </article>

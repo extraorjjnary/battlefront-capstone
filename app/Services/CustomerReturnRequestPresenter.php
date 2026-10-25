@@ -34,7 +34,7 @@ class CustomerReturnRequestPresenter
             ->where('requests.order_id', $order->id)->where('requests.user_id', $order->user_id)
             ->select('requests.*', 'order_items.product_id', 'returns.status as return_status', 'returns.created_at as received_at',
                 'refunds.approved_amount', 'verified.verified_amount', 'verified.recorded_amount', 'returns.public_feedback',
-                'resolution.type as resolution_type', 'resolution.summary as resolution_summary', 'resolution.completed_at as resolution_completed_at')
+                'resolution.type as resolution_type', 'resolution.completed_at as resolution_completed_at')
             ->selectRaw('COALESCE(order_items.product_name_at_time, products.name) as product_name')
             ->orderByDesc('requests.id')->get()
             ->map(fn (stdClass $row): array => $this->present($row, $order, $payments[(int) $row->customer_return_id] ?? []))->all());
@@ -62,7 +62,7 @@ class CustomerReturnRequestPresenter
                 $feedback = 'Your return has been accepted.';
                 $resolution = ['type' => $row->resolution_type ?? 'unknown',
                     'status' => $row->resolution_type === null ? 'unknown' : ($row->resolution_completed_at === null ? 'pending' : 'completed'),
-                    'summary' => $row->resolution_summary,
+                    'summary' => null,
                     'completed_at' => $row->resolution_completed_at === null ? null : Carbon::parse($row->resolution_completed_at)->toIso8601String()];
                 $approved = self::numericAmount((string) ($row->approved_amount ?? '0.00'));
                 if (bccomp($approved, '0.00', 2) > 0) {
@@ -73,7 +73,7 @@ class CustomerReturnRequestPresenter
                     $refund = ['approved_amount' => $approved, 'verified_paid_amount' => $verified, 'confirmed_paid_amount' => $verified, 'payments' => $payments,
                         'payment_recorded' => bccomp(self::numericAmount((string) ($row->recorded_amount ?? '0.00')), '0.00', 2) > 0,
                         'remaining_amount' => $complete ? '0.00' : bcsub($approved, $verified, 2)];
-                    $resolution = ['type' => 'refund', 'status' => $complete ? 'completed' : 'pending', 'summary' => $row->resolution_summary, 'completed_at' => null];
+                    $resolution = ['type' => 'refund', 'status' => $complete ? 'completed' : 'pending', 'summary' => null, 'completed_at' => null];
                 } elseif ($row->resolution_type === null) {
                     $feedback = 'Your return was accepted, but its customer resolution was not recorded. Contact Battlefront for confirmation.';
                 }

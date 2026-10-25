@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatCurrency } from '@/lib/currency';
 import { formatDateTime } from '@/lib/dateTime';
-import { orderStatusBadgeClass } from '@/lib/orderStatus';
+import { orderDisplayStatus, orderStatusBadgeClass } from '@/lib/orderStatus';
 import { index as productIndex } from '@/routes/products';
 
 defineProps({
@@ -156,11 +156,11 @@ defineOptions({
                                         variant="outline"
                                         :class="
                                             orderStatusBadgeClass(
-                                                order.status.value,
+                                                orderDisplayStatus(order).value,
                                             )
                                         "
                                     >
-                                        {{ order.status.label }}
+                                        {{ orderDisplayStatus(order).label }}
                                     </Badge>
                                 </dd>
                             </div>

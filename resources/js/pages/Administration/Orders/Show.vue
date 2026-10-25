@@ -14,10 +14,9 @@ import {
     Truck,
     UserRound,
 } from '@lucide/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import OrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
 import OrderHandlerController from '@/actions/App/Http/Controllers/Administration/OrderHandlerController';
-import CustomerReturnController from '@/actions/App/Http/Controllers/Administration/CustomerReturnController';
 import OrderPaymentProofController from '@/actions/App/Http/Controllers/Administration/OrderPaymentProofController';
 import OrderPaymentStatusController from '@/actions/App/Http/Controllers/Administration/OrderPaymentStatusController';
 import OrderManualShipmentController from '@/actions/App/Http/Controllers/Administration/OrderManualShipmentController';
@@ -27,6 +26,7 @@ import OrderShipmentStatusController from '@/actions/App/Http/Controllers/Admini
 import OrderShipmentReferenceController from '@/actions/App/Http/Controllers/Administration/OrderShipmentReferenceController';
 import InputError from '@/components/InputError.vue';
 import ShipmentTracking from '@/components/ShipmentTracking.vue';
+import OrderCancellationPanel from '@/components/OrderCancellationPanel.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -64,7 +64,7 @@ const props = defineProps({
 });
 
 const handlerForm = useForm({
-    handler_id: props.order.assigned_handler_id ?? '',
+    handler_id: '',
 });
 const claimForm = useForm({});
 const page = usePage();
@@ -72,20 +72,71 @@ const canProcess = computed(() => props.order.can_process === true);
 const unfinished = computed(
     () => !['completed', 'cancelled'].includes(props.order.status.value),
 );
+const cancellationPending = computed(
+    () => props.order.cancellation?.status.value === 'requested',
+);
+const canClaim = computed(
+    () =>
+        unfinished.value &&
+        !cancellationPending.value &&
+        !props.order.assigned_handler_id &&
+        page.props.auth.can?.processOrders === true,
+);
+const availableHandlers = computed(() =>
+    props.handler_options.filter((handler) =>
+        props.order.assigned_handler_id
+            ? handler.id !== props.order.assigned_handler_id
+            : handler.id !== page.props.auth.user.id,
+    ),
+);
+const handlerAction = computed(() =>
+    props.order.assigned_handler_id ? 'Reassign handler' : 'Assign handler',
+);
+const canAssign = computed(
+    () =>
+        unfinished.value &&
+        !cancellationPending.value &&
+        page.props.auth.can?.assignOrders === true,
+);
+const validHandlerSelection = computed(() =>
+    availableHandlers.value.some(
+        (handler) => String(handler.id) === String(handlerForm.handler_id),
+    ),
+);
 const handlerNotice = computed(() => {
-    if (!unfinished.value) {
-        return '';
+    if (props.order.cancellation?.status.value === 'requested') {
+        return 'Order handling is paused for cancellation review.';
     }
-    if (!props.order.assigned_handler_id) {
-        return 'Claim this order or assign a handler before processing it.';
-    }
-    if (canProcess.value) {
-        return 'You are responsible for processing this order.';
-    }
-    return page.props.auth.can?.assignOrders
-        ? 'Only the assigned handler can process this order. Reassign it explicitly to yourself or another eligible handler to change responsibility.'
-        : 'Only the assigned handler can process this order. You can view its details.';
+    return '';
 });
+
+watch(
+    () => [props.order.id, props.order.assigned_handler_id],
+    () => {
+        handlerForm.reset();
+        handlerForm.clearErrors();
+    },
+);
+
+function submitHandler() {
+    if (
+        !canAssign.value ||
+        !validHandlerSelection.value ||
+        handlerForm.processing
+    ) {
+        return;
+    }
+    handlerForm.patch(OrderHandlerController.assign(props.order.id), {
+        onSuccess: () => handlerForm.reset(),
+    });
+}
+
+function submitClaim() {
+    if (!canClaim.value || claimForm.processing) {
+        return;
+    }
+    claimForm.post(OrderHandlerController.claim(props.order.id));
+}
 
 const selectedOrderStatus = ref('');
 const orderConfirmationOpen = ref(false);
@@ -114,7 +165,7 @@ const localLbcBookingDialogOpen = ref(false);
 const localLbcBookingForm = useForm({});
 const manualShipmentForm = useForm({
     arrangement_confirmed: false,
-    carrier: '',
+    carrier: 'lbc',
     tracking_reference: '',
     eta_min_days: '',
     eta_max_days: '',
@@ -533,6 +584,13 @@ defineOptions({
     <main
         class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
     >
+        <OrderCancellationPanel
+            v-if="order.cancellation"
+            :order-id="order.id"
+            :cancellation="order.cancellation"
+            :payment-method="order.payment.method.value"
+            administration
+        />
         <section class="border-border bg-card relative overflow-hidden border">
             <div class="bg-primary absolute inset-y-0 left-0 w-1"></div>
             <div
@@ -584,10 +642,20 @@ defineOptions({
             class="border-border bg-card flex flex-wrap items-end gap-4 border p-5"
         >
             <div class="min-w-48 flex-1">
-                <p class="font-semibold">Assigned handler</p>
-                <p class="text-muted-foreground mt-1 text-sm">
-                    {{ order.assigned_handler_name ?? 'Unassigned' }}
-                    <span v-if="canProcess"> (you)</span>
+                <p class="font-semibold">
+                    {{
+                        order.assigned_handler_id
+                            ? `Handled by ${order.assigned_handler_name}`
+                            : 'Unassigned'
+                    }}
+                </p>
+                <p
+                    v-if="
+                        unfinished && order.assigned_handler_id && !canProcess
+                    "
+                    class="text-muted-foreground mt-1 text-sm"
+                >
+                    View only
                 </p>
                 <p
                     v-if="handlerNotice"
@@ -596,16 +664,7 @@ defineOptions({
                     {{ handlerNotice }}
                 </p>
             </div>
-            <form
-                v-if="
-                    page.props.auth.can?.processOrders &&
-                    !order.assigned_handler_id &&
-                    !['completed', 'cancelled'].includes(order.status.value)
-                "
-                @submit.prevent="
-                    claimForm.post(OrderHandlerController.claim(order.id))
-                "
-            >
+            <form v-if="canClaim" @submit.prevent="submitClaim">
                 <Button
                     type="submit"
                     variant="outline"
@@ -615,24 +674,20 @@ defineOptions({
                 <InputError :message="claimForm.errors.handler" />
             </form>
             <form
-                v-if="
-                    handler_options.length && page.props.auth.can?.assignOrders
-                "
-                class="flex items-end gap-2"
-                @submit.prevent="
-                    handlerForm.patch(OrderHandlerController.assign(order.id))
-                "
+                v-if="availableHandlers.length && canAssign"
+                class="flex w-full flex-wrap items-end gap-2 sm:w-auto"
+                @submit.prevent="submitHandler"
             >
-                <div>
-                    <Label for="assigned-handler">Assign handler</Label>
+                <div class="min-w-0 flex-1 sm:flex-none">
+                    <Label for="assigned-handler">{{ handlerAction }}</Label>
                     <select
                         id="assigned-handler"
                         v-model="handlerForm.handler_id"
-                        class="border-input bg-background mt-1 block h-9 min-w-44 border px-2 text-sm"
+                        class="border-input bg-background mt-1 block h-9 w-full min-w-0 border px-2 text-sm sm:w-44"
                     >
-                        <option value="">Select staff</option>
+                        <option value="">Select handler</option>
                         <option
-                            v-for="handler in handler_options"
+                            v-for="handler in availableHandlers"
                             :key="handler.id"
                             :value="handler.id"
                         >
@@ -642,10 +697,8 @@ defineOptions({
                 </div>
                 <Button
                     type="submit"
-                    :disabled="
-                        !handlerForm.handler_id || handlerForm.processing
-                    "
-                    >Assign</Button
+                    :disabled="!validHandlerSelection || handlerForm.processing"
+                    >{{ handlerAction }}</Button
                 >
                 <InputError
                     :message="
@@ -654,16 +707,6 @@ defineOptions({
                     "
                 />
             </form>
-            <Link
-                v-if="order.status.value === 'completed'"
-                :href="
-                    CustomerReturnController.index({
-                        query: { order_id: order.id },
-                    })
-                "
-                class="text-primary text-sm underline"
-                >Record return</Link
-            >
         </section>
 
         <div
@@ -935,9 +978,10 @@ defineOptions({
                     <p class="font-semibold">No configured delivery rate</p>
                     <p class="text-muted-foreground leading-6">
                         This order remains at its saved product subtotal with no
-                        delivery fee. No LBC quote, booking, or estimate is
-                        implied. Recording a manually arranged LBC shipment will
-                        not change the saved order amount or add a fee.
+                        delivery fee included. This does not guarantee free
+                        delivery. No LBC quote, booking, or estimate is implied.
+                        Confirming a delivery arrangement will not change the
+                        saved order amount or add a fee.
                     </p>
                     <p class="text-muted-foreground text-xs leading-5">
                         {{ order.delivery_quote.assumption_label }}
@@ -945,18 +989,18 @@ defineOptions({
                     <div v-if="order.can_create_manual_shipment && canProcess">
                         <Button type="button" @click="requestManualShipment">
                             <Truck />
-                            Create Manual Shipment
+                            Confirm delivery arrangement
                         </Button>
                         <Dialog v-model:open="manualShipmentDialogOpen">
                             <DialogContent>
                                 <DialogHeader>
                                     <DialogTitle>
-                                        Create Manual Shipment
+                                        Confirm delivery arrangement
                                     </DialogTitle>
                                     <DialogDescription>
-                                        Record an LBC arrangement confirmed
-                                        outside checkout. This does not add a
-                                        delivery fee or change the order total.
+                                        Confirm an LBC arrangement already made
+                                        outside checkout. The order total stays
+                                        unchanged.
                                     </DialogDescription>
                                 </DialogHeader>
                                 <div class="grid gap-4">
@@ -964,29 +1008,11 @@ defineOptions({
                                         <Label for="manual-shipment-carrier">
                                             Carrier
                                         </Label>
-                                        <Select
-                                            :model-value="
-                                                manualShipmentForm.carrier
-                                            "
-                                            @update:model-value="
-                                                manualShipmentForm.carrier =
-                                                    $event
-                                            "
-                                        >
-                                            <SelectTrigger
-                                                id="manual-shipment-carrier"
-                                                class="w-full"
-                                            >
-                                                <SelectValue
-                                                    placeholder="Select confirmed carrier"
-                                                />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="lbc">
-                                                    LBC
-                                                </SelectItem>
-                                            </SelectContent>
-                                        </Select>
+                                        <Input
+                                            id="manual-shipment-carrier"
+                                            model-value="LBC"
+                                            readonly
+                                        />
                                         <InputError
                                             :message="
                                                 manualShipmentForm.errors
@@ -996,7 +1022,7 @@ defineOptions({
                                     </div>
                                     <div class="grid gap-2">
                                         <Label for="manual-tracking-reference">
-                                            LBC tracking / reference (optional)
+                                            Tracking reference (optional)
                                         </Label>
                                         <Input
                                             id="manual-tracking-reference"
@@ -1015,16 +1041,13 @@ defineOptions({
                                     </div>
                                     <fieldset class="grid gap-2">
                                         <legend class="text-sm font-medium">
-                                            Estimated delivery from preparation
-                                            (optional)
+                                            Estimated delivery days (optional)
                                         </legend>
                                         <p
                                             class="text-muted-foreground text-xs leading-5"
                                         >
-                                            Enter both day values only when an
-                                            estimate is available. Leave both
-                                            blank if no estimate has been
-                                            supplied.
+                                            Days from preparation. Leave both
+                                            blank when unknown.
                                         </p>
                                         <div class="grid gap-3 sm:grid-cols-2">
                                             <div class="grid gap-2">
@@ -1083,11 +1106,9 @@ defineOptions({
                                                 for="manual-arrangement-confirmed"
                                                 class="text-sm leading-5 font-normal"
                                             >
-                                                I confirm LBC has accepted this
-                                                delivery arrangement. I
-                                                understand no delivery fee or
-                                                estimate is added unless
-                                                explicitly entered above.
+                                                I confirm that the delivery
+                                                arrangement with LBC has
+                                                actually been made.
                                             </Label>
                                         </div>
                                         <InputError
@@ -1101,7 +1122,7 @@ defineOptions({
                                 <DialogFooter>
                                     <DialogClose as-child>
                                         <Button type="button" variant="outline">
-                                            Keep unconfigured
+                                            Cancel
                                         </Button>
                                     </DialogClose>
                                     <Button
@@ -1116,7 +1137,7 @@ defineOptions({
                                         <Spinner
                                             v-if="manualShipmentForm.processing"
                                         />
-                                        Create Manual Shipment
+                                        Confirm delivery arrangement
                                     </Button>
                                 </DialogFooter>
                             </DialogContent>
@@ -1267,6 +1288,16 @@ defineOptions({
                                 </dt>
                                 <dd class="mt-1 font-semibold tabular-nums">
                                     {{ formatCurrency(order.delivery_fee) }}
+                                    <p
+                                        v-if="
+                                            order.delivery_quote
+                                                ?.pricing_configured === false
+                                        "
+                                        class="text-muted-foreground mt-1 text-xs font-normal"
+                                    >
+                                        No delivery fee included; this does not
+                                        guarantee free delivery.
+                                    </p>
                                 </dd>
                             </div>
                             <div>
@@ -1372,21 +1403,14 @@ defineOptions({
                     aria-label="Shipment actions"
                 >
                     <h2 class="font-semibold">Manual shipment actions</h2>
-                    <p
-                        v-if="!canProcess && unfinished"
-                        class="text-muted-foreground text-sm"
-                    >
-                        {{ handlerNotice }}
-                    </p>
                     <template
-                        v-else-if="
-                            canProcess && order.shipment_actions?.next_status
-                        "
+                        v-if="canProcess && order.shipment_actions?.next_status"
                     >
                         <div
                             v-if="
                                 order.shipment_actions.next_status.value ===
-                                'handed_to_lbc'
+                                    'handed_to_lbc' &&
+                                !order.shipment.tracking_reference
                             "
                             class="grid gap-2"
                         >
@@ -1422,6 +1446,7 @@ defineOptions({
                     </template>
                     <p
                         v-else-if="
+                            canProcess &&
                             ['pending', 'processing'].includes(
                                 order.status.value,
                             ) &&
@@ -1437,7 +1462,10 @@ defineOptions({
                                 : 'Verify payment and move the order to Processing before advancing shipment milestones.'
                         }}
                     </p>
-                    <p v-else class="text-muted-foreground text-sm">
+                    <p
+                        v-else-if="canProcess || !unfinished"
+                        class="text-muted-foreground text-sm"
+                    >
                         Shipment progression is closed for this order.
                     </p>
                     <InputError :message="shipmentStatusForm.errors.status" />
@@ -1459,8 +1487,8 @@ defineOptions({
                             maxlength="255"
                         />
                         <p class="text-muted-foreground text-xs">
-                            Enter only a supplied reference. Clear the field to
-                            remove an incorrect value.
+                            Enter only a supplied reference. Once saved, the LBC
+                            tracking number cannot be changed.
                         </p>
                         <InputError
                             :message="
@@ -1619,7 +1647,10 @@ defineOptions({
                             Update order status
                         </Button>
                     </div>
-                    <p v-else class="text-muted-foreground mt-4 text-sm">
+                    <p
+                        v-else-if="canProcess || !unfinished"
+                        class="text-muted-foreground mt-4 text-sm"
+                    >
                         <template
                             v-if="
                                 ['completed', 'cancelled'].includes(
@@ -1629,9 +1660,6 @@ defineOptions({
                         >
                             This order is in a terminal state and cannot be
                             changed.
-                        </template>
-                        <template v-else-if="!canProcess">
-                            {{ handlerNotice }}
                         </template>
                         <template
                             v-else-if="order.payment.method.value === 'cod' && order.payment.status.value === 'pending'"
@@ -2372,7 +2400,18 @@ defineOptions({
                     </div>
                     <div v-else class="mt-4 grid gap-3">
                         <p class="text-muted-foreground text-sm">
-                            <template v-if="order.status.value === 'cancelled'">
+                            <template
+                                v-if="
+                                    order.cancellation?.status.value ===
+                                    'requested'
+                                "
+                            >
+                                Payment review is paused until the cancellation
+                                request is decided.
+                            </template>
+                            <template
+                                v-else-if="order.status.value === 'cancelled'"
+                            >
                                 Cancelled orders cannot accept payment
                                 decisions. Any recorded payment remains
                                 unchanged.

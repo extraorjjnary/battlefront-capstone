@@ -31,6 +31,11 @@ test('shipment persistence stores manual milestones and ETA without copied handl
         'id', 'order_id', 'carrier', 'arrangement_type', 'status', 'preparation_days',
         'transit_min_days', 'transit_max_days', 'eta_min_days', 'eta_max_days',
         'tracking_reference', 'handed_to_carrier_at', 'delivered_at', 'created_at', 'updated_at',
+        'booking_source', 'booking_reference', 'carrier_cod_collected_amount', 'carrier_cod_collection_reference',
+        'carrier_cod_collected_at', 'carrier_cod_remitted_amount', 'carrier_cod_remittance_reference', 'carrier_cod_remitted_at',
+        'package_count', 'package_weight_kg', 'package_length_cm', 'package_width_cm', 'package_height_cm',
+        'declared_value', 'handoff_mode', 'actual_carrier_cost', 'carrier_cost_reference', 'carrier_cost_recorded_at',
+        'shipment_exception_code', 'shipment_exception_note', 'shipment_exception_reported_at', 'shipment_exception_resolved_at',
         'preparing_at', 'ready_for_dispatch_at', 'in_transit_at', 'out_for_delivery_at', 'cancelled_at',
         'eta_anchor_date', 'eta_timezone', 'estimated_delivery_start', 'estimated_delivery_end',
     ]);

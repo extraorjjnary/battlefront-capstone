@@ -145,7 +145,7 @@ test('inventory adjustment requests can be searched by product, requester, or re
         'updated_at' => now(),
     ]);
 
-    $this->actingAs($administrator)->get(route('administration.inventory-adjustments.index', ['q' => 'Search adjustment product']))
+    $this->actingAs($administrator)->get(route('administration.inventory-adjustments.index', ['q' => 'Search adjustment product', 'view' => 'all']))
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->where('filters.q', 'Search adjustment product')
             ->where('requests.total', 1)

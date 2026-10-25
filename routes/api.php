@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\CheckoutController;
 use App\Http\Controllers\Api\V1\CustomerReturnRequestController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\OrderCancellationController;
+use App\Http\Controllers\Api\V1\OrderCancellationRequestController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\OrderPaymentProofController;
 use App\Http\Controllers\Api\V1\OrderPaymentRetryController;
@@ -111,6 +112,8 @@ Route::prefix('v1')
             // orders
             Route::get('orders', [OrderController::class, 'index'])->name('orders.index');
             Route::post('orders', [OrderController::class, 'store'])->name('orders.store');
+            Route::post('orders/{order}/cancellation-requests', OrderCancellationRequestController::class)
+                ->whereNumber('order')->name('orders.cancellation-requests.store');
             Route::post('orders/{order}/cancel', OrderCancellationController::class)
                 ->whereNumber('order')->name('orders.cancel.store');
             Route::post('orders/{order}/paymongo/retry', OrderPaymentRetryController::class)
