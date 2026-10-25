@@ -2,6 +2,7 @@
 
 use App\Actions\Chatbot\CategorizeChatbotQuery;
 use App\Enums\ChatbotQueryCategory;
+use App\Services\Chatbot\ChatbotLanguage;
 use Illuminate\Support\Str;
 
 test('representative wording is classified without requiring seeded question text', function (
@@ -119,4 +120,9 @@ arch('chatbot query categorization remains provider independent')
     ->toOnlyUse([
         ChatbotQueryCategory::class,
         Str::class,
+        ChatbotLanguage::class,
     ]);
+
+arch('chatbot language normalization remains provider and database independent')
+    ->expect(ChatbotLanguage::class)
+    ->toOnlyUse([Str::class]);

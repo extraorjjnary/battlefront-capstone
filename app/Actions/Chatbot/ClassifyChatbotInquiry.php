@@ -3,7 +3,7 @@
 namespace App\Actions\Chatbot;
 
 use App\Enums\ChatbotQueryCategory;
-use Illuminate\Support\Str;
+use App\Services\Chatbot\ChatbotLanguage;
 
 class ClassifyChatbotInquiry
 {
@@ -17,7 +17,7 @@ class ClassifyChatbotInquiry
         '/(?<!\d)(?:\+63[\s-]?|0)9(?:[\s-]?\d){9}(?!\d)/u',
     ];
 
-    public function __construct(private CategorizeChatbotQuery $categorizer = new CategorizeChatbotQuery) {}
+    public function __construct(private CategorizeChatbotQuery $categorizer = new CategorizeChatbotQuery, private ChatbotLanguage $language = new ChatbotLanguage) {}
 
     /**
      * Classify ownership without retrieving records or invoking a provider.
@@ -32,13 +32,21 @@ class ClassifyChatbotInquiry
         }
 
         $choices = [];
-        $clauses = preg_split('/\s+(?:and|also|plus)\s+|[;?]+\s*(?:(?:and|also|plus)\s+)?/iu', $message, flags: PREG_SPLIT_NO_EMPTY) ?: [];
+        $ruleChoices = [];
+        $clauses = $this->language->clauses($message);
         foreach ($clauses as $clause) {
             $classified = $this->classifySingle($clause);
             if ($classified['category'] !== ChatbotQueryCategory::Unsupported) {
                 $category = $classified['category']->value;
                 $choices[$category] = isset($choices[$category]) ? $choices[$category].' and '.trim($clause) : trim($clause);
+                if ($classified['owner'] === 'application_rules' && $classified['rule_topic'] !== null) {
+                    $ruleChoices['faq:'.$classified['rule_topic']] = trim($clause);
+                }
             }
+        }
+        if (count($ruleChoices) > 1) {
+            unset($choices['faq']);
+            $choices = [...$choices, ...$ruleChoices];
         }
         if (count($choices) > 1) {
             $result['owner'] = 'clarification';
@@ -52,6 +60,10 @@ class ClassifyChatbotInquiry
 
     public function containsSensitiveInput(string $message): bool
     {
+        if (preg_match('/\b(?:password|passcode|senha|kontrasenyas|otp|pin|secret|credential|card number|cvv|api[ _-]?key)\b/iu', $message) === 1
+            || preg_match('/\b(?:sk-|AIza)[a-z0-9_-]{12,}\b|\b\d{4}[ -]?\d{4}[ -]?\d{4}[ -]?\d{4}\b/iu', $message) === 1) {
+            return true;
+        }
         foreach (self::SENSITIVE_INPUT_PATTERNS as $pattern) {
             if (preg_match($pattern, $message) === 1) {
                 return true;
@@ -65,7 +77,7 @@ class ClassifyChatbotInquiry
     private function classifySingle(string $message): array
     {
         $category = $this->categorizer->execute($message);
-        $text = Str::of($message)->lower()->replaceMatches('/[^\p{L}\p{N}\s]+/u', ' ')->squish()->toString();
+        $text = $this->language->normalized($message);
         $owner = $category->value;
         $reason = '';
         $topic = null;
@@ -86,7 +98,7 @@ class ClassifyChatbotInquiry
             $eligible = true;
         } elseif ($category === ChatbotQueryCategory::Order) {
             $owner = 'order';
-        } elseif ($this->categorizer->requiresLiveFacts($message) && $this->ruleTopic($text) !== 'delivery_quote') {
+        } elseif ($this->categorizer->requiresLiveFacts($message) && ! in_array($this->ruleTopic($text), ['delivery_quote', 'returns', 'refunds', 'cancellation'], true)) {
             $category = $this->categorizer->requiresStoreFacts($message) ? ChatbotQueryCategory::Store : ChatbotQueryCategory::Product;
             $owner = $category->value;
         } elseif (! in_array($category, [ChatbotQueryCategory::Product, ChatbotQueryCategory::Store], true) && ($topic = $this->ruleTopic($text)) !== null) {
@@ -121,6 +133,15 @@ class ClassifyChatbotInquiry
 
     private function ruleTopic(string $text): ?string
     {
+        if (preg_match('/\b(?:refund|refunds)\b/u', $text) === 1) {
+            return 'refunds';
+        }
+        if (preg_match('/\b(?:return|returns)\b/u', $text) === 1) {
+            return 'returns';
+        }
+        if (preg_match('/\b(?:cancel|cancellation)\b/u', $text) === 1) {
+            return 'cancellation';
+        }
         if (preg_match('/\b(?:delivery fee|delivery fees|shipping fee|shipping cost|delivery cost|delivery time|delivery estimate|estimated delivery|delivery eta)\b/u', $text) === 1) {
             return 'delivery_quote';
         }

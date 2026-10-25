@@ -32,6 +32,13 @@ class ResolveStoreContext
 
         $matchingBranches = $this->matchingBranches($branches, $message);
 
+        if ($matchingBranches->isEmpty()) {
+            $unpublished = Branch::query()->where('is_published', false)->get();
+            if ($this->matchingBranches($unpublished, $message)->isNotEmpty()) {
+                return ['branches' => []];
+            }
+        }
+
         return [
             'branches' => array_values(($matchingBranches->isNotEmpty() ? $matchingBranches : $branches)
                 ->sort(function (Branch $left, Branch $right): int {

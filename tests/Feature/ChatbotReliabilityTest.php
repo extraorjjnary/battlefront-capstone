@@ -51,7 +51,7 @@ test('provider outage asks for a branch instead of choosing one', function () {
     $this->postJson(route('chatbot.store'), ['message' => 'Where is your store?'])
         ->assertJsonPath('message', 'Which branch do you mean? Sagay City, Escalante City.');
 
-    ChatbotResponseAgent::assertPromptedTimes(1);
+    ChatbotResponseAgent::assertNeverPrompted();
 });
 
 test('competing FAQ matches clarify before provider generation', function () {
@@ -120,7 +120,7 @@ test('provider outage asks which product when several match', function () {
     $response = $this->postJson(route('chatbot.store'), ['message' => 'What is the price of Aurelius?']);
 
     expect($response->json('message'))->toStartWith('Which product do you mean?')->toContain('Aurelius Mouse', 'Aurelius Keyboard');
-    ChatbotResponseAgent::assertPromptedTimes(1);
+    ChatbotResponseAgent::assertNeverPrompted();
 });
 
 test('provider outage returns owned payment status without private order fields', function () {

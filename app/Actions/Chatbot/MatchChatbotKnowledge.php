@@ -4,6 +4,7 @@ namespace App\Actions\Chatbot;
 
 use App\Enums\ChatbotCategory;
 use App\Models\ChatbotKnowledge;
+use App\Services\Chatbot\ChatbotLanguage;
 use Illuminate\Support\Str;
 
 class MatchChatbotKnowledge
@@ -69,7 +70,7 @@ class MatchChatbotKnowledge
     /** @return list<string> */
     private function terms(string $message): array
     {
-        $message = $this->normalize($message);
+        $message = (new ChatbotLanguage)->normalized($message);
         $message = preg_replace('/\b(?:payment methods?|payment options?|ways to pay|how (?:can|do|should) i pay|how to pay|pay by card|card at store|cash payment|gcash|maya|pay cash|paymnt methods?)\b/u', 'payment method', $message);
         $message = preg_replace('/\b(?:accept|accepted|accepts|supported|support|offer|offered)\b/u', '', $message);
         $message = preg_replace('/\b(?:pick up|collection)\b/u', 'pickup', $message);

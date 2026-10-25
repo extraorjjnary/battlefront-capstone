@@ -3,10 +3,12 @@
 namespace App\Actions\Chatbot;
 
 use App\Enums\ChatbotQueryCategory;
-use Illuminate\Support\Str;
+use App\Services\Chatbot\ChatbotLanguage;
 
 class CategorizeChatbotQuery
 {
+    public function __construct(private ChatbotLanguage $language = new ChatbotLanguage) {}
+
     /** @var list<string> */
     private const OPEN_DOMAIN_PHRASES = [
         'who invented',
@@ -176,6 +178,9 @@ class CategorizeChatbotQuery
      */
     public function execute(string $message): ChatbotQueryCategory
     {
+        if ($this->language->blocked($message)) {
+            return ChatbotQueryCategory::Unsupported;
+        }
         $normalizedMessage = $this->normalize($message);
 
         if ($this->isBlocked($normalizedMessage)) {
@@ -188,6 +193,15 @@ class CategorizeChatbotQuery
 
         if (preg_match('/\b(?:my (?:payment|proof)|did (?:you receive|i pay)|have i paid)\b/u', $normalizedMessage) === 1) {
             return ChatbotQueryCategory::Order;
+        }
+
+        if (preg_match('/\bmy (?:refund|return|cancellation|parcel)\b/u', $normalizedMessage) === 1
+            || (preg_match('/\b(?:refund|return|cancellation) status\b/u', $normalizedMessage) === 1 && preg_match('/\bhow (?:do|can|to)\b/u', $normalizedMessage) !== 1)) {
+            return ChatbotQueryCategory::Order;
+        }
+
+        if (preg_match('/\b(?:delivery fee|shipping fee|shipping cost|delivery cost|delivery estimate|delivery time|cancel|cancellation|return|returns|refund|refunds)\b/u', $normalizedMessage) === 1) {
+            return ChatbotQueryCategory::Faq;
         }
 
         if (preg_match('/\b(?:how (?:do|can|should) i pay|how to pay|payment (?:methods?|options?)|ways to pay|what does .+ mean)\b/u', $normalizedMessage) === 1) {
@@ -214,9 +228,13 @@ class CategorizeChatbotQuery
 
     public function isBlocked(string $message): bool
     {
+        if ($this->language->blocked($message)) {
+            return true;
+        }
         $message = $this->normalize($message);
 
         return $message === ''
+            || $this->language->blocked($message)
             || $this->containsAny($message, self::OPEN_DOMAIN_PHRASES)
             || $this->containsAny($message, self::RECOMMENDATION_PHRASES);
     }
@@ -236,12 +254,7 @@ class CategorizeChatbotQuery
 
     private function normalize(string $message): string
     {
-        return Str::of($message)
-            ->trim()
-            ->lower()
-            ->replaceMatches('/[^\p{L}\p{N}\s]+/u', ' ')
-            ->squish()
-            ->toString();
+        return $this->language->normalized($message);
     }
 
     /**

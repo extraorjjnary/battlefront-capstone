@@ -2,6 +2,7 @@
 
 namespace App\Services\Chatbot;
 
+use App\Ai\Agents\ChatbotIntentAgent;
 use App\Ai\Agents\ChatbotResponseAgent;
 use GuzzleHttp\Exception\ConnectTimeoutException;
 use GuzzleHttp\Exception\NetworkException;
@@ -10,26 +11,71 @@ use GuzzleHttp\Exception\ResponseTimeoutException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 use JsonException;
 use Laravel\Ai\Exceptions\InsufficientCreditsException;
 use Laravel\Ai\Exceptions\ProviderConnectionException;
 use Laravel\Ai\Exceptions\ProviderOverloadedException;
 use Laravel\Ai\Exceptions\RateLimitedException;
+use Laravel\Ai\Responses\StructuredAgentResponse;
 use Throwable;
 
 class ChatbotAiAdapter
 {
+    /** @return array{outcome: string, category: string, intent: string, language: string}|null */
+    public function classify(string $message): ?array
+    {
+        $agent = new ChatbotIntentAgent;
+        $started = hrtime(true);
+        try {
+            $message = preg_replace('/\bbf[\s\W_]*\d+\b/iu', '[order reference]', $message) ?? $message;
+            $response = $agent->prompt($this->preparePrompt($message, ['allowed_intents' => ChatbotIntentAgent::INTENTS]));
+            if (! $response instanceof StructuredAgentResponse) {
+                $this->logAttempt($started, $agent->timeout(), 'invalid_classification');
+
+                return null;
+            }
+            $data = $response->structured;
+            $validator = Validator::make(['classification' => $data], [
+                'classification' => ['required', 'array:outcome,category,intent,language'],
+                'classification.outcome' => ['required', Rule::in(['supported', 'uncertain', 'unsupported'])],
+                'classification.category' => ['required', Rule::in(['product', 'store', 'order', 'faq', 'unsupported'])],
+                'classification.intent' => ['required', Rule::in([...array_keys(ChatbotIntentAgent::INTENTS), 'none'])],
+                'classification.language' => ['required', Rule::in([...ChatbotLanguage::LANGUAGES, 'und'])],
+            ]);
+            if ($validator->fails()
+                || ! is_string($data['outcome']) || ! is_string($data['category'])
+                || ! is_string($data['intent']) || ! is_string($data['language'])
+                || ($data['outcome'] === 'supported'
+                    ? (ChatbotIntentAgent::INTENTS[$data['intent']]['category'] ?? null) !== $data['category']
+                    : ($data['category'] !== 'unsupported' || $data['intent'] !== 'none'))) {
+                $this->logAttempt($started, $agent->timeout(), 'invalid_classification');
+
+                return null;
+            }
+            $this->logAttempt($started, $agent->timeout());
+
+            return ['outcome' => $data['outcome'], 'category' => $data['category'], 'intent' => $data['intent'], 'language' => $data['language']];
+        } catch (Throwable $exception) {
+            $details = $this->failureDetails($exception);
+            $this->logAttempt($started, $agent->timeout(), $details['failure'], $details['status'], $exception::class);
+
+            return null;
+        }
+    }
+
     /**
      * Generate chatbot wording from application-prepared input.
      *
      * @param  array<string|int, mixed>  $context
      * @return array{successful: true, text: string, failure: null}|array{successful: false, text: null, failure: string}
      */
-    public function generate(string $prompt, array $context): array
+    public function generate(string $prompt, array $context, string $language = 'en'): array
     {
         $preparedPrompt = $this->preparePrompt($prompt, $context);
-        $agent = new ChatbotResponseAgent;
+        $agent = new ChatbotResponseAgent($language);
         $started = hrtime(true);
 
         try {
