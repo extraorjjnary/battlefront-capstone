@@ -13,7 +13,9 @@ class UpdateInventoryRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()?->can('inventory.request') ?? false;
+        return $this->user()?->administrationRoleCode() === 'staff'
+            ? $this->user()->can('inventory.request')
+            : ($this->user()?->can('inventory.adjust') ?? false);
     }
 
     /**
@@ -23,10 +25,15 @@ class UpdateInventoryRequest extends FormRequest
      */
     public function rules(): array
     {
+        $direct = $this->user()->can('inventory.adjust');
+        $count = $this->routeIs('administration.inventory.count');
+
         return [
             'quantity' => ['bail', 'required', 'integer', 'min:0', 'max:4294967295'],
-            'reorder_level' => ['bail', 'required', 'integer', 'min:0', 'max:4294967295'],
-            'reason' => ['nullable', 'string', 'min:5', 'max:2000'],
+            'reorder_level' => ['bail', Rule::excludeIf($count), 'required', 'integer', 'min:0', 'max:4294967295'],
+            'observed_quantity' => [Rule::requiredIf($count || ($direct && $this->routeIs('administration.inventory.update'))), 'nullable', 'integer', 'min:0', 'max:4294967295'],
+            'stock_adjustment_confirmed' => [Rule::excludeIf(! $direct), 'required', 'accepted'],
+            'reason' => [Rule::requiredIf($direct && $this->input('reason_code') === 'theft_loss'), 'nullable', 'string', 'min:5', 'max:2000'],
             'reason_code' => ['required', Rule::in(['damage', 'theft_loss', 'found_stock', 'count_error', 'receiving_error', 'unit_of_measure_error', 'other'])],
         ];
     }

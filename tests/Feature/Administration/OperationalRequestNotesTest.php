@@ -13,7 +13,9 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 test('stock request entry points enforce reason direction and damage routing without side effects', function (string $kind, string $code, int $quantity, string $field, string $message) {
-    $actor = User::factory()->administrator()->create();
+    $actor = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $case = operationalNotesRequest($kind, $actor);
     $beforeRequests = DB::table('inventory_adjustment_requests')->count();
     $beforeAudit = DB::table('audit_logs')->count();
@@ -36,7 +38,9 @@ test('stock request entry points enforce reason direction and damage routing wit
 ]);
 
 test('stock requests accept blank notes and audit the selected reason', function (string $kind, string $code, string $label, array $notes) {
-    $actor = User::factory()->administrator()->create();
+    $actor = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $case = operationalNotesRequest($kind, $actor);
     $beforeStock = $case['product']->inventory?->getAttributes();
 
@@ -64,7 +68,9 @@ test('stock requests accept blank notes and audit the selected reason', function
 ]);
 
 test('opening stock cannot use loss or damage reasons', function (string $kind, string $code, string $field) {
-    $actor = User::factory()->administrator()->create();
+    $actor = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $case = operationalNotesRequest($kind, $actor);
     $beforeRequests = DB::table('inventory_adjustment_requests')->count();
 
@@ -79,7 +85,9 @@ test('opening stock cannot use loss or damage reasons', function (string $kind, 
 ]);
 
 test('shared stock request action rejects reason direction violations', function () {
-    $actor = User::factory()->administrator()->create();
+    $actor = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $product = Product::factory()->available()->create();
 
     expect(fn () => app(RequestInventoryAdjustment::class)->execute(
@@ -163,7 +171,9 @@ function operationalNotesRequest(string $kind, User $actor): array
 dataset('operational request kinds', ['stock', 'opening', 'count', 'replacement', 'opening replacement', 'damage', 'supplier', 'customer']);
 
 test('predefined request reasons accept absent or blank notes and retain meaningful audit explanations', function (string $kind, array $notes) {
-    $actor = User::factory()->administrator()->create();
+    $actor = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $case = operationalNotesRequest($kind, $actor);
 
     $this->actingAs($actor)->{$case['method']}($case['url'], [...$case['payload'], ...$notes])->assertSessionHasNoErrors();
@@ -197,6 +207,11 @@ test('authorized operational roles can submit predefined reasons alone and Other
     ]);
     $case = operationalNotesRequest($kind, $actor);
     $payload = $case['payload'];
+    $direct = $role !== 'staff' && in_array($kind, ['stock', 'opening', 'count'], true);
+    if ($direct) {
+        $payload['stock_adjustment_confirmed'] = true;
+        $payload['observed_quantity'] = $case['product']->inventory?->quantity ?? 0;
+    }
     if ($other) {
         $payload['reason_code'] = 'other';
         $payload['reason'] = 'Shelf checked by the requester';
@@ -207,6 +222,13 @@ test('authorized operational roles can submit predefined reasons alone and Other
     $explanation = $other
         ? ($kind === 'count' ? 'Physical sellable stock count: ' : '').'Shelf checked by the requester'
         : $case['explanation'];
+    if ($direct) {
+        $this->assertDatabaseCount('inventory_adjustment_requests', 0);
+        $this->assertDatabaseHas('audit_logs', ['action' => 'inventory.adjusted', 'reason' => $explanation]);
+        expect($case['product']->fresh()->inventory->quantity)->toBe(12);
+
+        return;
+    }
     $record = DB::table($case['table'])->orderByDesc('id')->first();
     expect($record->reason)->toBe($explanation);
     expect($record->reason_code)->toBe($payload['reason_code']);
@@ -214,7 +236,9 @@ test('authorized operational roles can submit predefined reasons alone and Other
 })->with('operational request kinds')->with(['staff', 'manager', 'owner'])->with([false, true]);
 
 test('supplied request notes retain the existing inclusive length limits', function (string $kind, int $length, bool $other) {
-    $actor = User::factory()->administrator()->create();
+    $actor = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $case = operationalNotesRequest($kind, $actor);
     $notes = str_repeat('x', $length);
     $payload = [...$case['payload'], 'reason' => $notes];
@@ -231,7 +255,9 @@ test('supplied request notes retain the existing inclusive length limits', funct
 })->with('operational request kinds')->with([5, 2000])->with([false, true]);
 
 test('invalid request reasons and notes cannot persist requests or stock changes', function (string $kind, array $override, string $field) {
-    $actor = User::factory()->administrator()->create();
+    $actor = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $case = operationalNotesRequest($kind, $actor);
     $beforeRequests = DB::table($case['table'])->count();
     $beforeAudit = DB::table('audit_logs')->count();

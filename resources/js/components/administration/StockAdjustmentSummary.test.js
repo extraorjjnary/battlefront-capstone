@@ -13,6 +13,18 @@ const Summary = compileSkeletonTestComponent(
     { vue: Vue },
 );
 
+test('direct stock summary labels the proposed quantity', async () => {
+    const html = await renderToString(
+        Vue.h(Summary, {
+            currentQuantity: 10,
+            requestedQuantity: 14,
+            quantityLabel: 'Proposed',
+        }),
+    );
+    assert.match(html, /Proposed<\/dt><dd>14 units/);
+    assert.ok(html.includes('Difference</dt><dd>+4 units</dd>'));
+});
+
 for (const [name, requested, expected] of [
     ['increase', 14, '+4 units'],
     ['decrease', 7, '−3 units'],

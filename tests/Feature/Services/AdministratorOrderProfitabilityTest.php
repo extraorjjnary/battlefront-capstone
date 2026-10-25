@@ -5,6 +5,17 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Services\AdministratorOrderProfitability;
 
+test('order profitability rejects nonnumeric refund totals', function (string $field) {
+    $order = Order::factory()->make(['status' => OrderStatus::Completed, 'product_subtotal' => '100.00']);
+    $order->setRelation('items', collect([
+        OrderItem::factory()->make(['quantity' => 1, 'price_at_time' => '100.00', 'acquisition_cost_at_time' => '30.00']),
+    ]));
+
+    expect(fn () => app(AdministratorOrderProfitability::class)->calculate($order, [
+        'has_sale' => true, 'sales_returns' => '0.00', 'cost_recovered' => '0.00', $field => 'invalid',
+    ]))->toThrow(InvalidArgumentException::class, 'Order profitability amounts must be numeric.');
+})->with(['sales_returns', 'cost_recovered']);
+
 test('order profitability preserves decimal arithmetic and saved subtotal precedence', function (?string $subtotal, string $expectedProfit) {
     $order = Order::factory()->make(['status' => OrderStatus::Completed, 'product_subtotal' => $subtotal]);
     $order->setRelation('items', collect([

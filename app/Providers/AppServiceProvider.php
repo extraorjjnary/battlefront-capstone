@@ -61,6 +61,10 @@ class AppServiceProvider extends ServiceProvider
             Gate::define($permission, fn (User $user): bool => $user->hasAdministrationPermission($permission));
         }
 
+        Gate::define('inventory.adjust', fn (User $user): bool => in_array($user->administrationRoleCode(), ['owner', 'manager'], true)
+            && $user->hasAdministrationPermission('inventory.request')
+            && $user->hasAdministrationPermission('inventory.approve'));
+
         Gate::define(
             'use-customer-cart',
             fn (User $user): bool => $user->is_active && $user->role === UserRole::Customer,
