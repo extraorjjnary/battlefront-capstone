@@ -1,6 +1,6 @@
 # LBC flow and Battlefront system mapping
 
-Status: preparation only. The LBC stages below are derived from public LBC service descriptions, not from an accessible merchant API contract. See [official source evidence](api-sources.md). No implementation interfaces or schemas are approved.
+Status: preparation only. The LBC stages below are derived from public LBC service descriptions, not an accessible merchant API contract. They do not define implementation interfaces or schemas. An approved internal simulation may use synthetic Battlefront-only behavior; it cannot claim provider compatibility. See [official source evidence](api-sources.md).
 
 ## LBC-led shipment flow to verify
 
@@ -42,4 +42,4 @@ This is a preparation sequence, not an API call order. Do not design a request/r
 
 ## Existing Battlefront boundaries
 
-Battlefront currently has one Shipment per Order, manual registration and progression, immutable quote/total snapshots, a configured delivery estimate system, COD and pickup payment exceptions, and PayMongo cancellation gates. These are system constraints; they do not prove the public LBC flow fits without changes. Any change to checkout, persisted package data, shipment cardinality, payment/settlement, inventory, sales, or cancellation requires separate design and approval. Follow the current cancellation cutoff before `handed_to_lbc`; an older `.ai/rules/models-js-pages-orders.md` statement conflicts and needs separate maintenance.
+Battlefront currently has one Shipment per Order, manual registration and progression, immutable quote/total snapshots, a configured delivery estimate system, COD and pickup payment exceptions, and approved PayMongo cancellation requirements; verify implementation before describing them as current behavior. These are system constraints; they do not prove the public LBC flow fits without changes. Any change to checkout, persisted package data, shipment cardinality, payment/settlement, inventory, sales, or cancellation requires separate design and approval. Follow the current cancellation cutoff before `handed_to_lbc`; an older `.ai/rules/models-js-pages-orders.md` statement conflicts and needs separate maintenance.

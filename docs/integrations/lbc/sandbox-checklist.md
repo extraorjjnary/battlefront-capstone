@@ -24,7 +24,7 @@ This checklist prepares future design and review. It does not authorize contacti
 ## Gate 3: map and review the integration design
 
 - Map each verified LBC stage to Battlefront order, shipment, payment, inventory, notification, and sales responsibilities. Treat booking, identifier issue, handoff, tracking, delivery, collection, and remittance as distinct events.
-- Preserve the immutable order/fee snapshots and the current PayMongo reconciliation/confirmed-flow-closure rules. LBC COD/COP settlement cannot be inferred from a delivery status or substituted for PayMongo payment evidence.
+- Preserve immutable order/fee snapshots and approved PayMongo reconciliation/confirmed-flow-closure requirements; verify implementation before describing them as current behavior. LBC COD/COP settlement cannot be inferred from a delivery status or substituted for PayMongo payment evidence.
 - Reuse existing authorization and locking only after confirming they fit the provider stages. Review one-shipment-per-order compatibility, multiple tracking identifiers, booking provenance, duplicate prevention, retries, cancellation races, and operator reconciliation.
 - Keep provider calls outside database transactions; define durable recovery for timeouts and partial outcomes from the verified LBC contract.
 - Approve interfaces, persistence and forward-only migration impact, UX/operator workflow, privacy/logging, rollout, and tests before implementation.

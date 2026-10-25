@@ -1,16 +1,16 @@
 # Local LBC flow simulation
 
-No LBC simulation is implemented. Any future mock should be a local/test-only test double for an explicitly approved LBC domain flow, based on the selected product's verified merchant contract. Do not invent a Battlefront booking sequence and call it LBC-compatible merely because the public consumer flow is visible.
+No LBC simulation is implemented. An explicitly approved internal Battlefront simulation may model synthetic local behavior without a merchant contract. Identify its inputs, outputs, identifiers, and state transitions as Battlefront test behavior; do not call it LBC-compatible or derive provider status semantics from public consumer pages. A provider-compatible simulation requires the selected product's verified merchant contract.
 
-The mock must make no outbound LBC or PayMongo calls, require no credentials, fail closed unless explicitly enabled in local/testing, and refuse mutation in production. Suggested variables such as `LBC_MODE` and `LBC_ENABLED` are examples only and have no effect today. Never make the mock real by changing a base URL.
+The mock must make no outbound LBC or PayMongo calls, require no credentials, fail closed unless explicitly enabled in local/testing, and refuse mutation in production. Suggested variables such as `LBC_MODE` and `LBC_ENABLED` are examples only and have no effect today. Never make the mock real by changing a base URL. A task testing order-cancellation payment coordination may use HTTP fakes for PayMongo reconciliation while preventing real requests; this does not change the carrier-only no-network requirement.
 
-Once the product/flow is approved, the simulation should model only the confirmed concepts needed by the project: serviceability/quote result, selected handoff mode, booking outcome, provider identifier types and issuance timing, physical handoff, tracking updates, and any approved collection/remittance events. Until verified, use deterministic synthetic values and label them as simulated; do not mimic real LBC tracking-number formats or claim that LBC accepted a shipment.
+Once internal behavior is approved, the simulation should model only concepts needed by that assignment. Use deterministic synthetic values; do not mimic real LBC tracking-number formats or claim LBC acceptance. Model provider identifiers, states, or collection/remittance only when verified for the selected product and included in approved scope.
 
 ## Implementation boundaries after separate approval
 
 - Reuse canonical address/order data only where the selected LBC contract requires it. Do not duplicate recipient PII or store raw payloads without approved retention/security design.
 - Keep Battlefront Order, Shipment, payment, inventory, sales, carrier booking, buyer collection, and seller remittance states separate.
-- Use documented LBC idempotency/lookup behavior for timeout recovery. If not available, design explicit operator reconciliation before any retry; do not invent safe retry semantics.
+- For provider-compatible behavior, use documented idempotency/lookup semantics for timeout recovery. If unavailable, require an approved reconciliation design before retry. Internal simulation retry behavior must be labeled as local behavior and cannot imply provider guarantees.
 - Keep provider calls outside database transactions. Use existing authorization and order/shipment locking only after the verified LBC flow has been mapped to those boundaries.
 - Simulate failures through server-side test configuration, never request-selected flags. Local simulation notifications must never reach real email or push destinations.
 - Preserve manual shipment registration and historical order/payment workflows unless a separate approved scope changes them.

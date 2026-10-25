@@ -565,6 +565,14 @@ defineOptions({
                                     >
                                         {{ selectedQuote.assumption_label }}
                                     </p>
+                                    <a
+                                        class="text-primary underline underline-offset-4"
+                                        href="https://ratecalcapi.lbcapps.com/Tools/PH_Rate_Calculator"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        Check this route with LBC’s official rate calculator
+                                    </a>
                                 </template>
                                 <template v-else>
                                     <p class="font-semibold">
@@ -625,6 +633,14 @@ defineOptions({
                                     >
                                         {{ selectedQuote.notice }}
                                     </p>
+                                    <a
+                                        class="text-primary underline underline-offset-4"
+                                        href="https://ratecalcapi.lbcapps.com/Tools/PH_Rate_Calculator"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        Check this route with LBC’s official rate calculator
+                                    </a>
                                     <p
                                         v-if="selectedQuote.is_demo"
                                         class="text-muted-foreground text-xs leading-5"
@@ -742,11 +758,13 @@ defineOptions({
                                 <template v-else>
                                     The total COD amount includes your products
                                     and the configured demo delivery fee.
-                                    Payment will be collected upon delivery; no
-                                    advance payment or payment proof is
-                                    required. Battlefront manually arranges
-                                    delivery. This selection does not book or
-                                    approve COD with LBC.
+                                    LBC collects the full amount at delivery.
+                                    Battlefront records payment after LBC
+                                    remits the full order amount. No advance
+                                    payment or payment proof is required.
+                                    Battlefront arranges delivery manually;
+                                    this checkout does not create an LBC
+                                    booking.
                                 </template>
                             </AlertDescription>
                         </Alert>

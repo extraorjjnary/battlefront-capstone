@@ -9,6 +9,10 @@ return [
 
     'operational_branch_city' => 'Sagay City',
 
+    'shipping' => [
+        'lbc_mock_enabled' => (bool) env('BATTLEFRONT_LBC_MOCK_ENABLED', false),
+    ],
+
     'timezone' => 'Asia/Manila',
 
     'returns' => [

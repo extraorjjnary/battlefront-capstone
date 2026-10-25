@@ -16,12 +16,15 @@ use App\Http\Controllers\Administration\InventoryAdjustmentController;
 use App\Http\Controllers\Administration\InventoryController;
 use App\Http\Controllers\Administration\NotificationController as AdministrationNotificationController;
 use App\Http\Controllers\Administration\OrderCodCollectionController;
+use App\Http\Controllers\Administration\OrderCodRemittanceController;
 use App\Http\Controllers\Administration\OrderController as AdministrationOrderController;
 use App\Http\Controllers\Administration\OrderHandlerController;
+use App\Http\Controllers\Administration\OrderLocalLbcBookingController;
 use App\Http\Controllers\Administration\OrderManualShipmentController;
 use App\Http\Controllers\Administration\OrderPaymentProofController;
 use App\Http\Controllers\Administration\OrderPaymentStatusController;
 use App\Http\Controllers\Administration\OrderPickupConfirmationController;
+use App\Http\Controllers\Administration\OrderShipmentOperationsController;
 use App\Http\Controllers\Administration\OrderShipmentReferenceController;
 use App\Http\Controllers\Administration\OrderShipmentStatusController;
 use App\Http\Controllers\Administration\OrderStatusController;
@@ -293,12 +296,18 @@ Route::middleware(['auth', 'can:access-administration'])
         Route::post('orders/{order}/shipment/manual', [OrderManualShipmentController::class, 'store'])
             ->middleware('can:orders.process')
             ->name('orders.shipment.manual.store');
+        Route::post('orders/{order}/shipment/local-lbc-booking', [OrderLocalLbcBookingController::class, 'store'])
+            ->middleware('can:orders.process')
+            ->name('orders.shipment.local-lbc-booking.store');
         Route::patch('orders/{order}/shipment/status', [OrderShipmentStatusController::class, 'update'])
             ->middleware('can:orders.process')
             ->name('orders.shipment.status.update');
         Route::patch('orders/{order}/shipment/reference', [OrderShipmentReferenceController::class, 'update'])
             ->middleware('can:orders.process')
             ->name('orders.shipment.reference.update');
+        Route::patch('orders/{order}/shipment/operations', [OrderShipmentOperationsController::class, 'update'])
+            ->middleware('can:orders.process')
+            ->name('orders.shipment.operations.update');
         Route::patch('orders/{order}/payment-status', [OrderPaymentStatusController::class, 'update'])
             ->middleware('can:orders.process')
             ->name('orders.payment-status.update');
@@ -306,6 +315,10 @@ Route::middleware(['auth', 'can:access-administration'])
             ->middleware('can:orders.process')
             ->whereNumber('order')
             ->name('orders.cod-collection.store');
+        Route::post('orders/{order}/cod-remittance', [OrderCodRemittanceController::class, 'store'])
+            ->middleware('can:orders.process')
+            ->whereNumber('order')
+            ->name('orders.cod-remittance.store');
         Route::post('orders/{order}/pickup-confirmation', [OrderPickupConfirmationController::class, 'store'])
             ->middleware('can:orders.process')
             ->whereNumber('order')

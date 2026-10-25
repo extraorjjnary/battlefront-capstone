@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
+use App\Enums\PaymentMethod;
 use App\Enums\ShipmentArrangement;
 use App\Enums\ShipmentStatus;
 use App\Models\Order;
@@ -15,7 +16,7 @@ class ShipmentPresenter
     public const NOTICE = 'Shipment status is manually maintained by Battlefront. This is not live LBC or GPS tracking.';
 
     /** @return array<string, mixed>|null */
-    public function detail(Order $order): ?array
+    public function detail(Order $order, bool $includeInternal = false): ?array
     {
         $shipment = $order->shipment;
         if ($order->fulfillment_method !== FulfillmentMethod::Delivery || $shipment === null) {
@@ -24,7 +25,7 @@ class ShipmentPresenter
 
         $status = $order->status === OrderStatus::Cancelled ? ShipmentStatus::Cancelled : $shipment->status;
 
-        return [
+        $detail = [
             'carrier' => $shipment->carrier,
             'arrangement' => [
                 'value' => $shipment->arrangement_type->value,
@@ -49,6 +50,45 @@ class ShipmentPresenter
                 ? 'This order was completed before the shipment workflow was introduced. Only recorded milestones are shown.'
                 : null,
         ];
+
+        if ($includeInternal) {
+            $detail['booking_simulation'] = $shipment->booking_source === 'battlefront_simulation'
+                ? [
+                    'reference' => $shipment->booking_reference,
+                    'label' => 'Battlefront local simulation only',
+                    'notice' => 'No LBC booking was submitted and this reference is not an LBC tracking number.',
+                ]
+                : null;
+            $detail['carrier_cod_settlement'] = $order->payment_method === PaymentMethod::Cod ? [
+                'collected_amount' => $shipment->carrier_cod_collected_amount,
+                'collection_reference' => $shipment->carrier_cod_collection_reference,
+                'collected_at' => $shipment->carrier_cod_collected_at?->toIso8601String(),
+                'remitted_amount' => $shipment->carrier_cod_remitted_amount,
+                'remittance_reference' => $shipment->carrier_cod_remittance_reference,
+                'remitted_at' => $shipment->carrier_cod_remitted_at?->toIso8601String(),
+            ] : null;
+            $detail['operations'] = [
+                'package_count' => $shipment->package_count,
+                'package_weight_kg' => $shipment->package_weight_kg,
+                'package_length_cm' => $shipment->package_length_cm,
+                'package_width_cm' => $shipment->package_width_cm,
+                'package_height_cm' => $shipment->package_height_cm,
+                'declared_value' => $shipment->declared_value,
+                'handoff_mode' => $shipment->handoff_mode,
+                'actual_carrier_cost' => $shipment->actual_carrier_cost,
+                'carrier_cost_reference' => $shipment->carrier_cost_reference,
+                'carrier_cost_recorded_at' => $shipment->carrier_cost_recorded_at?->toIso8601String(),
+                'delivery_fee_variance' => $shipment->actual_carrier_cost === null
+                    ? null
+                    : bcsub($order->delivery_fee, $shipment->actual_carrier_cost, 2),
+                'exception_code' => $shipment->shipment_exception_code,
+                'exception_note' => $shipment->shipment_exception_note,
+                'exception_reported_at' => $shipment->shipment_exception_reported_at?->toIso8601String(),
+                'exception_resolved_at' => $shipment->shipment_exception_resolved_at?->toIso8601String(),
+            ];
+        }
+
+        return $detail;
     }
 
     /** @return list<array{status: string, label: string, occurred_at: string}> */

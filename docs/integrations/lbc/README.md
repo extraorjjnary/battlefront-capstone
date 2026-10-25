@@ -1,6 +1,21 @@
 # LBC integration preparation
 
-This packet prepares future LBC integration design from LBC's published shipping and ecommerce flows. It does not implement an integration or authorize LBC contact, merchant registration, credentials, API calls, bookings, tunnels, or production changes. Public LBC pages describe customer/merchant service flows; they do not establish Battlefront's merchant API contract or entitlement. See the [official source audit](api-sources.md) and [capability matrix](capability-matrix.md), checked 2026-10-24.
+This packet prepares Battlefront's LBC work. Public LBC pages describe advertised service flows; they do not establish Battlefront's merchant API contract or entitlement. An explicitly approved internal Battlefront simulation may use synthetic local behavior without that contract, but cannot claim LBC compatibility. Provider-compatible simulations, sandbox operations, and production work each require verified evidence and their own authorization. See the [official source audit](api-sources.md) and [capability matrix](capability-matrix.md), checked 2026-10-24.
+
+## Start with the relevant guidance
+
+Read this README for every LBC task, then select references by task:
+
+| Task | Read |
+| --- | --- |
+| Official capability/API research | [API source audit](api-sources.md), [capability matrix](capability-matrix.md), [open decisions](open-questions.md) |
+| Domain mapping or system design | [scope](integration-scope.md), [architecture](architecture.md), [lifecycle](shipping-lifecycle.md), [payment coordination](payment-coordination.md), [open decisions](open-questions.md) |
+| Local simulation | [mock development](mock-development.md), [architecture](architecture.md), [lifecycle](shipping-lifecycle.md), [security](security.md), and relevant current `.ai/rules` |
+| Security review | [security](security.md), [mock development](mock-development.md), [payment coordination](payment-coordination.md), and relevant current `.ai/rules` |
+| Tests | [mock development](mock-development.md), [lifecycle](shipping-lifecycle.md), [security](security.md), and adjacent tests; read the [sandbox checklist](sandbox-checklist.md) only for authorized sandbox work |
+| Sandbox readiness or production proposal | [sandbox checklist](sandbox-checklist.md), [open decisions](open-questions.md), and selected product contract evidence |
+
+Read `docs/CAPSTONE_CONTEXT.md` for changes affecting approved project scope or architecture. Read PayMongo references only when the task touches gateway behavior. Current approved `.ai/rules` govern Battlefront behavior; this packet distinguishes requirements from verified implementation.
 
 ## Start from LBC's flow
 
@@ -19,6 +34,6 @@ The portal publicly advertises booking/tracking and has indexed API names/descri
 
 ## Existing system constraints to preserve during mapping
 
-Battlefront currently has one Shipment per order, manual shipment registration and progression, immutable delivery/order snapshots, COD and pickup payment exceptions, and PayMongo-specific reconciliation/cancellation gates. These are compatibility constraints to map against the verified LBC flow, not evidence that the integration should simply reuse every existing step unchanged. See [system mapping](architecture.md), [payment coordination](payment-coordination.md), and [open decisions](open-questions.md).
+Battlefront currently has one Shipment per order, manual shipment registration and progression, immutable delivery/order snapshots, COD and pickup payment exceptions, and approved PayMongo reconciliation/cancellation requirements; verify implementation before calling them current behavior. These are compatibility constraints to map against the verified LBC flow, not evidence that the integration should simply reuse every existing step unchanged. See [system mapping](architecture.md), [payment coordination](payment-coordination.md), and [open decisions](open-questions.md).
 
-Follow current approved project rules and PayMongo readiness decisions where they govern existing behavior. Current order cancellation stops before `handed_to_lbc`; `.ai/rules/models-js-pages-orders.md` has older after-handoff wording and needs separate rule maintenance. No checkout, payment, stock, or refund behavior changes are authorized by this preparation.
+Follow current approved project rules and PayMongo readiness decisions where they govern existing behavior. Current order cancellation stops before `handed_to_lbc`; historical after-handoff wording in `.ai/rules/models-js-pages-orders.md` is superseded by the current order cancellation rule. No checkout, payment, stock, or refund behavior changes are authorized by this preparation.

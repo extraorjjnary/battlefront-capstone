@@ -149,18 +149,26 @@ class Order extends Model
 
     public function paymentStatusLabel(): string
     {
-        return $this->payment_method === PaymentMethod::Cod
-            && $this->payment_status === PaymentStatus::Pending
-            && $this->status !== OrderStatus::Cancelled
-                ? 'COD — Awaiting Collection'
-                : $this->payment_status->label();
+        if ($this->payment_method !== PaymentMethod::Cod
+            || $this->payment_status !== PaymentStatus::Pending
+            || $this->status === OrderStatus::Cancelled) {
+            return $this->payment_status->label();
+        }
+
+        return $this->shipment?->carrier_cod_collected_at !== null
+            ? 'COD — Awaiting LBC Remittance'
+            : 'COD — Awaiting Collection';
     }
 
     public function customerStatusLabel(): string
     {
-        return $this->isDeliveredCodAwaitingCollection()
-            ? 'Delivered — awaiting COD confirmation'
-            : $this->status->customerLabel($this->fulfillment_method);
+        if (! $this->isDeliveredCodAwaitingCollection()) {
+            return $this->status->customerLabel($this->fulfillment_method);
+        }
+
+        return $this->shipment?->carrier_cod_collected_at !== null
+            ? 'Delivered — awaiting LBC remittance'
+            : 'Delivered — awaiting COD collection';
     }
 
     public function isDeliveredCodAwaitingCollection(): bool

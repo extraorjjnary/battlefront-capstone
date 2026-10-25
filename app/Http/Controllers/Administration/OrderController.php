@@ -202,7 +202,7 @@ class OrderController extends Controller
                 ],
                 'status' => $this->statusData($order->status),
                 'delivery_quote' => $quotes->stored($order),
-                'shipment' => $shipments->detail($order),
+                'shipment' => $shipments->detail($order, includeInternal: true),
                 'can_create_manual_shipment' => $canProcess && $processing->canCreateManualShipment($order),
                 'shipment_actions' => $order->shipment === null ? null : [
                     'next_status' => $nextShipmentStatus === null ? null : [
@@ -210,6 +210,7 @@ class OrderController extends Controller
                         'label' => $nextShipmentStatus->label(),
                     ],
                     'can_update_reference' => $canProcess && $processing->canUpdateShipmentReference($order),
+                    'can_simulate_local_lbc_booking' => $canProcess && $processing->canSimulateLocalLbcBooking($order),
                 ],
                 'allowed_status_transitions' => collect($canProcess ? $processing->allowedOrderTransitions($order) : [])
                     ->map(fn (OrderStatus $status): array => $this->statusData($status))
@@ -233,6 +234,7 @@ class OrderController extends Controller
                         'merchant_cutoff_at' => $payMongoFlow->merchant_cutoff_at->toIso8601String(),
                     ],
                     'can_confirm_cod_collection' => $canProcess && $processing->canConfirmCodCollection($order),
+                    'can_confirm_cod_remittance' => $canProcess && $processing->canConfirmCodRemittance($order),
                     'pay_at_pickup' => $order->payment_method->isPayAtPickup(),
                     'can_confirm_pickup' => $canProcess && $processing->canConfirmPickup($order),
                     'proof_submitted' => $order->payment_proof_path !== null,

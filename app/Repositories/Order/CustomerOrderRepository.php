@@ -22,7 +22,7 @@ class CustomerOrderRepository
                 'payment_method',
                 'created_at',
             ])
-            ->with('shipment:id,order_id,status')
+            ->with('shipment:id,order_id,status,carrier_cod_collected_at')
             ->withCount('items')
             ->withSum('items as total_quantity', 'quantity')
             ->orderByDesc('created_at')

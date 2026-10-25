@@ -9,6 +9,6 @@
 - Keep provider calls outside database transactions. Record enough typed provenance to prevent reference overwrites and support reconciliation, but avoid duplicate recipient addresses and unapproved raw payload retention.
 - Preserve saved order totals and delivery-fee snapshots. A later carrier quote or charge cannot silently reprice an order. LBC COD/COP requires a separate reviewed collection/remittance design; it is not equivalent to the current Battlefront COD/pickup workflow.
 - Preserve PayMongo authenticated event and cancellation rules. Carrier responses cannot establish PayMongo payment, close a Checkout Session/Payment Intent, restore stock, or represent a refund.
-- Follow the current Battlefront cancellation cutoff before `handed_to_lbc`; the conflicting stale after-handoff rule in `.ai/rules/models-js-pages-orders.md` is not authoritative.
-- Keep a future local simulation outbound-free, disabled by default, confined to local/testing, conspicuously synthetic, and unable to send real notifications. Production must refuse mock mutations.
+- Follow the current Battlefront cancellation cutoff before `handed_to_lbc`; the historical after-handoff wording in `.ai/rules/models-js-pages-orders.md` is superseded by the current order-processing rule.
+- Keep an approved internal simulation outbound-free, disabled by default, confined to local/testing, conspicuously synthetic, and unable to send real notifications. Production must refuse mock mutations. It need not have an LBC contract but cannot claim LBC compatibility.
 - For a future adapter, review authorization, webhook signature/raw-body verification, replay defense, privacy/retention, logging, retries, cancellation, reconciliation, and operator recovery against the actual official contract.

@@ -184,12 +184,14 @@ class CustomerOrderPresenter
             }
 
             if ($order->payment_status === PaymentStatus::Verified) {
-                return 'Battlefront has manually confirmed that LBC collected your COD payment.';
+                return 'Battlefront has manually reconciled the LBC COD remittance for your order.';
             }
 
-            return $order->shipment?->status === ShipmentStatus::Delivered
-                ? 'Delivery is recorded. Your order remains Processing until Battlefront manually confirms LBC collected the COD payment.'
-                : 'The total COD amount, including the configured delivery fee, is payable upon delivery. No advance payment or uploaded proof is required. LBC booking and collection are managed manually by Battlefront.';
+            return $order->shipment?->carrier_cod_collected_at !== null
+                ? 'LBC collection is recorded. Your order remains Processing until Battlefront reconciles the remittance.'
+                : ($order->shipment?->status === ShipmentStatus::Delivered
+                    ? 'Delivery is recorded. Your order remains Processing until Battlefront confirms LBC collected the COD payment.'
+                    : 'The total COD amount, including the configured delivery fee, is payable upon delivery. No advance payment or uploaded proof is required. LBC booking and collection are managed manually by Battlefront.');
         }
 
         if ($order->payment_method->isPayAtPickup()) {
