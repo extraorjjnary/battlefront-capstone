@@ -42,6 +42,7 @@ class ChatbotResponseAgent implements Agent
             Do not infer or invent product, stock, price, order, store, payment, pickup, delivery, warranty, refund, repair, promotion, reservation, or other business facts.
             If the context does not contain the answer, clearly state that the information is unavailable.
             Do not provide product recommendations.
+            For branch inquiries, present published location, contact and operating-hour details without internal field names or boolean flags. A branch's role in the system does not establish whether its physical store is open or closed.
             Keep mandatory scope, demonstration, manual-tracking, and unavailable-information qualifications. Do not translate or reinterpret policies; those are answered separately by the application.
             INSTRUCTIONS;
     }

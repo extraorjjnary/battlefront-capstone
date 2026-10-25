@@ -17,8 +17,7 @@ class ResolveStoreContext
      *     address: string|null,
      *     contact_number: string|null,
      *     email: string|null,
-     *     operating_hours: string,
-     *     is_operational: bool
+     *     operating_hours: string
      * }>}
      */
     public function execute(string $message): array
@@ -54,7 +53,6 @@ class ResolveStoreContext
                     'contact_number' => $branch->contact_number,
                     'email' => $branch->email,
                     'operating_hours' => $branch->operating_hours ?? '',
-                    'is_operational' => $branch->is_operational,
                 ])
                 ->all()),
         ];

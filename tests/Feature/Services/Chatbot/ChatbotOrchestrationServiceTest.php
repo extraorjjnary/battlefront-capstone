@@ -191,14 +191,33 @@ test('sends only approved reference facts for the requested store', function () 
             'contact_number' => '0938 647 6046',
             'email' => 'approved-store@example.test',
             'operating_hours' => '08:00-18:00',
-            'is_operational' => true,
         ]],
     ];
     ChatbotResponseAgent::assertPrompted(function (AgentPrompt $prompt) use ($expectedContext): bool {
         return str_contains($prompt->prompt, json_encode($expectedContext, JSON_THROW_ON_ERROR))
+            && ! str_contains($prompt->prompt, 'is_operational')
             && ! str_contains($prompt->prompt, '10.123456')
             && ! str_contains($prompt->prompt, 'Unrelated private branch detail.');
     });
+    Http::assertNothingSent();
+});
+
+test('localized San Carlos location replies use published details without internal branch flags', function () {
+    Http::preventStrayRequests();
+    Branch::factory()->create([
+        'city' => 'San Carlos City',
+        'address' => 'Carmona St., Brgy. V, San Carlos City',
+        'operating_hours' => '8:00 AM-6:00 PM',
+    ]);
+    $wording = 'Ang Battlefront sa San Carlos naa sa Carmona St., Brgy. V, San Carlos City.';
+    ChatbotResponseAgent::fake([$wording])->preventStrayPrompts();
+
+    $result = app(ChatbotOrchestrationService::class)->respond('asa inyong tindahan sa san carlos branch?');
+
+    expect($result['message'])->toBe($wording);
+    ChatbotResponseAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, 'Carmona St., Brgy. V, San Carlos City')
+        && str_contains($prompt->prompt, '8:00 AM-6:00 PM')
+        && ! str_contains($prompt->prompt, 'is_operational'));
     Http::assertNothingSent();
 });
 
