@@ -35,6 +35,7 @@ use App\Http\Controllers\Administration\SupplierController;
 use App\Http\Controllers\Administration\SupplierReturnController;
 use App\Http\Controllers\Administration\TeamController;
 use App\Http\Controllers\Administration\WorkQueueController;
+use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CartController;
 use App\Http\Controllers\CartItemController;
@@ -60,6 +61,14 @@ use Illuminate\Support\Facades\Route;
 
 // guest landing page
 Route::get('/', [HomeController::class, 'index'])->name('home');
+
+Route::middleware('guest')->group(function (): void {
+    Route::get('email/verify', [EmailVerificationController::class, 'show'])->name('verification.notice');
+    Route::post('email/verify', [EmailVerificationController::class, 'store'])
+        ->middleware('throttle:30,1')->name('verification.verify');
+    Route::post('email/resend', [EmailVerificationController::class, 'resend'])
+        ->middleware('throttle:30,1')->name('verification.send');
+});
 
 // public/customer branches
 Route::get('branches', [BranchController::class, 'index'])->name('branches.index');

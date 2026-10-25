@@ -104,33 +104,39 @@ test('profile rejects invalid email replacements', function (mixed $email) {
     'invalid address' => 'invalid',
 ]);
 
-test('unverified profile updates preserve a null verification timestamp', function () {
+test('unverified sessions cannot update profiles or mark their email verified', function () {
     $user = User::factory()->customer()->unverified()->create();
+    $name = $user->name;
+    $email = $user->email;
 
     $this->actingAs($user)->patch(route('profile.update'), [
         'name' => 'Updated name',
         'email_verified_at' => '2026-01-01 00:00:00',
-    ])->assertSessionHasNoErrors();
+    ])->assertRedirectToRoute('login');
 
-    expect($user->refresh()->name)->toBe('Updated name')
+    $this->assertGuest();
+    expect($user->refresh()->name)->toBe($name)
+        ->and($user->email)->toBe($email)
         ->and($user->email_verified_at)->toBeNull();
 });
 
-test('the shared profile action never writes email or its verification timestamp', function () {
-    $user = User::factory()->customer()->create();
+test('the shared profile action never writes email or its verification timestamp', function (bool $verified) {
+    $user = User::factory()->customer()->create([
+        'email_verified_at' => $verified ? now() : null,
+    ]);
     $email = $user->email;
     $verifiedAt = $user->getRawOriginal('email_verified_at');
 
     app(UpdateProfile::class)($user, [
         'name' => 'Updated name',
         'email' => 'replacement@example.test',
-        'email_verified_at' => null,
+        'email_verified_at' => $verified ? null : now(),
     ]);
 
     expect($user->refresh()->name)->toBe('Updated name')
         ->and($user->email)->toBe($email)
         ->and($user->getRawOriginal('email_verified_at'))->toBe($verifiedAt);
-});
+})->with(['verified' => true, 'unverified' => false]);
 
 test('customer profile saves and clears a normalized default mobile number independently of its address', function () {
     $user = User::factory()->customer()->create([

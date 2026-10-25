@@ -20,6 +20,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Sanctum\PersonalAccessToken;
+use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -40,6 +42,12 @@ class AppServiceProvider extends ServiceProvider
 
         $this->configureDefaults();
         $this->monitorRecommendationQueryTime();
+
+        Sanctum::authenticateAccessTokensUsing(
+            fn (PersonalAccessToken $token, bool $isValid): bool => $isValid
+                && $token->tokenable instanceof User
+                && $token->tokenable->hasVerifiedEmail(),
+        );
 
         Gate::define(
             'access-administration',

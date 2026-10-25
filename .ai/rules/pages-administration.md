@@ -16,3 +16,7 @@ The existing admin@example.com account is IT, not the business owner. The fixed 
 ## Current administrator sign-in gate
 
 Supersedes the earlier requirement in this file that IT or other administrators must change passwords and enroll in 2FA before access. Two-factor authentication is disabled for now, and signed-in active accounts with an assigned administration role can immediately use only the permissions granted to that role.
+
+## Require verified ownership before administrator login
+
+Mandatory email OTP verification supersedes earlier statements that any active assigned administrator may sign in immediately. Team provisioning and role permissions remain unchanged; new real administrators verify through the same credential-confirmed OTP flow before their first login. Preserve already verified administrators and trusted development seeder pre-verification, account conflicts, passwords and idempotency; never enable local/example-address bypasses or mass verification.

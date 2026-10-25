@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\CartItemController;
 use App\Http\Controllers\Api\V1\ChatbotController;
 use App\Http\Controllers\Api\V1\CheckoutController;
 use App\Http\Controllers\Api\V1\CustomerReturnRequestController;
+use App\Http\Controllers\Api\V1\EmailVerificationController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\OrderCancellationController;
 use App\Http\Controllers\Api\V1\OrderCancellationRequestController;
@@ -35,9 +36,13 @@ Route::prefix('v1')
 
         // authentication
         Route::post('auth/register', [AuthController::class, 'register'])
-            ->middleware('throttle:5,1')->name('auth.register');
+            ->middleware('throttle:registration')->name('auth.register');
         Route::post('auth/login', [AuthController::class, 'login'])
             ->middleware('throttle:login')->name('auth.login');
+        Route::post('auth/email/verify', [EmailVerificationController::class, 'verify'])
+            ->middleware('throttle:30,1')->name('auth.email.verify');
+        Route::post('auth/email/resend', [EmailVerificationController::class, 'resend'])
+            ->middleware('throttle:30,1')->name('auth.email.resend');
 
         // products
         Route::get('products', [ProductController::class, 'index'])->name('products.index');

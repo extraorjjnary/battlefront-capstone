@@ -65,13 +65,16 @@ Catalog validates `page` as an integer >=1; order history uses Laravel's paginat
 
 ### Rate limits
 
-| Scope            | Limit                                                                 |
-| ---------------- | --------------------------------------------------------------------- |
-| API v1           | 60 requests/minute/IP across the version group                        |
-| Registration     | Additional 5/minute/IP                                                |
-| Login            | Additional 5/minute/lowercased email + IP, shared named login limiter |
-| Chatbot guest    | Additional 5/minute/IP, shared with web guests                        |
-| Chatbot customer | Additional 10/minute/customer, shared across tokens/devices and web   |
+| Scope             | Limit                                                                            |
+| ----------------- | -------------------------------------------------------------------------------- |
+| API v1            | 60 requests/minute/IP across the version group                                   |
+| Registration      | Additional 5/minute/IP shared with web signup; isolated from storefront activity |
+| Login             | Additional 5/minute/lowercased email + IP, shared named login limiter            |
+| OTP issuance      | 5/hour/account and 20/hour/IP across web/mobile; 60-second resend cooldown       |
+| OTP verification  | 10/minute/account and 30/minute/IP; 5 attempts per issued code                   |
+| OTP API endpoints | Additional 30/minute/IP for verification and resend                              |
+| Chatbot guest     | Additional 5/minute/IP, shared with web guests                                   |
+| Chatbot customer  | Additional 10/minute/customer, shared across tokens/devices and web              |
 
 The chatbot-specific 429 message is `Too many questions. Please wait a minute and try again.` The general API limit can be reached first. Respect `Retry-After`. Limits count requests, not only failed attempts. Users behind one LAN can share the IP allowance.
 
@@ -79,55 +82,57 @@ The chatbot-specific 429 message is `Too many questions. Please wait a minute an
 
 Bearer header: `Authorization: Bearer <token>`. No session login, CSRF-cookie request, or Fortify flow is needed for the mobile API. Fortify remains the web authentication flow.
 
-Registration/login create a new Sanctum personal access token with a **30-day per-token expiration**. The response includes `expires_at`; store the raw token securely on the device. Tokens are only returned at creation/login. There is no refresh endpoint or token listing endpoint. Login again after expiry. Multiple devices can have separate tokens; logout deletes only the token presented for that request.
+Only login by an active, email-verified customer creates a Sanctum personal access token with a **30-day per-token expiration**. Registration and valid credentials for an unverified customer return a restricted email-verification context, never an authenticated session or token. OTP verification also issues no token; log in afterward. The verified login response includes `expires_at`; store the raw token securely on the device. There is no refresh endpoint or token listing endpoint. Login again after expiry. Multiple devices can have separate tokens; logout deletes only the token presented for that request.
 
 ### Complete endpoint inventory
 
 All paths below are relative to `base_url`. GET routes also support HEAD through Laravel.
 
-| Method | Path                                                     | Access         | Success |
-| ------ | -------------------------------------------------------- | -------------- | ------- |
-| GET    | /health                                                  | Public         | 200     |
-| POST   | /auth/register                                           | Public         | 201     |
-| POST   | /auth/login                                              | Public         | 200     |
-| POST   | /auth/logout                                             | Customer       | 204     |
-| GET    | /profile                                                 | Customer       | 200     |
-| PATCH  | /profile                                                 | Customer       | 200     |
-| GET    | /products                                                | Public         | 200     |
-| GET    | /products/filters                                        | Public         | 200     |
-| GET    | /products/{product}                                      | Public         | 200     |
-| GET    | /branches                                                | Public         | 200     |
-| GET    | /cart                                                    | Customer       | 200     |
-| POST   | /cart/items                                              | Customer       | 200     |
-| PATCH  | /cart/items/{cartItem}                                   | Customer       | 200     |
-| DELETE | /cart/items/{cartItem}                                   | Customer       | 200     |
-| GET    | /checkout                                                | Customer       | 200     |
-| GET    | /delivery-locations                                      | Customer       | 200     |
-| GET    | /checkout/delivery-quote                                 | Customer       | 200     |
-| POST   | /orders                                                  | Customer       | 201     |
-| GET    | /orders                                                  | Customer       | 200     |
-| GET    | /orders/{order}                                          | Customer       | 200     |
-| GET    | /orders/{order}/return-requests                          | Customer       | 200     |
-| POST   | /orders/{order}/return-requests                          | Customer       | 201     |
-| GET    | /orders/{order}/return-requests/{returnRequest}          | Customer       | 200     |
-| POST   | /orders/{order}/return-requests/{returnRequest}/withdraw | Customer       | 200     |
-| POST   | /orders/{order}/payment-proof                            | Customer       | 200     |
-| GET    | /notifications                                           | Customer       | 200     |
-| GET    | /notifications/unread-count                              | Customer       | 200     |
-| PATCH  | /notifications/{notification}/read                       | Customer       | 200     |
-| PATCH  | /notifications/read-all                                  | Customer       | 200     |
-| PUT    | /push-devices/{device}                                   | Customer       | 200     |
-| DELETE | /push-devices/{device}                                   | Customer       | 204     |
-| POST   | /chatbot                                                 | Guest/customer | 200     |
-| GET    | /recommendations                                         | Guest/customer | 200     |
-| GET    | /recommendations/personalized                            | Customer       | 200     |
-| POST   | /recommendations/interactions                            | Guest/customer | 204     |
+| Method | Path                                                     | Access          | Success |
+| ------ | -------------------------------------------------------- | --------------- | ------- |
+| GET    | /health                                                  | Public          | 200     |
+| POST   | /auth/register                                           | Public          | 201     |
+| POST   | /auth/login                                              | Public          | 200     |
+| POST   | /auth/email/verify                                       | Pending context | 200     |
+| POST   | /auth/email/resend                                       | Pending context | 200     |
+| POST   | /auth/logout                                             | Customer        | 204     |
+| GET    | /profile                                                 | Customer        | 200     |
+| PATCH  | /profile                                                 | Customer        | 200     |
+| GET    | /products                                                | Public          | 200     |
+| GET    | /products/filters                                        | Public          | 200     |
+| GET    | /products/{product}                                      | Public          | 200     |
+| GET    | /branches                                                | Public          | 200     |
+| GET    | /cart                                                    | Customer        | 200     |
+| POST   | /cart/items                                              | Customer        | 200     |
+| PATCH  | /cart/items/{cartItem}                                   | Customer        | 200     |
+| DELETE | /cart/items/{cartItem}                                   | Customer        | 200     |
+| GET    | /checkout                                                | Customer        | 200     |
+| GET    | /delivery-locations                                      | Customer        | 200     |
+| GET    | /checkout/delivery-quote                                 | Customer        | 200     |
+| POST   | /orders                                                  | Customer        | 201     |
+| GET    | /orders                                                  | Customer        | 200     |
+| GET    | /orders/{order}                                          | Customer        | 200     |
+| GET    | /orders/{order}/return-requests                          | Customer        | 200     |
+| POST   | /orders/{order}/return-requests                          | Customer        | 201     |
+| GET    | /orders/{order}/return-requests/{returnRequest}          | Customer        | 200     |
+| POST   | /orders/{order}/return-requests/{returnRequest}/withdraw | Customer        | 200     |
+| POST   | /orders/{order}/payment-proof                            | Customer        | 200     |
+| GET    | /notifications                                           | Customer        | 200     |
+| GET    | /notifications/unread-count                              | Customer        | 200     |
+| PATCH  | /notifications/{notification}/read                       | Customer        | 200     |
+| PATCH  | /notifications/read-all                                  | Customer        | 200     |
+| PUT    | /push-devices/{device}                                   | Customer        | 200     |
+| DELETE | /push-devices/{device}                                   | Customer        | 204     |
+| POST   | /chatbot                                                 | Guest/customer  | 200     |
+| GET    | /recommendations                                         | Guest/customer  | 200     |
+| GET    | /recommendations/personalized                            | Customer        | 200     |
+| POST   | /recommendations/interactions                            | Guest/customer  | 204     |
 
 Public health/catalog/branches do not authenticate supplied credentials. Registration/login authenticate their submitted fields, not a bearer header.
 
 For **chatbot and the public recommendation feed/interaction routes**: omit Authorization entirely for guests; valid customer tokens are accepted; valid administrator tokens get 403; invalid/expired/revoked/malformed supplied Authorization gets 401. An empty bearer header is not a guest request. Web sessions do not authenticate these API requests.
 
-Customer-only routes require Sanctum plus the customer role gate: missing/invalid/expired/revoked token gets 401; administrator token gets 403. Foreign cart/order IDs are concealed with 404. Chatbot order ownership failures instead use the safe conversational fallback described below. Validation may run before resource lookup, so use otherwise valid input when testing ownership.
+Customer-only routes require Sanctum, verified email ownership, and the customer role gate: missing/invalid/expired/revoked tokens and tokens belonging to unverified accounts get 401; a verified administrator token gets 403. Unverified tokens are also refused by optional-auth chatbot/recommendation routes and never enable authenticated catalog personalization. Foreign cart/order IDs are concealed with 404. Chatbot order ownership failures instead use the safe conversational fallback described below. Validation may run before resource lookup, so use otherwise valid input when testing ownership.
 
 ## 3. Registration, login, profile
 
@@ -147,11 +152,54 @@ The password default outside production is minimum 8 characters. Production conf
 
 The shared request also validates optional `default_delivery_address` (nullable string, max 255), **but registration does not persist it**. Send it in the profile update instead. Submitted role/ownership fields do not create administrators.
 
+Registration returns **201** with `message` and `data.status = verification_required`. It creates an unverified customer and sends a six-digit OTP through the existing configured Laravel mailer. No token or user resource is returned:
+
+```json
+{
+    "message": "Verify your email address before signing in.",
+    "data": {
+        "status": "verification_required",
+        "verification_token": "<restricted-context-issued-at-runtime>",
+        "masked_email": "m***@example.test",
+        "verification_expires_at": "<ISO timestamp>",
+        "expires_at": "<OTP expiry ISO timestamp or null>",
+        "resend_available_at": "<ISO timestamp or null>",
+        "attempts_remaining": 5,
+        "delivery_status": "sent",
+        "retry_after": 60
+    }
+}
+```
+
+Keep `verification_token` only in temporary verification-screen memory. This random 256-bit token expires after thirty minutes and authorizes OTP verification/resend for its bound account/email; it cannot authenticate other API operations. Never put it in a URL, log it, or treat it as a Sanctum bearer token. The OTP is never returned by the application. Delivery failures leave the account unverified and report `delivery_status = failed`; registration still returns 201 because the account exists. Rate-limited issuance reports `rate_limited` and `retry_after`. Returning to login and supplying valid credentials safely establishes a new verification context for an existing unverified customer, invalidating any older context without resetting OTP attempts.
+
+### POST /auth/email/verify and POST /auth/email/resend
+
+Both endpoints are unauthenticated and require the restricted `verification_token`; do not send a bearer header. Verification additionally requires `code` as a **six-character numeric string**, preserving leading zeroes such as `"001234"`. A correct, current code returns `200` with `{"message":"Email verified. You can now sign in.","data":{"status":"verified"}}`. Clear the verification context/code and return to login; verification grants no session or token.
+
+Codes expire after **five minutes** and permit **five attempts per issued code**. Verification is one-time; consumed, expired, incorrect, or unknown contexts return Laravel `422` field errors under `errors.code` without revealing account existence. A resend invalidates the previous code, resets its attempt allowance, and starts a new expiry. It returns `200` with `message` and updated verification metadata. Delivery failure returns `503` and `delivery_status = failed`; the account remains unverified. Display the server's message and preserve the safe context for retry.
+
+The resend cooldown is **sixty seconds**, including when delivery fails. Show a countdown from `resend_available_at`; the server enforces it. Additional account/email and IP limits apply to issuance and verification across web and mobile. Verification and resend also have a 30-request/minute/IP endpoint limit, in addition to the common API limit. Throttling returns `429` with `Retry-After`; wait before retrying. Repeated login or switching channels does not reset an issued code's failed attempts. Remaining-attempt metadata is guidance; the server always decides eligibility.
+
+### Manual Gmail delivery test — separate authorization required
+
+Automated verification uses fake/mocked Laravel mail only. Actual Gmail delivery has not been verified by those tests. Preserve the existing Gmail SMTP/App Password configuration; do not copy secrets into source code, Postman, screenshots, or logs. OTP delivery uses the configured SMTP mailer synchronously, with a ten-second SMTP timeout; no queue worker or email-link callback is needed. Non-SMTP mailers are rejected for OTP delivery outside automated tests to prevent plaintext codes reaching a log transport. Gmail transport/account rejection may require checking the existing settings privately; never replace credentials automatically.
+
+After the developer separately authorizes a real inbox test:
+
+1. Apply the additive OTP migration to the intended database without resetting it, and build/start the normal application. Confirm the existing configured mailer is SMTP privately; do not print environment/configuration secrets.
+2. Open Battlefront's existing registration page, register a unique address controlled by the authorized tester, and confirm the Verify Email page appears while authenticated features remain inaccessible.
+3. Check that inbox and spam folder. Read the six-digit code from the Battlefront email and enter it within five minutes, keeping any leading zeroes. For a new web customer in the original registration session, confirm verification automatically signs in and opens the dashboard or pending cart/intended page. Existing-account recovery and administrator verification still return to login. Mobile verification remains separate from login as described in the next step.
+4. For mobile/Postman, use the authorized email with `/auth/register`; confirm `201` and no bearer token. Set the locally scoped secret `verification_code` from the inbox, run Verify Email OTP, then run Login customer to receive the normal token. Never export the populated environment or code.
+5. On a separate unverified test account, confirm an immediate resend is limited, wait sixty seconds, resend, and check that only the replacement code works. Confirm an expired/used code is rejected. Clear local OTP/context values after testing and record results without codes, tokens, credentials, or personal inbox content.
+
+Trusted development seeders alone pre-verify the existing five demo identities and the thirty demonstration customers. Existing verified users need no OTP. Newly provisioned real administrators and existing unverified accounts verify after valid web credentials; verification never changes their roles, account status, ownership, or stored business records. Password reset does not verify email ownership.
+
 ### POST /auth/login
 
-Required: `email` (valid email string), `password` (string), `device_name` (string, max 255). No password_confirmation. Invalid credentials and administrator credentials both return the same 401 and issue no token.
+Required: `email` (valid email string), `password` (string), `device_name` (string, max 255). No password_confirmation. Invalid credentials, inactive accounts, and administrator credentials all return the same 401 and issue no token. Valid credentials for an active unverified customer return 403 with the pending verification response below. Already verified customers receive the existing token response.
 
-Both authentication success responses use:
+Verified login uses:
 
 ```json
 {
@@ -199,7 +247,7 @@ GET returns:
 
 PATCH requires `name` (string, max 255). Account email addresses are read-only: omit `email`, or send the exact current email for compatibility with existing clients. Any different value, including a case-only change, blank, null, or a non-string value, returns 422 with `errors.email`: `Your account email address cannot be changed.` A rejected request saves no profile changes. Existing request trimming still applies. `default_delivery_contact_number` is optional and nullable: omit to preserve, send null/blank to clear. Accept Philippine mobile numbers in `09XXXXXXXXX` or `+639XXXXXXXXX` form, with optional spaces/hyphens; responses and saved values use `+639XXXXXXXXX`. The number prefills checkout, where customers may override it per order. Legacy mobile `default_delivery_address` remains nullable/max 255: omit to preserve, send null/blank to clear. Existing v1 structured clients may send `default_delivery_destination`, `default_delivery_barangay_code`, and `default_delivery_address_details`. Nationwide clients also send `default_delivery_region_code`, nullable `default_delivery_province_code`, and `default_delivery_city_code`; the destination may be omitted and resolved from the city code. Complete parent membership is validated locally. Optional `default_delivery_address_action` explicitly selects `keep`, `save`, or `clear`; structured keys without an action imply `save`. Keep leaves the saved address untouched, save stores validated components plus a server-formatted string, and clear clears both. Structured saves ignore a supplied assembled address. Profile responses include `default_delivery_address_prefill` for structured form hydration. Checkout's `delivery_address_prefill` uses saved components directly. Legacy free-text updates clear stale components and populate new ones only when matching is unambiguous. No existing text is guessed or silently discarded by migration.
 
-New customers have `search_recommendations_enabled` and `product_view_recommendations_enabled` enabled by default, so no profile setup is needed. PATCH can independently disable either preference; turning one off pauses its recording/ranking and retains unexpired history. The global `personalized_recommendations_enabled` switch pauses all personal ranking and new search/view recording; all three preferences default to true. Re-enabling uses retained unexpired history. Retained activity expires after 90 days. Ordinary profile updates never change the email or its verification timestamp; verification is currently optional/disabled. Email remains present in GET and successful PATCH responses. Registration still requires a valid, unique email.
+New customers have `search_recommendations_enabled` and `product_view_recommendations_enabled` enabled by default, so no profile setup is needed. PATCH can independently disable either preference; turning one off pauses its recording/ranking and retains unexpired history. The global `personalized_recommendations_enabled` switch pauses all personal ranking and new search/view recording; all three preferences default to true. Re-enabling uses retained unexpired history. Retained activity expires after 90 days. Ordinary profile updates never change the email or its verification timestamp. Email verification is mandatory before authenticated access, and a submitted `email_verified_at` cannot bypass it. Email remains present in GET and successful PATCH responses. Registration still requires a valid, unique email.
 
 ```json
 {
@@ -974,7 +1022,9 @@ The collection uses the [Postman v2.1 JSON format](https://schema.postman.com/) 
 | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | base_url                                                  | Reachable API root, ending /api/v1; blank in export                                                                                                  |
 | email, password, name, device_name                        | Your disposable local customer; credentials blank in export                                                                                          |
-| token                                                     | Automatically captured after successful register/login; protected requests inherit it                                                                |
+| token                                                     | Automatically captured only after verified login; protected requests inherit it                                                                      |
+| verification_token                                        | Automatically captured after registration or an unverified valid login; restricted, temporary, never a bearer token                                  |
+| verification_code                                         | Manually entered from an authorized test inbox, kept local and cleared after verification; never export populated values                             |
 | product_id, category_id, tag_id, brand                    | Select actual values from catalog/detail/filter responses                                                                                            |
 | category_id_2                                             | Another real active category ID for the optional category_ids[1] query entry; leave singular category_id disabled when enabling category_ids entries |
 | min_price, max_price, sort                                | Optional catalog bounds and featured/price_asc/price_desc ordering; bounds start blank and query entries are disabled                                |
@@ -994,7 +1044,7 @@ The collection uses the [Postman v2.1 JSON format](https://schema.postman.com/) 
 
 No file path is committed. Select a file in each multipart request after import. IDs start blank so the collection cannot silently assume database IDs. Raw JSON scripts serialize environment values to preserve quotes/backslashes in names/passwords; edit the script template if changing the represented body. Requests never log tokens.
 
-Successful login/registration replace `token`, clear conversation state and clear selected cart/order IDs. Logout captures the old token in `revoked_token` for the negative check, then clears `token` and both context values. Remove `revoked_token` after checking. Guest requests have explicit No Auth, even when a customer token is populated.
+Verified login replaces `token`, clears verification/conversation state and clears selected cart/order IDs. Registration or an unverified valid login clears the bearer token and captures only `verification_token`; enter the inbox code locally, verify, and log in afterward. Logout captures the old token in `revoked_token` for the negative check, then clears `token` and both context values. Remove `revoked_token` after checking. Guest and OTP requests have explicit No Auth, even when a customer token is populated.
 
 ### Required manual sequence
 
@@ -1002,7 +1052,7 @@ Use a disposable development database/account with an active product, live Sagay
 
 1. **Connectivity/public reads:** Health (200), product filters/list/detail and branches (200). Enable catalog filters individually, then combine search/brand/tag with multiple categories and price bounds. Disable singular `category_id` when using `category_ids` entries. Check discount-aware price sorting in both directions and follow `links.next` to confirm filters persist. Try conflicting category inputs, invalid category IDs, reversed bounds, and an invalid sort (422); restore valid params afterward. Check nullable fields and compare the existing web catalog behavior separately.
 2. **Access:** Profile without token (401). Guest behavioral feed (200); authenticated personalized feed without a token (401). Guest chatbot public question/follow-up (200). Guest order question returns sign-in fallback. Pace calls under guest limits.
-3. **Authentication/profile:** Register a unique customer (201) OR log in (200); confirm token capture. Read/update profile (200), verify only approved fields. Invalid login gives 401; duplicate/invalid registration gives 422.
+3. **Authentication/profile:** With separate authorization for real email delivery, register a unique customer (201), confirm no bearer token, manually enter the inbox code in `verification_code`, verify (200), and log in (200) to capture a token. Alternatively, log in with a trusted already verified demo account without sending email. Valid credentials for an existing unverified account return 403 plus verification context; invalid credentials return 401. Verify resend cooldown (429), replacement code, invalid/expired code (422), and one-time verification. Read/update profile (200), verify only approved fields. Duplicate/invalid registration gives 422. Never run this SMTP sequence automatically or against an actual inbox without authorization.
 4. **Cart:** Add stock-eligible product (200), verify captured cart_item_id; update quantity and totals; remove (200). Add again before checkout. Try quantity zero, quantity above stock, and an unavailable product (422); failed operations must not corrupt the cart.
 5. **Checkout/orders:** Select one, multiple, or all owned cart-item IDs and include them in both preview and placement. Preview checkout (200), verify the 12 legacy quotes, then request a live estimate for a Negros Occidental code such as City of Bago (`1804502000`) and validate its barangays. Check standard/fragile/bulky and mixed carts, subtotal/fee/final total, demo/proxy wording and provisional calendar windows. Verify an unconfigured destination quote has `pricing_configured=false`, `order_placement_allowed=true`, GCash/Maya/COD eligibility, no carrier/ETA, and permits product-subtotal-only placement without an automatic Shipment. Submit cash/card pickup (201, zero fee/no Shipment); omit address and destination. Refill before each wallet placement, select an image, and include a configured or valid unconfigured destination code plus detailed address for delivery. Try missing/unsupported/wrong-case/array destinations, pickup destination/address, and forged quote fields. Verify recalculated configured fees/relative ETA, unconfigured no-fee snapshots, pending order/payment, selected-item removal, unselected-item retention and selected inventory deduction through existing web administration. Confirm no selection, duplicates, foreign/missing/removed IDs and stale selected stock fail without changes. Leave bulky/fragile products unselected and verify their handling/ETA do not affect the order.
 6. **Replacement proof:** Reject the test wallet payment through existing web administration. Set rejected_order_id, select a replacement image, submit (200). Verify pending payment, cleared rejection, unchanged order status/stock. Retry while payment is pending (422). Test unsupported file type and >5 MB (422 when Laravel handles it).

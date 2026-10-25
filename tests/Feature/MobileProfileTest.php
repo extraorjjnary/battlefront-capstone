@@ -141,7 +141,7 @@ test('profile update returns 422 for a duplicate email and leaves the profile un
     expect($user->fresh()->getAttributes())->toBe($original);
 });
 
-test('mobile name updates allow omitted email and preserve verification status', function (bool $verified) {
+test('mobile name updates preserve verification status and require a verified account', function (bool $verified) {
     $user = User::factory()->customer()->create([
         'email_verified_at' => $verified ? '2026-01-01 00:00:00' : null,
         'default_delivery_address' => 'Saved address',
@@ -152,7 +152,16 @@ test('mobile name updates allow omitted email and preserve verification status',
     $this->withToken($token)->patchJson('/api/v1/profile', [
         'name' => 'Updated Customer',
         'email_verified_at' => '2026-02-01 00:00:00',
-    ])->assertOk()
+    ])->assertStatus($verified ? 200 : 401);
+
+    if (! $verified) {
+        expect($user->refresh()->name)->not->toBe('Updated Customer')
+            ->and($user->email_verified_at)->toBeNull();
+
+        return;
+    }
+
+    $this->getJson('/api/v1/profile')->assertOk()
         ->assertJsonPath('data.name', 'Updated Customer')
         ->assertJsonPath('data.email', $user->email)
         ->assertJsonPath('data.default_delivery_address', 'Saved address');

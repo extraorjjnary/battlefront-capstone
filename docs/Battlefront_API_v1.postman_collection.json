@@ -181,7 +181,7 @@
         },
         {
             "name": "Authentication",
-            "description": "Set local test credentials. Register OR log in; sign out last. No CSRF cookie is required.",
+            "description": "Register, manually enter an authorized inbox OTP, verify, then log in. Existing verified demo accounts may log in directly. Real email testing requires separate authorization; never run an inbox test automatically. No CSRF cookie is required.",
             "item": [
                 {
                     "name": "Register customer",
@@ -202,7 +202,7 @@
                             "host": ["{{base_url}}"],
                             "path": ["auth", "register"]
                         },
-                        "description": "201: customer + 30-day token. Unique email required. 422 invalid fields; 429 after five attempts/IP/minute. Registration does not persist default_delivery_address.",
+                        "description": "201: unverified customer plus restricted verification context; no user resource or bearer token. Delivery failure is data.delivery_status=failed; account remains unverified. Unique email required. 422 invalid fields; 429 after five attempts/IP/minute. Registration does not persist default_delivery_address.",
                         "auth": {
                             "type": "noauth"
                         },
@@ -239,11 +239,13 @@
                                 "type": "text/javascript",
                                 "exec": [
                                     "pm.test(\"Status 201\", () => pm.response.to.have.status(201));",
-                                    "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
                                     "if (pm.response.code === 201) {",
                                     "  const body = pm.response.json();",
-                                    "  pm.test(\"Response contract\", () => pm.expect(body).to.have.property(\"data\"));",
-                                    "  pm.test(\"Bearer token\", () => { pm.expect(body.data.token).to.be.a(\"string\").and.not.empty; pm.expect(body.data.token_type).to.equal(\"Bearer\"); });\n  if (typeof body.data.token === \"string\" && body.data.token.length) {\n    pm.environment.set(\"token\", body.data.token);\n    pm.environment.set(\"context_token\", \"\");\n    pm.environment.set(\"guest_context_token\", \"\");\n    pm.environment.set(\"cart_item_id\", \"\");\n    pm.environment.set(\"order_id\", \"\");\n  }",
+                                    "  pm.test(\"Pending verification without authentication\", () => { pm.expect(body.data.status).to.equal(\"verification_required\"); pm.expect(body.data).not.to.have.property(\"token\"); pm.expect(body.data).not.to.have.property(\"user\"); });",
+                                    "  pm.environment.set(\"token\", \"\");",
+                                    "  pm.environment.set(\"verification_token\", body.data.verification_token || \"\");",
+                                    "  pm.environment.set(\"verification_code\", \"\");",
+                                    "  for (const key of [\"context_token\", \"guest_context_token\", \"cart_item_id\", \"order_id\"]) pm.environment.set(key, \"\");",
                                     "}"
                                 ]
                             }
@@ -269,7 +271,7 @@
                                     "host": ["{{base_url}}"],
                                     "path": ["auth", "register"]
                                 },
-                                "description": "201: customer + 30-day token. Unique email required. 422 invalid fields; 429 after five attempts/IP/minute. Registration does not persist default_delivery_address.",
+                                "description": "201: unverified customer plus restricted verification context; no user resource or bearer token. Delivery failure is data.delivery_status=failed; account remains unverified. Unique email required. 422 invalid fields; 429 after five attempts/IP/minute. Registration does not persist default_delivery_address.",
                                 "auth": {
                                     "type": "noauth"
                                 },
@@ -291,9 +293,133 @@
                                     "value": "application/json"
                                 }
                             ],
-                            "body": "{\n  \"data\": {\n    \"user\": {\n      \"id\": 1,\n      \"name\": \"Example Customer\",\n      \"email\": \"customer@example.test\",\n      \"default_delivery_address\": null,\n      \"search_recommendations_enabled\": true,\n      \"product_view_recommendations_enabled\": true,\n      \"personalized_recommendations_enabled\": true\n    },\n    \"token\": \"<issued-only-at-runtime>\",\n    \"token_type\": \"Bearer\",\n    \"expires_at\": \"2026-10-31T08:00:00+00:00\"\n  }\n}"
+                            "body": "{\n  \"message\": \"Verify your email address before signing in.\",\n  \"data\": {\n    \"status\": \"verification_required\",\n    \"verification_token\": \"<restricted-context-issued-at-runtime>\",\n    \"masked_email\": \"c***@example.test\",\n    \"verification_expires_at\": \"2026-10-31T08:30:00+00:00\",\n    \"expires_at\": \"2026-10-31T08:05:00+00:00\",\n    \"resend_available_at\": \"2026-10-31T08:01:00+00:00\",\n    \"attempts_remaining\": 5,\n    \"delivery_status\": \"sent\",\n    \"retry_after\": 60\n  }\n}"
                         }
                     ]
+                },
+                {
+                    "name": "Verify Email OTP",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/email/verify",
+                            "host": ["{{base_url}}"],
+                            "path": ["auth", "email", "verify"]
+                        },
+                        "description": "Requires a pending context and six-character string entered manually from an authorized inbox.200 marks email verified but issues no token; log in afterward. 422 invalid/expired/used code or context, 429 limits. Code expires in 5 minutes with 5 attempts. Never export populated OTP/context values.",
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"verification_token\": \"{{verification_token}}\",\n  \"code\": \"{{verification_code}}\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const template = {\"verification_token\":\"{{verification_token}}\",\"code\":\"{{verification_code}}\"};",
+                                    "for (const [key, value] of Object.entries(template)) template[key] = value.replace(/\\{\\{([^{}]+)\\}\\}/g, (_, name) => String(pm.environment.get(name) ?? \"\"));",
+                                    "pm.request.body.update(JSON.stringify(template));"
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
+                                    "if (pm.response.code === 200) {",
+                                    "  const body = pm.response.json();",
+                                    "  pm.test(\"Verified without authentication\", () => { pm.expect(body.data.status).to.equal(\"verified\"); pm.expect(body.data).not.to.have.property(\"token\"); });",
+                                    "  pm.environment.set(\"verification_token\", \"\");",
+                                    "  pm.environment.set(\"token\", \"\");",
+                                    "}",
+                                    "pm.environment.set(\"verification_code\", \"\");"
+                                ]
+                            }
+                        }
+                    ],
+                    "response": []
+                },
+                {
+                    "name": "Resend Email OTP",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/email/resend",
+                            "host": ["{{base_url}}"],
+                            "path": ["auth", "email", "resend"]
+                        },
+                        "description": "Manual authorized inbox test only. Wait 60 seconds between sends. 200 replaces the old code; 429 includes Retry-After; 503 means delivery failed and account remains unverified. Shared account/IP limits prevent repeated email generation. Enter the replacement inbox code manually.",
+                        "auth": {
+                            "type": "noauth"
+                        },
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"verification_token\": \"{{verification_token}}\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const template = {\"verification_token\":\"{{verification_token}}\"};",
+                                    "for (const [key, value] of Object.entries(template)) template[key] = value.replace(/\\{\\{([^{}]+)\\}\\}/g, (_, name) => String(pm.environment.get(name) ?? \"\"));",
+                                    "pm.request.body.update(JSON.stringify(template));"
+                                ]
+                            }
+                        },
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "pm.test(\"Sent, cooldown, or delivery unavailable\", () => pm.expect([200, 429, 503]).to.include(pm.response.code));",
+                                    "if (pm.response.code === 200) { const body = pm.response.json(); pm.test(\"Replacement sent without authentication\", () => { pm.expect(body.data.delivery_status).to.equal(\"sent\"); pm.expect(body.data).not.to.have.property(\"token\"); }); }",
+                                    "if (pm.response.code === 429) pm.test(\"Retry-After present\", () => pm.expect(pm.response.headers.get(\"Retry-After\")).to.exist);",
+                                    "pm.environment.set(\"verification_code\", \"\");"
+                                ]
+                            }
+                        }
+                    ],
+                    "response": []
                 },
                 {
                     "name": "Login customer",
@@ -314,7 +440,7 @@
                             "host": ["{{base_url}}"],
                             "path": ["auth", "login"]
                         },
-                        "description": "200: new 30-day token. Invalid credentials and administrator login both return 401. Five attempts/email+IP/minute.",
+                        "description": "200: verified active customer receives unchanged 30-day bearer token. Valid unverified customer credentials return 403 plus restricted verification context, never a token. Invalid credentials, inactive accounts and administrators return identical 401. Five attempts/email+IP/minute.",
                         "auth": {
                             "type": "noauth"
                         },
@@ -350,12 +476,19 @@
                             "script": {
                                 "type": "text/javascript",
                                 "exec": [
-                                    "pm.test(\"Status 200\", () => pm.response.to.have.status(200));",
-                                    "pm.test(\"JSON response\", () => pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"));",
+                                    "pm.test(\"Login or verification required\", () => pm.expect([200, 403]).to.include(pm.response.code));",
                                     "if (pm.response.code === 200) {",
                                     "  const body = pm.response.json();",
-                                    "  pm.test(\"Response contract\", () => pm.expect(body).to.have.property(\"data\"));",
-                                    "  pm.test(\"Bearer token\", () => { pm.expect(body.data.token).to.be.a(\"string\").and.not.empty; pm.expect(body.data.token_type).to.equal(\"Bearer\"); });\n  if (typeof body.data.token === \"string\" && body.data.token.length) {\n    pm.environment.set(\"token\", body.data.token);\n    pm.environment.set(\"context_token\", \"\");\n    pm.environment.set(\"guest_context_token\", \"\");\n    pm.environment.set(\"cart_item_id\", \"\");\n    pm.environment.set(\"order_id\", \"\");\n  }",
+                                    "  pm.test(\"Bearer token\", () => { pm.expect(body.data.token).to.be.a(\"string\").and.not.empty; pm.expect(body.data.token_type).to.equal(\"Bearer\"); });",
+                                    "  pm.environment.set(\"token\", body.data.token);",
+                                    "  for (const key of [\"verification_token\", \"verification_code\", \"context_token\", \"guest_context_token\", \"cart_item_id\", \"order_id\"]) pm.environment.set(key, \"\");",
+                                    "} else if (pm.response.code === 403) {",
+                                    "  const body = pm.response.json();",
+                                    "  pm.test(\"Verification context only\", () => { pm.expect(body.data.status).to.equal(\"verification_required\"); pm.expect(body.data).not.to.have.property(\"token\"); });",
+                                    "  pm.environment.set(\"token\", \"\");",
+                                    "  pm.environment.set(\"verification_token\", body.data.verification_token || \"\");",
+                                    "  pm.environment.set(\"verification_code\", \"\");",
+                                    "  for (const key of [\"context_token\", \"guest_context_token\", \"cart_item_id\", \"order_id\"]) pm.environment.set(key, \"\");",
                                     "}"
                                 ]
                             }

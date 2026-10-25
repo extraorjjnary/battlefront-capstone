@@ -12,6 +12,195 @@ const executable = process.env.BATTLEFRONT_UI_BROWSER;
 const widths = [320, 375, 390, 428, 768, 1024, 1440];
 
 test(
+    'email OTP verification preserves leading zeros, cooldown, and recovery feedback',
+    { skip: !baseUrl || !executable, timeout: 60000 },
+    async (t) => {
+        const browser = await openBrowser(t);
+        const verification = {
+            status: 'verification_required',
+            masked_email: 'c***@example.test',
+            verification_expires_at: new Date(
+                Date.now() + 1800000,
+            ).toISOString(),
+            expires_at: new Date(Date.now() + 300000).toISOString(),
+            resend_available_at: new Date(Date.now() - 1000).toISOString(),
+            attempts_remaining: 5,
+            delivery_status: 'sent',
+            retry_after: 0,
+        };
+        const props = { verification, status: '' };
+        const codeInput = `document.querySelector('#code')`;
+        const verifyButton = `document.querySelectorAll('form')[0].querySelector('button[type=submit]')`;
+        const resendButton = `document.querySelectorAll('form')[1].querySelector('button[type=submit]')`;
+        async function waitFor(expression, message) {
+            for (let attempt = 0; attempt < 100; attempt++) {
+                if (await browser.evaluate(expression)) return;
+                await delay(25);
+            }
+            assert.fail(message + '; ' + browser.exceptions.join('; '));
+        }
+
+        for (const theme of ['light', 'dark']) {
+            await browser.show('auth/VerifyEmail', props, false, theme);
+            for (const width of [320, 1440]) {
+                await browser.resize(width);
+                assert.deepEqual(
+                    await browser.evaluate(`(() => {
+                        const controls = [...document.querySelectorAll('#app input, #app button, #app label, #app p, #app h1, #app a')];
+                        return controls.filter((element) => {
+                            const rect = element.getBoundingClientRect();
+                            return rect.width && rect.height && (rect.left < -1 || rect.right > innerWidth + 1);
+                        }).map((element) => element.id || element.textContent.trim());
+                    })()`),
+                    [],
+                    `Verification content fits ${theme} at ${width}px`,
+                );
+            }
+            assert.equal(
+                await browser.evaluate(
+                    `document.documentElement.classList.contains('dark')`,
+                ),
+                theme === 'dark',
+            );
+        }
+        assert.deepEqual(
+            await browser.evaluate(
+                `({ type: ${codeInput}.type, inputmode: ${codeInput}.inputMode, autocomplete: ${codeInput}.autocomplete, maxlength: ${codeInput}.maxLength })`,
+            ),
+            {
+                type: 'text',
+                inputmode: 'numeric',
+                autocomplete: 'one-time-code',
+                maxlength: 6,
+            },
+        );
+        assert.equal(
+            await browser.evaluate(
+                `document.querySelector('a[href="/login"]').textContent.trim()`,
+            ),
+            'Return to login',
+        );
+
+        const invalid = 'The code is invalid. Check your email and try again.';
+        browser.registerForm('/email/verify', {
+            ...props,
+            verification: { ...verification, attempts_remaining: 4 },
+            errors: { code: invalid },
+        });
+        await browser.evaluate(`(() => {
+            const input = ${codeInput};
+            input.value = '001234';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.form.requestSubmit();
+        })()`);
+        await waitFor(
+            `document.querySelector('#code-error').textContent.includes(${JSON.stringify(invalid)}) && ${codeInput}.getAttribute('aria-invalid') === 'true'`,
+            'Invalid codes show inline feedback',
+        );
+        assert.equal(
+            JSON.parse(browser.formRequests[0].postData).code,
+            '001234',
+        );
+        assert.equal(await browser.evaluate(`${codeInput}.value`), '001234');
+        assert.ok(
+            await browser.evaluate(
+                `document.querySelector('#code-guidance').textContent.includes('4 attempts remaining')`,
+            ),
+        );
+
+        await browser.show(
+            'auth/VerifyEmail',
+            {
+                ...props,
+                verification: {
+                    ...verification,
+                    resend_available_at: new Date(
+                        Date.now() + 1000,
+                    ).toISOString(),
+                },
+            },
+            false,
+            'light',
+        );
+        assert.equal(await browser.evaluate(`${resendButton}.disabled`), true);
+        assert.match(
+            await browser.evaluate(`${resendButton}.textContent.trim()`),
+            /^Resend code in \d+s$/,
+        );
+        await waitFor(
+            `${resendButton}.disabled === false`,
+            'The resend button enables after the visible cooldown',
+        );
+        browser.registerForm('/email/resend', {
+            ...props,
+            status: 'A new verification code has been sent. Check your inbox.',
+            verification: {
+                ...verification,
+                resend_available_at: new Date(Date.now() + 60000).toISOString(),
+            },
+        });
+        await browser.evaluate(
+            `document.querySelectorAll('form')[1].requestSubmit()`,
+        );
+        await waitFor(
+            `!!document.querySelector('[role=status]') && ${resendButton}.disabled`,
+            'Resending confirms delivery and restarts cooldown',
+        );
+        assert.equal(
+            new URL(browser.formRequests[1].url).pathname,
+            '/email/resend',
+        );
+
+        for (const [changes, guidance, resendDisabled = false] of [
+            [
+                { expires_at: new Date(Date.now() - 1000).toISOString() },
+                'This code has expired.',
+            ],
+            [{ attempts_remaining: 0 }, 'You have used all five attempts.'],
+            [
+                { delivery_status: 'failed', expires_at: null },
+                'Email delivery was unsuccessful.',
+            ],
+            [
+                {
+                    delivery_status: 'rate_limited',
+                    expires_at: null,
+                    resend_available_at: new Date(
+                        Date.now() + 60000,
+                    ).toISOString(),
+                },
+                'Code requests are temporarily limited.',
+                true,
+            ],
+        ]) {
+            await browser.show(
+                'auth/VerifyEmail',
+                {
+                    ...props,
+                    verification: { ...verification, ...changes },
+                },
+                false,
+                'light',
+            );
+            assert.ok(
+                await browser.evaluate(
+                    `document.querySelector('[role=alert], [role=status]').textContent.includes(${JSON.stringify(guidance)})`,
+                ),
+            );
+            assert.equal(
+                await browser.evaluate(`${verifyButton}.disabled`),
+                true,
+            );
+            assert.equal(
+                await browser.evaluate(`${resendButton}.disabled`),
+                resendDisabled,
+            );
+        }
+        assert.deepEqual(browser.exceptions, []);
+    },
+);
+
+test(
     'branch management forms and directories fit both themes and keep publication explicit',
     {
         skip: !baseUrl || !executable,

@@ -1,8 +1,10 @@
 <?php
 
+use App\Mail\VerifyEmailOtp;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\Cart\CartService;
+use Illuminate\Support\Facades\Mail;
 
 dataset('unavailable pending cart products', [
     'inactive product' => [fn (Product $product) => $product->update(['is_active' => false]), 'product_id', 'This product is no longer available.'],
@@ -123,7 +125,8 @@ test('customer login adds the pending quantity to the existing cart and redirect
     expect($item->refresh()->quantity)->toBe(5);
 });
 
-test('registration from the login screen adds the pending selection to the new customer cart', function () {
+test('registration preserves a pending selection until verification signs the new customer in', function () {
+    Mail::fake();
     $product = Product::factory()->available()->create();
     $this->post(route('cart.intent.store'), ['product_id' => $product->id, 'quantity' => 4]);
     $this->get(route('login'))->assertOk();
@@ -134,7 +137,13 @@ test('registration from the login screen adds the pending selection to the new c
         'email' => 'pending-cart@example.com',
         'password' => 'password',
         'password_confirmation' => 'password',
-    ])->assertRedirectToRoute('cart.index')
+    ])->assertRedirectToRoute('verification.notice')
+        ->assertSessionHas('pending_cart_intent.quantity', 4);
+
+    $this->assertGuest();
+    $this->assertDatabaseCount('carts', 0);
+    $this->post(route('verification.verify'), ['code' => Mail::sent(VerifyEmailOtp::class)->sole()->code])
+        ->assertRedirectToRoute('cart.index')
         ->assertInertiaFlash('toast', ['type' => 'success', 'message' => 'Product added to cart.'])
         ->assertSessionMissing('pending_cart_intent');
 
@@ -143,6 +152,7 @@ test('registration from the login screen adds the pending selection to the new c
     $this->assertDatabaseHas('carts', ['user_id' => $customer->id]);
     $this->assertDatabaseHas('cart_items', ['cart_id' => $customer->cart->id, 'product_id' => $product->id, 'quantity' => 4]);
     expect($product->inventory->quantity)->toBe(10);
+    Mail::assertSentCount(1);
 });
 
 test('failed authentication retains the intent for a successful retry', function (string $routeName, string $errorField) {
@@ -165,6 +175,7 @@ test('failed authentication retains the intent for a successful retry', function
 ]);
 
 test('expired intent is discarded and preserves normal authentication redirects', function (string $routeName) {
+    Mail::fake();
     $this->freezeTime();
     $customer = User::factory()->customer()->make();
     if ($routeName === 'login.store') {
@@ -174,16 +185,22 @@ test('expired intent is discarded and preserves normal authentication redirects'
     $this->post(route('cart.intent.store'), ['product_id' => $product->id, 'quantity' => 2]);
     $this->travel(15)->minutes();
 
-    $this->withSession(['url.intended' => route('products.index')])->post(route($routeName), [
+    $response = $this->withSession(['url.intended' => route('products.index')])->post(route($routeName), [
         'name' => $customer->name,
         'email' => $customer->email,
         'password' => 'password',
         'password_confirmation' => 'password',
-    ])->assertRedirectToRoute('products.index')
+    ]);
+    if ($routeName === 'register.store') {
+        $response->assertRedirectToRoute('verification.notice');
+        $response = $this->post(route('verification.verify'), ['code' => Mail::sent(VerifyEmailOtp::class)->sole()->code]);
+    }
+    $response->assertRedirectToRoute('products.index')
         ->assertSessionMissing('pending_cart_intent')
         ->assertInertiaFlashMissing('toast');
 
     $this->assertDatabaseCount('carts', 0);
+    Mail::assertSentCount($routeName === 'register.store' ? 1 : 0);
 })->with(['login.store', 'register.store']);
 
 test('malformed session intents are discarded without interrupting customer login', function (array $invalidFields) {
@@ -217,16 +234,21 @@ test('normal JSON login responses are unchanged without a cart intent', function
     $this->assertDatabaseCount('carts', 0);
 });
 
-test('normal JSON registration responses are unchanged without a cart intent', function () {
+test('JSON registration returns verification status without authentication or a cart', function () {
+    Mail::fake();
     $this->postJson(route('register.store'), [
         'name' => 'New Customer',
         'email' => 'normal-json@example.com',
         'password' => 'password',
         'password_confirmation' => 'password',
-    ])->assertCreated()->assertContent('""');
+    ])->assertCreated()->assertJsonPath('data.status', 'verification_required')
+        ->assertJsonMissingPath('data.registration')
+        ->assertJsonMissingPath('data.password_fingerprint')
+        ->assertJsonMissingPath('email_verification');
 
-    $this->assertAuthenticated();
+    $this->assertGuest();
     $this->assertDatabaseCount('carts', 0);
+    Mail::assertSentCount(1);
 });
 
 test('administrator login discards the pending selection without using a customer cart', function () {
@@ -261,6 +283,7 @@ test('login gracefully consumes products that became unavailable during authenti
 })->with('unavailable pending cart products');
 
 test('deleted pending products do not interrupt successful registration', function () {
+    Mail::fake();
     $product = Product::factory()->available()->create();
     $this->post(route('cart.intent.store'), ['product_id' => $product->id, 'quantity' => 2]);
     $product->inventory()->delete();
@@ -271,12 +294,15 @@ test('deleted pending products do not interrupt successful registration', functi
         'email' => 'deleted-product@example.com',
         'password' => 'password',
         'password_confirmation' => 'password',
-    ])->assertRedirectToRoute('cart.index')
+    ])->assertRedirectToRoute('verification.notice');
+    $this->post(route('verification.verify'), ['code' => Mail::sent(VerifyEmailOtp::class)->sole()->code])
+        ->assertRedirectToRoute('cart.index')
         ->assertInertiaFlash('toast', ['type' => 'error', 'message' => 'This product is no longer available.'])
         ->assertSessionMissing('pending_cart_intent');
 
     $this->assertAuthenticated();
     $this->assertDatabaseCount('carts', 0);
+    Mail::assertSentCount(1);
 });
 
 test('pending quantity cannot push an existing cart line beyond current stock', function () {
@@ -314,17 +340,24 @@ test('a consumed intent cannot add again from a stale authentication session sna
 });
 
 test('normal authentication retains intended redirects without an intent', function (string $routeName) {
+    Mail::fake();
     $customer = User::factory()->customer()->make();
     if ($routeName === 'login.store') {
         $customer->save();
     }
 
-    $this->withSession(['url.intended' => route('products.index')])->post(route($routeName), [
+    $response = $this->withSession(['url.intended' => route('products.index')])->post(route($routeName), [
         'name' => $customer->name,
         'email' => $customer->email,
         'password' => 'password',
         'password_confirmation' => 'password',
-    ])->assertRedirectToRoute('products.index')->assertInertiaFlashMissing('toast');
+    ]);
+    if ($routeName === 'register.store') {
+        $response->assertRedirectToRoute('verification.notice');
+        $response = $this->post(route('verification.verify'), ['code' => Mail::sent(VerifyEmailOtp::class)->sole()->code]);
+    }
+    $response->assertRedirectToRoute('products.index')->assertInertiaFlashMissing('toast');
 
     $this->assertDatabaseCount('carts', 0);
+    Mail::assertSentCount($routeName === 'register.store' ? 1 : 0);
 })->with(['login.store', 'register.store']);

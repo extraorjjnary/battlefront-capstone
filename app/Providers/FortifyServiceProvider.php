@@ -3,8 +3,11 @@
 namespace App\Providers;
 
 use App\Actions\Cart\ResumePendingCartIntent;
+use App\Actions\Fortify\AttemptVerifiedAuthentication;
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Responses\PendingEmailVerificationResponse;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Foundation\Application;
@@ -15,12 +18,13 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
+use Laravel\Fortify\Actions\AttemptToAuthenticate;
 use Laravel\Fortify\Contracts\LoginResponse as LoginResponseContract;
 use Laravel\Fortify\Contracts\RegisterResponse as RegisterResponseContract;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
+use Laravel\Fortify\Http\Controllers\RegisteredUserController as FortifyRegisteredUserController;
 use Laravel\Fortify\Http\Responses\LoginResponse;
-use Laravel\Fortify\Http\Responses\RegisterResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class FortifyServiceProvider extends ServiceProvider
@@ -30,6 +34,9 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(FortifyRegisteredUserController::class, RegisteredUserController::class);
+        $this->app->bind(AttemptToAuthenticate::class, AttemptVerifiedAuthentication::class);
+
         $this->app->singleton(LoginResponseContract::class, fn (Application $app) => new class($app->make(ResumePendingCartIntent::class)) extends LoginResponse
         {
             public function __construct(private ResumePendingCartIntent $resumePendingCartIntent) {}
@@ -41,16 +48,7 @@ class FortifyServiceProvider extends ServiceProvider
             }
         });
 
-        $this->app->singleton(RegisterResponseContract::class, fn (Application $app) => new class($app->make(ResumePendingCartIntent::class)) extends RegisterResponse
-        {
-            public function __construct(private ResumePendingCartIntent $resumePendingCartIntent) {}
-
-            /** @param Request $request */
-            public function toResponse(mixed $request): Response
-            {
-                return $this->resumePendingCartIntent->execute($request) ?? parent::toResponse($request);
-            }
-        });
+        $this->app->singleton(RegisterResponseContract::class, PendingEmailVerificationResponse::class);
     }
 
     /**
@@ -110,6 +108,8 @@ class FortifyServiceProvider extends ServiceProvider
      */
     private function configureRateLimiting(): void
     {
+        RateLimiter::for('registration', fn (Request $request): Limit => Limit::perMinute(5)
+            ->by('ip:'.$request->ip()));
 
         RateLimiter::for('login', function (Request $request) {
             $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());
