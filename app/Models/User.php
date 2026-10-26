@@ -222,4 +222,14 @@ class User extends Authenticatable
     {
         return $this->hasMany(CustomerProductView::class);
     }
+
+    /**
+     * Get this customer's saved products.
+     *
+     * @return HasMany<WishlistItem, $this>
+     */
+    public function wishlistItems(): HasMany
+    {
+        return $this->hasMany(WishlistItem::class);
+    }
 }

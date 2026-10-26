@@ -1,6 +1,8 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
 import { ArrowRight } from '@lucide/vue';
+import { usePage } from '@inertiajs/vue3';
+import WishlistButton from '@/components/catalog/WishlistButton.vue';
 import ProductImage from '@/components/catalog/ProductImage.vue';
 import ProductPrice from '@/components/catalog/ProductPrice.vue';
 import StockAvailability from '@/components/catalog/StockAvailability.vue';
@@ -11,9 +13,14 @@ import { show as productShow } from '@/routes/products';
 
 defineProps({ product: { type: Object, required: true } });
 const { prefetchProduct, cancelProductPrefetch } = useProductPrefetch();
+const page = usePage();
 </script>
 
 <template>
+    <div
+        class="surface-card border-border bg-card focus-visible:ring-ring group relative hover:border-primary/60 flex min-h-full min-w-0 flex-col overflow-hidden border transition-colors"
+    >
+    <WishlistButton class="absolute top-3 right-3 z-10" :product-id="product.id" :product-name="product.name" :is-wishlisted="product.is_wishlisted" :can-wishlist="page.props.auth?.can?.useCustomerCart === true" compact />
     <Link
         :href="productShow(product.id)"
         @pointerenter="prefetchProduct($event, productShow(product.id))"
@@ -24,7 +31,7 @@ const { prefetchProduct, cancelProductPrefetch } = useProductPrefetch();
             cancelProductPrefetch();
             rememberCatalogVisit($event, product.id);
         "
-        class="surface-card border-border bg-card focus-visible:ring-ring group hover:border-primary/60 flex min-h-full min-w-0 flex-col overflow-hidden border transition-colors focus-visible:ring-2 focus-visible:outline-none"
+        class="focus-visible:ring-ring flex min-h-full min-w-0 flex-col focus-visible:ring-2 focus-visible:outline-none"
     >
         <div class="aspect-square overflow-hidden sm:aspect-3/2">
             <ProductImage
@@ -91,4 +98,5 @@ const { prefetchProduct, cancelProductPrefetch } = useProductPrefetch();
             </div>
         </article>
     </Link>
+    </div>
 </template>

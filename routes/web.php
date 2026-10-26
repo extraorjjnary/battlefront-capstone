@@ -37,6 +37,7 @@ use App\Http\Controllers\Administration\StockReconciliationController;
 use App\Http\Controllers\Administration\SupplierController;
 use App\Http\Controllers\Administration\SupplierReturnController;
 use App\Http\Controllers\Administration\TeamController;
+use App\Http\Controllers\Administration\WishlistReportController;
 use App\Http\Controllers\Administration\WorkQueueController;
 use App\Http\Controllers\BranchController;
 use App\Http\Controllers\CartController;
@@ -60,6 +61,7 @@ use App\Http\Controllers\ProductCatalogController;
 use App\Http\Controllers\ProductDwellController;
 use App\Http\Controllers\ProductViewController;
 use App\Http\Controllers\RecommendationInteractionController;
+use App\Http\Controllers\WishlistController;
 use Illuminate\Support\Facades\Route;
 
 // guest landing page
@@ -113,6 +115,12 @@ Route::middleware(['auth', 'can:use-customer-cart'])
             ->whereNumber('cartItem')
             ->name('items.destroy');
     });
+
+Route::middleware(['auth', 'can:use-customer-cart'])->prefix('wishlist')->name('wishlist.')->group(function () {
+    Route::get('/', [WishlistController::class, 'index'])->name('index');
+    Route::post('/', [WishlistController::class, 'store'])->middleware('throttle:60,1')->name('store');
+    Route::delete('/{product}', [WishlistController::class, 'destroy'])->whereNumber('product')->name('destroy');
+});
 
 // customer checkout preview
 Route::middleware(['auth', 'can:use-customer-cart'])
@@ -336,6 +344,8 @@ Route::middleware(['auth', 'can:access-administration'])
         Route::get('reports/sales', [SalesReportController::class, 'index'])
             ->middleware('can:reports.view')
             ->name('reports.sales');
+        Route::get('reports/wishlist', [WishlistReportController::class, 'index'])->middleware('can:reports.view')->name('reports.wishlist');
+        Route::get('reports/wishlist/csv', [WishlistReportController::class, 'csv'])->middleware('can:reports.export')->name('reports.wishlist.csv');
         Route::get('reports/staff', [StaffPerformanceController::class, 'index'])
             ->middleware('can:orders.view')->name('reports.staff');
         Route::get('reports/stock-reconciliation', [StockReconciliationController::class, 'index'])

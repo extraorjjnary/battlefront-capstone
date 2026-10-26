@@ -2,6 +2,7 @@
 
 use App\Console\Commands\PruneExpiredCustomerSearches;
 use App\Console\Commands\PruneExpiredRecommendationInteractions;
+use App\Console\Commands\PruneWishlistActivities;
 use App\Console\Commands\ReconcilePayMongoOrders;
 use App\Jobs\ProcessPayMongoWebhook;
 use App\Models\PayMongoWebhookInbox;
@@ -14,6 +15,7 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::command('sanctum:prune-expired --hours=24')->daily();
 Schedule::command(PruneExpiredCustomerSearches::class)->daily();
 Schedule::command(PruneExpiredRecommendationInteractions::class)->daily();
+Schedule::command(PruneWishlistActivities::class)->daily();
 Schedule::call(static function (): void {
     PayMongoWebhookInbox::query()
         ->whereIn('status', ['received', 'unmatched'])

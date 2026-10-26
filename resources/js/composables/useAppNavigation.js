@@ -7,6 +7,7 @@ import {
     Truck,
     Undo2,
     Handshake,
+    Heart,
     ChartColumnIncreasing,
     Logs,
     UserRoundCog,
@@ -32,6 +33,7 @@ import InventoryController from '@/actions/App/Http/Controllers/Administration/I
 import AdministrationOrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import SalesReportController from '@/actions/App/Http/Controllers/Administration/SalesReportController';
+import WishlistReportController from '@/actions/App/Http/Controllers/Administration/WishlistReportController';
 import StaffPerformanceController from '@/actions/App/Http/Controllers/Administration/StaffPerformanceController';
 import StockReconciliationController from '@/actions/App/Http/Controllers/Administration/StockReconciliationController';
 import WorkQueueController from '@/actions/App/Http/Controllers/Administration/WorkQueueController';
@@ -48,6 +50,7 @@ import { index as cartIndex } from '@/routes/cart';
 import { index as orderIndex } from '@/routes/orders';
 import { index as productIndex } from '@/routes/products';
 import { edit as editProfile } from '@/routes/profile';
+import { index as wishlistIndex } from '@/routes/wishlist';
 
 export function useAppNavigation() {
     const page = usePage();
@@ -170,6 +173,8 @@ export function useAppNavigation() {
                     href: SalesReportController.index(),
                     icon: ChartColumn,
                 });
+            if (page.props.auth?.can?.viewReports)
+                items.push({ title: 'Wishlist analytics', href: WishlistReportController.index(), icon: ChartColumn });
             if (page.props.auth?.can?.viewOrders)
                 items.push({
                     title: page.props.auth?.can?.viewStaffReports
@@ -210,6 +215,8 @@ export function useAppNavigation() {
                     activeRoutes: [ChatbotKnowledgeController.index()],
                 });
         } else {
+            if (canUseCustomerCart.value)
+                items.push({ title: 'Wishlist', href: wishlistIndex(), icon: Heart, pendingCount: page.props.wishlistCount ?? 0 });
             items.push({
                 title: 'Products',
                 href: productIndex(),

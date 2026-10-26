@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\CartItemController;
 use App\Http\Controllers\Api\V1\ChatbotController;
 use App\Http\Controllers\Api\V1\CheckoutController;
 use App\Http\Controllers\Api\V1\CustomerReturnRequestController;
+use App\Http\Controllers\Api\V1\CustomerPasswordController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\OrderCancellationController;
 use App\Http\Controllers\Api\V1\OrderCancellationRequestController;
@@ -14,8 +15,11 @@ use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\OrderPaymentProofController;
 use App\Http\Controllers\Api\V1\OrderPaymentRetryController;
 use App\Http\Controllers\Api\V1\ProductController;
+use App\Http\Controllers\Api\V1\ProductDwellController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\PushDeviceController;
+use App\Http\Controllers\Api\V1\WishlistController;
+use App\Http\Controllers\ProductViewController;
 use App\Http\Controllers\Api\V1\RecommendationController;
 use App\Http\Controllers\CustomerRefundProofController;
 use App\Http\Controllers\DeliveryLocationController;
@@ -48,6 +52,10 @@ Route::prefix('v1')
         Route::get('products/filters', [ProductController::class, 'filters'])->name('products.filters');
         Route::get('products/{product}', [ProductController::class, 'show'])
             ->whereNumber('product')->name('products.show');
+        Route::post('products/{product}/view', [ProductViewController::class, 'store'])
+            ->middleware([AuthorizeApiRecommendations::class, 'throttle:60,1'])->whereNumber('product')->name('products.view');
+        Route::post('products/{product}/dwell', ProductDwellController::class)
+            ->middleware([AuthorizeApiRecommendations::class, 'throttle:60,1'])->whereNumber('product')->name('products.dwell');
 
         // branch
         Route::get('branches', [BranchController::class, 'index'])->name('branches.index');
@@ -65,6 +73,10 @@ Route::prefix('v1')
 
         // auth customers endpoint
         Route::middleware(['auth:sanctum', 'can:use-customer-cart'])->group(function (): void {
+            Route::put('profile/password', CustomerPasswordController::class)->middleware('throttle:6,1')->name('profile.password');
+            Route::get('wishlist', [WishlistController::class, 'index'])->name('wishlist.index');
+            Route::post('wishlist', [WishlistController::class, 'store'])->middleware('throttle:60,1')->name('wishlist.store');
+            Route::delete('wishlist/{product}', [WishlistController::class, 'destroy'])->whereNumber('product')->name('wishlist.destroy');
             Route::get('orders/{order}/refund-payments/{payment}/proof/{evidence}', CustomerRefundProofController::class)
                 ->whereNumber(['order', 'payment', 'evidence'])->name('orders.refund-payments.proof.show');
             Route::get('orders/{order}/return-requests', [CustomerReturnRequestController::class, 'index'])

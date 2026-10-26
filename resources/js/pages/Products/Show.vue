@@ -7,6 +7,7 @@ import ProductImage from '@/components/catalog/ProductImage.vue';
 import ProductPrice from '@/components/catalog/ProductPrice.vue';
 import RecommendationSection from '@/components/recommendations/RecommendationSection.vue';
 import StockAvailability from '@/components/catalog/StockAvailability.vue';
+import WishlistButton from '@/components/catalog/WishlistButton.vue';
 import ShippingHandling from '@/components/catalog/ShippingHandling.vue';
 import StorefrontHeader from '@/components/StorefrontHeader.vue';
 import { Badge } from '@/components/ui/badge';
@@ -218,6 +219,7 @@ function returnToCatalog() {
                     >
                         {{ product.name }}
                     </h1>
+                    <WishlistButton class="mt-4 self-start" :product-id="product.id" :product-name="product.name" :is-wishlisted="product.is_wishlisted" :can-wishlist="canUseCustomerCart" />
 
                     <ProductPrice
                         :price="product.price"
