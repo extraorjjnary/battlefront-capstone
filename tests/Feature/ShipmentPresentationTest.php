@@ -137,6 +137,9 @@ test('cancelled delivery presents a terminal status and retains recorded milesto
                 'next_status' => null,
                 'can_update_reference' => false,
                 'can_simulate_local_lbc_booking' => false,
+                'can_update_package_details' => false,
+                'can_record_carrier_cost' => false,
+                'can_update_shipment_exception' => false,
             ])
             ->where('order.allowed_status_transitions', []));
 });

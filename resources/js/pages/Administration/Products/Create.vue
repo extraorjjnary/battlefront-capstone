@@ -9,6 +9,7 @@ defineProps({
     categories: { type: Array, required: true },
     tags: { type: Array, required: true },
     shipping_profiles: { type: Array, required: true },
+    package_estimates: { type: Object, required: true },
 });
 
 defineOptions({
@@ -36,6 +37,7 @@ defineOptions({
                 :categories="categories"
                 :tags="tags"
                 :shipping-profiles="shipping_profiles"
+                :package-estimates="package_estimates"
                 :show-preparation="false"
                 :form="ProductController.store.form()"
                 submit-label="Create product"

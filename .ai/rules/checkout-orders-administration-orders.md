@@ -5,9 +5,9 @@ paths:
 
 # Checkout Orders Administration Orders
 
-## Keep COD fulfillment unpaid until explicit delivered collection confirmation
+## Keep COD unpaid until separately reconciled remittance
 
-The approved COD refinement supersedes prepaid-only delivery and universal advance-verification rules for COD only. COD is proof-free, quoted LBC delivery-only; Pending payment allows Processing and sequential shipment progression. Delivered leaves COD Processing/unpaid with no sale. Only the administrator Confirm COD Collection action, with an explicit manual confirmation, may lock Order then Shipment, verify payment, complete the order and record one sale atomically; generic payment decisions cannot handle COD. Preserve cancellation cutoffs and stock restoration rules; never infer collection, returns, refunds or carrier settlement from shipment status.
+The approved COD refinement supersedes prepaid-only delivery and universal advance-verification rules for COD only. COD is proof-free and delivery-only; Pending payment allows Processing and sequential shipment progression. Delivered leaves COD Processing/unpaid with no sale. The assigned handler records the saved-total collection after delivery, then separately reconciles full remittance and records its reference. Only remittance verification marks payment Verified, completes the order and records one sale atomically. Generic payment decisions cannot handle COD. Collection/remittance evidence is immutable; preserve cancellation and stock rules. Shipment status alone never establishes collection, remittance, payment, return, or refund.
 
 ## Confirm Cash/Card payment and product handover together at pickup
 

@@ -13,7 +13,7 @@ LBC transport charges, Battlefront customer payment, LBC COD/COP buyer collectio
 
 ## Battlefront boundaries
 
-Battlefront COD currently remains pending through delivery and requires the existing explicit administrator collection confirmation before payment verification/completion/sale. Do not reinterpret that action as LBC COD settlement. If LBC collects the buyer's money, design a distinct carrier-collection and settlement workflow with durable evidence and reconciliation before changing payment/order/sales behavior. LBC COP is likewise distinct from Battlefront pickup, which has no Shipment.
+Battlefront's current COD workflow remains pending through delivery. An assigned administrator records collection of the saved order total, then separately reconciles full remittance with a reference; only remittance verification marks payment verified, completes the order, and records the sale. These are Battlefront's manual records and do not prove LBC performed a contracted COD/COP settlement. Any carrier collection/reconciliation integration still needs verified merchant evidence and separate approval. LBC COP remains distinct from Battlefront pickup, which has no Shipment.
 
 PayMongo requirements and implemented behavior are separate claims: consult approved project rules and the PayMongo readiness packet, then verify implementation before describing a safeguard as current behavior. LBC booking, tracking, cancellation, or remittance must not create PayMongo evidence or close a PayMongo flow. For eligible PayMongo-origin order cancellation, the approved requirement is latest-state reconciliation and confirmed applicable-flow closure before stock restoration. A carrier cancellation is not PayMongo closure or a refund.
 

@@ -29,7 +29,7 @@ This is a preparation sequence, not an API call order. Do not design a request/r
 | Pickup vs branch drop-off | Who schedules/executes the handoff and records acceptance? | Existing shipment progression is manual and does not represent booking confirmation or scheduled rider pickup exactly. |
 | Booking/tracking/waybill identifiers | Which identifiers exist, when issued, and how are they recovered after timeout? | Existing Shipment has a tracking reference field; it may not represent all LBC identifiers/provenance. |
 | Provider tracking and notices | Which provider statuses/events are authoritative, and how are they reconciled? | Existing milestones are Battlefront-owned manual milestones; public tracking labels cannot be treated as API enum/event contracts. |
-| LBC COD/COP collection | Is carrier collection/remittance part of Battlefront's payment design? | Existing COD payment is confirmed through Battlefront's explicit action. LBC collection and remittance would require separate settlement/accounting and reconciliation design. |
+| LBC COD/COP collection | Is carrier collection/remittance part of the selected merchant contract? | Battlefront already records manual COD collection and separately reconciles remittance before payment/sale completion. These records do not verify LBC settlement or API capability. |
 | Parcels per order | Can one Battlefront Order produce multiple LBC bookings/tracking numbers? | Existing schema permits one Shipment per Order. LBC public materials advertise single and multiple booking, but scope/contract is not established. |
 
 ## Boundary recommendations for future design

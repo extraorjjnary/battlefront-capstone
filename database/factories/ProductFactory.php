@@ -30,6 +30,11 @@ class ProductFactory extends Factory
             'is_featured' => false,
             'discount_price' => null,
             'image_path' => null,
+            'package_weight_kg' => '1.000',
+            'package_length_cm' => '25.00',
+            'package_width_cm' => '20.00',
+            'package_height_cm' => '10.00',
+            'package_measurement_source' => 'estimated',
         ];
     }
 

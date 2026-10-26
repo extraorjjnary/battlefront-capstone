@@ -161,10 +161,9 @@ class Shipment extends Model
     private function belongsToEligibleOrder(Order $order): bool
     {
         if ($this->arrangement_type === ShipmentArrangement::Manual) {
-            return ($order->delivery_quote_metadata['pricing_status'] ?? null) === 'not_configured'
-                && $order->delivery_fee === '0.00'
+            return in_array($order->delivery_quote_metadata['pricing_status'] ?? null, ['not_configured', 'regional_estimate'], strict: true)
                 && $order->product_subtotal !== null
-                && bccomp($order->total_amount, $order->product_subtotal, 2) === 0
+                && bccomp($order->total_amount, bcadd($order->product_subtotal, $order->delivery_fee, 2), 2) === 0
                 && $this->carrier === 'lbc'
                 && $this->preparation_days === null
                 && $this->transit_min_days === null
@@ -177,7 +176,7 @@ class Shipment extends Model
 
         return $order->delivery_destination !== null
             && $order->shipping_profile !== null
-            && ($order->delivery_quote_metadata['pricing_status'] ?? null) !== 'not_configured';
+            && ! in_array($order->delivery_quote_metadata['pricing_status'] ?? null, ['not_configured', 'regional_estimate'], strict: true);
     }
 
     /** @return array<string, string> */

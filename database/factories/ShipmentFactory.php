@@ -65,7 +65,14 @@ class ShipmentFactory extends Factory
         return app(DeliveryRules::class)->quote(
             FulfillmentMethod::Delivery,
             $order->delivery_destination,
-            [new Product(['shipping_profile' => $order->shipping_profile])],
+            [new Product([
+                'shipping_profile' => $order->shipping_profile,
+                'package_weight_kg' => '1.000',
+                'package_length_cm' => '25.00',
+                'package_width_cm' => '20.00',
+                'package_height_cm' => '10.00',
+                'package_measurement_source' => 'estimated',
+            ])],
         ) ?? throw new LogicException('A shipment factory requires a delivery quote.');
     }
 }

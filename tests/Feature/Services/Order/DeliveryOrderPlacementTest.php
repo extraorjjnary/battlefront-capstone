@@ -53,11 +53,11 @@ test('delivery placement snapshots each profile and the relative quote in one st
 
     $this->assertDatabaseHas('orders', [
         'id' => $order->id, 'delivery_destination' => 'Bacolod City',
-        'delivery_base_fee' => '250.00', 'shipping_profile' => $profile->value,
+        'delivery_base_fee' => '295.00', 'shipping_profile' => $profile->value,
         'handling_surcharge' => $surcharge, 'delivery_fee' => $fee,
         'product_subtotal' => '18.66', 'total_amount' => $finalTotal,
     ]);
-    expect($order)->delivery_base_fee->toBe('250.00')->shipping_profile->toBe($profile)
+    expect($order)->delivery_base_fee->toBe('295.00')->shipping_profile->toBe($profile)
         ->handling_surcharge->toBe($surcharge)->delivery_fee->toBe($fee)
         ->product_subtotal->toBe('18.66')->total_amount->toBe($finalTotal)
         ->delivery_origin_city->toBe('Sagay City')->delivery_is_demo->toBeTrue()
@@ -73,9 +73,9 @@ test('delivery placement snapshots each profile and the relative quote in one st
     expect($customer->refresh()->cart)->toBeNull();
     Http::assertNothingSent();
 })->with([
-    'standard' => [ShippingProfile::Standard, '0.00', '250.00', '268.66', 1, 2, 3],
-    'fragile' => [ShippingProfile::Fragile, '50.00', '300.00', '318.66', 2, 3, 4],
-    'bulky' => [ShippingProfile::Bulky, '100.00', '350.00', '368.66', 3, 4, 5],
+    'standard' => [ShippingProfile::Standard, '0.00', '295.00', '313.66', 1, 2, 3],
+    'fragile' => [ShippingProfile::Fragile, '50.00', '345.00', '363.66', 2, 3, 4],
+    'bulky' => [ShippingProfile::Bulky, '100.00', '395.00', '413.66', 3, 4, 5],
 ]);
 
 test('mixed-cart delivery charges the highest profile once for all purchased quantities', function () {
@@ -94,7 +94,7 @@ test('mixed-cart delivery charges the highest profile once for all purchased qua
     $order = app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData($customer->cart->items->modelKeys()), 'Sagay City');
 
     expect($order)->product_subtotal->toBe('120.00')->shipping_profile->toBe(ShippingProfile::Bulky)
-        ->handling_surcharge->toBe('100.00')->delivery_fee->toBe('180.00')->total_amount->toBe('300.00');
+        ->handling_surcharge->toBe('100.00')->delivery_fee->toBe('675.00')->total_amount->toBe('795.00');
     expect($order->shipment)->preparation_days->toBe(3)->eta_min_days->toBe(3)->eta_max_days->toBe(4);
     $this->assertDatabaseCount('shipments', 1);
 });
@@ -216,7 +216,7 @@ test('payment rejection and proof replacement retain stock and delivery snapshot
     app(ResubmitPaymentProof::class)->execute($customer, $order, 'payment-proofs/replacement.jpg');
 
     expect($order->refresh())->payment_status->toBe(PaymentStatus::Pending)
-        ->payment_rejection_reason->toBeNull()->total_amount->toBe('330.00')->delivery_fee->toBe('130.00');
+        ->payment_rejection_reason->toBeNull()->total_amount->toBe('375.00')->delivery_fee->toBe('175.00');
     expect($order->shipment->getAttributes())->toBe($shipment);
     expect($stock->refresh()->quantity)->toBe(8);
     Storage::disk('local')->assertMissing('payment-proofs/verified.jpg');
@@ -251,7 +251,7 @@ test('verified shipment delivery records the product subtotal while preserving p
     }
 
     expect($order->refresh()->sale->amount)->toBe('200.00');
-    expect($order)->product_subtotal->toBe('200.00')->delivery_fee->toBe('130.00')->total_amount->toBe('330.00');
+    expect($order)->product_subtotal->toBe('200.00')->delivery_fee->toBe('175.00')->total_amount->toBe('375.00');
     expect($order->status)->toBe(OrderStatus::Completed);
     expect($order->shipment)->status->toBe(ShipmentStatus::Delivered)->handed_to_carrier_at->not->toBeNull()->delivered_at->not->toBeNull();
     expect($stock->refresh()->quantity)->toBe(8);
@@ -270,7 +270,7 @@ test('cancellation restores quoted order stock once while retaining its snapshot
     $processing->updateStatus($order, OrderStatus::Cancelled);
 
     expect($stock->refresh()->quantity)->toBe(10);
-    expect($order->refresh())->total_amount->toBe('380.00')->delivery_fee->toBe('180.00');
+    expect($order->refresh())->total_amount->toBe('425.00')->delivery_fee->toBe('225.00');
     expect($order->shipment->getAttributes())->toMatchArray([
         ...array_diff_key($shipment, array_flip(['status', 'cancelled_at', 'updated_at'])),
         'status' => ShipmentStatus::Cancelled->value,

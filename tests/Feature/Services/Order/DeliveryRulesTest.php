@@ -34,8 +34,22 @@ test('all configured destinations resolve approved fees and transit ranges witho
         'is_demo' => true,
         'assumption_label' => 'Battlefront demonstration estimates. New Negros Occidental rates use OSM administrative-boundary centroids as straight-line proxies; they are not official LBC rates or verified production shipping charges.',
         'pricing_configured' => true,
+        'pricing_status' => 'configured_estimate',
+        'delivery_arrangement_required' => false,
         'shipping_profile' => 'standard',
         'base_fee' => $baseFee,
+        'region_group' => 'visayas',
+        'route_base_fee' => $baseFee,
+        'weight_surcharge' => '0.00',
+        'actual_weight_kg' => '1.000',
+        'volumetric_weight_kg' => '1.000',
+        'billable_weight_kg' => '1.000',
+        'weight_rate_per_kg' => '45.00',
+        'weight_step_kg' => '0.50',
+        'included_weight_kg' => '1.00',
+        'volumetric_divisor_cm3_per_kg' => 5000,
+        'estimate_disclosure' => 'Battlefront estimate based on saved package measurements; volumetric weight uses an internal 5000 cubic centimeters per kilogram assumption and is not an official LBC rate.',
+        'measurement_sources' => ['estimated' => 1, 'measured' => 0],
         'handling_surcharge' => '0.00',
         'delivery_fee' => $baseFee,
         'preparation_days' => 1,
@@ -197,9 +211,9 @@ test('mixed products select the highest profile once independent of ordering or 
         ->eta_min_days->toBe($etaMinimum)
         ->eta_max_days->toBe($etaMaximum);
 })->with([
-    'fragile outranks standard' => [[ShippingProfile::Standard, ShippingProfile::Fragile, ShippingProfile::Standard], 'fragile', '130.00', 2, 3],
-    'bulky last' => [[ShippingProfile::Standard, ShippingProfile::Fragile, ShippingProfile::Bulky], 'bulky', '180.00', 3, 4],
-    'bulky first and repeated' => [[ShippingProfile::Bulky, ShippingProfile::Fragile, ShippingProfile::Bulky, ShippingProfile::Standard], 'bulky', '180.00', 3, 4],
+    'fragile outranks standard' => [[ShippingProfile::Standard, ShippingProfile::Fragile, ShippingProfile::Standard], 'fragile', '220.00', 2, 3],
+    'bulky last' => [[ShippingProfile::Standard, ShippingProfile::Fragile, ShippingProfile::Bulky], 'bulky', '270.00', 3, 4],
+    'bulky first and repeated' => [[ShippingProfile::Bulky, ShippingProfile::Fragile, ShippingProfile::Bulky, ShippingProfile::Standard], 'bulky', '315.00', 3, 4],
 ]);
 
 test('persisted mixed carts keep one surcharge when line quantities change', function () {
@@ -215,31 +229,35 @@ test('persisted mixed carts keep one surcharge when line quantities change', fun
         CartItem::factory()->for($cart)->for($product)->create(['quantity' => 1]);
     }
     $rules = app(DeliveryRules::class);
-    $before = $rules->quote(FulfillmentMethod::Delivery, 'Cadiz City', $cart->items()->with('product')->get()->pluck('product'));
+    $beforeItems = $cart->items()->with('product')->get();
+    $before = $rules->quote(FulfillmentMethod::Delivery, 'Cadiz City', $beforeItems->pluck('product'), $beforeItems->pluck('quantity', 'product_id')->all());
     $cart->items()->update(['quantity' => 5]);
+    $afterItems = $cart->items()->with('product')->get();
 
-    $after = $rules->quote(FulfillmentMethod::Delivery, 'Cadiz City', $cart->items()->with('product')->get()->pluck('product'));
+    $after = $rules->quote(FulfillmentMethod::Delivery, 'Cadiz City', $afterItems->pluck('product'), $afterItems->pluck('quantity', 'product_id')->all());
 
-    expect($after)->toBe($before)
-        ->shipping_profile->toBe('bulky')
+    expect($before['delivery_fee'])->toBe('355.00')
+        ->and($after['delivery_fee'])->toBe('1075.00');
+    expect($after)->shipping_profile->toBe('bulky')
         ->handling_surcharge->toBe('100.00')
-        ->delivery_fee->toBe('220.00')
         ->preparation_days->toBe(3)
         ->eta_min_days->toBe(4)
         ->eta_max_days->toBe(4);
 });
 
-test('valid nationwide destinations without configured pricing return a zero fee without an ETA', function () {
+test('valid nationwide destinations outside configured routes receive a regional fee estimate without an ETA', function () {
     $product = Product::factory()->bulky()->make(['category_id' => 1]);
 
     $quote = app(DeliveryRules::class)->quote(FulfillmentMethod::Delivery, '1380300000', [$product]);
 
     expect($quote)
-        ->pricing_configured->toBeFalse()
+        ->pricing_status->toBe('regional_estimate')
+        ->delivery_arrangement_required->toBeTrue()
+        ->pricing_configured->toBeTrue()
         ->shipping_profile->toBe('bulky')
-        ->base_fee->toBe('0.00')
-        ->handling_surcharge->toBe('0.00')
-        ->delivery_fee->toBe('0.00')
+        ->base_fee->toBe('200.00')
+        ->handling_surcharge->toBe('100.00')
+        ->delivery_fee->toBe('300.00')
         ->preparation_days->toBeNull()
         ->transit_min_days->toBeNull()
         ->transit_max_days->toBeNull()
@@ -285,3 +303,63 @@ test('configured decimal fees are added at two decimal places independently of g
         bcscale($previousScale);
     }
 });
+
+test('weight fees use decimal step rounding and round the resulting charge to cents', function () {
+    config(['battlefront.shipping.extra_weight_rates.visayas' => '10.01']);
+    $product = Product::factory()->standard()->make([
+        'package_weight_kg' => '2.500',
+        'package_length_cm' => '10.00',
+        'package_width_cm' => '10.00',
+        'package_height_cm' => '10.00',
+    ]);
+
+    $quote = app(DeliveryRules::class)->quote(FulfillmentMethod::Delivery, 'Sagay City', [$product]);
+
+    expect($quote['billable_weight_kg'])->toBe('2.500')
+        ->and($quote['weight_surcharge'])->toBe('15.02')
+        ->and($quote['delivery_fee'])->toBe('95.02');
+});
+
+test('volumetric weight controls the billable step when it exceeds actual weight', function () {
+    config(['battlefront.shipping.extra_weight_rates.visayas' => '10.01']);
+    $product = Product::factory()->standard()->make([
+        'package_weight_kg' => '0.300',
+        'package_length_cm' => '50.00',
+        'package_width_cm' => '50.00',
+        'package_height_cm' => '5.02',
+    ]);
+
+    $quote = app(DeliveryRules::class)->quote(FulfillmentMethod::Delivery, 'Sagay City', [$product]);
+
+    expect($quote['volumetric_weight_kg'])->toBe('2.510')
+        ->and($quote['billable_weight_kg'])->toBe('3.000')
+        ->and($quote['weight_surcharge'])->toBe('20.02');
+});
+
+test('volumetric weights retain precision when rounding up to a billing step', function () {
+    $product = Product::factory()->standard()->make([
+        'package_weight_kg' => '0.500',
+        'package_length_cm' => '10.00',
+        'package_width_cm' => '10.00',
+        'package_height_cm' => '50.02',
+    ]);
+
+    $quote = app(DeliveryRules::class)->quote(FulfillmentMethod::Delivery, 'Sagay City', [$product]);
+
+    expect($quote['volumetric_weight_kg'])->toBe('1.000')
+        ->and($quote['billable_weight_kg'])->toBe('1.500')
+        ->and($quote['weight_surcharge'])->toBe('22.50');
+});
+
+test('weight fee calculations reject missing or invalid package measurements and pricing configuration', function (array $productAttributes, array $pricing, string $message) {
+    config($pricing);
+    $product = Product::factory()->standard()->make($productAttributes + ['category_id' => 1]);
+
+    expect(fn () => app(DeliveryRules::class)->quote(FulfillmentMethod::Delivery, 'Sagay City', [$product]))
+        ->toThrow(DomainException::class, $message);
+})->with([
+    'zero package weight' => [['package_weight_kg' => '0.000'], [], 'Package weight and dimensions are required to estimate delivery.'],
+    'zero package dimension' => [['package_length_cm' => '0.00'], [], 'Package weight and dimensions are required to estimate delivery.'],
+    'zero weight step' => [[], ['battlefront.shipping.weight_step_kg' => '0.00'], 'Delivery weight pricing is unavailable for this location.'],
+    'malformed weight rate' => [[], ['battlefront.shipping.extra_weight_rates.visayas' => 'not-a-rate'], 'Delivery weight pricing is unavailable for this location.'],
+]);

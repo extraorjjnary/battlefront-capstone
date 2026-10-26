@@ -79,8 +79,9 @@ test('web and mobile checkout expose equivalent quotes for all destination fees 
         ['Silay City', 220, 1, 2], ['Talisay City', 240, 1, 2], ['Bacolod City', 250, 1, 2],
     ] as $index => [$destination, $base, $minimum, $maximum]) {
         expect($quotes[$index])->destination->toBe($destination)
-            ->base_fee->toBe($base.'.00')->handling_surcharge->toBe($surcharge.'.00')
-            ->delivery_fee->toBe(($base + $surcharge).'.00')->total->toBe(($base + $surcharge + 18).'.66')
+            ->base_fee->toBe(($base + 45).'.00')->route_base_fee->toBe($base.'.00')
+            ->weight_surcharge->toBe('45.00')->handling_surcharge->toBe($surcharge.'.00')
+            ->delivery_fee->toBe(($base + 45 + $surcharge).'.00')->total->toBe(($base + 45 + $surcharge + 18).'.66')
             ->product_subtotal->toBe('18.66')->shipping_profile->toBe($profile->value)
             ->preparation_days->toBe($preparation)->transit_min_days->toBe($minimum)->transit_max_days->toBe($maximum)
             ->eta_min_days->toBe($preparation + $minimum)->eta_max_days->toBe($preparation + $maximum)
@@ -141,9 +142,10 @@ test('new Negros delivery estimate is shared by web and mobile quotes and order 
     $apiQuote->assertJsonPath('data.quote.destination_label', 'City of Bago')
         ->assertJsonPath('data.quote.pricing_configured', true)
         ->assertJsonPath('data.quote.order_placement_allowed', true)
-        ->assertJsonPath('data.quote.base_fee', '280.00')
-        ->assertJsonPath('data.quote.delivery_fee', '280.00')
-        ->assertJsonPath('data.quote.total', '298.66')
+        ->assertJsonPath('data.quote.base_fee', '325.00')
+        ->assertJsonPath('data.quote.route_base_fee', '280.00')
+        ->assertJsonPath('data.quote.delivery_fee', '325.00')
+        ->assertJsonPath('data.quote.total', '343.66')
         ->assertJsonPath('data.quote.payment_methods', ['gcash', 'maya', 'cod'])
         ->assertJsonPath('data.quote.transit_min_days', 2)
         ->assertJsonPath('data.quote.transit_max_days', 3);
@@ -168,14 +170,14 @@ test('new Negros delivery estimate is shared by web and mobile quotes and order 
         $response->assertRedirectToRoute('orders.show', $order)->assertSessionHasNoErrors();
     } else {
         $response->assertSuccessful()
-            ->assertJsonPath('data.delivery_quote.base_fee', '280.00')
+            ->assertJsonPath('data.delivery_quote.base_fee', '325.00')
             ->assertJsonPath('data.delivery_quote.transit_min_days', 2);
     }
     expect($order)->delivery_destination->toBe('City of Bago')
         ->product_subtotal->toBe('18.66')
-        ->delivery_base_fee->toBe('280.00')
-        ->delivery_fee->toBe('280.00')
-        ->total_amount->toBe('298.66');
+        ->delivery_base_fee->toBe('325.00')
+        ->delivery_fee->toBe('325.00')
+        ->total_amount->toBe('343.66');
     expect($order->delivery_quote_metadata['city_code'])->toBe($cityCode);
     expect($order->shipment)->carrier->toBe('lbc')
         ->transit_min_days->toBe(2)
@@ -185,7 +187,7 @@ test('new Negros delivery estimate is shared by web and mobile quotes and order 
 
     $customerDetail = $this->withToken($token)->getJson('/api/v1/orders/'.$order->id)->assertOk()
         ->assertJsonPath('data.delivery_quote.destination', 'City of Bago')
-        ->assertJsonPath('data.delivery_quote.base_fee', '280.00');
+        ->assertJsonPath('data.delivery_quote.base_fee', '325.00');
     $webDetail = $this->actingAs($customer)->get(route('orders.show', $order))->assertOk();
     expect($customerDetail->json('data.delivery_quote'))->toBe($webDetail->inertiaProps('order.delivery_quote'));
     $administrator = User::factory()->administrator()->create();
@@ -193,7 +195,7 @@ test('new Negros delivery estimate is shared by web and mobile quotes and order 
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('order.delivery_quote.destination', 'City of Bago')
-            ->where('order.delivery_quote.base_fee', '280.00')
+            ->where('order.delivery_quote.base_fee', '325.00')
             ->where('order.delivery_quote.transit_min_days', 2));
 })->with(['web', 'api']);
 
@@ -215,15 +217,16 @@ test('delivery placement snapshots each profile through the shared web and mobil
     }
     expect($order)->product_subtotal->toBe('18.66')->delivery_fee->toBe($fee)->total_amount->toBe($total)
         ->shipping_profile->toBe($profile)->delivery_destination->toBe('Sagay City');
+    expect($order->delivery_quote_metadata['customer_fee_policy'])->toBe('fixed_at_placement_battlefront_absorbs_variance');
     expect($order->shipment)->status->toBe(ShipmentStatus::AwaitingPreparation)->preparation_days->toBe($preparation);
     expect($stock->refresh()->quantity)->toBe(8);
     expect($customer->refresh()->cart)->toBeNull();
     $this->assertDatabaseCount('shipments', 1);
     expect($order->payment_proof_path)->toBeNull();
 })->with(['web', 'api'])->with([
-    'standard' => [ShippingProfile::Standard, '80.00', '98.66', 1],
-    'fragile' => [ShippingProfile::Fragile, '130.00', '148.66', 2],
-    'bulky' => [ShippingProfile::Bulky, '180.00', '198.66', 3],
+    'standard' => [ShippingProfile::Standard, '125.00', '143.66', 1],
+    'fragile' => [ShippingProfile::Fragile, '175.00', '193.66', 2],
+    'bulky' => [ShippingProfile::Bulky, '225.00', '243.66', 3],
 ]);
 
 test('mixed cart preview and placement charge the highest handling profile only once', function (string $channel) {
@@ -239,14 +242,14 @@ test('mixed cart preview and placement charge the highest handling profile only 
     $this->get('/api/v1/checkout?'.http_build_query(['cart_item_ids' => $customer->cart->items->modelKeys()]))->assertOk()
         ->assertJsonPath('data.delivery_quotes.0.product_subtotal', '120.00')
         ->assertJsonPath('data.delivery_quotes.0.handling_surcharge', '100.00')
-        ->assertJsonPath('data.delivery_quotes.0.delivery_fee', '180.00')
-        ->assertJsonPath('data.delivery_quotes.0.total', '300.00');
+        ->assertJsonPath('data.delivery_quotes.0.delivery_fee', '675.00')
+        ->assertJsonPath('data.delivery_quotes.0.total', '795.00');
 
     $response = $this->post($channel === 'web' ? route('orders.store') : '/api/v1/orders', deliveryCheckoutSubmission($customer->cart->items->modelKeys()));
 
     $channel === 'web' ? $response->assertSessionHasNoErrors() : $response->assertSuccessful();
     expect(Order::sole())->product_subtotal->toBe('120.00')->handling_surcharge->toBe('100.00')
-        ->delivery_fee->toBe('180.00')->total_amount->toBe('300.00')->shipping_profile->toBe(ShippingProfile::Bulky);
+        ->delivery_fee->toBe('675.00')->total_amount->toBe('795.00')->shipping_profile->toBe(ShippingProfile::Bulky);
     expect(Inventory::pluck('quantity')->all())->toBe([7, 7, 7, 7]);
     $this->assertDatabaseCount('shipments', 1);
 })->with(['web', 'api']);
@@ -256,7 +259,7 @@ test('placement ignores forged quote values and recalculates changed prices prof
     $this->seed(BranchSeeder::class);
     ['customer' => $customer, 'product' => $product, 'stock' => $stock] = deliveryCheckoutCart();
     $this->actingAs($customer)->withToken($customer->createToken('Phone')->plainTextToken);
-    $this->get('/api/v1/checkout?'.http_build_query(['cart_item_ids' => $customer->cart->items->modelKeys()]))->assertOk()->assertJsonPath('data.delivery_quotes.0.total', '98.66');
+    $this->get('/api/v1/checkout?'.http_build_query(['cart_item_ids' => $customer->cart->items->modelKeys()]))->assertOk()->assertJsonPath('data.delivery_quotes.0.total', '143.66');
     $product->update(['discount_price' => null, 'shipping_profile' => ShippingProfile::Bulky]);
     config([
         'battlefront.delivery.destinations.Sagay City' => ['base_fee' => '80.15', 'transit_min_days' => 2, 'transit_max_days' => 3],
@@ -275,15 +278,15 @@ test('placement ignores forged quote values and recalculates changed prices prof
 
     $channel === 'web' ? $response->assertSessionHasNoErrors() : $response->assertSuccessful();
     $order = Order::sole();
-    expect($order)->product_subtotal->toBe('20.30')->delivery_base_fee->toBe('80.15')->handling_surcharge->toBe('100.25')
-        ->delivery_fee->toBe('180.40')->total_amount->toBe('200.70')->shipping_profile->toBe(ShippingProfile::Bulky);
+    expect($order)->product_subtotal->toBe('20.30')->delivery_base_fee->toBe('125.15')->handling_surcharge->toBe('100.25')
+        ->delivery_fee->toBe('225.40')->total_amount->toBe('245.70')->shipping_profile->toBe(ShippingProfile::Bulky);
     expect($order->shipment)->carrier->toBe('lbc')->preparation_days->toBe(4)->eta_min_days->toBe(6)->eta_max_days->toBe(7);
     expect($stock->refresh()->quantity)->toBe(8);
     config(['battlefront.delivery.destinations' => [], 'battlefront.delivery.profiles' => [], 'battlefront.delivery.carrier' => 'changed']);
     $product->update(['shipping_profile' => ShippingProfile::Standard, 'price' => '999.00']);
 
     $detail = $this->get('/api/v1/orders/'.$order->id)->assertOk()
-        ->assertJsonPath('data.total', '200.70')->assertJsonPath('data.delivery_quote.base_fee', '80.15')
+        ->assertJsonPath('data.total', '245.70')->assertJsonPath('data.delivery_quote.base_fee', '125.15')
         ->assertJsonPath('data.delivery_quote.carrier', 'lbc')->assertJsonPath('data.delivery_quote.eta_max_days', 7)
         ->assertJsonMissingPath('data.delivery_quote.estimated_delivery_start')
         ->assertJsonMissingPath('data.payment_proof_path');

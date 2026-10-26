@@ -34,7 +34,7 @@ class PrepareCheckout
     {
         $cart = $this->reviewCheckoutCart->execute($customer, $cartItemIds);
         $products = Product::query()
-            ->select(['id', 'shipping_profile'])
+            ->select(['id', 'shipping_profile', 'package_weight_kg', 'package_length_cm', 'package_width_cm', 'package_height_cm', 'package_measurement_source'])
             ->whereKey(array_column(array_column($cart['items'], 'product'), 'id'))
             ->get();
         $anchor = CarbonImmutable::now(config('app.timezone'))->startOfDay();
@@ -42,7 +42,7 @@ class PrepareCheckout
 
         foreach (array_keys($this->deliveryRules->destinations()) as $destination) {
             try {
-                $quote = $this->deliveryRules->quote(FulfillmentMethod::Delivery, $destination, $products);
+                $quote = $this->deliveryRules->quote(FulfillmentMethod::Delivery, $destination, $products, $this->quantities($cart['items']));
                 $deliveryQuotes[] = $this->deliveryQuotePresenter->checkout($quote, $cart['total'], $anchor);
             } catch (DomainException) {
                 // A specific configured exclusion can retire a legacy route.
@@ -116,7 +116,7 @@ class PrepareCheckout
     public function quote(User $customer, array $cartItemIds, string $cityCode): array
     {
         $cart = $this->reviewCheckoutCart->execute($customer, $cartItemIds);
-        $products = Product::query()->select(['id', 'shipping_profile'])
+        $products = Product::query()->select(['id', 'shipping_profile', 'package_weight_kg', 'package_length_cm', 'package_width_cm', 'package_height_cm', 'package_measurement_source'])
             ->whereKey(array_column(array_column($cart['items'], 'product'), 'id'))->get();
         try {
             $this->deliveryLocations->city($cityCode);
@@ -124,7 +124,7 @@ class PrepareCheckout
             throw ValidationException::withMessages(['delivery_city_code' => $exception->getMessage()]);
         }
         try {
-            $quote = $this->deliveryRules->quote(FulfillmentMethod::Delivery, $cityCode, $products);
+            $quote = $this->deliveryRules->quote(FulfillmentMethod::Delivery, $cityCode, $products, $this->quantities($cart['items']));
         } catch (DomainException $exception) {
             return ['available' => false, 'quote' => null, 'notice' => $exception->getMessage()];
         }
@@ -148,5 +148,18 @@ class PrepareCheckout
             'account_number' => (string) config("battlefront.payment_accounts.{$method->value}.account_number"),
             'is_demo' => (bool) config("battlefront.payment_accounts.{$method->value}.is_demo"),
         ];
+    }
+
+    /** @param list<array<string, mixed>> $items
+     * @return array<int, int>
+     */
+    private function quantities(array $items): array
+    {
+        $quantities = [];
+        foreach ($items as $item) {
+            $quantities[(int) $item['product']['id']] = (int) $item['quantity'];
+        }
+
+        return $quantities;
     }
 }

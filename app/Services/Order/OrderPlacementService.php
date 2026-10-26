@@ -188,7 +188,7 @@ class OrderPlacementService
             }
 
             $quote = $deliveryDestination !== null
-                ? $this->deliveryRules->quote(FulfillmentMethod::Delivery, $deliveryDestination, $products)
+                ? $this->deliveryRules->quote(FulfillmentMethod::Delivery, $deliveryDestination, $products, $cartItems->mapWithKeys(fn (CartItem $item): array => [$item->product_id => $item->quantity])->all())
                 : null;
             $zone = $deliveryDestination !== null ? $this->deliveryRules->zone($deliveryDestination) : null;
             $methodAvailableForZone = $checkout['payment_method'] === PaymentMethod::Online
@@ -215,28 +215,32 @@ class OrderPlacementService
                 'delivery_fee' => $deliveryFee,
                 'total_amount' => $finalTotal,
                 'delivery_destination' => $zone['destination'] ?? null,
-                'delivery_quote_metadata' => $zone !== null ? [
+                'delivery_quote_metadata' => $zone !== null && $quote !== null ? [
                     'city_code' => $zone['city_code'], 'province_code' => $zone['province_code'], 'region_code' => $zone['region_code'],
                     'dataset_version' => PsgcDeliveryLocations::VERSION, 'rule_id' => $zone['rule_id'], 'rules_version' => $zone['rules_version'],
-                    'pricing_status' => $zone['configured'] ? 'configured_estimate' : 'not_configured',
+                    'pricing_status' => $quote['pricing_status'],
+                    'customer_fee_policy' => in_array($quote['pricing_status'], ['configured_estimate', 'regional_estimate'], strict: true)
+                        ? 'fixed_at_placement_battlefront_absorbs_variance'
+                        : null,
                     'payment_methods' => $zone['payment_methods'],
+                    'region_group' => $quote['region_group'] ?? null,
+                    'weight_pricing' => array_intersect_key($quote, array_flip(['route_base_fee', 'weight_surcharge', 'actual_weight_kg', 'volumetric_weight_kg', 'billable_weight_kg', 'weight_rate_per_kg', 'weight_step_kg', 'included_weight_kg', 'volumetric_divisor_cm3_per_kg', 'estimate_disclosure', 'measurement_sources'])),
+                    'delivery_arrangement_required' => $quote['delivery_arrangement_required'],
                     'address_components' => $checkout['delivery_address_components'] ?? null,
                     'payment_assumption' => $checkout['payment_method'] === PaymentMethod::Online
                         ? 'Online payment through PayMongo Hosted Checkout. Provider fees are absorbed by Battlefront.'
-                        : Config::string(($zone['configured']
+                        : ($quote['pricing_status'] === 'regional_estimate'
+                            ? 'Battlefront’s regional delivery fee estimate is included in the total. Delivery arrangement and ETA are confirmed manually.'
+                            : Config::string(($quote['pricing_status'] === 'configured_estimate'
                         ? 'battlefront.delivery.payment_assumptions.'
-                        : 'battlefront.delivery.unconfigured_route.payment_assumptions.').$checkout['payment_method']->value),
+                        : 'battlefront.delivery.unconfigured_route.payment_assumptions.').$checkout['payment_method']->value)),
                 ] : null,
                 'delivery_base_fee' => $quote['base_fee'] ?? null,
                 'shipping_profile' => $quote['shipping_profile'] ?? null,
                 'handling_surcharge' => $quote['handling_surcharge'] ?? null,
                 'delivery_origin_city' => $quote['origin_city'] ?? null,
-                'delivery_is_demo' => $zone === null
-                    ? null
-                    : ($zone['configured'] ? ($quote['is_demo'] ?? null) : false),
-                'delivery_assumption_label' => $zone !== null && ! $zone['configured']
-                    ? Config::string('battlefront.delivery.unconfigured_route.assumption_label')
-                    : ($quote['assumption_label'] ?? null),
+                'delivery_is_demo' => $quote['is_demo'] ?? null,
+                'delivery_assumption_label' => $quote['assumption_label'] ?? null,
                 'status' => OrderStatus::Pending,
                 'payment_status' => PaymentStatus::Pending,
                 'payment_method' => $checkout['payment_method'],

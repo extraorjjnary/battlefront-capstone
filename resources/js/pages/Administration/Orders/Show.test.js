@@ -130,8 +130,10 @@ function orderHarness(t, overrides = {}, permissions = {}) {
             const route = () => ({ url: '/orders/1', method: 'patch' });
             modules[name] = { default: new Proxy(route, { get: () => route }) };
         } else if (name.startsWith('@/routes/')) {
+            const route = () => ({ url: '/orders/1', method: 'patch' });
             modules[name] = {
                 store: () => ({ url: '/orders/1', method: 'post' }),
+                update: route,
             };
         } else if (name.startsWith('@/lib/')) {
             modules[name] = {
@@ -203,13 +205,54 @@ function findElement(node, type) {
     return findElement(node.children?.default?.() ?? node.children, type);
 }
 
+test('saved shipment records are read-only until explicitly edited', async (t) => {
+    const view = orderHarness(t, {
+        can_process: true,
+        assigned_handler_id: 1,
+        shipment: {
+            status: { value: 'awaiting_preparation', label: 'Awaiting preparation' },
+            tracking_reference: null,
+            operations: {
+                package_count: 1,
+                package_weight_kg: '1.000',
+                package_length_cm: '10.00',
+                package_width_cm: '10.00',
+                package_height_cm: '10.00',
+                declared_value: '100.00',
+                handoff_mode: 'branch_dropoff',
+            },
+        },
+    });
+
+    await view.html();
+    assert.ok(findButton(view.tree(), 'Edit saved records'));
+    assert.equal(Boolean(findButton(view.tree(), 'Save shipment records')), false);
+    assert.equal(findElement(view.tree(), 'fieldset').props.disabled, true);
+
+    findButton(view.tree(), 'Edit saved records').props.onClick();
+    await view.html();
+    assert.ok(findButton(view.tree(), 'Update shipment records'));
+    assert.equal(findElement(view.tree(), 'fieldset').props.disabled, false);
+
+    findButton(view.tree(), 'Update shipment records').props.onClick();
+    view.submissions.at(-1)[1].onSuccess();
+
+    await view.html();
+    assert.ok(findButton(view.tree(), 'Edit saved records'));
+    assert.equal(Boolean(findButton(view.tree(), 'Update shipment records')), false);
+});
+
 test('delivery arrangement confirmation keeps optional details blank and requires actual arrangement', async (t) => {
     const view = orderHarness(t, {
         can_process: true,
         assigned_handler_id: 1,
         shipment: null,
         can_create_manual_shipment: true,
-        delivery_quote: { pricing_configured: false },
+        delivery_quote: {
+            delivery_arrangement_required: true,
+            pricing_status: 'not_configured',
+            assumption_label: 'Historical delivery pricing remains unchanged.',
+        },
     });
     let html = await view.html();
     assert.match(html, /Confirm delivery arrangement/);
@@ -259,7 +302,11 @@ test('delivery arrangement confirmation keeps optional details blank and require
 
 test('unconfigured delivery fee remains explicitly unpriced after shipment confirmation', async (t) => {
     const view = orderHarness(t, {
-        delivery_quote: { pricing_configured: false },
+        delivery_quote: {
+            delivery_arrangement_required: true,
+            pricing_status: 'not_configured',
+            assumption_label: 'Historical delivery pricing remains unchanged.',
+        },
     });
     assert.match(
         await view.html(),

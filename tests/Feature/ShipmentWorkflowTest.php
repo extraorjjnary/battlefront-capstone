@@ -89,6 +89,39 @@ function recordManualShipmentOperationsForTest(Order $order, User $actor): void
     ], $actor);
 }
 
+test('shipment operations accept decimal numbers from JSON requests', function () {
+    $order = shipmentWorkflowOrder();
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)
+        ->patch(route('administration.orders.shipment.operations.update', $order), [
+            'package_count' => 1,
+            'package_weight_kg' => 0.1,
+            'package_length_cm' => 0.1,
+            'package_width_cm' => 0.1,
+            'package_height_cm' => 0.09,
+            'declared_value' => 350,
+            'handoff_mode' => 'branch_dropoff',
+            'actual_carrier_cost' => 349,
+            'carrier_cost_reference' => 'RECEIPT-62',
+            'carrier_cost_confirmed' => true,
+            'shipment_exception_code' => null,
+            'shipment_exception_note' => null,
+            'shipment_exception_resolved' => false,
+        ])
+        ->assertSessionHasNoErrors()
+        ->assertInertiaFlash('toast.message', 'Shipment operations updated.');
+
+    $shipment = $order->refresh()->shipment;
+    expect($shipment->package_weight_kg)->toBe('0.100')
+        ->and($shipment->package_length_cm)->toBe('0.10')
+        ->and($shipment->package_height_cm)->toBe('0.09')
+        ->and($shipment->actual_carrier_cost)->toBe('349.00')
+        ->and($shipment->carrier_cost_reference)->toBe('RECEIPT-62');
+});
+
 test('administrators advance the full manual lifecycle and complete one sale without deducting stock', function () {
     $this->travelTo('2026-10-08 09:00:00');
     Storage::fake('local');
@@ -468,15 +501,21 @@ test('customer mobile API has no shipment mutation endpoint', function (string $
     expect($order->refresh()->shipment->getAttributes())->toBe($before);
 })->with(['status', 'reference']);
 
-test('manual arrangement availability follows wallet processing and preserves pending COD', function (PaymentMethod $method, OrderStatus $status, PaymentStatus $paymentStatus, bool $eligible) {
+test('manual arrangement availability follows prepaid processing and preserves pending COD', function (PaymentMethod $method, OrderStatus $status, PaymentStatus $paymentStatus, bool $eligible, string $nextStep) {
     $order = unconfiguredShipmentTestOrder($method, $status, $paymentStatus);
+    if ($method === PaymentMethod::Online) {
+        $order->payment_origin = 'paymongo';
+        $order->save();
+    }
     $administrator = User::factory()->administrator()->create();
     $order->assigned_handler_id = $administrator->id;
     $order->save();
     $this->actingAs($administrator);
 
     $this->get(route('administration.orders.show', $order))
-        ->assertInertia(fn (Assert $page) => $page->where('order.can_create_manual_shipment', $eligible));
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('order.can_create_manual_shipment', $eligible)
+            ->where('order.delivery_next_step.title', $nextStep));
 
     $before = $order->refresh()->getAttributes();
     $response = $this->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload());
@@ -494,14 +533,17 @@ test('manual arrangement availability follows wallet processing and preserves pe
     expect($order->getAttributes())->toBe($before);
     $this->assertDatabaseCount('sales', 0);
 })->with([
-    'pending GCash awaiting verification' => [PaymentMethod::GCash, OrderStatus::Pending, PaymentStatus::Pending, false],
-    'pending GCash already verified' => [PaymentMethod::GCash, OrderStatus::Pending, PaymentStatus::Verified, false],
-    'processing GCash' => [PaymentMethod::GCash, OrderStatus::Processing, PaymentStatus::Verified, true],
-    'pending Maya awaiting verification' => [PaymentMethod::Maya, OrderStatus::Pending, PaymentStatus::Pending, false],
-    'pending Maya already verified' => [PaymentMethod::Maya, OrderStatus::Pending, PaymentStatus::Verified, false],
-    'processing Maya' => [PaymentMethod::Maya, OrderStatus::Processing, PaymentStatus::Verified, true],
-    'pending COD' => [PaymentMethod::Cod, OrderStatus::Pending, PaymentStatus::Pending, true],
-    'processing COD' => [PaymentMethod::Cod, OrderStatus::Processing, PaymentStatus::Pending, true],
+    'pending GCash awaiting verification' => [PaymentMethod::GCash, OrderStatus::Pending, PaymentStatus::Pending, false, 'Verify payment'],
+    'pending GCash already verified' => [PaymentMethod::GCash, OrderStatus::Pending, PaymentStatus::Verified, false, 'Move order to Processing'],
+    'processing GCash' => [PaymentMethod::GCash, OrderStatus::Processing, PaymentStatus::Verified, true, 'Confirm delivery arrangement'],
+    'pending Maya awaiting verification' => [PaymentMethod::Maya, OrderStatus::Pending, PaymentStatus::Pending, false, 'Verify payment'],
+    'pending Maya already verified' => [PaymentMethod::Maya, OrderStatus::Pending, PaymentStatus::Verified, false, 'Move order to Processing'],
+    'processing Maya' => [PaymentMethod::Maya, OrderStatus::Processing, PaymentStatus::Verified, true, 'Confirm delivery arrangement'],
+    'pending PayMongo awaiting confirmation' => [PaymentMethod::Online, OrderStatus::Pending, PaymentStatus::Pending, false, 'Await payment confirmation'],
+    'pending PayMongo already verified' => [PaymentMethod::Online, OrderStatus::Pending, PaymentStatus::Verified, false, 'Move order to Processing'],
+    'processing PayMongo' => [PaymentMethod::Online, OrderStatus::Processing, PaymentStatus::Verified, true, 'Confirm delivery arrangement'],
+    'pending COD' => [PaymentMethod::Cod, OrderStatus::Pending, PaymentStatus::Pending, true, 'Confirm delivery arrangement'],
+    'processing COD' => [PaymentMethod::Cod, OrderStatus::Processing, PaymentStatus::Pending, true, 'Confirm delivery arrangement'],
 ]);
 
 test('administrators register a manual shipment without changing commercial snapshots', function () {
@@ -826,9 +868,9 @@ test('manual COD delivery still waits for explicit collection confirmation', fun
     $this->actingAs($administrator);
     $this->post(route('administration.orders.shipment.manual.store', $order), manualShipmentPayload())
         ->assertSessionHasNoErrors();
-    recordManualShipmentOperationsForTest($order, $administrator);
     $this->patch(route('administration.orders.status.update', $order), ['status' => 'processing'])
         ->assertSessionHasNoErrors();
+    recordManualShipmentOperationsForTest($order, $administrator);
 
     foreach (['preparing', 'ready_for_dispatch', 'handed_to_lbc', 'in_transit', 'out_for_delivery', 'delivered'] as $status) {
         $this->patch(route('administration.orders.shipment.status.update', $order), ['status' => $status])

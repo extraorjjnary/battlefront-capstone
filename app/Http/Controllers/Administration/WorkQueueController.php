@@ -14,7 +14,7 @@ class WorkQueueController extends Controller
     {
         $filters = $request->validate([
             'page' => ['nullable', 'integer', 'min:1'],
-            'kind' => ['nullable', 'string', 'in:stock_adjustment,damage,supplier_return,customer_handover,refund,refund_reconciliation,customer_return,customer_request,customer_resolution,order,cancellation_review,cancellation_refund'],
+            'kind' => ['nullable', 'string', 'in:stock_adjustment,damage,supplier_return,customer_handover,refund,refund_reconciliation,customer_return,customer_request,customer_resolution,order,shipping,cancellation_review,cancellation_refund'],
             'responsible' => ['nullable', 'string', 'max:255'],
             'older_than' => ['nullable', 'integer', 'in:1,7,30'],
         ]);

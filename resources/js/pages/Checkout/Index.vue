@@ -535,10 +535,7 @@ defineOptions({
                                 aria-live="polite"
                             >
                                 <template
-                                    v-if="
-                                        selectedQuote.pricing_configured ===
-                                        false
-                                    "
+                                    v-if="selectedQuote.pricing_status === 'not_configured'"
                                 >
                                     <p class="font-semibold">
                                         No delivery estimate configured ·
@@ -573,6 +570,62 @@ defineOptions({
                                         Check this route with LBC’s official rate calculator
                                     </a>
                                 </template>
+                                <template
+                                    v-else-if="selectedQuote.delivery_arrangement_required"
+                                >
+                                    <p class="font-semibold">
+                                        Battlefront regional shipping estimate ·
+                                        {{
+                                            selectedQuote.destination_label ??
+                                            selectedQuote.destination
+                                        }}
+                                    </p>
+                                    <p>
+                                        Route base
+                                        {{
+                                            formatCurrency(
+                                                selectedQuote.route_base_fee,
+                                            )
+                                        }}
+                                        + weight
+                                        {{ formatCurrency(selectedQuote.weight_surcharge) }}
+                                        + handling
+                                        {{
+                                            formatCurrency(
+                                                selectedQuote.handling_surcharge,
+                                            )
+                                        }}
+                                    </p>
+                                    <p class="text-muted-foreground text-xs">
+                                        Billable weight: {{ selectedQuote.billable_weight_kg }} kg (actual {{ selectedQuote.actual_weight_kg }} kg; volumetric {{ selectedQuote.volumetric_weight_kg }} kg).
+                                    </p>
+                                    <p class="text-muted-foreground text-xs">
+                                        Package measurements: {{ selectedQuote.measurement_sources.measured }} item units measured and {{ selectedQuote.measurement_sources.estimated }} estimated.
+                                    </p>
+                                    <p class="leading-6">
+                                        The estimated shipping fee is included
+                                        in your total. Battlefront will confirm
+                                        the delivery arrangement and ETA
+                                        manually.
+                                    </p>
+                                    <p class="text-muted-foreground text-xs leading-5">
+                                        {{ selectedQuote.notice }}
+                                    </p>
+                                    <p class="text-muted-foreground text-xs leading-5">
+                                        {{ selectedQuote.assumption_label }}
+                                    </p>
+                                    <p class="text-muted-foreground text-xs leading-5">
+                                        {{ selectedQuote.estimate_disclosure }}
+                                    </p>
+                                    <a
+                                        class="text-primary underline underline-offset-4"
+                                        href="https://www.lbcexpress.com/rates/"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        Check LBC’s official rate calculator
+                                    </a>
+                                </template>
                                 <template v-else>
                                     <p class="font-semibold">
                                         {{
@@ -596,18 +649,29 @@ defineOptions({
                                         }}
                                     </p>
                                     <p class="text-muted-foreground">
-                                        Base fee
+                                        Route base
                                         {{
                                             formatCurrency(
-                                                selectedQuote.base_fee,
+                                                selectedQuote.route_base_fee,
                                             )
                                         }}
+                                        + weight
+                                        {{ formatCurrency(selectedQuote.weight_surcharge) }}
                                         + handling
                                         {{
                                             formatCurrency(
                                                 selectedQuote.handling_surcharge,
                                             )
                                         }}
+                                    </p>
+                                    <p class="text-muted-foreground text-xs">
+                                        Billable weight: {{ selectedQuote.billable_weight_kg }} kg (actual {{ selectedQuote.actual_weight_kg }} kg; volumetric {{ selectedQuote.volumetric_weight_kg }} kg).
+                                    </p>
+                                    <p class="text-muted-foreground text-xs">
+                                        Package measurements: {{ selectedQuote.measurement_sources.measured }} item units measured and {{ selectedQuote.measurement_sources.estimated }} estimated.
+                                    </p>
+                                    <p class="text-muted-foreground text-xs leading-5">
+                                        {{ selectedQuote.estimate_disclosure }}
                                     </p>
                                     <p class="font-semibold">
                                         Estimated delivery:
@@ -647,6 +711,17 @@ defineOptions({
                                         {{ selectedQuote.assumption_label }}
                                     </p>
                                 </template>
+                                <p
+                                    v-if="
+                                        selectedQuote.pricing_status ===
+                                            'configured_estimate' ||
+                                        selectedQuote.pricing_status ===
+                                            'regional_estimate'
+                                    "
+                                    class="border-border text-muted-foreground border-t pt-2 text-xs leading-5"
+                                >
+                                    The shipping fee shown here is fixed when you place the order. Battlefront covers any difference from the courier's final charge.
+                                </p>
                             </div>
                         </div>
                     </section>
@@ -754,6 +829,11 @@ defineOptions({
                                     arrangement is included; delivery
                                     arrangements must be confirmed separately.
                                 </template>
+                                <template
+                                    v-else-if="selectedQuote?.delivery_arrangement_required"
+                                >
+                                    The total COD amount includes the product subtotal and Battlefront’s regional delivery fee estimate. Battlefront will confirm the delivery arrangement manually. No advance payment or payment proof is required.
+                                </template>
                                 <template v-else>
                                     The total COD amount includes your products
                                     and the configured demo delivery fee.
@@ -789,6 +869,11 @@ defineOptions({
                                     only; no delivery fee is included. Any
                                     delivery arrangement and charge must be
                                     confirmed separately.
+                                </template>
+                                <template
+                                    v-else-if="selectedQuote.delivery_arrangement_required"
+                                >
+                                    Pay {{ formatCurrency(selectedQuote.total) }} to Battlefront, including the product subtotal and regional delivery fee estimate. Battlefront will confirm delivery arrangements manually.
                                 </template>
                                 <template v-else>
                                     Pay
@@ -972,7 +1057,7 @@ defineOptions({
                             <dt class="text-muted-foreground">Delivery fee</dt>
                             <dd class="font-semibold tabular-nums">
                                 {{
-                                    selectedQuote?.pricing_configured === false
+                                    selectedQuote?.pricing_status === 'not_configured'
                                         ? 'Not quoted'
                                         : selectedQuote
                                           ? formatCurrency(
@@ -989,7 +1074,7 @@ defineOptions({
                         >
                             <dt class="font-semibold">
                                 {{
-                                    selectedQuote?.pricing_configured === false
+                                    selectedQuote?.pricing_status === 'not_configured'
                                         ? isCod
                                             ? 'Product subtotal payable upon delivery'
                                             : 'Product subtotal payable'
@@ -1000,7 +1085,7 @@ defineOptions({
                             </dt>
                             <dd class="text-2xl font-bold tabular-nums">
                                 {{
-                                    selectedQuote?.pricing_configured === false
+                                    selectedQuote?.pricing_status === 'not_configured'
                                         ? formatCurrency(
                                               selectedQuote.product_subtotal,
                                           )

@@ -47,6 +47,7 @@ test('mobile checkout returns shared preparation and hosted payment options', fu
         'pickup_location' => $prepared['pickupLocation'],
         'fulfillment_methods' => $prepared['fulfillmentMethods'],
         'payment_methods' => $prepared['paymentMethods'],
+        'paymongo_hosted_methods' => $prepared['paymongoHostedMethods'],
         'delivery_quotes' => $prepared['deliveryQuotes'],
         'delivery_locations' => $prepared['deliveryLocations'],
         'delivery_address_prefill' => $prepared['deliveryAddressPrefill'],
@@ -85,7 +86,7 @@ test('mobile checkout places all approved payment and fulfillment combinations',
         $payload['delivery_destination'] = 'Sagay City';
     }
     $response = $this->post('/api/v1/orders', $payload)->assertSuccessful()
-        ->assertJsonPath('data.total', $fulfillment === 'delivery' ? '98.66' : '18.66')
+        ->assertJsonPath('data.total', $fulfillment === 'delivery' ? '143.66' : '18.66')
         ->assertJsonPath('data.status.value', 'pending')
         ->assertJsonPath('data.payment.status.value', 'pending')
         ->assertJsonPath('data.payment.method.value', $hostedMethod === null ? $payment : 'online')

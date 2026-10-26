@@ -95,12 +95,12 @@ test('COD checkout places quoted delivery without proof and consumes only select
     } else {
         $this->withToken($customer->createToken('Phone')->plainTextToken)->postJson('/api/v1/orders', $payload)
             ->assertCreated()->assertJsonPath('data.payment.method.value', 'cod')->assertJsonPath('data.payment.proof_submitted', false)
-            ->assertJsonPath('data.payment.can_resubmit_proof', false)->assertJsonPath('data.total', '280.00');
+            ->assertJsonPath('data.payment.can_resubmit_proof', false)->assertJsonPath('data.total', '325.00');
     }
 
     $order = Order::sole();
     expect($order)->status->toBe(OrderStatus::Pending)->payment_status->toBe(PaymentStatus::Pending)
-        ->product_subtotal->toBe('200.00')->delivery_fee->toBe('80.00')->total_amount->toBe('280.00')
+        ->product_subtotal->toBe('200.00')->delivery_fee->toBe('125.00')->total_amount->toBe('325.00')
         ->payment_proof_path->toBeNull()->delivery_is_demo->toBeTrue();
     expect($order->delivery_address)->toBe($legacyAddress ? 'Legacy delivery address' : '12 Mabini Street, Poblacion I, Sagay City, Negros Occidental');
     expect($order->shipment)->status->toBe(ShipmentStatus::AwaitingPreparation)->carrier->toBe('lbc');
@@ -215,6 +215,9 @@ test('COD progresses through shipment milestones and separates collection from r
     expect($order->shipment)->carrier_cod_collected_amount->toBe('180.00')->carrier_cod_collected_at->not->toBeNull();
     expect($order->sale)->toBeNull();
     $this->assertDatabaseCount('sales', 0);
+    $this->get(route('administration.orders.show', $order))->assertInertia(fn (Assert $page) => $page
+        ->where('order.payment.can_confirm_cod_collection', false)
+        ->where('order.payment.can_confirm_cod_remittance', true));
     $this->post(route('administration.orders.cod-remittance.store', $order), [
         'cod_remittance_confirmed' => true,
         'carrier_cod_remittance_reference' => 'LBC-REMITTANCE-REFERENCE',

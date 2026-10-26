@@ -24,18 +24,18 @@ class UpdateOrderShipmentOperationsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'package_count' => ['required', 'integer', 'between:1,99'],
-            'package_weight_kg' => ['required', 'numeric', 'gt:0', 'max:99999.999'],
-            'package_length_cm' => ['required', 'numeric', 'gt:0', 'max:99999.99'],
-            'package_width_cm' => ['required', 'numeric', 'gt:0', 'max:99999.99'],
-            'package_height_cm' => ['required', 'numeric', 'gt:0', 'max:99999.99'],
-            'declared_value' => ['required', 'numeric', 'min:0', 'max:9999999999.99'],
-            'handoff_mode' => ['required', 'in:rider_pickup,branch_dropoff'],
-            'actual_carrier_cost' => ['nullable', 'numeric', 'min:0', 'max:9999999999.99'],
-            'carrier_cost_reference' => ['nullable', 'string', 'max:100', 'required_with:actual_carrier_cost'],
+            'package_count' => ['sometimes', 'required', 'integer', 'between:1,99'],
+            'package_weight_kg' => ['sometimes', 'required', 'numeric', 'gt:0', 'max:99999.999'],
+            'package_length_cm' => ['sometimes', 'required', 'numeric', 'gt:0', 'max:99999.99'],
+            'package_width_cm' => ['sometimes', 'required', 'numeric', 'gt:0', 'max:99999.99'],
+            'package_height_cm' => ['sometimes', 'required', 'numeric', 'gt:0', 'max:99999.99'],
+            'declared_value' => ['sometimes', 'required', 'numeric', 'min:0', 'max:9999999999.99'],
+            'handoff_mode' => ['sometimes', 'required', 'in:rider_pickup,branch_dropoff'],
+            'actual_carrier_cost' => ['sometimes', 'required', 'numeric', 'min:0', 'max:9999999999.99'],
+            'carrier_cost_reference' => ['sometimes', 'required', 'string', 'max:100'],
             'carrier_cost_confirmed' => ['sometimes', 'accepted'],
-            'shipment_exception_code' => ['nullable', 'in:booking_failed,pickup_missed,delivery_attempt_failed,damaged,lost,return_to_sender,other'],
-            'shipment_exception_note' => ['nullable', 'string', 'max:2000', 'required_with:shipment_exception_code'],
+            'shipment_exception_code' => ['sometimes', 'nullable', 'in:booking_failed,pickup_missed,delivery_attempt_failed,damaged,lost,return_to_sender,other'],
+            'shipment_exception_note' => ['sometimes', 'nullable', 'required_with:shipment_exception_code', 'string', 'max:2000'],
             'shipment_exception_resolved' => ['sometimes', 'boolean'],
         ];
     }
@@ -44,6 +44,26 @@ class UpdateOrderShipmentOperationsRequest extends FormRequest
     public function after(): array
     {
         return [function (Validator $validator): void {
+            $packageFields = ['package_count', 'package_weight_kg', 'package_length_cm', 'package_width_cm', 'package_height_cm', 'declared_value', 'handoff_mode'];
+            $hasPackageFields = collect($packageFields)->contains(fn (string $field): bool => $this->exists($field));
+
+            if ($hasPackageFields) {
+                foreach ($packageFields as $field) {
+                    if (! $this->exists($field)) {
+                        $validator->errors()->add($field, 'Complete all package details together.');
+                    }
+                }
+            }
+
+            if ($this->exists('actual_carrier_cost') !== $this->exists('carrier_cost_reference')) {
+                $validator->errors()->add('actual_carrier_cost', 'Provide the carrier cost and its receipt or reference together.');
+            }
+
+            if (! $hasPackageFields && ! $this->exists('actual_carrier_cost')
+                && ! $this->filled('shipment_exception_code') && ! $this->boolean('shipment_exception_resolved')) {
+                $validator->errors()->add('shipment', 'Submit package details, carrier cost, or a shipment issue to update.');
+            }
+
             if ($this->filled('actual_carrier_cost') && ! $this->boolean('carrier_cost_confirmed')) {
                 $validator->errors()->add('carrier_cost_confirmed', 'Confirm the carrier cost against its receipt or LBC reference.');
             }

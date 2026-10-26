@@ -193,6 +193,10 @@ class CustomerOrderPresenter
                 return 'The product subtotal is payable upon delivery. No delivery fee is included, and no LBC booking or carrier collection arrangement is represented.';
             }
 
+            if (($order->delivery_quote_metadata['pricing_status'] ?? null) === 'regional_estimate' && $order->shipment === null) {
+                return 'The order total, including Battlefront’s regional delivery fee estimate, is payable upon delivery. Battlefront will confirm the delivery arrangement manually; the fee is not an official LBC quotation.';
+            }
+
             if ($order->payment_status === PaymentStatus::Verified) {
                 return 'Battlefront has manually reconciled the LBC COD remittance for your order.';
             }

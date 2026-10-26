@@ -15,7 +15,7 @@ An order may transition from processing to completed only while payment_status i
 
 ## Require verified payment before order fulfillment transitions
 
-Require payment_status=verified before Pending may move to Processing and before Processing may move to Completed. Pending or rejected payment blocks both transitions; cancellation remains allowed, terminal/reverse transitions remain prohibited, and status processing must not mutate inventory.
+Require verified payment before ordinary prepaid fulfillment. Approved Pending COD delivery and pay-at-pickup orders may enter Processing unpaid through their dedicated workflows; COD completes only after separate full remittance reconciliation, and pickup requires the combined payment-and-handover action. Pending or rejected prepaid payment blocks fulfillment; cancellation remains governed by the shared cancellation rules, and status processing does not mutate inventory.
 
 ## Restore stock only on explicit eligible cancellation
 

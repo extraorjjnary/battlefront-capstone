@@ -265,31 +265,127 @@ class OrderProcessingService
         if ($this->hasCancellationHold($order)
             || $order->fulfillment_method !== FulfillmentMethod::Delivery
             || $order->status !== OrderStatus::Processing
-            || ! $this->paymentAllowsFulfillment($order)) {
+            || ! $this->paymentAllowsFulfillment($order)
+            || ($order->shipment?->shipment_exception_reported_at !== null && $order->shipment->shipment_exception_resolved_at === null)) {
             return null;
         }
 
         return $order->shipment?->status->next();
     }
 
+    /** @return array{title: string, detail: string}|null */
+    public function deliveryNextStep(Order $order): ?array
+    {
+        if ($order->fulfillment_method !== FulfillmentMethod::Delivery) {
+            return null;
+        }
+
+        if ($this->hasCancellationHold($order)) {
+            return ['title' => 'Review cancellation request', 'detail' => 'Order handling is paused while the cancellation request is under review.'];
+        }
+
+        if ($order->status === OrderStatus::Cancelled) {
+            return ['title' => 'Delivery cancelled', 'detail' => 'No further delivery action is available for this order.'];
+        }
+
+        if ($order->status === OrderStatus::Completed) {
+            if ($order->shipment?->shipment_exception_reported_at !== null && $order->shipment->shipment_exception_resolved_at === null) {
+                return ['title' => 'Resolve shipping issue', 'detail' => 'Record the follow-up for this delivered shipment. Order payment and sales are unchanged.'];
+            }
+
+            if ($order->shipment !== null && $order->shipment->carrier_cost_recorded_at === null) {
+                return ['title' => 'Record carrier cost', 'detail' => 'Add the carrier receipt or reference to reconcile delivery cost.'];
+            }
+
+            return ['title' => 'Delivery complete', 'detail' => 'The saved order total and delivery records are final.'];
+        }
+
+        if ($order->payment_status === PaymentStatus::Rejected) {
+            return ['title' => 'Resolve rejected payment', 'detail' => 'Keep fulfillment paused until the payment issue is resolved or the order is cancelled.'];
+        }
+
+        if ($order->shipment?->shipment_exception_reported_at !== null && $order->shipment->shipment_exception_resolved_at === null) {
+            return ['title' => 'Resolve shipping issue', 'detail' => 'Shipment milestones are paused until the assigned handler records the issue as resolved.'];
+        }
+
+        if ($order->payment_status === PaymentStatus::Pending && $order->payment_method !== PaymentMethod::Cod) {
+            $detail = $order->payment_origin === 'paymongo'
+                ? 'Wait for authenticated PayMongo confirmation before processing or preparing delivery.'
+                : 'Review the submitted payment proof and verify payment before processing or preparing delivery.';
+
+            return ['title' => $order->payment_origin === 'paymongo' ? 'Await payment confirmation' : 'Verify payment', 'detail' => $detail];
+        }
+
+        if ($order->shipment?->status === ShipmentStatus::Delivered && $order->payment_method === PaymentMethod::Cod) {
+            if ($order->shipment->carrier_cod_collected_at === null) {
+                return ['title' => 'Record COD collection', 'detail' => 'Confirm LBC collected the saved order total. Delivery alone does not verify payment.'];
+            }
+
+            if ($order->shipment->carrier_cod_remitted_at === null) {
+                return ['title' => 'Reconcile COD remittance', 'detail' => 'Verify the collected order total was remitted and record the LBC remittance reference.'];
+            }
+        }
+
+        if ($order->status === OrderStatus::Pending
+            && $order->payment_method !== PaymentMethod::Cod
+            && in_array(OrderStatus::Processing, $this->allowedOrderTransitions($order), strict: true)) {
+            return ['title' => 'Move order to Processing', 'detail' => 'Begin fulfillment after the required payment checks are complete.'];
+        }
+
+        if ($order->shipment === null && $this->requiresManualShipment($order)) {
+            return ['title' => 'Confirm delivery arrangement', 'detail' => 'Confirm the LBC arrangement and ETA manually. The saved customer delivery fee and order total cannot be changed.'];
+        }
+
+        if ($order->status === OrderStatus::Pending && in_array(OrderStatus::Processing, $this->allowedOrderTransitions($order), strict: true)) {
+            return ['title' => 'Move order to Processing', 'detail' => 'Begin fulfillment after the required payment or COD checks are complete.'];
+        }
+
+        $nextShipmentStatus = $this->nextShipmentStatus($order);
+        if ($nextShipmentStatus !== null) {
+            return ['title' => 'Mark '.$nextShipmentStatus->label(), 'detail' => 'Advance delivery by one recorded milestone after confirming the physical shipment state.'];
+        }
+
+        if ($order->payment_status === PaymentStatus::Pending) {
+            return ['title' => 'Prepare COD delivery', 'detail' => 'Confirm the delivery arrangement, then advance shipment milestones. Payment remains pending until collection is reconciled.'];
+        }
+
+        return null;
+    }
+
     private function requiresManualShipment(Order $order): bool
     {
         return $order->fulfillment_method === FulfillmentMethod::Delivery
-            && ($order->delivery_quote_metadata['pricing_status'] ?? null) === 'not_configured';
+            && in_array($order->delivery_quote_metadata['pricing_status'] ?? null, ['not_configured', 'regional_estimate'], strict: true);
     }
 
     public function canCreateManualShipment(Order $order): bool
     {
         return ! $this->hasCancellationHold($order)
             && $this->requiresManualShipment($order)
-            && $order->delivery_fee === '0.00'
             && $order->product_subtotal !== null
-            && bccomp($order->total_amount, $order->product_subtotal, 2) === 0
+            && bccomp($order->total_amount, bcadd($order->product_subtotal, $order->delivery_fee, 2), 2) === 0
             && in_array($order->status, [OrderStatus::Pending, OrderStatus::Processing], strict: true)
-            && (! in_array($order->payment_method, [PaymentMethod::GCash, PaymentMethod::Maya], strict: true)
+            && (! in_array($order->payment_method, [PaymentMethod::GCash, PaymentMethod::Maya, PaymentMethod::Online], strict: true)
                 || $order->status === OrderStatus::Processing)
             && $order->payment_status !== PaymentStatus::Rejected
             && $order->shipment === null;
+    }
+
+    public function canUpdateShipmentOperations(Order $order, string $operation): bool
+    {
+        $shipment = $order->shipment;
+        if ($shipment === null || $order->fulfillment_method !== FulfillmentMethod::Delivery || $order->status === OrderStatus::Cancelled) {
+            return false;
+        }
+
+        return match ($operation) {
+            'package' => $order->status === OrderStatus::Processing
+                && $shipment->handed_to_carrier_at === null,
+            'carrier_cost' => $shipment->carrier_cost_recorded_at === null
+                && in_array($order->status, [OrderStatus::Processing, OrderStatus::Completed], strict: true),
+            'exception' => in_array($order->status, [OrderStatus::Processing, OrderStatus::Completed], strict: true),
+            default => false,
+        };
     }
 
     public function canSimulateLocalLbcBooking(Order $order): bool
@@ -371,7 +467,14 @@ class OrderProcessingService
                 ]);
             }
 
-            if ($shipment->handed_to_carrier_at !== null && $shipment->package_count !== null && (
+            $hasPackageDetails = array_key_exists('package_count', $operations);
+            if ($hasPackageDetails && ! $this->canUpdateShipmentOperations($lockedOrder, 'package')) {
+                throw ValidationException::withMessages([
+                    'package_count' => 'Package details can only be recorded before LBC handoff on an active order.',
+                ]);
+            }
+
+            if ($hasPackageDetails && $shipment->handed_to_carrier_at !== null && $shipment->package_count !== null && (
                 (string) $shipment->package_count !== (string) $operations['package_count']
                 || bccomp($this->decimalString($shipment->package_weight_kg), $this->decimalString($operations['package_weight_kg']), 3) !== 0
                 || bccomp($this->decimalString($shipment->package_length_cm), $this->decimalString($operations['package_length_cm']), 2) !== 0
@@ -385,16 +488,22 @@ class OrderProcessingService
                 ]);
             }
 
-            $shipment->package_count = (int) $operations['package_count'];
-            $shipment->package_weight_kg = $this->decimalString($operations['package_weight_kg']);
-            $shipment->package_length_cm = $this->decimalString($operations['package_length_cm']);
-            $shipment->package_width_cm = $this->decimalString($operations['package_width_cm']);
-            $shipment->package_height_cm = $this->decimalString($operations['package_height_cm']);
-            $shipment->declared_value = $this->decimalString($operations['declared_value']);
-            $shipment->handoff_mode = (string) $operations['handoff_mode'];
+            if ($hasPackageDetails) {
+                $shipment->package_count = (int) $operations['package_count'];
+                $shipment->package_weight_kg = $this->decimalString($operations['package_weight_kg']);
+                $shipment->package_length_cm = $this->decimalString($operations['package_length_cm']);
+                $shipment->package_width_cm = $this->decimalString($operations['package_width_cm']);
+                $shipment->package_height_cm = $this->decimalString($operations['package_height_cm']);
+                $shipment->declared_value = $this->decimalString($operations['declared_value']);
+                $shipment->handoff_mode = (string) $operations['handoff_mode'];
+            }
 
             $carrierCost = $operations['actual_carrier_cost'] ?? null;
-            if ($carrierCost !== null) {
+            if (array_key_exists('actual_carrier_cost', $operations)) {
+                if (! $this->canUpdateShipmentOperations($lockedOrder, 'carrier_cost')) {
+                    throw ValidationException::withMessages(['actual_carrier_cost' => 'Carrier cost can be recorded once for an active or completed delivery.']);
+                }
+
                 if ($shipment->carrier_cost_recorded_at !== null && (
                     bccomp($this->decimalString($shipment->actual_carrier_cost), $this->decimalString($carrierCost), 2) !== 0
                     || $shipment->carrier_cost_reference !== trim((string) $operations['carrier_cost_reference'])
@@ -413,11 +522,18 @@ class OrderProcessingService
 
             $exceptionCode = $operations['shipment_exception_code'] ?? null;
             if (filled($exceptionCode)) {
-                $exceptionNote = trim((string) $operations['shipment_exception_note']);
-                $exceptionChanged = $shipment->shipment_exception_code !== (string) $exceptionCode
-                    || $shipment->shipment_exception_note !== $exceptionNote;
+                if (! $this->canUpdateShipmentOperations($lockedOrder, 'exception')) {
+                    throw ValidationException::withMessages(['shipment_exception_code' => 'A shipping issue can only be recorded for an active or completed delivery.']);
+                }
 
-                if ($exceptionChanged) {
+                $exceptionNote = trim((string) $operations['shipment_exception_note']);
+                if ($shipment->shipment_exception_reported_at !== null && $shipment->shipment_exception_resolved_at === null) {
+                    if ($shipment->shipment_exception_code !== (string) $exceptionCode
+                        || $shipment->shipment_exception_note !== $exceptionNote
+                        || ! filter_var($operations['shipment_exception_resolved'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                        throw ValidationException::withMessages(['shipment_exception_code' => 'Resolve the current shipping issue before recording another one.']);
+                    }
+                } else {
                     $shipment->shipment_exception_code = (string) $exceptionCode;
                     $shipment->shipment_exception_note = $exceptionNote;
                     $shipment->shipment_exception_reported_at = Carbon::now();
@@ -426,6 +542,10 @@ class OrderProcessingService
             }
 
             if ($shipment->shipment_exception_reported_at !== null && filter_var($operations['shipment_exception_resolved'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+                if (! $this->canUpdateShipmentOperations($lockedOrder, 'exception')) {
+                    throw ValidationException::withMessages(['shipment_exception_resolved' => 'The shipping issue can no longer be changed for this order.']);
+                }
+
                 if ($shipment->shipment_exception_resolved_at === null) {
                     $shipment->shipment_exception_resolved_at = Carbon::now();
                 }
@@ -480,7 +600,7 @@ class OrderProcessingService
 
             if (! $this->canCreateManualShipment($lockedOrder)) {
                 throw ValidationException::withMessages([
-                    'carrier' => 'Manual shipments are available only for eligible, unconfigured delivery orders without an existing shipment.',
+                    'carrier' => 'Manual shipments are available only for eligible delivery orders requiring an arrangement and without an existing shipment.',
                 ]);
             }
 
@@ -982,11 +1102,17 @@ class OrderProcessingService
      */
     private function decimalString(mixed $value): string
     {
-        if ((! is_string($value) && ! is_int($value)) || ! is_numeric($value)) {
+        if ((! is_string($value) && ! is_int($value) && ! is_float($value)) || ! is_numeric($value)) {
             throw new \LogicException('A required decimal value is missing or invalid.');
         }
 
-        return (string) $value;
+        $decimal = (string) $value;
+
+        if (str_contains(strtolower($decimal), 'e')) {
+            $decimal = rtrim(rtrim(sprintf('%.14F', (float) $value), '0'), '.');
+        }
+
+        return $decimal;
     }
 
     public function canProcess(Order $order, User $actor): bool

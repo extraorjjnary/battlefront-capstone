@@ -67,7 +67,14 @@ class OrderFactory extends Factory
             $quote = app(DeliveryRules::class)->quote(
                 FulfillmentMethod::Delivery,
                 $destination,
-                [new Product(['shipping_profile' => $profile])],
+                [new Product([
+                    'shipping_profile' => $profile,
+                    'package_weight_kg' => '1.000',
+                    'package_length_cm' => '25.00',
+                    'package_width_cm' => '20.00',
+                    'package_height_cm' => '10.00',
+                    'package_measurement_source' => 'estimated',
+                ])],
             );
 
             return [

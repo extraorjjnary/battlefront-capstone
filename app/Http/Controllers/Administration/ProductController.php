@@ -253,6 +253,11 @@ class ProductController extends Controller
                     'discount_price',
                     'is_active',
                     'edit_version',
+                    'package_weight_kg',
+                    'package_length_cm',
+                    'package_width_cm',
+                    'package_height_cm',
+                    'package_measurement_source',
                 ]),
                 ...($request->user()->can('products.cost') ? ['acquisition_cost' => $product->acquisition_cost] : []),
                 'image_url' => $product->image_url,
@@ -295,6 +300,11 @@ class ProductController extends Controller
                     'discount_price',
                     'is_active',
                     'edit_version',
+                    'package_weight_kg',
+                    'package_length_cm',
+                    'package_width_cm',
+                    'package_height_cm',
+                    'package_measurement_source',
                 ]),
                 'image_url' => $product->image_url,
                 'tag_ids' => $product->tags->pluck('id')->all(),
@@ -352,13 +362,15 @@ class ProductController extends Controller
      * @return array{
      *     categories: Collection<int, Category>,
      *     tags: Collection<int, Tag>,
-     *     shipping_profiles: list<array{profile: string, label: string, surcharge: string, preparation_days: int}>
+     *     shipping_profiles: list<array{profile: string, label: string, surcharge: string, preparation_days: int}>,
+     *     package_estimates: array{fallback: array<string, string>, categories: array<string, array<string, string>>}
      * }
      */
     private function productOptions(): array
     {
         return [
             'shipping_profiles' => $this->presenter->handlingOptions(),
+            'package_estimates' => config('battlefront.shipping.package_estimates'),
             'categories' => Category::query()
                 ->select(['id', 'name', 'is_active'])
                 ->orderBy('name')

@@ -13,6 +13,8 @@ use stdClass;
 
 class AdministrationWorkQueue
 {
+    private const SHIPPING_OPERATIONS_AVAILABLE_AT = '2026-10-24 16:37:15';
+
     /**
      * @param  array<string, mixed>  $filters
      * @return LengthAwarePaginator<int, array<string, mixed>>
@@ -26,7 +28,21 @@ class AdministrationWorkQueue
         }
 
         return $query
-            ->when($filters['kind'] ?? null, fn (Builder $query, string $kind): Builder => $query->where('kind', $kind))
+            ->when(($filters['kind'] ?? null) === 'shipping', fn (Builder $query): Builder => $query
+                ->where('kind', 'order')
+                ->whereExists(fn (Builder $shipments): Builder => $shipments->selectRaw('1')->from('shipments')
+                    ->whereColumn('shipments.order_id', 'work_queue.case_id')
+                    ->where(function (Builder $followUps): void {
+                        $followUps->where(fn (Builder $issue): Builder => $issue->whereNotNull('shipment_exception_reported_at')->whereNull('shipment_exception_resolved_at'))
+                            ->orWhere(fn (Builder $tracking): Builder => $tracking->whereIn('status', ['handed_to_lbc', 'in_transit', 'out_for_delivery', 'delivered'])->whereNull('tracking_reference'))
+                            ->orWhere(fn (Builder $cod): Builder => $cod->where('status', 'delivered')->whereNull('carrier_cod_collected_at')
+                                ->whereExists(fn (Builder $order): Builder => $order->selectRaw('1')->from('orders')->whereColumn('orders.id', 'shipments.order_id')->where('orders.status', 'processing')->where('orders.payment_method', 'cod')))
+                            ->orWhere(fn (Builder $remittance): Builder => $remittance->where('status', 'delivered')->whereNotNull('carrier_cod_collected_at')->whereNull('carrier_cod_remitted_at')
+                                ->whereExists(fn (Builder $order): Builder => $order->selectRaw('1')->from('orders')->whereColumn('orders.id', 'shipments.order_id')->where('orders.status', 'processing')->where('orders.payment_method', 'cod')))
+                            ->orWhere(fn (Builder $cost): Builder => $cost->whereNull('carrier_cost_recorded_at')->whereNotNull('delivered_at')->where('delivered_at', '>=', self::SHIPPING_OPERATIONS_AVAILABLE_AT)->whereExists(fn (Builder $completed): Builder => $completed->selectRaw('1')->from('orders')->whereColumn('orders.id', 'shipments.order_id')->where('orders.status', 'completed')))
+                            ->orWhere(fn (Builder $overdue): Builder => $overdue->whereNotNull('estimated_delivery_end')->whereDate('estimated_delivery_end', '<', now(config('app.timezone'))->toDateString())->whereNotIn('status', ['delivered', 'cancelled']));
+                    })))
+            ->when(($filters['kind'] ?? null) !== 'shipping' && ($filters['kind'] ?? null), fn (Builder $query, string $kind): Builder => $query->where('kind', $kind))
             ->when($filters['responsible'] ?? null, fn (Builder $query, string $responsible): Builder => $query->where('responsible_name', 'like', '%'.$responsible.'%'))
             ->when($filters['older_than'] ?? null, fn (Builder $query, int $days): Builder => $query->where('created_at', '<', now()->subDays($days)))
             ->orderBy('created_at')->orderBy('kind')->orderBy('id')
@@ -134,7 +150,18 @@ class AdministrationWorkQueue
                 ->leftJoin('users', 'users.id', '=', 'work.assigned_handler_id')
                 ->select('work.id', 'work.id as case_id', 'work.created_at', 'users.name as responsible_name', 'users.is_active as responsible_active', 'work.status')
                 ->selectRaw("'order' as kind")
-                ->whereIn('work.status', ['pending', 'processing'])
+                ->where(function (Builder $orders): void {
+                    $orders->whereIn('work.status', ['pending', 'processing'])
+                        ->orWhere(fn (Builder $completed): Builder => $completed->where('work.status', 'completed')
+                            ->whereExists(fn (Builder $shipment): Builder => $shipment->selectRaw('1')->from('shipments')
+                                ->whereColumn('shipments.order_id', 'work.id')
+                                ->where(function (Builder $followUps): void {
+                                    $followUps->whereNotNull('shipment_exception_reported_at')->whereNull('shipment_exception_resolved_at')
+                                        ->orWhere(fn (Builder $cost): Builder => $cost->whereNull('carrier_cost_recorded_at')
+                                            ->whereNotNull('delivered_at')
+                                            ->where('delivered_at', '>=', self::SHIPPING_OPERATIONS_AVAILABLE_AT));
+                                })));
+                })
                 ->whereNotExists(fn (Builder $query) => $query->selectRaw('1')->from('order_cancellation_requests as cancellation')
                     ->whereColumn('cancellation.order_id', 'work.id')->where('cancellation.status', 'pending'))
                 ->when(! $actor->can('orders.assign'), fn (Builder $query) => $query->where(fn (Builder $query) => $query
@@ -150,7 +177,20 @@ class AdministrationWorkQueue
             $combined->unionAll($query);
         }
 
-        return DB::query()->fromSub($combined, 'work_queue');
+        return DB::query()->fromSub($combined, 'work_queue')
+            ->select('work_queue.*')
+            ->selectSub(DB::table('shipments')->select('status')->whereColumn('order_id', 'work_queue.case_id')->limit(1), 'shipment_status')
+            ->selectSub(DB::table('shipments')->select('tracking_reference')->whereColumn('order_id', 'work_queue.case_id')->limit(1), 'shipment_tracking_reference')
+            ->selectSub(DB::table('shipments')->select('shipment_exception_reported_at')->whereColumn('order_id', 'work_queue.case_id')->limit(1), 'shipment_exception_reported_at')
+            ->selectSub(DB::table('shipments')->select('shipment_exception_resolved_at')->whereColumn('order_id', 'work_queue.case_id')->limit(1), 'shipment_exception_resolved_at')
+            ->selectSub(DB::table('shipments')->select('carrier_cod_collected_at')->whereColumn('order_id', 'work_queue.case_id')->limit(1), 'carrier_cod_collected_at')
+            ->selectSub(DB::table('shipments')->select('carrier_cod_remitted_at')->whereColumn('order_id', 'work_queue.case_id')->limit(1), 'carrier_cod_remitted_at')
+            ->selectSub(DB::table('shipments')->select('carrier_cost_recorded_at')->whereColumn('order_id', 'work_queue.case_id')->limit(1), 'carrier_cost_recorded_at')
+            ->selectSub(DB::table('shipments')->select('package_count')->whereColumn('order_id', 'work_queue.case_id')->limit(1), 'shipment_package_count')
+            ->selectSub(DB::table('shipments')->select('estimated_delivery_end')->whereColumn('order_id', 'work_queue.case_id')->limit(1), 'estimated_delivery_end')
+            ->selectSub(DB::table('shipments')->select('eta_timezone')->whereColumn('order_id', 'work_queue.case_id')->limit(1), 'eta_timezone')
+            ->selectSub(DB::table('orders')->select('payment_method')->whereColumn('id', 'work_queue.case_id')->limit(1), 'order_payment_method')
+            ->selectSub(DB::table('orders')->select('status')->whereColumn('id', 'work_queue.case_id')->limit(1), 'order_status');
     }
 
     /** @param string|list<string> $statuses */
@@ -186,7 +226,7 @@ class AdministrationWorkQueue
             'refund' => ['Record outstanding refund payment', 'administration.customer-returns.index'],
             'refund_reconciliation' => ['Reconcile refund payment', 'administration.customer-returns.index'],
             'customer_return' => ['Review customer return', 'administration.customer-returns.index'],
-            'order' => [$entry->responsible_active !== null && ! (bool) $entry->responsible_active ? 'Reassign inactive handler' : ($entry->status === 'pending' ? 'Review payment and assign or process order' : 'Review active fulfillment'), 'administration.orders.show'],
+            'order' => [$entry->responsible_active !== null && ! (bool) $entry->responsible_active ? 'Reassign inactive handler' : $this->shippingAction($entry), 'administration.orders.show'],
             default => throw new LogicException('Unknown administration work queue item.'),
         };
 
@@ -205,5 +245,44 @@ class AdministrationWorkQueue
                 ...($entry->kind === 'refund_reconciliation' ? ['payment_id' => $id] : []),
             ]).($entry->kind === 'refund_reconciliation' ? '#refund-payment-'.$id : ''),
         ];
+    }
+
+    private function shippingAction(stdClass $entry): string
+    {
+        if ($entry->shipment_exception_reported_at !== null && $entry->shipment_exception_resolved_at === null) {
+            return 'Resolve the open shipping issue';
+        }
+
+        if ($entry->shipment_status === 'delivered' && $entry->order_payment_method === 'cod' && $entry->order_status === 'processing') {
+            if ($entry->carrier_cod_collected_at === null) {
+                return 'Confirm COD collection';
+            }
+
+            if ($entry->carrier_cod_remitted_at === null) {
+                return 'Reconcile COD remittance';
+            }
+        }
+
+        if ($entry->estimated_delivery_end !== null
+            && in_array($entry->shipment_status, ['handed_to_lbc', 'in_transit', 'out_for_delivery'], strict: true)
+            && now($entry->eta_timezone ?: config('app.timezone'))->gt(CarbonImmutable::parse($entry->estimated_delivery_end, $entry->eta_timezone ?: config('app.timezone'))->endOfDay())) {
+            return 'Follow up on the overdue delivery estimate';
+        }
+
+        if (in_array($entry->shipment_status, ['handed_to_lbc', 'in_transit', 'out_for_delivery', 'delivered'], strict: true)
+            && $entry->shipment_tracking_reference === null) {
+            return 'Record the LBC tracking reference';
+        }
+
+        if (in_array($entry->shipment_status, ['awaiting_preparation', 'preparing', 'ready_for_dispatch'], strict: true)
+            && $entry->shipment_package_count === null) {
+            return 'Record packed parcel details';
+        }
+
+        if ($entry->order_status === 'completed' && $entry->carrier_cost_recorded_at === null) {
+            return 'Record the carrier cost receipt';
+        }
+
+        return $entry->status === 'pending' ? 'Review payment and assign or process order' : 'Review active fulfillment';
     }
 }

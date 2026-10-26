@@ -406,6 +406,12 @@ function finishPaymentWindow(page) {
                                 </dt>
                                 <dd class="font-semibold tabular-nums">
                                     {{ formatCurrency(order.delivery_fee) }}
+                                    <p
+                                        v-if="order.delivery_quote?.fixed_delivery_fee"
+                                        class="text-muted-foreground mt-1 max-w-xs text-left text-xs font-normal leading-5"
+                                    >
+                                        This fee was fixed when you placed the order. Battlefront covers any difference from the courier's final charge.
+                                    </p>
                                 </dd>
                             </div>
                         </dl>
@@ -422,8 +428,8 @@ function finishPaymentWindow(page) {
                         >
                             <template
                                 v-if="
-                                    order.delivery_quote.pricing_configured ===
-                                    false
+                                    order.delivery_quote.pricing_status ===
+                                    'not_configured'
                                 "
                             >
                                 <p class="font-semibold">
@@ -441,6 +447,26 @@ function finishPaymentWindow(page) {
                                     {{ order.delivery_quote.assumption_label }}
                                 </p>
                             </template>
+                            <template
+                                v-else-if="order.delivery_quote.delivery_arrangement_required"
+                            >
+                                <p class="font-semibold">
+                                    Battlefront regional shipping estimate ·
+                                    {{ order.delivery_quote.destination }}
+                                </p>
+                                <p class="text-muted-foreground text-sm">
+                                    {{ order.delivery_quote.notice }}
+                                </p>
+                                <p v-if="order.delivery_quote.billable_weight_kg" class="text-sm">
+                                    Route {{ formatCurrency(order.delivery_quote.route_base_fee) }} + weight {{ formatCurrency(order.delivery_quote.weight_surcharge) }} + handling {{ formatCurrency(order.delivery_quote.handling_surcharge) }} · {{ order.delivery_quote.billable_weight_kg }} kg billable
+                                </p>
+                                <p class="text-muted-foreground text-xs">
+                                    {{ order.delivery_quote.assumption_label }}
+                                </p>
+                                <p v-if="order.delivery_quote.estimate_disclosure" class="text-muted-foreground text-xs">
+                                    {{ order.delivery_quote.estimate_disclosure }}
+                                </p>
+                            </template>
                             <template v-else>
                                 <p class="font-semibold">
                                     {{
@@ -452,6 +478,9 @@ function finishPaymentWindow(page) {
                                     {{
                                         order.delivery_quote.packing_expectation
                                     }}
+                                </p>
+                                <p v-if="order.delivery_quote.billable_weight_kg" class="text-sm">
+                                    Route {{ formatCurrency(order.delivery_quote.route_base_fee) }} + weight {{ formatCurrency(order.delivery_quote.weight_surcharge) }} + handling {{ formatCurrency(order.delivery_quote.handling_surcharge) }} · {{ order.delivery_quote.billable_weight_kg }} kg billable
                                 </p>
                                 <p>
                                     Estimated preparation and transit:
