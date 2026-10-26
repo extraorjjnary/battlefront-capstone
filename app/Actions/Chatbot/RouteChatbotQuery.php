@@ -3,6 +3,7 @@
 namespace App\Actions\Chatbot;
 
 use App\Enums\ChatbotQueryCategory;
+use App\Services\Chatbot\ChatbotLanguage;
 
 class RouteChatbotQuery
 {
@@ -10,26 +11,31 @@ class RouteChatbotQuery
         private CategorizeChatbotQuery $categorizer,
         private MatchChatbotKnowledge $knowledge,
         private ClassifyChatbotInquiry $boundary,
+        private ChatbotLanguage $language = new ChatbotLanguage,
     ) {}
 
     /** @return array{category: ChatbotQueryCategory, choices: array<string, string>} */
     public function execute(string $message): array
     {
-        $category = $this->boundary->execute($message)['category'];
+        $classification = $this->boundary->execute($message);
+        $category = $classification['category'];
 
         if ($this->categorizer->isBlocked($message)) {
             return ['category' => $category, 'choices' => []];
         }
 
         $choices = [];
-        $clauses = preg_split('/\s+(?:and|also|plus)\s+|[;?]+\s*(?:(?:and|also|plus)\s+)?/iu', $message, flags: PREG_SPLIT_NO_EMPTY) ?: [];
+        $splitRules = count(array_filter(array_keys($classification['choices']), fn (string $key): bool => str_starts_with($key, 'faq:'))) > 1;
+        $clauses = $this->language->clauses($message);
 
         foreach ($clauses as $clause) {
             $clauseCategory = $this->categoryWithKnowledge($clause);
 
             if ($clauseCategory !== ChatbotQueryCategory::Unsupported) {
-                $choices[$clauseCategory->value] = isset($choices[$clauseCategory->value])
-                    ? $choices[$clauseCategory->value].' and '.trim($clause)
+                $ruleTopic = $this->boundary->execute($clause)['rule_topic'];
+                $key = $splitRules && $ruleTopic !== null ? 'faq:'.$ruleTopic : $clauseCategory->value;
+                $choices[$key] = isset($choices[$key])
+                    ? $choices[$key].' and '.trim($clause)
                     : trim($clause);
             }
         }
@@ -61,6 +67,11 @@ class RouteChatbotQuery
                 'product' => 'product information',
                 'order' => 'your order',
                 'store' => 'store information',
+                'faq:payment_methods', 'faq:payment_proof' => 'payment guidance',
+                'faq:fulfillment', 'faq:delivery_quote' => 'delivery guidance',
+                'faq:cancellation' => 'cancellation guidance',
+                'faq:returns' => 'return guidance',
+                'faq:refunds' => 'refund guidance',
                 default => 'payment or delivery guidance',
             }, array_keys($choices),
         )).'? Please repeat that part of your question or name its topic.';

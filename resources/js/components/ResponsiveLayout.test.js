@@ -12,6 +12,195 @@ const executable = process.env.BATTLEFRONT_UI_BROWSER;
 const widths = [320, 375, 390, 428, 768, 1024, 1440];
 
 test(
+    'email OTP verification preserves leading zeros, cooldown, and recovery feedback',
+    { skip: !baseUrl || !executable, timeout: 60000 },
+    async (t) => {
+        const browser = await openBrowser(t);
+        const verification = {
+            status: 'verification_required',
+            masked_email: 'c***@example.test',
+            verification_expires_at: new Date(
+                Date.now() + 1800000,
+            ).toISOString(),
+            expires_at: new Date(Date.now() + 300000).toISOString(),
+            resend_available_at: new Date(Date.now() - 1000).toISOString(),
+            attempts_remaining: 5,
+            delivery_status: 'sent',
+            retry_after: 0,
+        };
+        const props = { verification, status: '' };
+        const codeInput = `document.querySelector('#code')`;
+        const verifyButton = `document.querySelectorAll('form')[0].querySelector('button[type=submit]')`;
+        const resendButton = `document.querySelectorAll('form')[1].querySelector('button[type=submit]')`;
+        async function waitFor(expression, message) {
+            for (let attempt = 0; attempt < 100; attempt++) {
+                if (await browser.evaluate(expression)) return;
+                await delay(25);
+            }
+            assert.fail(message + '; ' + browser.exceptions.join('; '));
+        }
+
+        for (const theme of ['light', 'dark']) {
+            await browser.show('auth/VerifyEmail', props, false, theme);
+            for (const width of [320, 1440]) {
+                await browser.resize(width);
+                assert.deepEqual(
+                    await browser.evaluate(`(() => {
+                        const controls = [...document.querySelectorAll('#app input, #app button, #app label, #app p, #app h1, #app a')];
+                        return controls.filter((element) => {
+                            const rect = element.getBoundingClientRect();
+                            return rect.width && rect.height && (rect.left < -1 || rect.right > innerWidth + 1);
+                        }).map((element) => element.id || element.textContent.trim());
+                    })()`),
+                    [],
+                    `Verification content fits ${theme} at ${width}px`,
+                );
+            }
+            assert.equal(
+                await browser.evaluate(
+                    `document.documentElement.classList.contains('dark')`,
+                ),
+                theme === 'dark',
+            );
+        }
+        assert.deepEqual(
+            await browser.evaluate(
+                `({ type: ${codeInput}.type, inputmode: ${codeInput}.inputMode, autocomplete: ${codeInput}.autocomplete, maxlength: ${codeInput}.maxLength })`,
+            ),
+            {
+                type: 'text',
+                inputmode: 'numeric',
+                autocomplete: 'one-time-code',
+                maxlength: 6,
+            },
+        );
+        assert.equal(
+            await browser.evaluate(
+                `document.querySelector('a[href="/login"]').textContent.trim()`,
+            ),
+            'Return to login',
+        );
+
+        const invalid = 'The code is invalid. Check your email and try again.';
+        browser.registerForm('/email/verify', {
+            ...props,
+            verification: { ...verification, attempts_remaining: 4 },
+            errors: { code: invalid },
+        });
+        await browser.evaluate(`(() => {
+            const input = ${codeInput};
+            input.value = '001234';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.form.requestSubmit();
+        })()`);
+        await waitFor(
+            `document.querySelector('#code-error').textContent.includes(${JSON.stringify(invalid)}) && ${codeInput}.getAttribute('aria-invalid') === 'true'`,
+            'Invalid codes show inline feedback',
+        );
+        assert.equal(
+            JSON.parse(browser.formRequests[0].postData).code,
+            '001234',
+        );
+        assert.equal(await browser.evaluate(`${codeInput}.value`), '001234');
+        assert.ok(
+            await browser.evaluate(
+                `document.querySelector('#code-guidance').textContent.includes('4 attempts remaining')`,
+            ),
+        );
+
+        await browser.show(
+            'auth/VerifyEmail',
+            {
+                ...props,
+                verification: {
+                    ...verification,
+                    resend_available_at: new Date(
+                        Date.now() + 1000,
+                    ).toISOString(),
+                },
+            },
+            false,
+            'light',
+        );
+        assert.equal(await browser.evaluate(`${resendButton}.disabled`), true);
+        assert.match(
+            await browser.evaluate(`${resendButton}.textContent.trim()`),
+            /^Resend code in \d+s$/,
+        );
+        await waitFor(
+            `${resendButton}.disabled === false`,
+            'The resend button enables after the visible cooldown',
+        );
+        browser.registerForm('/email/resend', {
+            ...props,
+            status: 'A new verification code has been sent. Check your inbox.',
+            verification: {
+                ...verification,
+                resend_available_at: new Date(Date.now() + 60000).toISOString(),
+            },
+        });
+        await browser.evaluate(
+            `document.querySelectorAll('form')[1].requestSubmit()`,
+        );
+        await waitFor(
+            `!!document.querySelector('[role=status]') && ${resendButton}.disabled`,
+            'Resending confirms delivery and restarts cooldown',
+        );
+        assert.equal(
+            new URL(browser.formRequests[1].url).pathname,
+            '/email/resend',
+        );
+
+        for (const [changes, guidance, resendDisabled = false] of [
+            [
+                { expires_at: new Date(Date.now() - 1000).toISOString() },
+                'This code has expired.',
+            ],
+            [{ attempts_remaining: 0 }, 'You have used all five attempts.'],
+            [
+                { delivery_status: 'failed', expires_at: null },
+                'Email delivery was unsuccessful.',
+            ],
+            [
+                {
+                    delivery_status: 'rate_limited',
+                    expires_at: null,
+                    resend_available_at: new Date(
+                        Date.now() + 60000,
+                    ).toISOString(),
+                },
+                'Code requests are temporarily limited.',
+                true,
+            ],
+        ]) {
+            await browser.show(
+                'auth/VerifyEmail',
+                {
+                    ...props,
+                    verification: { ...verification, ...changes },
+                },
+                false,
+                'light',
+            );
+            assert.ok(
+                await browser.evaluate(
+                    `document.querySelector('[role=alert], [role=status]').textContent.includes(${JSON.stringify(guidance)})`,
+                ),
+            );
+            assert.equal(
+                await browser.evaluate(`${verifyButton}.disabled`),
+                true,
+            );
+            assert.equal(
+                await browser.evaluate(`${resendButton}.disabled`),
+                resendDisabled,
+            );
+        }
+        assert.deepEqual(browser.exceptions, []);
+    },
+);
+
+test(
     'branch management forms and directories fit both themes and keep publication explicit',
     {
         skip: !baseUrl || !executable,
@@ -1213,7 +1402,11 @@ test(
             low_stock_count: 1,
             out_of_stock_count: 0,
         };
-        const staff = { viewInventory: true, requestInventory: true };
+        const staff = {
+            viewInventory: true,
+            requestInventory: true,
+            requestInventoryAdjustment: true,
+        };
         const trigger = `document.querySelector('main [data-slot="collapsible-trigger"]')`;
         const form = `document.querySelector('main article form')`;
         const expanded = `${trigger}.getAttribute('aria-expanded')`;
@@ -1271,6 +1464,7 @@ test(
                     `Object.fromEntries(new FormData(${form}))`,
                 ),
                 {
+                    observed_quantity: String(product.inventory.quantity),
                     quantity: '12',
                     reorder_level: '10',
                     reason_code: 'count_error',
@@ -1408,6 +1602,245 @@ test(
         assert.equal(
             await browser.evaluate(`${form}.elements.reorder_level.required`),
             true,
+        );
+
+        const direct = {
+            viewInventory: true,
+            requestInventory: true,
+            adjustInventory: true,
+        };
+        for (const theme of ['light', 'dark']) {
+            await browser.show(
+                'Administration/Inventory',
+                inventory,
+                'admin',
+                theme,
+                {},
+                direct,
+            );
+            assert.match(
+                await browser.evaluate(`${trigger}.textContent`),
+                /Adjust stock/,
+            );
+            await browser.evaluate(`${trigger}.click()`);
+            assert.equal(
+                await browser.evaluate(
+                    `${form}.querySelector('button[type=submit]').disabled`,
+                ),
+                true,
+            );
+            await browser.evaluate(`(() => {
+                const form = ${form};
+                form.elements.quantity.value = '12';
+                form.elements.quantity.dispatchEvent(new Event('input', { bubbles: true }));
+                form.elements.reason_code.value = 'theft_loss';
+                form.elements.reason_code.dispatchEvent(new Event('change', { bubbles: true }));
+            })()`);
+            assert.equal(
+                await browser.evaluate(`${form}.elements.reason.required`),
+                true,
+            );
+            assert.match(
+                await browser.evaluate(`${form}.textContent`),
+                /Proposed/,
+            );
+            await browser.evaluate(
+                `${form}.elements.stock_adjustment_confirmed.click()`,
+            );
+            assert.equal(
+                await browser.evaluate(
+                    `${form}.querySelector('button[type=submit]').disabled`,
+                ),
+                false,
+            );
+            await browser.evaluate(`(() => {
+                const input = ${form}.elements.quantity;
+                input.value = '8';
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            })()`);
+            assert.equal(
+                await browser.evaluate(
+                    `${form}.elements.stock_adjustment_confirmed.checked`,
+                ),
+                false,
+            );
+            assert.equal(
+                await browser.evaluate(
+                    `${form}.querySelector('button[type=submit]').disabled`,
+                ),
+                true,
+            );
+            for (const width of [320, 768, 1440]) {
+                await browser.resize(width);
+                await assertFits(
+                    browser,
+                    `direct adjustment ${theme} ${width}`,
+                );
+            }
+            await browser.evaluate(`(() => {
+                const input = ${form}.elements.reason;
+                input.value = 'Two units missing after shelf inspection';
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+            })()`);
+            await browser.evaluate(
+                `${form}.elements.stock_adjustment_confirmed.click()`,
+            );
+            browser.registerForm(
+                await browser.evaluate(`new URL(${form}.action).pathname`),
+                {
+                    ...inventory,
+                    products: paginated([
+                        {
+                            ...inventory.products.data[0],
+                            inventory: {
+                                ...inventory.products.data[0].inventory,
+                                quantity: 8,
+                            },
+                        },
+                    ]),
+                },
+            );
+            await browser.evaluate(`${form}.requestSubmit()`);
+            for (let attempt = 0; attempt < 100; attempt++) {
+                if (
+                    await browser.evaluate(
+                        `${form}.elements.observed_quantity.value === '8'`,
+                    )
+                )
+                    break;
+                await delay(50);
+            }
+            assert.equal(
+                await browser.evaluate(
+                    `${form}.elements.observed_quantity.value`,
+                ),
+                '8',
+            );
+            assert.equal(
+                await browser.evaluate(`${form}.elements.quantity.value`),
+                '8',
+            );
+            assert.equal(
+                await browser.evaluate(
+                    `${form}.elements.stock_adjustment_confirmed.checked`,
+                ),
+                false,
+            );
+
+            await browser.show(
+                'Administration/Inventory',
+                uninitialized,
+                'admin',
+                theme,
+                {},
+                direct,
+            );
+            await browser.evaluate(`${trigger}.click()`);
+            assert.match(
+                await browser.evaluate(`${form}.textContent`),
+                /Set up stock/,
+            );
+            assert.equal(
+                await browser.evaluate(
+                    `${form}.elements.stock_adjustment_confirmed.required`,
+                ),
+                true,
+            );
+            assert.equal(
+                await browser.evaluate(
+                    `${form}.querySelector('button[type=submit]').disabled`,
+                ),
+                true,
+            );
+        }
+
+        const reconciliation = {
+            inventories: paginated([
+                {
+                    inventory_id: 7,
+                    product_id: 7,
+                    name: 'Counted product',
+                    product_code: 'RAM-007',
+                    sellable: 10,
+                    quarantined: 0,
+                    ledger_sellable: 10,
+                    ledger_quarantined: 0,
+                    sellable_difference: 0,
+                    quarantined_difference: 0,
+                    case_difference: 0,
+                    case_expected: 0,
+                    case_breakdown: {
+                        damage: 0,
+                        customer_return: 0,
+                        supplier_return: 0,
+                    },
+                    findings: [],
+                },
+            ]),
+            filters: { q: null },
+        };
+        await browser.show(
+            'Administration/Reports/StockReconciliation',
+            reconciliation,
+            'admin',
+            'light',
+            {},
+            direct,
+        );
+        await browser.evaluate(
+            "document.querySelector('main details').open = true",
+        );
+        const countForm = "document.querySelector('main form')";
+        assert.match(
+            await browser.evaluate(`${countForm}.textContent`),
+            /Apply count correction/,
+        );
+        assert.equal(
+            await browser.evaluate(
+                `${countForm}.elements.stock_adjustment_confirmed.required`,
+            ),
+            true,
+        );
+        await browser.evaluate(`(() => {
+            const select = ${countForm}.elements.reason_code;
+            select.value = 'theft_loss';
+            select.dispatchEvent(new Event('change', { bubbles: true }));
+        })()`);
+        assert.equal(
+            await browser.evaluate(`${countForm}.elements.reason.required`),
+            true,
+        );
+        await browser.evaluate(
+            `${countForm}.elements.stock_adjustment_confirmed.click()`,
+        );
+        await browser.evaluate(`(() => {
+            const input = ${countForm}.elements.reason;
+            input.value = 'Two units missing from shelf';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        })()`);
+        assert.equal(
+            await browser.evaluate(
+                `${countForm}.elements.stock_adjustment_confirmed.checked`,
+            ),
+            false,
+        );
+        await browser.show(
+            'Administration/Reports/StockReconciliation',
+            reconciliation,
+            'admin',
+            'light',
+            {},
+            staff,
+        );
+        assert.equal(
+            await browser.evaluate(
+                `${countForm}.querySelector('[name=stock_adjustment_confirmed]')`,
+            ),
+            null,
+        );
+        assert.match(
+            await browser.evaluate(`${countForm}.textContent`),
+            /Manager or Owner approval is required/,
         );
 
         const suppliers = {

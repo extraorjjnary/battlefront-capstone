@@ -4,6 +4,7 @@ use App\Models\Category;
 use App\Models\Inventory;
 use App\Models\Product;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
 test('guests are redirected when viewing inventory', function () {
@@ -283,8 +284,10 @@ test('customers cannot initialize inventory', function () {
     ]);
 });
 
-test('administrators can initialize missing inventory', function () {
-    $administrator = User::factory()->administrator()->create();
+test('staff can request missing inventory initialization', function () {
+    $administrator = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $product = Product::factory()->create();
     $otherProduct = Product::factory()->create();
 
@@ -322,7 +325,9 @@ test('administrators can initialize missing inventory', function () {
 });
 
 test('invalid initial inventory values are rejected without creating inventory', function () {
-    $administrator = User::factory()->administrator()->create();
+    $administrator = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $product = Product::factory()->create();
 
     $response = $this
@@ -342,7 +347,9 @@ test('invalid initial inventory values are rejected without creating inventory',
 });
 
 test('initializing inventory twice preserves the existing stock values', function () {
-    $administrator = User::factory()->administrator()->create();
+    $administrator = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $inventory = Inventory::factory()->create([
         'quantity' => 10,
         'reorder_level' => 3,
@@ -408,8 +415,10 @@ test('customers cannot update inventory', function () {
     ]);
 });
 
-test('administrators can update inventory stock values', function () {
-    $administrator = User::factory()->administrator()->create();
+test('staff can request inventory stock changes', function () {
+    $administrator = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $inventory = Inventory::factory()->create([
         'quantity' => 10,
         'reorder_level' => 3,
@@ -443,7 +452,9 @@ test('administrators can update inventory stock values', function () {
 });
 
 test('invalid inventory values are rejected without changing stock', function (array $payload, array $errors) {
-    $administrator = User::factory()->administrator()->create();
+    $administrator = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $inventory = Inventory::factory()->create([
         'quantity' => 10,
         'reorder_level' => 3,

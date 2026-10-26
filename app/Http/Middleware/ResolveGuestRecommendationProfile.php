@@ -31,7 +31,7 @@ class ResolveGuestRecommendationProfile
         $routeName = $request->route()?->getName();
         $profileRoutes = ['home', 'products.index', 'products.show'];
         $profileLookupRoutes = [...$profileRoutes, 'products.dwell.store', 'products.view.store'];
-        $authenticationRoutes = ['login.store', 'register.store'];
+        $authenticationRoutes = ['login.store', 'register.store', 'verification.verify'];
         $shouldResolveProfile = in_array($routeName, $profileLookupRoutes, true)
             || (is_string($token) && $token !== '' && in_array($routeName, $authenticationRoutes, true));
 
@@ -78,12 +78,20 @@ class ResolveGuestRecommendationProfile
         $response = $next($request);
         $user = $request->user();
         $isLoggingOut = $wasAuthenticated && $user === null && $request->routeIs('logout');
-        $isSuccessfulRegistration = ! $wasAuthenticated
-            && $request->routeIs('register.store')
-            && $user instanceof User;
+        $continuation = $user instanceof User && $request->routeIs('login.store', 'verification.verify')
+            ? $request->session()->pull('registration_continuation') : null;
+        $isVerifiedRegistrationLogin = ! $wasAuthenticated
+            && $request->routeIs('login.store', 'verification.verify')
+            && $user instanceof User
+            && $user->hasVerifiedEmail()
+            && is_array($continuation)
+            && ($continuation['user_id'] ?? null) === $user->id
+            && ($continuation['profile_id'] ?? null) === $profile?->id
+            && is_string($continuation['token_hash'] ?? null)
+            && hash_equals($continuation['token_hash'], $profile->token_hash ?? '');
 
         if ($profile !== null && ($user instanceof User || $isLoggingOut)) {
-            if ($isSuccessfulRegistration && $user->role === UserRole::Customer) {
+            if ($isVerifiedRegistrationLogin && $user->role === UserRole::Customer) {
                 ($this->mergeHistory)($profile, $user);
             } else {
                 $profile->delete();

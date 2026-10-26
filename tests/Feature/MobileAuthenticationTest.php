@@ -4,10 +4,12 @@ use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Mail;
 
-test('registration creates a customer and returns a 30-day bearer token', function () {
+test('registration creates an unverified customer without a bearer token', function () {
     $this->travelTo(now()->startOfSecond());
     Event::fake([Registered::class]);
+    Mail::fake();
 
     $response = $this->postJson('/api/v1/auth/register', [
         'name' => 'Mobile Customer',
@@ -19,34 +21,20 @@ test('registration creates a customer and returns a 30-day bearer token', functi
     ]);
 
     $response->assertCreated()
-        ->assertJsonPath('data.user.name', 'Mobile Customer')
-        ->assertJsonPath('data.user.email', 'mobile@example.com')
-        ->assertJsonPath('data.user.default_delivery_address', null)
-        ->assertJsonPath('data.token_type', 'Bearer')
-        ->assertJsonPath('data.expires_at', now()->addDays(30)->toIso8601String());
+        ->assertJsonPath('data.status', 'verification_required')
+        ->assertJsonPath('data.delivery_status', 'sent')
+        ->assertJsonMissingPath('data.token')
+        ->assertJsonMissingPath('data.user');
 
     $user = User::where('email', 'mobile@example.com')->firstOrFail();
-    expect($user->role)->toBe(UserRole::Customer);
-    expect($response->json('data.user'))->toBe([
-        'id' => $user->id,
-        'name' => 'Mobile Customer',
-        'email' => 'mobile@example.com',
-        'default_delivery_address' => null,
-        'default_delivery_address_prefill' => [
-            'delivery_destination' => '',
-            'delivery_barangay_code' => '',
-            'delivery_address_details' => '',
-        ],
-        'default_delivery_contact_number' => null,
-        'search_recommendations_enabled' => true,
-        'product_view_recommendations_enabled' => true,
-        'personalized_recommendations_enabled' => true,
-    ]);
-    expect($response->json('data.token'))->toBeString()->toContain('|');
-    $this->assertDatabaseHas('personal_access_tokens', [
-        'tokenable_id' => $user->id,
-        'name' => 'Pixel 8',
-    ]);
+    expect($user->role)->toBe(UserRole::Customer)
+        ->and($user->name)->toBe('Mobile Customer')
+        ->and($user->email_verified_at)->toBeNull()
+        ->and($user->default_delivery_address)->toBeNull()
+        ->and($response->json('data.verification_token'))->toBeString()->not->toBeEmpty();
+    $this->assertDatabaseCount('personal_access_tokens', 0);
+    $this->assertGuest();
+    Mail::assertSentCount(1);
     Event::assertDispatched(Registered::class);
 });
 
@@ -83,7 +71,7 @@ test('mobile registration still requires a valid unique email', function (array 
 ]);
 
 test('login returns a bearer token for a customer without a web session', function () {
-    $user = User::factory()->customer()->unverified()->create([
+    $user = User::factory()->customer()->create([
         'email' => 'customer@example.com',
     ]);
 

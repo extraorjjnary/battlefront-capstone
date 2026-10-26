@@ -10,8 +10,11 @@ use GuzzleHttp\Exception\ResponseTimeoutException;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Laravel\Ai\Ai;
+use Laravel\Ai\AiManager;
 use Laravel\Ai\Exceptions\AiException;
 use Laravel\Ai\Exceptions\ProviderConnectionException;
 use Laravel\Ai\Prompts\AgentPrompt;
@@ -180,10 +183,12 @@ test('uses configured bounded timeout and logs successful request timing', funct
 ]);
 
 test('classifies actual HTTP provider errors and logs only safe status metadata', function (int $status, string $failure) {
+    Http::swap(new Factory);
     Http::preventStrayRequests();
     Log::spy();
     config(['ai.providers.gemini.key' => 'test-key']);
     Http::fake(['generativelanguage.googleapis.com/*' => Http::response(['error' => ['message' => 'Private upstream data']], $status)]);
+    Ai::swap(new AiManager(app()));
 
     $result = app(ChatbotAiAdapter::class)->generate('Private customer question', ['knowledge' => []]);
 
@@ -220,6 +225,7 @@ test('classifies transport timeout separately from DNS failure using typed excep
 ]);
 
 test('classifies a timeout while receiving the provider response without retrying', function () {
+    Http::swap(new Factory);
     Http::preventStrayRequests();
     config(['ai.providers.gemini.key' => 'test-key']);
     Http::fake(['generativelanguage.googleapis.com/*' => fn () => throw new ResponseTimeoutException(
@@ -227,8 +233,10 @@ test('classifies a timeout while receiving the provider response without retryin
         new Request('POST', 'https://example.test'),
         new Response(200),
     )]);
+    Ai::swap(new AiManager(app()));
 
     $result = app(ChatbotAiAdapter::class)->generate('Store hours?', ['branches' => []]);
 
     expect($result)->toBe(['successful' => false, 'text' => null, 'failure' => 'timeout']);
+    Http::assertSentCount(1);
 });

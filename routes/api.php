@@ -6,8 +6,9 @@ use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Api\V1\CartItemController;
 use App\Http\Controllers\Api\V1\ChatbotController;
 use App\Http\Controllers\Api\V1\CheckoutController;
-use App\Http\Controllers\Api\V1\CustomerReturnRequestController;
 use App\Http\Controllers\Api\V1\CustomerPasswordController;
+use App\Http\Controllers\Api\V1\CustomerReturnRequestController;
+use App\Http\Controllers\Api\V1\EmailVerificationController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\OrderCancellationController;
 use App\Http\Controllers\Api\V1\OrderCancellationRequestController;
@@ -18,13 +19,13 @@ use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProductDwellController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\PushDeviceController;
-use App\Http\Controllers\Api\V1\WishlistController;
-use App\Http\Controllers\ProductViewController;
 use App\Http\Controllers\Api\V1\RecommendationController;
+use App\Http\Controllers\Api\V1\WishlistController;
 use App\Http\Controllers\CustomerRefundProofController;
 use App\Http\Controllers\DeliveryLocationController;
 use App\Http\Controllers\DeliveryQuoteController;
 use App\Http\Controllers\PayMongoWebhookController;
+use App\Http\Controllers\ProductViewController;
 use App\Http\Controllers\RecommendationInteractionController;
 use App\Http\Middleware\AuthorizeApiChatbot;
 use App\Http\Middleware\AuthorizeApiRecommendations;
@@ -43,9 +44,13 @@ Route::prefix('v1')
 
         // authentication
         Route::post('auth/register', [AuthController::class, 'register'])
-            ->middleware('throttle:5,1')->name('auth.register');
+            ->middleware('throttle:registration')->name('auth.register');
         Route::post('auth/login', [AuthController::class, 'login'])
             ->middleware('throttle:login')->name('auth.login');
+        Route::post('auth/email/verify', [EmailVerificationController::class, 'verify'])
+            ->middleware('throttle:30,1')->name('auth.email.verify');
+        Route::post('auth/email/resend', [EmailVerificationController::class, 'resend'])
+            ->middleware('throttle:30,1')->name('auth.email.resend');
 
         // products
         Route::get('products', [ProductController::class, 'index'])->name('products.index');

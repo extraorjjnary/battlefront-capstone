@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EncryptCookies;
 use App\Http\Middleware\EnforceActiveAccount;
+use App\Http\Middleware\EnforceVerifiedEmail;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\ResolveGuestRecommendationProfile;
@@ -27,6 +28,7 @@ return Application::configure(basePath: dirname(__DIR__))
             append: [
                 ResolveGuestRecommendationProfile::class,
                 EnforceActiveAccount::class,
+                EnforceVerifiedEmail::class,
                 HandleAppearance::class,
                 HandleInertiaRequests::class,
                 AddLinkHeadersForPreloadedAssets::class,
@@ -34,6 +36,8 @@ return Application::configure(basePath: dirname(__DIR__))
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->dontFlash(['code', 'verification_token']);
+
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );

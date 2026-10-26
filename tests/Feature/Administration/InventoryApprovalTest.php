@@ -54,7 +54,9 @@ test('reason based increases and decreases require independent approval and pres
 ])->with(['manager', 'owner']);
 
 test('approval enforces stock direction while accepting older requests without notes', function (string $code, int $target, string $notes, ?string $field) {
-    $requester = User::factory()->administrator()->create();
+    $requester = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $reviewer = User::factory()->administrator()->create();
     $inventory = Product::factory()->available()->create()->inventory;
     $inventory->forceFill(['quantity' => 10, 'quarantined_quantity' => 3])->save();
@@ -115,7 +117,9 @@ test('ordinary product editing cannot overwrite sellable or quarantined quantiti
 });
 
 test('an automatic stock movement invalidates a stale manual adjustment without applying it', function () {
-    $requester = User::factory()->administrator()->create();
+    $requester = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $reviewer = User::factory()->administrator()->create();
     $product = Product::factory()->available()->create();
     $before = $product->inventory->quantity;
@@ -157,7 +161,9 @@ test('inventory adjustment requests can be searched by product, requester, or re
 });
 
 test('a physical stock count creates a separate approved adjustment request', function () {
-    $requester = User::factory()->administrator()->create();
+    $requester = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $reviewer = User::factory()->administrator()->create();
     $product = Product::factory()->available()->create();
     $inventory = $product->inventory;
@@ -196,7 +202,9 @@ test('a physical stock count creates a separate approved adjustment request', fu
 });
 
 test('a physical count cannot be submitted against a stale inventory value', function () {
-    $requester = User::factory()->administrator()->create();
+    $requester = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $inventory = Product::factory()->available()->create()->inventory;
     $observedQuantity = $inventory->quantity;
     $inventory->update(['quantity' => $observedQuantity + 1]);
@@ -211,7 +219,9 @@ test('a physical count cannot be submitted against a stale inventory value', fun
 });
 
 test('physical stock count requests require a reason category', function () {
-    $requester = User::factory()->administrator()->create();
+    $requester = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $inventory = Product::factory()->available()->create()->inventory;
 
     $this->actingAs($requester)->post(route('administration.inventory.count', $inventory), [
@@ -283,11 +293,7 @@ test('owners cannot approve their own stock request', function () {
     $owner = User::factory()->administrator()->create();
     $product = Product::factory()->available()->create();
 
-    $this->actingAs($owner)->patch(route('administration.inventory.update', $product->inventory), [
-        'quantity' => $product->inventory->quantity + 1,
-        'reorder_level' => $product->inventory->reorder_level,
-        'reason_code' => 'count_error', 'reason' => 'Physical count correction',
-    ])->assertSessionHasNoErrors();
+    app(RequestInventoryAdjustment::class)->execute($product, $owner, $product->inventory->quantity + 1, 'Historical count correction');
 
     $requestId = DB::table('inventory_adjustment_requests')->where('product_id', $product->id)->value('id');
     $this->actingAs($owner)->post(route('administration.inventory-adjustments.decide', $requestId), [
@@ -298,7 +304,9 @@ test('owners cannot approve their own stock request', function () {
 });
 
 test('an authorized reviewer may reject a pending request after its requester is deactivated', function () {
-    $requester = User::factory()->administrator()->create();
+    $requester = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $reviewer = User::factory()->administrator()->create([
         'administration_role_id' => DB::table('administration_roles')->where('code', 'manager')->value('id'),
     ]);
@@ -358,7 +366,9 @@ test('a requester can withdraw and replace a pending stock request without chang
 });
 
 test('opening stock stays unavailable until a second person approves it', function () {
-    $requester = User::factory()->administrator()->create();
+    $requester = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $reviewer = User::factory()->administrator()->create();
     $product = Product::factory()->create();
 
@@ -379,11 +389,13 @@ test('opening stock stays unavailable until a second person approves it', functi
 });
 
 test('posted audit and inventory movements reject direct mutation', function () {
-    $owner = User::factory()->administrator()->create();
+    $staff = User::factory()->administrator()->create([
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
+    ]);
     $product = Product::factory()->available()->create();
     $otherOwner = User::factory()->administrator()->create();
 
-    $this->actingAs($owner)->patch(route('administration.inventory.update', $product->inventory), [
+    $this->actingAs($staff)->patch(route('administration.inventory.update', $product->inventory), [
         'quantity' => $product->inventory->quantity + 1,
         'reorder_level' => $product->inventory->reorder_level,
         'reason_code' => 'count_error', 'reason' => 'Count correction after audit',

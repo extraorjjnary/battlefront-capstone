@@ -18,7 +18,7 @@ test('returns only minimal customer-facing status fields for an owned order refe
         'created_at' => '2026-09-20 10:00:00',
     ]);
 
-    $context = (new ResolveOrderContext)->execute($customer, "Status of {$order->reference}?");
+    $context = app(ResolveOrderContext::class)->execute($customer, "Status of {$order->reference}?");
 
     expect($context)->toBe([
         'orders' => [[
@@ -41,7 +41,7 @@ test('cannot retrieve another customers order by reference', function () {
     $otherCustomer = User::factory()->customer()->create();
     $foreignOrder = Order::factory()->for($otherCustomer)->create();
 
-    $context = (new ResolveOrderContext)->execute($customer, "Track {$foreignOrder->reference}");
+    $context = app(ResolveOrderContext::class)->execute($customer, "Track {$foreignOrder->reference}");
 
     expect($context)->toBe(['orders' => []]);
 });
@@ -50,7 +50,7 @@ test('normalizes shorthand and padded references to the owned canonical order re
     $customer = User::factory()->customer()->create();
     $order = Order::factory()->for($customer)->create();
 
-    $context = (new ResolveOrderContext)->execute($customer, sprintf($messageFormat, $order->id));
+    $context = app(ResolveOrderContext::class)->execute($customer, sprintf($messageFormat, $order->id));
 
     expect($context['orders'])->toHaveCount(1)
         ->and($context['orders'][0]['reference'])->toBe($order->reference);
@@ -70,7 +70,7 @@ test('includes current payment method and status only for a specific owned payme
         'created_at' => '2026-09-20 10:00:00',
     ]);
 
-    $context = (new ResolveOrderContext)->execute($customer, "Payment for BF-{$order->id}?");
+    $context = app(ResolveOrderContext::class)->execute($customer, "Payment for BF-{$order->id}?");
 
     expect($context)->toBe([
         'orders' => [[
@@ -96,7 +96,7 @@ test('does not disclose payment context for a foreign reference or a guest', fun
     $customer = User::factory()->customer()->create();
     $otherCustomer = User::factory()->customer()->create();
     $foreignOrder = Order::factory()->paidWithMaya()->for($otherCustomer)->create();
-    $resolver = new ResolveOrderContext;
+    $resolver = app(ResolveOrderContext::class);
 
     $foreignContext = $resolver->execute($customer, "Payment for BF-{$foreignOrder->id}?");
     $guestContext = $resolver->execute(null, "Payment for BF-{$foreignOrder->id}?");
@@ -109,7 +109,7 @@ test('returns no protected order data for guests and administrators', function (
     $customer = User::factory()->customer()->create();
     Order::factory()->for($customer)->create();
     $administrator = User::factory()->administrator()->create();
-    $resolver = new ResolveOrderContext;
+    $resolver = app(ResolveOrderContext::class);
 
     $guestContext = $resolver->execute(null, 'Show my order status');
     $administratorContext = $resolver->execute($administrator, 'Show my order status');
@@ -125,7 +125,7 @@ test('uses the persisted customer role when a supplied user model is stale', fun
         'role' => 'administrator',
     ]);
 
-    $context = (new ResolveOrderContext)->execute($customer, 'Show my order status');
+    $context = app(ResolveOrderContext::class)->execute($customer, 'Show my order status');
 
     expect($context)->toBe(['orders' => []]);
 });
@@ -143,7 +143,7 @@ test('returns the five newest owned orders when no reference is supplied', funct
 
     Order::factory()->for($otherCustomer)->create(['created_at' => '2026-09-30 08:00:00']);
 
-    $context = (new ResolveOrderContext)->execute($customer, 'What is my order status?');
+    $context = app(ResolveOrderContext::class)->execute($customer, 'What is my order status?');
 
     expect(array_column($context['orders'], 'reference'))->toBe(
         $orders
@@ -162,7 +162,7 @@ test('an unknown reference returns an explicit empty order context', function ()
         'payment_method' => PaymentMethod::Cash,
     ]);
 
-    $context = (new ResolveOrderContext)->execute($customer, 'Track BF-999999');
+    $context = app(ResolveOrderContext::class)->execute($customer, 'Track BF-999999');
 
     expect($context)->toBe(['orders' => []]);
 });

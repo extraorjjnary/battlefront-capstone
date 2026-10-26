@@ -17,8 +17,7 @@ class ResolveStoreContext
      *     address: string|null,
      *     contact_number: string|null,
      *     email: string|null,
-     *     operating_hours: string,
-     *     is_operational: bool
+     *     operating_hours: string
      * }>}
      */
     public function execute(string $message): array
@@ -31,6 +30,13 @@ class ResolveStoreContext
             ->get();
 
         $matchingBranches = $this->matchingBranches($branches, $message);
+
+        if ($matchingBranches->isEmpty()) {
+            $unpublished = Branch::query()->where('is_published', false)->get();
+            if ($this->matchingBranches($unpublished, $message)->isNotEmpty()) {
+                return ['branches' => []];
+            }
+        }
 
         return [
             'branches' => array_values(($matchingBranches->isNotEmpty() ? $matchingBranches : $branches)
@@ -47,7 +53,6 @@ class ResolveStoreContext
                     'contact_number' => $branch->contact_number,
                     'email' => $branch->email,
                     'operating_hours' => $branch->operating_hours ?? '',
-                    'is_operational' => $branch->is_operational,
                 ])
                 ->all()),
         ];

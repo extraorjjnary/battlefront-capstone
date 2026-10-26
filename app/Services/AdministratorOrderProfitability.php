@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\OrderStatus;
 use App\Models\Order;
 use App\Models\OrderItem;
+use InvalidArgumentException;
 
 class AdministratorOrderProfitability
 {
@@ -17,6 +18,9 @@ class AdministratorOrderProfitability
         $orderHasSale = $inputs['has_sale'];
         $salesReturns = $inputs['sales_returns'];
         $costRecovered = $inputs['cost_recovered'];
+        if (! is_numeric($salesReturns) || ! is_numeric($costRecovered)) {
+            throw new InvalidArgumentException('Order profitability amounts must be numeric.');
+        }
         $costOfGoodsSold = '0.00';
         $hasMissingCost = $order->items->isEmpty();
         foreach ($order->items as $item) {

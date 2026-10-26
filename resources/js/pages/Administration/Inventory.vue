@@ -3,7 +3,7 @@ import PageHeader from '@/components/PageHeader.vue';
 import InlineEditor from '@/components/administration/InlineEditor.vue';
 import StockAdjustmentSummary from '@/components/administration/StockAdjustmentSummary.vue';
 import DamageReportController from '@/actions/App/Http/Controllers/Administration/DamageReportController';
-import { Form, Head, Link, router } from '@inertiajs/vue3';
+import { Form, Head, Link, router, usePage } from '@inertiajs/vue3';
 import {
     Boxes,
     ChevronLeft,
@@ -33,6 +33,29 @@ import { formatDateTime } from '@/lib/dateTime';
 
 const requestReasonCodes = ref({});
 const requestedQuantities = ref({});
+const stockConfirmations = ref({});
+const page = usePage();
+const canAdjustStock = computed(() =>
+    Boolean(page.props.auth.can?.adjustInventory),
+);
+const canChangeStock = computed(
+    () =>
+        canAdjustStock.value || page.props.auth.can?.requestInventoryAdjustment,
+);
+
+function resetStockConfirmation(event, productId) {
+    if (event.target.name !== 'stock_adjustment_confirmed') {
+        stockConfirmations.value[productId] = false;
+    }
+}
+
+function stockSubmitted(productId) {
+    if (canAdjustStock.value) {
+        stockConfirmations.value[productId] = false;
+        delete requestedQuantities.value[productId];
+        delete requestReasonCodes.value[productId];
+    }
+}
 
 const props = defineProps({
     products: { type: Object, required: true },
@@ -390,29 +413,41 @@ defineOptions({
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <InlineEditor
-                            v-if="
-                                product.inventory &&
-                                $page.props.auth.can?.requestInventory
-                            "
+                            v-if="product.inventory && canChangeStock"
                             :trigger-label="
-                                'Request stock change for ' + product.name
+                                (canAdjustStock
+                                    ? 'Adjust stock for '
+                                    : 'Request stock change for ') +
+                                product.name
                             "
-                            label="Request stock change"
+                            :label="
+                                canAdjustStock
+                                    ? 'Adjust stock'
+                                    : 'Request stock change'
+                            "
                             v-slot="{ reveal }"
                         >
                             <p
                                 class="text-muted-foreground mb-3 text-sm"
                                 role="note"
                             >
-                                Another administrator must approve this request
-                                before stock changes.
+                                {{
+                                    canAdjustStock
+                                        ? 'Stock changes immediately after validation and confirmation.'
+                                        : 'Manager or Owner approval is required before stock changes.'
+                                }}
                             </p>
                             <Form
                                 @error="reveal"
-                                v-if="
-                                    product.inventory &&
-                                    $page.props.auth.can?.requestInventory
+                                @input.capture="
+                                    resetStockConfirmation($event, product.id)
                                 "
+                                @change.capture="
+                                    resetStockConfirmation($event, product.id)
+                                "
+                                @success="stockSubmitted(product.id)"
+                                :key="`stock-${product.id}-${product.inventory?.quantity}`"
+                                v-if="product.inventory && canChangeStock"
                                 v-bind="
                                     InventoryController.update.form(
                                         product.inventory.id,
@@ -422,8 +457,18 @@ defineOptions({
                                 class="grid gap-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-start"
                                 v-slot="{ errors, processing }"
                             >
+                                <input
+                                    type="hidden"
+                                    name="observed_quantity"
+                                    :value="product.inventory.quantity"
+                                />
                                 <div class="sm:col-span-3">
                                     <StockAdjustmentSummary
+                                        :quantity-label="
+                                            canAdjustStock
+                                                ? 'Proposed'
+                                                : 'Requested'
+                                        "
                                         :current-quantity="
                                             product.inventory.quantity
                                         "
@@ -523,7 +568,10 @@ defineOptions({
                                         :for="`reason-${product.inventory.id}`"
                                         >{{
                                             requestReasonCodes[product.id] ===
-                                            'other'
+                                                'other' ||
+                                            (canAdjustStock &&
+                                                requestReasonCodes[product.id] ===
+                                                    'theft_loss')
                                                 ? 'Additional notes (required)'
                                                 : 'Additional notes (optional)'
                                         }}</Label
@@ -534,7 +582,10 @@ defineOptions({
                                         name="reason"
                                         :required="
                                             requestReasonCodes[product.id] ===
-                                            'other'
+                                                'other' ||
+                                            (canAdjustStock &&
+                                                requestReasonCodes[product.id] ===
+                                                    'theft_loss')
                                         "
                                         minlength="5"
                                         maxlength="2000"
@@ -552,13 +603,50 @@ defineOptions({
                                     </p>
                                 </div>
 
+                                <div
+                                    v-if="canAdjustStock"
+                                    class="grid gap-2 sm:col-span-3"
+                                >
+                                    <label
+                                        class="flex items-start gap-2 text-sm"
+                                    >
+                                        <input
+                                            v-model="
+                                                stockConfirmations[product.id]
+                                            "
+                                            type="checkbox"
+                                            name="stock_adjustment_confirmed"
+                                            value="1"
+                                            required
+                                            class="mt-1"
+                                        />
+                                        I confirm the proposed quantity,
+                                        difference, and reason above. Apply this
+                                        stock change immediately.
+                                    </label>
+                                    <InputError
+                                        :message="
+                                            errors.stock_adjustment_confirmed
+                                        "
+                                    />
+                                </div>
+
                                 <Button
                                     class="min-h-11 sm:justify-self-start"
-                                    :disabled="processing"
+                                    type="submit"
+                                    :disabled="
+                                        processing ||
+                                        (canAdjustStock &&
+                                            !stockConfirmations[product.id])
+                                    "
                                 >
                                     <Spinner v-if="processing" />
                                     <Save v-else />
-                                    Request stock change
+                                    {{
+                                        canAdjustStock
+                                            ? 'Adjust stock'
+                                            : 'Request stock change'
+                                    }}
                                 </Button>
                             </Form>
                         </InlineEditor>
@@ -621,10 +709,7 @@ defineOptions({
                             </Form>
                         </InlineEditor>
                         <InlineEditor
-                            v-if="
-                                !product.inventory &&
-                                $page.props.auth.can?.requestInventory
-                            "
+                            v-if="!product.inventory && canChangeStock"
                             :trigger-label="'Set up stock for ' + product.name"
                             label="Set up stock"
                             v-slot="{ reveal }"
@@ -633,15 +718,22 @@ defineOptions({
                                 class="text-muted-foreground mb-3 text-sm"
                                 role="note"
                             >
-                                Another administrator must approve the opening
-                                stock.
+                                {{
+                                    canAdjustStock
+                                        ? 'Opening stock is available immediately after validation and confirmation.'
+                                        : 'Manager or Owner approval is required for opening stock.'
+                                }}
                             </p>
                             <Form
                                 @error="reveal"
-                                v-if="
-                                    !product.inventory &&
-                                    $page.props.auth.can?.requestInventory
+                                @input.capture="
+                                    resetStockConfirmation($event, product.id)
                                 "
+                                @change.capture="
+                                    resetStockConfirmation($event, product.id)
+                                "
+                                @success="stockSubmitted(product.id)"
+                                v-if="!product.inventory && canChangeStock"
                                 v-bind="
                                     InventoryController.store.form(product.id)
                                 "
@@ -660,8 +752,11 @@ defineOptions({
                                     <p
                                         class="text-muted-foreground mt-2 text-sm"
                                     >
-                                        Request starting quantities for this
-                                        product.
+                                        {{
+                                            canAdjustStock
+                                                ? 'Set starting quantities for this product.'
+                                                : 'Request starting quantities for this product.'
+                                        }}
                                     </p>
                                 </div>
 
@@ -768,6 +863,11 @@ defineOptions({
                                 </div>
 
                                 <StockAdjustmentSummary
+                                    :quantity-label="
+                                        canAdjustStock
+                                            ? 'Proposed'
+                                            : 'Requested'
+                                    "
                                     class="sm:col-span-3"
                                     :current-quantity="0"
                                     :requested-quantity="
@@ -775,13 +875,50 @@ defineOptions({
                                     "
                                 />
 
+                                <div
+                                    v-if="canAdjustStock"
+                                    class="grid gap-2 sm:col-span-3"
+                                >
+                                    <label
+                                        class="flex items-start gap-2 text-sm"
+                                    >
+                                        <input
+                                            v-model="
+                                                stockConfirmations[product.id]
+                                            "
+                                            type="checkbox"
+                                            name="stock_adjustment_confirmed"
+                                            value="1"
+                                            required
+                                            class="mt-1"
+                                        />
+                                        I confirm the proposed quantity,
+                                        difference, and reason above. Apply this
+                                        stock change immediately.
+                                    </label>
+                                    <InputError
+                                        :message="
+                                            errors.stock_adjustment_confirmed
+                                        "
+                                    />
+                                </div>
+
                                 <Button
                                     class="min-h-11 sm:justify-self-start"
-                                    :disabled="processing"
+                                    type="submit"
+                                    :disabled="
+                                        processing ||
+                                        (canAdjustStock &&
+                                            !stockConfirmations[product.id])
+                                    "
                                 >
                                     <Spinner v-if="processing" />
                                     <Save v-else />
-                                    Request opening stock
+                                    {{
+                                        canAdjustStock
+                                            ? 'Set up stock'
+                                            : 'Request opening stock'
+                                    }}
                                 </Button>
                             </Form>
                         </InlineEditor>

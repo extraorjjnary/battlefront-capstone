@@ -1,6 +1,9 @@
 <?php
 
+use App\Ai\Agents\ChatbotIntentAgent;
+use App\Ai\Agents\ChatbotResponseAgent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /*
@@ -16,6 +19,15 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
+    ->beforeEach(function () {
+        // Chatbot verification must never consume the configured Gemini quota.
+        config()->set('ai.providers.gemini.key', 'testing-only');
+        ChatbotResponseAgent::fake()->preventStrayPrompts();
+        ChatbotIntentAgent::fake()->preventStrayPrompts();
+        Http::fake([
+            'generativelanguage.googleapis.com/*' => fn () => throw new RuntimeException('Gemini HTTP requests must be explicitly faked in tests.'),
+        ]);
+    })
     ->in('Feature');
 
 /*

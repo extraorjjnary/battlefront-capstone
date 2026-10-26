@@ -87,7 +87,7 @@ test('multiple matching products require an explicit name on follow up', functio
     $second = $chat->respond('Is it available?', null, $first['context_token'], 'session-a');
 
     expect($second['message'])->toContain('Which product');
-    ChatbotResponseAgent::assertPromptedTimes(1);
+    ChatbotResponseAgent::assertNeverPrompted();
 });
 
 test('expired tampered and foreign session context cannot resolve a follow up', function (string $change) {

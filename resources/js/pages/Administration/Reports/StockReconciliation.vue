@@ -10,9 +10,25 @@ import { Form } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const requestedQuantities = ref({});
+const stockConfirmations = ref({});
+const reasonCodes = ref({});
+
+function resetStockConfirmation(event, inventoryId) {
+    if (event.target.name !== 'stock_adjustment_confirmed') {
+        stockConfirmations.value[inventoryId] = false;
+    }
+}
+
+function countSubmitted(inventoryId) {
+    if (canAdjustStock.value) {
+        stockConfirmations.value[inventoryId] = false;
+        delete requestedQuantities.value[inventoryId];
+        delete reasonCodes.value[inventoryId];
+    }
+}
 
 const props = defineProps({
     inventories: { type: Object, required: true },
@@ -21,6 +37,9 @@ const props = defineProps({
     filters: { type: Object, required: true },
 });
 const page = usePage();
+const canAdjustStock = computed(() =>
+    Boolean(page.props.auth.can?.adjustInventory),
+);
 const { search, isSearching, clearSearch } = useDebouncedSearch({
     initialSearch: props.filters.q,
     currentSearch: () => props.filters.q,
@@ -55,7 +74,11 @@ defineOptions({
         <p class="text-muted-foreground text-sm" role="note">
             Compare stock records with recorded changes and open cases. This
             does not count or change stock. Review any mismatch before
-            requesting a change.
+            {{
+                canAdjustStock
+                    ? 'applying a stock correction.'
+                    : 'requesting a change.'
+            }}
         </p>
         <SearchField
             id="reconciliation-search"
@@ -191,7 +214,11 @@ defineOptions({
                         </td>
                         <td class="p-3">
                             <details
-                                v-if="page.props.auth.can?.requestInventory"
+                                v-if="
+                                    canAdjustStock ||
+                                    page.props.auth.can
+                                        ?.requestInventoryAdjustment
+                                "
                             >
                                 <summary
                                     class="text-primary cursor-pointer underline"
@@ -199,6 +226,20 @@ defineOptions({
                                     Record shelf count
                                 </summary>
                                 <Form
+                                    :key="`count-${item.inventory_id}-${item.sellable}`"
+                                    @input.capture="
+                                        resetStockConfirmation(
+                                            $event,
+                                            item.inventory_id,
+                                        )
+                                    "
+                                    @change.capture="
+                                        resetStockConfirmation(
+                                            $event,
+                                            item.inventory_id,
+                                        )
+                                    "
+                                    @success="countSubmitted(item.inventory_id)"
                                     v-bind="
                                         InventoryController.count.form(
                                             item.inventory_id,
@@ -208,6 +249,11 @@ defineOptions({
                                     class="mt-2 grid max-w-full min-w-0 min-w-56 gap-2"
                                 >
                                     <StockAdjustmentSummary
+                                        :quantity-label="
+                                            canAdjustStock
+                                                ? 'Proposed'
+                                                : 'Requested'
+                                        "
                                         :current-quantity="item.sellable"
                                         :requested-quantity="
                                             requestedQuantities[
@@ -237,6 +283,9 @@ defineOptions({
                                     <label class="max-w-full min-w-0 text-xs"
                                         >Count reason<select
                                             name="reason_code"
+                                            v-model="
+                                                reasonCodes[item.inventory_id]
+                                            "
                                             required
                                             class="border-input bg-background focus-visible:ring-ring mt-1 min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
                                         >
@@ -264,10 +313,22 @@ defineOptions({
                                         </select></label
                                     >
                                     <label class="max-w-full min-w-0 text-xs"
-                                        >Notes (Optional)<Input
+                                        >{{
+                                            canAdjustStock &&
+                                            reasonCodes[item.inventory_id] ===
+                                                'theft_loss'
+                                                ? 'Notes (Required)'
+                                                : 'Notes (Optional)'
+                                        }}<Input
                                             aria-label="Notes"
                                             class="min-h-11"
                                             name="reason"
+                                            :required="
+                                                canAdjustStock &&
+                                                reasonCodes[
+                                                    item.inventory_id
+                                                ] === 'theft_loss'
+                                            "
                                             minlength="5"
                                             maxlength="2000"
                                             placeholder="Who counted and when"
@@ -282,25 +343,64 @@ defineOptions({
                                             >Damage Reports</Link
                                         >.
                                     </p>
+                                    <p
+                                        v-if="!canAdjustStock"
+                                        class="text-muted-foreground text-xs"
+                                    >
+                                        Manager or Owner approval is required
+                                        before stock changes.
+                                    </p>
+                                    <label
+                                        v-else
+                                        class="flex items-start gap-2 text-xs"
+                                    >
+                                        <input
+                                            v-model="
+                                                stockConfirmations[
+                                                    item.inventory_id
+                                                ]
+                                            "
+                                            type="checkbox"
+                                            name="stock_adjustment_confirmed"
+                                            value="1"
+                                            required
+                                            class="mt-1"
+                                        />
+                                        I confirm the proposed quantity,
+                                        difference, and reason above. Apply this
+                                        stock change immediately.
+                                    </label>
                                     <Button
                                         class="min-h-11"
                                         type="submit"
                                         size="sm"
-                                        :disabled="processing"
-                                        >Submit for approval</Button
+                                        :disabled="
+                                            processing ||
+                                            (canAdjustStock &&
+                                                !stockConfirmations[
+                                                    item.inventory_id
+                                                ])
+                                        "
+                                        >{{
+                                            canAdjustStock
+                                                ? 'Apply count correction'
+                                                : 'Submit for approval'
+                                        }}</Button
                                     >
                                     <p
                                         v-if="
                                             errors.quantity ||
                                             errors.reason_code ||
-                                            errors.reason
+                                            errors.reason ||
+                                            errors.stock_adjustment_confirmed
                                         "
                                         class="text-destructive text-xs"
                                     >
                                         {{
                                             errors.quantity ||
                                             errors.reason_code ||
-                                            errors.reason
+                                            errors.reason ||
+                                            errors.stock_adjustment_confirmed
                                         }}
                                     </p>
                                 </Form>

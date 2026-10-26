@@ -20,6 +20,8 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Laravel\Sanctum\PersonalAccessToken;
+use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -42,6 +44,12 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
         $this->monitorRecommendationQueryTime();
 
+        Sanctum::authenticateAccessTokensUsing(
+            fn (PersonalAccessToken $token, bool $isValid): bool => $isValid
+                && $token->tokenable instanceof User
+                && $token->tokenable->hasVerifiedEmail(),
+        );
+
         Gate::define(
             'access-administration',
             fn (User $user): bool => $user->isAdministrator()
@@ -61,6 +69,10 @@ class AppServiceProvider extends ServiceProvider
         ] as $permission) {
             Gate::define($permission, fn (User $user): bool => $user->hasAdministrationPermission($permission));
         }
+
+        Gate::define('inventory.adjust', fn (User $user): bool => in_array($user->administrationRoleCode(), ['owner', 'manager'], true)
+            && $user->hasAdministrationPermission('inventory.request')
+            && $user->hasAdministrationPermission('inventory.approve'));
 
         Gate::define(
             'use-customer-cart',

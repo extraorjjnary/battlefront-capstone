@@ -1,8 +1,11 @@
 <?php
 
+use App\Mail\VerifyEmailOtp;
 use App\Models\GuestRecommendationProfile;
 use App\Models\User;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Fortify\Features;
 
@@ -12,8 +15,8 @@ test('login screen can be rendered', function () {
     $response->assertOk();
 });
 
-test('users can authenticate without a verified email', function () {
-    $user = User::factory()->unverified()->create();
+test('verified users can authenticate', function () {
+    $user = User::factory()->create();
 
     $response = $this->post(route('login.store'), [
         'email' => $user->email,
@@ -25,6 +28,34 @@ test('users can authenticate without a verified email', function () {
 
     $this->get(route('dashboard'))->assertOk();
 });
+
+test('valid unverified credentials start verification without authenticating', function () {
+    Mail::fake();
+    $user = User::factory()->unverified()->create();
+
+    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password', 'remember' => true])
+        ->assertRedirectToRoute('verification.notice')
+        ->assertCookieMissing(Auth::guard('web')->getRecallerName())
+        ->assertSessionHas('email_verification.token');
+
+    $this->assertGuest();
+    expect($user->fresh()->email_verified_at)->toBeNull();
+    Mail::assertSent(VerifyEmailOtp::class, fn (VerifyEmailOtp $mail): bool => $mail->hasTo($user->email));
+});
+
+test('invalid and inactive credentials do not reveal verification status or send codes', function (string $kind) {
+    Mail::fake();
+    $user = User::factory()->unverified()->create(['is_active' => $kind !== 'inactive']);
+
+    $this->post(route('login.store'), [
+        'email' => $kind === 'unknown' ? 'unknown@example.test' : $user->email,
+        'password' => $kind === 'wrong password' ? 'wrong-password' : 'password',
+    ])->assertSessionHasErrors(['email' => trans('auth.failed')])
+        ->assertSessionMissing('email_verification.token');
+
+    $this->assertGuest();
+    Mail::assertNothingSent();
+})->with(['unknown', 'wrong password', 'inactive']);
 
 test('successful sign-in discards guest recommendation history and expires its browser cookie', function () {
     $user = User::factory()->customer()->create();

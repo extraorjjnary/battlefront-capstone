@@ -17,7 +17,6 @@ test('returns confirmed stored data for a named branch', function () {
             'contact_number' => '0938 647 6046',
             'email' => 'battlefrontcomputertrading@gmail.com',
             'operating_hours' => '8:00 AM–6:00 PM',
-            'is_operational' => true,
         ]);
 });
 
@@ -35,7 +34,6 @@ test('returns the branch directory with the operational branch first for a gener
             'contact_number',
             'email',
             'operating_hours',
-            'is_operational',
         ]);
 });
 

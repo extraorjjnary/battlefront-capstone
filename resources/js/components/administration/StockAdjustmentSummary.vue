@@ -4,6 +4,7 @@ import { computed } from 'vue';
 const props = defineProps({
     currentQuantity: { type: Number, required: true },
     requestedQuantity: { type: [Number, String], default: '' },
+    quantityLabel: { type: String, default: 'Requested' },
 });
 
 const requested = computed(() => {
@@ -30,7 +31,7 @@ const difference = computed(() => {
             <dd>{{ currentQuantity }} units</dd>
         </div>
         <div>
-            <dt class="text-muted-foreground">Requested</dt>
+            <dt class="text-muted-foreground">{{ quantityLabel }}</dt>
             <dd>{{ requested === null ? '—' : `${requested} units` }}</dd>
         </div>
         <div>

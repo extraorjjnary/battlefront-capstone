@@ -9,6 +9,7 @@ use App\Http\Requests\Api\V1\RegisterRequest;
 use App\Http\Resources\Api\V1\CustomerProfileResource;
 use App\Models\PushDevice;
 use App\Models\User;
+use App\Services\EmailOtpVerification;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -18,7 +19,7 @@ use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
-    public function register(RegisterRequest $request, CreateNewUser $createNewUser): JsonResponse
+    public function register(RegisterRequest $request, CreateNewUser $createNewUser, EmailOtpVerification $verification): JsonResponse
     {
         $user = $createNewUser->create($request->only([
             'name', 'email', 'password', 'password_confirmation',
@@ -26,10 +27,13 @@ class AuthController extends Controller
 
         event(new Registered($user));
 
-        return $this->tokenResponse($request, $user, $request->string('device_name')->toString(), 201);
+        return response()->json([
+            'message' => 'Verify your email address before signing in.',
+            'data' => $verification->start($user, (string) $request->ip()),
+        ], 201)->header('Cache-Control', 'no-store');
     }
 
-    public function login(Request $request): JsonResponse
+    public function login(Request $request, EmailOtpVerification $verification): JsonResponse
     {
         $validated = $request->validate([
             'email' => ['required', 'string', 'email'],
@@ -50,6 +54,13 @@ class AuthController extends Controller
 
         if (! $user->is_active || $user->role !== UserRole::Customer) {
             abort(401, 'Invalid credentials.');
+        }
+
+        if (! $user->hasVerifiedEmail()) {
+            return response()->json([
+                'message' => 'Verify your email address before signing in.',
+                'data' => $verification->start($user, (string) $request->ip()),
+            ], 403)->header('Cache-Control', 'no-store');
         }
 
         return $this->tokenResponse($request, $user, $validated['device_name']);

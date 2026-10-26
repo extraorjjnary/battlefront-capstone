@@ -10,7 +10,6 @@ use App\Models\Tag;
 use App\Models\User;
 use App\Repositories\Catalog\ProductCatalogRepository;
 use App\Services\CatalogProductPresenter;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -126,7 +125,6 @@ test('restocking never reactivates manually disabled products or categories', fu
 
 test('administrators can inspect and restock sold out products while inactive records stay manageable', function () {
     $administrator = User::factory()->administrator()->create();
-    $reviewer = User::factory()->administrator()->create();
     $product = Product::factory()->create();
     $inventory = Inventory::factory()->for($product)->create(['quantity' => 0, 'reorder_level' => 2]);
     $inactive = Product::factory()->inactive()->for(Category::factory()->inactive())->create();
@@ -142,12 +140,10 @@ test('administrators can inspect and restock sold out products while inactive re
         'reorder_level' => 2,
         'reason_code' => 'count_error',
         'reason' => 'Restock after physical count',
-    ])->assertRedirect();
-    $requestId = DB::table('inventory_adjustment_requests')->where('product_id', $product->id)->value('id');
-    $this->actingAs($reviewer)->post(route('administration.inventory-adjustments.decide', $requestId), [
-        'decision' => 'approve',
-        'reason' => 'Count verified in person',
-    ])->assertSessionHasNoErrors();
+        'observed_quantity' => 0,
+        'stock_adjustment_confirmed' => true,
+    ])->assertSessionHasNoErrors()->assertRedirect();
+    $this->assertDatabaseCount('inventory_adjustment_requests', 0);
 
     expect($inventory->refresh()->quantity)->toBe(2);
     expect($product->refresh()->is_active)->toBeTrue();

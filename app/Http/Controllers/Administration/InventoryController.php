@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Administration;
 
+use App\Actions\Inventory\ApplyInventoryAdjustment;
 use App\Actions\Inventory\RequestInventoryAdjustment;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\InventoryIndexRequest;
@@ -13,7 +14,6 @@ use App\Support\OperationalRequestReason;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -77,23 +77,36 @@ class InventoryController extends Controller
         UpdateInventoryRequest $request,
         Product $product,
         RequestInventoryAdjustment $adjustment,
+        ApplyInventoryAdjustment $directAdjustment,
     ): RedirectResponse {
         if ($product->inventory()->exists()) {
             throw ValidationException::withMessages(['quantity' => 'Inventory is already initialized.']);
         }
 
-        $adjustment->execute(
-            $product,
-            $request->user(),
-            $request->integer('quantity'),
-            OperationalRequestReason::resolve($request->string('reason_code')->toString(), $request->validated('reason'), openingStock: true, notesOptional: true),
-            $request->integer('reorder_level'),
-            reasonCode: $request->string('reason_code')->toString(),
-        );
+        $direct = $request->user()->can('inventory.adjust');
+        if ($direct) {
+            $directAdjustment->execute(
+                $product,
+                $request->user(),
+                $request->integer('quantity'),
+                $request->string('reason_code')->toString(),
+                $request->validated('reason'),
+                initialReorderLevel: $request->integer('reorder_level'),
+            );
+        } else {
+            $adjustment->execute(
+                $product,
+                $request->user(),
+                $request->integer('quantity'),
+                OperationalRequestReason::resolve($request->string('reason_code')->toString(), $request->validated('reason'), openingStock: true, notesOptional: true),
+                $request->integer('reorder_level'),
+                reasonCode: $request->string('reason_code')->toString(),
+            );
+        }
 
         Inertia::flash('toast', [
             'type' => 'success',
-            'message' => __('Opening stock submitted for approval.'),
+            'message' => $direct ? __('Opening stock initialized.') : __('Opening stock submitted for approval.'),
         ]);
 
         return to_route('administration.inventory.index');
@@ -106,48 +119,69 @@ class InventoryController extends Controller
         UpdateInventoryRequest $request,
         Inventory $inventory,
         RequestInventoryAdjustment $adjustment,
+        ApplyInventoryAdjustment $directAdjustment,
     ): RedirectResponse {
         if ($request->integer('reorder_level') !== $inventory->reorder_level) {
             throw ValidationException::withMessages(['reorder_level' => 'Change the reorder level separately from a stock request.']);
         }
 
-        $adjustment->execute(
-            $inventory->product,
-            $request->user(),
-            $request->integer('quantity'),
-            OperationalRequestReason::resolve($request->string('reason_code')->toString(), $request->validated('reason'), notesOptional: true),
-            reasonCode: $request->string('reason_code')->toString(),
-        );
+        $direct = $request->user()->can('inventory.adjust');
+        if ($direct) {
+            $directAdjustment->execute(
+                $inventory->product,
+                $request->user(),
+                $request->integer('quantity'),
+                $request->string('reason_code')->toString(),
+                $request->validated('reason'),
+                expectedQuantity: $request->integer('observed_quantity'),
+            );
+        } else {
+            $adjustment->execute(
+                $inventory->product,
+                $request->user(),
+                $request->integer('quantity'),
+                OperationalRequestReason::resolve($request->string('reason_code')->toString(), $request->validated('reason'), notesOptional: true),
+                reasonCode: $request->string('reason_code')->toString(),
+            );
+        }
 
         Inertia::flash('toast', [
             'type' => 'success',
-            'message' => __('Stock change submitted for approval.'),
+            'message' => $direct ? __('Stock adjusted successfully.') : __('Stock change submitted for approval.'),
         ]);
 
         return back();
     }
 
-    public function count(Request $request, Inventory $inventory, RequestInventoryAdjustment $adjustment): RedirectResponse
+    public function count(UpdateInventoryRequest $request, Inventory $inventory, RequestInventoryAdjustment $adjustment, ApplyInventoryAdjustment $directAdjustment): RedirectResponse
     {
-        $validated = $request->validate([
-            'quantity' => ['required', 'integer', 'min:0', 'max:4294967295'],
-            'observed_quantity' => ['required', 'integer', 'min:0', 'max:4294967295'],
-            'reason' => ['nullable', 'string', 'min:5', 'max:2000'],
-            'reason_code' => ['required', Rule::in(['damage', 'theft_loss', 'found_stock', 'count_error', 'receiving_error', 'unit_of_measure_error', 'other'])],
-        ]);
+        $validated = $request->validated();
 
-        $adjustment->execute(
-            $inventory->product,
-            $request->user(),
-            (int) $validated['quantity'],
-            'Physical sellable stock count: '.OperationalRequestReason::resolve($validated['reason_code'], $validated['reason'] ?? null, notesOptional: true),
-            expectedQuantity: (int) $validated['observed_quantity'],
-            reasonCode: $validated['reason_code'],
-        );
+        $direct = $request->user()->can('inventory.adjust');
+        if ($direct) {
+            $directAdjustment->execute(
+                $inventory->product,
+                $request->user(),
+                (int) $validated['quantity'],
+                $validated['reason_code'],
+                $validated['reason'] ?? null,
+                expectedQuantity: (int) $validated['observed_quantity'],
+                physicalCount: true,
+            );
+        } else {
+            $adjustment->execute(
+                $inventory->product,
+                $request->user(),
+                (int) $validated['quantity'],
+                'Physical sellable stock count: '.OperationalRequestReason::resolve($validated['reason_code'], $validated['reason'] ?? null, notesOptional: true),
+                expectedQuantity: (int) $validated['observed_quantity'],
+                reasonCode: $validated['reason_code'],
+            );
+        }
 
         Inertia::flash('toast', [
             'type' => 'success',
-            'message' => __('Physical count submitted for approval.'),
+            'message' => $direct ? __('Physical count adjustment applied.') : __('Physical count submitted for approval.'),
         ]);
 
         return back();
