@@ -2,6 +2,7 @@
 
 namespace App\Services\Reporting;
 
+use App\Models\Category;
 use App\Models\Product;
 use App\Repositories\Reporting\WishlistReportRepository;
 use Carbon\CarbonImmutable;
@@ -83,7 +84,9 @@ class WishlistReportService
         return $this->repository->overview();
     }
 
-    /** @param array<string, mixed> $filters */
+    /** @param array<string, mixed> $filters
+     * @return LazyCollection<int, array<string, mixed>>
+     */
     public function exportProducts(array $filters): LazyCollection
     {
         $coverageStart = $this->repository->activityCoverageStart();
@@ -105,7 +108,7 @@ class WishlistReportService
     }
 
     /** @param array<string, mixed> $filters
-     * @return array{out_of_stock:list<array<string,mixed>>,low_stock:list<array<string,mixed>>}
+     * @return list<array<string,mixed>>
      */
     private function stockDemand(array $filters, string $stock, bool $coverageComplete): array
     {
@@ -173,17 +176,18 @@ class WishlistReportService
             && $net >= $filters['minimum_net_additions']
             && $increasePercent !== null
             && $increasePercent >= $filters['minimum_increase_percent'];
+        $category = $product->getRelationValue('category');
         $isCurrentProduct = ! $product->trashed()
             && $product->is_active
-            && $product->category !== null
-            && ! $product->category->trashed()
-            && $product->category->is_active;
+            && $category instanceof Category
+            && ! $category->trashed()
+            && $category->is_active;
 
         return [
             'id' => $product->id,
             'name' => $product->trashed() ? 'Archived product' : $product->name,
             'image_url' => $product->trashed() ? null : $product->image_url,
-            'category' => $product->category?->name,
+            'category' => $category instanceof Category ? $category->name : null,
             'is_active' => $isCurrentProduct,
             'price' => $product->price,
             'discount_price' => $product->discount_price,

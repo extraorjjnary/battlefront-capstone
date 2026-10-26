@@ -60,3 +60,15 @@ function something()
 {
     // ..
 }
+
+/** @return array{package_weight_kg: string, package_length_cm: string, package_width_cm: string, package_height_cm: string, package_measurement_source: string} */
+function validPackageMeasurements(): array
+{
+    return [
+        'package_weight_kg' => '1.000',
+        'package_length_cm' => '10.00',
+        'package_width_cm' => '10.00',
+        'package_height_cm' => '10.00',
+        'package_measurement_source' => 'estimated',
+    ];
+}

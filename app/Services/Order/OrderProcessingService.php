@@ -1112,6 +1112,10 @@ class OrderProcessingService
             $decimal = rtrim(rtrim(sprintf('%.14F', (float) $value), '0'), '.');
         }
 
+        if (! is_numeric($decimal)) {
+            throw new \LogicException('A required decimal value is missing or invalid.');
+        }
+
         return $decimal;
     }
 

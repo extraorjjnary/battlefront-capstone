@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use App\Models\PayMongoFlow;
+use App\Models\User;
 use App\Services\CustomerOrderPresenter;
 use App\Services\PayMongo\RetryDirectOnlineBanking;
 use App\Services\PayMongo\StartDirectQrPh;
@@ -22,8 +22,7 @@ class OrderPaymentRetryController extends Controller
         RetryDirectOnlineBanking $retryBank,
         StartDirectQrPh $retryQrPh,
         CustomerOrderPresenter $presenter,
-    ): JsonResponse
-    {
+    ): JsonResponse {
         /** @var User $customer */
         $customer = $request->user();
         $persistedOrder = $customer->orders()->whereKey($order)->firstOrFail();

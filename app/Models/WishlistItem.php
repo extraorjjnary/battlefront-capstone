@@ -9,11 +9,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['user_id', 'product_id', 'save_cycle_id'])]
 class WishlistItem extends Model
 {
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return BelongsTo<Product, $this> */
     public function product(): BelongsTo
     {
         return $this->belongsTo(Product::class)->withTrashed();

@@ -3,8 +3,8 @@
 use App\Enums\UserRole;
 use App\Models\Product;
 use App\Models\User;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 it('updates a customer password using the guarded mobile endpoint', function () {
     $customer = User::factory()->customer()->create();

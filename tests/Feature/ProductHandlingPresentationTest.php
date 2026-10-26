@@ -32,7 +32,7 @@ test('catalog and administration expose configured handling without private clas
 
 test('saving unchanged handling preserves its source even with the retired review flag', function (?string $source) {
     $product = Product::factory()->create(['shipping_profile' => 'fragile', 'shipping_profile_source' => $source]);
-    $payload = [...$product->only(['product_code', 'name', 'category_id', 'price', 'is_featured']),
+    $payload = [...validPackageMeasurements(), ...$product->only(['product_code', 'name', 'category_id', 'price', 'is_featured']),
         'edit_version' => $product->edit_version,
         'shipping_profile' => 'fragile', 'shipping_profile_reviewed' => true, 'shipping_profile_source' => 'forged'];
 
@@ -40,7 +40,7 @@ test('saving unchanged handling preserves its source even with the retired revie
         ->put(route('administration.products.update', $product), $payload)->assertSessionHasNoErrors();
 
     expect($product->refresh()->shipping_profile_source)->toBe($source);
-    $this->put(route('administration.products.update', $product), [...$payload, 'edit_version' => $product->refresh()->edit_version, 'shipping_profile' => 'standard'])
+    $this->put(route('administration.products.update', $product), [...validPackageMeasurements(), ...$payload, 'edit_version' => $product->refresh()->edit_version, 'shipping_profile' => 'standard'])
         ->assertSessionHasNoErrors();
     expect($product->refresh()->shipping_profile)->toBe(ShippingProfile::Standard);
     expect($product->shipping_profile_source)->toBe('manual');
@@ -50,7 +50,7 @@ test('invalid handling cannot change a product assignment', function () {
     $product = Product::factory()->create(['shipping_profile' => 'bulky', 'shipping_profile_source' => 'catalog_review_v1']);
 
     $this->actingAs(User::factory()->administrator()->create())
-        ->put(route('administration.products.update', $product), [
+        ->put(route('administration.products.update', $product), [...validPackageMeasurements(),
             ...$product->only(['product_code', 'name', 'category_id', 'price', 'is_featured']),
             'edit_version' => $product->edit_version,
             'shipping_profile' => 'oversized',

@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Storage;
 function imageProductPayload(?Product $product = null): array
 {
     return [
+        ...validPackageMeasurements(),
         ...($product !== null ? ['product_code' => $product->product_code] : []),
         'name' => $product?->name ?? 'Admin-created product',
         'category_id' => $product?->category_id ?? Category::factory()->create()->id,
@@ -29,7 +30,7 @@ test('administrators can create optimized images independently of catalog genera
     Storage::fake('local');
     $administrator = User::factory()->administrator()->create();
 
-    $this->actingAs($administrator)->post(route('administration.products.store'), [
+    $this->actingAs($administrator)->post(route('administration.products.store'), [...validPackageMeasurements(),
         ...imageProductPayload(),
         'image' => UploadedFile::fake()->image('product.'.$extension, 320, 640),
     ])->assertSessionHasNoErrors()->assertRedirect(route('administration.products.index'));
@@ -67,7 +68,7 @@ test('a product code edit retains its existing admin image', function () {
     $product = app(CreateProduct::class)->execute(imageProductPayload(), [], UploadedFile::fake()->image('old.png'));
     $oldPath = $product->image_path;
 
-    $this->actingAs($administrator)->put(route('administration.products.update', $product), [
+    $this->actingAs($administrator)->put(route('administration.products.update', $product), [...validPackageMeasurements(),
         ...imageProductPayload($product), 'product_code' => 'RENAMED001',
     ])->assertSessionHasNoErrors();
 
@@ -83,7 +84,7 @@ test('administrators replace imported images through a method-spoofed upload wit
     Storage::disk('public')->put($oldPath, 'catalog bytes');
     $product = Product::factory()->create(['image_path' => $oldPath, 'is_catalog_imported' => true]);
 
-    $this->actingAs($administrator)->post(route('administration.products.update', $product), [
+    $this->actingAs($administrator)->post(route('administration.products.update', $product), [...validPackageMeasurements(),
         ...imageProductPayload($product),
         '_method' => 'put',
         'image' => UploadedFile::fake()->image('replacement.png', 640, 320),
@@ -103,7 +104,7 @@ test('optimization failure during creation leaves no product or image', function
     $header = 'IHDR'.pack('NNCCCCC', 10000, 10000, 8, 2, 0, 0, 0);
     file_put_contents($source->getPathname(), "\x89PNG\r\n\x1a\n".pack('N', 13).$header.pack('N', crc32($header)));
 
-    $this->actingAs($administrator)->post(route('administration.products.store'), [
+    $this->actingAs($administrator)->post(route('administration.products.store'), [...validPackageMeasurements(),
         ...imageProductPayload(), 'image' => $source,
     ])->assertSessionHasErrors(['image' => 'The product image must contain between 1 and 40 million pixels.']);
 
@@ -122,7 +123,7 @@ test('optimization failure during replacement preserves product details and its 
     $header = 'IHDR'.pack('NNCCCCC', 10000, 10000, 8, 2, 0, 0, 0);
     file_put_contents($source->getPathname(), "\x89PNG\r\n\x1a\n".pack('N', 13).$header.pack('N', crc32($header)));
 
-    $this->actingAs($administrator)->post(route('administration.products.update', $product), [
+    $this->actingAs($administrator)->post(route('administration.products.update', $product), [...validPackageMeasurements(),
         ...imageProductPayload($product), '_method' => 'put', 'name' => 'Changed name', 'image' => $source,
     ])->assertSessionHasErrors(['image' => 'The product image must contain between 1 and 40 million pixels.']);
 

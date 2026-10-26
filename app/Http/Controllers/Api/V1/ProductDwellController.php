@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Http\Controllers\Controller;
 use App\Actions\User\RecordCustomerProductDwell;
 use App\Enums\UserRole;
+use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreProductDwellRequest;
 use App\Models\GuestRecommendationProfile;
 use App\Models\User;

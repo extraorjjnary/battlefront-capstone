@@ -32,6 +32,7 @@ function harness(t, pageName, pageProps = {}) {
                 user: { id: 1 },
                 can: {
                     requestInventory: true,
+                    requestInventoryAdjustment: true,
                     requestReturns: true,
                     approveInventory: true,
                     approveReturns: true,

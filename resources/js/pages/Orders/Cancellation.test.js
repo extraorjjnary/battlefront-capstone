@@ -327,6 +327,7 @@ test('customer detail labels an unconfigured zero-fee delivery without showing a
                 total: '100.00',
                 delivery_quote: {
                     pricing_configured: false,
+                    pricing_status: 'not_configured',
                     destination: 'City of Makati',
                     notice: 'Delivery fee not configured.',
                     assumption_label: 'No LBC quotation or booking exists.',
@@ -462,6 +463,8 @@ test('admin detail flags unconfigured delivery logistics without offering LBC tr
         },
         delivery_quote: {
             pricing_configured: false,
+            pricing_status: 'not_configured',
+            delivery_arrangement_required: true,
             assumption_label: 'No LBC quotation or booking exists.',
         },
         shipment: null,

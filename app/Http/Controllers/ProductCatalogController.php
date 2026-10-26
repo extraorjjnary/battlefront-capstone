@@ -149,7 +149,7 @@ class ProductCatalogController extends Controller
     {
         $products = $this->productCatalogRepository->paginate($filters);
         $savedIds = $customer instanceof User
-            ? app(WishlistService::class)->savedProductIds($customer, $products->getCollection()->modelKeys())
+            ? app(WishlistService::class)->savedProductIds($customer, array_map('intval', array_values($products->getCollection()->modelKeys())))
             : [];
 
         return $products->through(fn (Product $product): array => [

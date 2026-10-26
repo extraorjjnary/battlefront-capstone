@@ -97,6 +97,7 @@ function navigationHarness({
             '@/routes/orders': { index: route('/orders') },
             '@/routes/products': { index: route('/products') },
             '@/routes/profile': { edit: route('/settings/profile') },
+            '@/routes/wishlist': { index: route('/wishlist') },
             '@/components/ui/tooltip': {
                 Tooltip: primitive,
                 TooltipContent: primitive,

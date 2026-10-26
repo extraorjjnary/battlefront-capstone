@@ -4,6 +4,7 @@ namespace App\Services\Wishlist;
 
 use App\Enums\UserRole;
 use App\Enums\WishlistActivityType;
+use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\WishlistActivity;
@@ -34,13 +35,13 @@ class WishlistService
             return [];
         }
 
-        return WishlistItem::query()
+        return array_values(WishlistItem::query()
             ->where('user_id', $customer->id)
             ->whereIn('product_id', array_slice(array_unique($productIds), 0, 48))
             ->orderBy('product_id')
             ->pluck('product_id')
             ->map(static fn (int $id): int => $id)
-            ->all();
+            ->all());
     }
 
     public function add(User $customer, int $productId): bool
@@ -55,7 +56,8 @@ class WishlistService
 
             $product = Product::query()->with('category')->find($productId);
 
-            if ($product === null || ! $product->is_active || $product->category?->trashed() || ! $product->category?->is_active) {
+            $category = $product?->getRelationValue('category');
+            if ($product === null || ! $product->is_active || ! $category instanceof Category || $category->trashed() || ! $category->is_active) {
                 throw ValidationException::withMessages(['product_id' => __('This product cannot be saved right now.')]);
             }
 

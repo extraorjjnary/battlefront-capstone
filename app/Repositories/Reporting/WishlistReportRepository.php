@@ -19,12 +19,14 @@ class WishlistReportRepository
     /** @return list<array{id:int,name:string}> */
     public function categoryOptions(): array
     {
-        return Category::query()->orderBy('name')->get(['id', 'name'])
+        return array_values(Category::query()->orderBy('name')->get(['id', 'name'])
             ->map(static fn (Category $category): array => ['id' => $category->id, 'name' => $category->name])
-            ->all();
+            ->all());
     }
 
-    /** @return array{entries: int, customers: int, products: int} */
+    /** @param array<string, mixed> $filters
+     * @return array{entries: int, customers: int, products: int}
+     */
     public function overview(array $filters = []): array
     {
         $query = WishlistItem::query()->toBase()
@@ -44,7 +46,9 @@ class WishlistReportRepository
         ];
     }
 
-    /** @param array<string, mixed> $filters */
+    /** @param array<string, mixed> $filters
+     * @return LengthAwarePaginator<int, Product>
+     */
     public function products(array $filters): LengthAwarePaginator
     {
         return $this->productsQuery($filters)->paginate(20)->appends($filters);
@@ -67,7 +71,7 @@ class WishlistReportRepository
                 ->whereRaw('((COALESCE(current_activity.additions, 0) - COALESCE(current_activity.removals, 0)) - (COALESCE(previous_activity.additions, 0) - COALESCE(previous_activity.removals, 0))) * 100.0 / (COALESCE(previous_activity.additions, 0) - COALESCE(previous_activity.removals, 0)) >= ?', [$filters['minimum_increase_percent']]);
         }
 
-        return $query->limit($limit)->get()->all();
+        return array_values($query->limit($limit)->get()->all());
     }
 
     /** @param array<string, mixed> $filters
@@ -94,7 +98,9 @@ class WishlistReportRepository
         ];
     }
 
-    /** @return list<array{date: string, additions: int, removals: int}> */
+    /** @param array<string, mixed> $filters
+     * @return list<array{date: string, additions: int, removals: int}>
+     */
     public function dailyActivity(CarbonImmutable $from, CarbonImmutable $to, array $filters = []): array
     {
         $localDate = DB::getDriverName() === 'sqlite'
@@ -114,7 +120,7 @@ class WishlistReportRepository
             });
         }
 
-        return $query
+        return array_values($query
             ->selectRaw("{$localDate} as activity_date")
             ->selectRaw("SUM(CASE WHEN event_type = 'added' THEN 1 ELSE 0 END) as additions")
             ->selectRaw("SUM(CASE WHEN event_type = 'removed' THEN 1 ELSE 0 END) as removals")
@@ -126,7 +132,7 @@ class WishlistReportRepository
                 'additions' => (int) $row->additions,
                 'removals' => (int) $row->removals,
             ])
-            ->all();
+            ->all());
     }
 
     public function activityCoverageStart(): ?CarbonImmutable
@@ -191,16 +197,22 @@ class WishlistReportRepository
             ->when($filters['stock'] === 'low_stock', static fn (Builder $query): Builder => $query->where('inventories.quantity', '>', 0)->whereColumn('inventories.quantity', '<=', 'inventories.reorder_level'))
             ->when($filters['stock'] === 'out_of_stock', static fn (Builder $query): Builder => $query->where('inventories.quantity', 0))
             ->when($filters['stock'] === 'unavailable', static fn (Builder $query): Builder => $query->whereNull('inventories.product_id'))
-            ->orderByRaw(match ($filters['sort']) {
-                'name' => 'products.name',
-                'price' => 'COALESCE(products.discount_price, products.price)',
-                'stock' => 'inventories.quantity',
-                'interest' => '(COALESCE(current_activity.additions, 0) - COALESCE(current_activity.removals, 0))',
-                default => 'COALESCE(saved_customers.customers_count, 0)',
-            }.' '.strtoupper($filters['direction']))
+            ->orderByRaw(match ($filters['sort'].':'.$filters['direction']) {
+                'name:asc' => 'products.name ASC',
+                'name:desc' => 'products.name DESC',
+                'price:asc' => 'COALESCE(products.discount_price, products.price) ASC',
+                'price:desc' => 'COALESCE(products.discount_price, products.price) DESC',
+                'stock:asc' => 'inventories.quantity ASC',
+                'stock:desc' => 'inventories.quantity DESC',
+                'interest:asc' => '(COALESCE(current_activity.additions, 0) - COALESCE(current_activity.removals, 0)) ASC',
+                'interest:desc' => '(COALESCE(current_activity.additions, 0) - COALESCE(current_activity.removals, 0)) DESC',
+                'customers:asc' => 'COALESCE(saved_customers.customers_count, 0) ASC',
+                default => 'COALESCE(saved_customers.customers_count, 0) DESC',
+            })
             ->orderBy('products.id');
     }
 
+    /** @param array<string, mixed> $filters */
     private function productActivity(CarbonImmutable $from, CarbonImmutable $to, array $filters): QueryBuilder
     {
         $query = WishlistActivity::query()->toBase()
@@ -224,6 +236,7 @@ class WishlistReportRepository
             ->groupBy('product_id');
     }
 
+    /** @param array<string, mixed> $filters */
     private function applyProductFilters(QueryBuilder $query, array $filters): void
     {
         if (($filters['q'] ?? '') !== '') {

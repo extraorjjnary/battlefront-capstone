@@ -10,7 +10,7 @@ use InvalidArgumentException;
 class AdministratorOrderProfitability
 {
     /**
-     * @param  array{has_sale: bool, sales_returns: numeric-string, cost_recovered: numeric-string}  $inputs
+     * @param  array{has_sale: bool, sales_returns: string, cost_recovered: string}  $inputs
      * @return array{sales_returns: string, cost_of_goods_sold: string, gross_profit: string|null, available: bool}
      */
     public function calculate(Order $order, array $inputs): array

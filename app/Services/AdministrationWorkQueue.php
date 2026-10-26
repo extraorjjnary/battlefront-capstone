@@ -42,7 +42,7 @@ class AdministrationWorkQueue
                             ->orWhere(fn (Builder $cost): Builder => $cost->whereNull('carrier_cost_recorded_at')->whereNotNull('delivered_at')->where('delivered_at', '>=', self::SHIPPING_OPERATIONS_AVAILABLE_AT)->whereExists(fn (Builder $completed): Builder => $completed->selectRaw('1')->from('orders')->whereColumn('orders.id', 'shipments.order_id')->where('orders.status', 'completed')))
                             ->orWhere(fn (Builder $overdue): Builder => $overdue->whereNotNull('estimated_delivery_end')->whereDate('estimated_delivery_end', '<', now(config('app.timezone'))->toDateString())->whereNotIn('status', ['delivered', 'cancelled']));
                     })))
-            ->when(($filters['kind'] ?? null) !== 'shipping' && ($filters['kind'] ?? null), fn (Builder $query, string $kind): Builder => $query->where('kind', $kind))
+            ->when(($filters['kind'] ?? null) !== 'shipping' && ($filters['kind'] ?? null), fn (Builder $query): Builder => $query->where('kind', $filters['kind']))
             ->when($filters['responsible'] ?? null, fn (Builder $query, string $responsible): Builder => $query->where('responsible_name', 'like', '%'.$responsible.'%'))
             ->when($filters['older_than'] ?? null, fn (Builder $query, int $days): Builder => $query->where('created_at', '<', now()->subDays($days)))
             ->orderBy('created_at')->orderBy('kind')->orderBy('id')

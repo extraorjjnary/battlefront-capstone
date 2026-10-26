@@ -68,6 +68,7 @@ function orderHarness(t, overrides = {}, permissions = {}) {
             shipment_actions: {
                 next_status: { value: 'in_transit', label: 'In transit' },
                 can_update_reference: true,
+                can_update_package_details: true,
             },
             allowed_status_transitions: [
                 { value: 'cancelled', label: 'Cancelled' },
@@ -100,12 +101,19 @@ function orderHarness(t, overrides = {}, permissions = {}) {
         Link: primitive,
         usePage: () => page,
         useForm: (data) => {
+            let defaults = { ...data };
             const form = Vue.reactive({
                 ...data,
                 errors: {},
                 processing: false,
                 reset() {
-                    Object.assign(form, data);
+                    Object.assign(form, defaults);
+                },
+                defaults(values) {
+                    defaults = { ...values };
+                },
+                transform() {
+                    return form;
                 },
                 clearErrors() {
                     form.errors = {};
@@ -225,21 +233,21 @@ test('saved shipment records are read-only until explicitly edited', async (t) =
     });
 
     await view.html();
-    assert.ok(findButton(view.tree(), 'Edit saved records'));
-    assert.equal(Boolean(findButton(view.tree(), 'Save shipment records')), false);
+    assert.ok(findButton(view.tree(), 'Edit package details'));
+    assert.equal(Boolean(findButton(view.tree(), 'Save package details')), false);
     assert.equal(findElement(view.tree(), 'fieldset').props.disabled, true);
 
-    findButton(view.tree(), 'Edit saved records').props.onClick();
+    findButton(view.tree(), 'Edit package details').props.onClick();
     await view.html();
-    assert.ok(findButton(view.tree(), 'Update shipment records'));
+    assert.ok(findButton(view.tree(), 'Save package details'));
     assert.equal(findElement(view.tree(), 'fieldset').props.disabled, false);
 
-    findButton(view.tree(), 'Update shipment records').props.onClick();
+    findButton(view.tree(), 'Save package details').props.onClick();
     view.submissions.at(-1)[1].onSuccess();
 
     await view.html();
-    assert.ok(findButton(view.tree(), 'Edit saved records'));
-    assert.equal(Boolean(findButton(view.tree(), 'Update shipment records')), false);
+    assert.ok(findButton(view.tree(), 'Edit package details'));
+    assert.equal(Boolean(findButton(view.tree(), 'Save package details')), false);
 });
 
 test('delivery arrangement confirmation keeps optional details blank and requires actual arrangement', async (t) => {
