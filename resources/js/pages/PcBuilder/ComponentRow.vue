@@ -5,6 +5,7 @@ defineProps({
     required: Boolean,
     items: Array,
     disabled: Boolean,
+    multiple: Boolean,
 });
 defineEmits(['select', 'remove']);
 </script>
@@ -58,9 +59,15 @@ defineEmits(['select', 'remove']);
         <Button
             variant="outline"
             :disabled="disabled"
-            :aria-label="`${items.length ? 'Change' : 'Select'} ${label}`"
+            :aria-label="`${items.length ? (multiple ? 'Add another' : 'Change') : 'Select'} ${label}`"
             @click="$emit('select', $event)"
-            >{{ items.length ? 'Change / add' : 'Select part' }}</Button
+            >{{
+                items.length
+                    ? multiple
+                        ? 'Add another'
+                        : 'Change part'
+                    : 'Select part'
+            }}</Button
         >
     </section>
 </template>

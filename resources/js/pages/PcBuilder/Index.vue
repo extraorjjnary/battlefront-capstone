@@ -1,5 +1,9 @@
 <script setup>
 import StorefrontHeader from '@/components/StorefrontHeader.vue';
+import ConfirmActionDialog from '@/components/ConfirmActionDialog.vue';
+import { useActionConfirmation } from '@/composables/useActionConfirmation';
+import { login } from '@/routes';
+import { cartBlocker, allowsMultipleComponents } from './builderActions';
 import { Button } from '@/components/ui/button';
 import BuildSummary from './BuildSummary.vue';
 import SavedBuilds from './SavedBuilds.vue';
@@ -87,6 +91,15 @@ const saveHttp = useHttp({
     components: [],
 });
 const page = usePage();
+const { confirmation, confirm, answer } = useActionConfirmation();
+const cartExplanation = computed(() =>
+    cartBlocker({
+        checking: checking.value,
+        error: validationError.value,
+        missing: requiredMissing.value.map((type) => componentLabels[type]),
+        validation: validation.value,
+    }),
+);
 let validationTimer;
 
 const componentTypes = computed(() =>
@@ -155,6 +168,8 @@ onMounted(() => {
             );
             budget.value = typeof draft.budget === 'string' ? draft.budget : '';
             mode.value = draft.mode === 'advanced' ? 'advanced' : 'simple';
+            buildName.value =
+                typeof draft.name === 'string' ? draft.name : 'My PC Build';
         }
     } catch {
         try {
@@ -166,7 +181,7 @@ onMounted(() => {
 });
 
 watch(
-    [selections, budget, mode],
+    [selections, budget, mode, buildName],
     () => {
         try {
             localStorage.setItem(
@@ -175,6 +190,7 @@ watch(
                     selections: selections.value,
                     budget: budget.value,
                     mode: mode.value,
+                    name: buildName.value,
                 }),
             );
         } catch {
@@ -222,12 +238,7 @@ function addProduct(product) {
     const existing = selections.value.find(
         (item) => item.product_id === product.id,
     );
-    const allowsMultiple = [
-        'memory',
-        'storage',
-        'fan',
-        'network_adapter',
-    ].includes(product.component_type);
+    const allowsMultiple = allowsMultipleComponents(product.component_type);
     if (existing && allowsMultiple) {
         existing.quantity = Math.min(
             existing.quantity + 1,
@@ -320,6 +331,10 @@ function rowItems(type) {
 }
 
 async function addCurrentBuildToCart() {
+    if (!page.props.auth?.user) {
+        router.visit(login.url());
+        return;
+    }
     if (
         transferring.value ||
         saveHttp.processing ||
@@ -364,8 +379,7 @@ function requestComponents() {
 
 async function saveCurrentBuild() {
     if (!page.props.auth?.user) {
-        validationError.value =
-            'Sign in to save this build. Your guest draft stays in this browser.';
+        router.visit(login.url());
         return;
     }
     saveHttp.name = buildName.value.trim() || 'My PC Build';
@@ -385,6 +399,8 @@ async function saveCurrentBuild() {
         editingUuid.value = saved.uuid;
         saveHttp.edit_version = saved.edit_version;
         buildName.value = saved.name;
+        shareMessage.value =
+            'Build saved. Stock is checked again when you add it to cart.';
         return saved;
     } catch {
         validationError.value =
@@ -392,14 +408,15 @@ async function saveCurrentBuild() {
     }
 }
 
-function loadBuild(build) {
+async function loadBuild(build) {
     if (transferring.value) return;
+    if (!(await mayReplaceBuild())) return;
     selections.value = build.items.map((item) => ({
         key: item.key,
         product_id: item.product_id,
         component_type: item.component_type,
         quantity: item.quantity,
-        configuration: item.configuration ?? {},
+        configuration: JSON.parse(JSON.stringify({ ...item.configuration })),
     }));
     mode.value = build.mode;
     budget.value = build.budget ?? '';
@@ -410,8 +427,9 @@ function loadBuild(build) {
     savedOpen.value = false;
 }
 
-function startNewBuild() {
+async function startNewBuild() {
     if (transferring.value) return;
+    if (!(await mayReplaceBuild())) return;
     selections.value = [];
     mode.value = 'simple';
     budget.value = '';
@@ -420,15 +438,31 @@ function startNewBuild() {
     saveHttp.edit_version = 1;
 }
 
-function loadTemplate(template) {
+async function loadTemplate(template) {
     if (transferring.value) return;
-    selections.value = template.components.map((item) => ({ ...item }));
+    if (!(await mayReplaceBuild())) return;
+    selections.value = JSON.parse(JSON.stringify(template.components)).map(
+        (item) => ({ ...item, configuration: { ...item.configuration } }),
+    );
     budget.value = template.budget ?? '';
     buildName.value = template.name;
     editingUuid.value = null;
     mode.value = 'simple';
     activeType.value = template.components[0]?.component_type ?? 'processor';
     saveHttp.edit_version = 1;
+}
+
+async function mayReplaceBuild() {
+    return (
+        selections.value.length === 0 ||
+        (await confirm({
+            title: 'Replace the current build?',
+            description:
+                'Your current selections will be replaced. Save this build first if you want to keep it.',
+            label: 'Replace build',
+            destructive: true,
+        }))
+    );
 }
 
 function toggleCompare(build) {
@@ -467,12 +501,25 @@ async function duplicateSavedBuild(build) {
 }
 
 async function deleteSavedBuild(build) {
+    if (
+        !(await confirm({
+            title: `Delete ${build.name}?`,
+            description:
+                'This removes the saved build. Current selections remain in the builder.',
+            label: 'Delete build',
+            destructive: true,
+        }))
+    )
+        return;
     try {
         await saveHttp.delete(deleteBuild.url({ uuid: build.uuid }));
         savedBuilds.value = savedBuilds.value.filter(
             (saved) => saved.uuid !== build.uuid,
         );
-        if (editingUuid.value === build.uuid) startNewBuild();
+        if (editingUuid.value === build.uuid) {
+            editingUuid.value = null;
+            saveHttp.edit_version = 1;
+        }
     } catch {
         validationError.value = 'This build could not be deleted.';
     }
@@ -696,18 +743,18 @@ function setFanMount(item, position) {
                 <Button
                     variant="outline"
                     :disabled="transferring"
-                    @click="savedOpen = !savedOpen"
+                    @click="
+                        page.props.auth?.user
+                            ? (savedOpen = !savedOpen)
+                            : router.visit(login.url())
+                    "
                     >{{
                         savedOpen
                             ? 'Close saved builds'
-                            : 'Load / manage builds'
+                            : page.props.auth?.user
+                              ? 'Saved builds'
+                              : 'Sign in to view saved builds'
                     }}</Button
-                >
-                <Button
-                    variant="outline"
-                    :disabled="saveHttp.processing || transferring"
-                    @click="saveCurrentBuild"
-                    >Save build</Button
                 >
                 <Button
                     v-if="editingUuid"
@@ -726,7 +773,7 @@ function setFanMount(item, position) {
                     variant="ghost"
                     :disabled="transferring"
                     @click="startNewBuild"
-                    >Clear / new build</Button
+                    >Start new build</Button
                 >
                 <p
                     v-if="!page.props.auth?.user"
@@ -776,6 +823,7 @@ function setFanMount(item, position) {
                         :key="type"
                         :label="componentLabels[type]"
                         :required="requiredTypes.includes(type)"
+                        :multiple="allowsMultipleComponents(type)"
                         :items="rowItems(type)"
                         :disabled="transferring"
                         @select="openPicker(type, $event)"
@@ -950,27 +998,43 @@ function setFanMount(item, position) {
 
                         <Button
                             class="mt-4 w-full"
+                            variant="outline"
                             :disabled="saveHttp.processing || transferring"
                             @click="saveCurrentBuild"
                         >
-                            {{ editingUuid ? 'Save changes' : 'Save build' }}
+                            {{
+                                !page.props.auth?.user
+                                    ? 'Sign in to save build'
+                                    : editingUuid
+                                      ? 'Save changes'
+                                      : 'Save build'
+                            }}
                         </Button>
                         <Button
                             class="mt-2 w-full"
                             :disabled="
                                 saveHttp.processing ||
                                 transferring ||
-                                checking ||
-                                !validation?.complete
+                                (Boolean(page.props.auth?.user) &&
+                                    (checking || !validation?.complete))
                             "
                             @click="addCurrentBuildToCart"
                         >
                             {{
                                 transferring
                                     ? 'Saving and adding...'
-                                    : 'Add build to cart'
+                                    : !page.props.auth?.user
+                                      ? 'Sign in to add to cart'
+                                      : 'Add build to cart'
                             }}
                         </Button>
+                        <p
+                            v-if="cartExplanation"
+                            class="text-muted-foreground mt-3 text-sm"
+                            role="status"
+                        >
+                            {{ cartExplanation }}
+                        </p>
                     </BuildSummary>
                 </aside>
             </div>
@@ -1006,5 +1070,6 @@ function setFanMount(item, position) {
                 >
             </div>
         </main>
+        <ConfirmActionDialog :confirmation="confirmation" @answer="answer" />
     </div>
 </template>

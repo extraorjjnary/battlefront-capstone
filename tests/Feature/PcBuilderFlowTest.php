@@ -196,6 +196,39 @@ test('PC build template management is limited to product managers', function () 
     $this->actingAs($customer)->get(route('administration.pc-build-templates.index'))->assertForbidden();
 });
 
+test('admin template editing round trips component configuration and product identity', function () {
+    $administrator = User::factory()->administrator()->create();
+    $fan = createBuilderProduct('fan', ['size_mm' => 120, 'power_draw_w' => 3, 'header_type' => '4pin']);
+    $case = createBuilderProduct('case', ['fan_mounting_positions' => ['front', 'rear']]);
+    $configuration = ['mounting_position' => 'front', 'future_setting' => 'preserved'];
+    $template = app(PcBuildTemplateService::class)->save($administrator, [
+        'name' => 'Fan template', 'is_active' => false,
+        'components' => [['key' => 'fan-1', 'product_id' => $fan->id, 'quantity' => 2, 'configuration' => $configuration]],
+    ]);
+
+    $this->actingAs($administrator)->get(route('administration.pc-build-templates.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('templates.0.components.0.configuration', $configuration)
+            ->where('templates.0.components.0.product_name', $fan->name)
+            ->where('templates.0.components.0.product_code', $fan->product_code)
+            ->where('products', fn ($products) => collect($products)->firstWhere('id', $case->id)['fan_mounting_positions'] === ['front', 'rear']));
+
+    $this->putJson(route('administration.pc-build-templates.update', $template), [
+        'name' => 'Updated fan template', 'is_active' => false, 'edit_version' => $template->edit_version,
+        'components' => [['key' => 'fan-1', 'product_id' => $fan->id, 'quantity' => 1, 'configuration' => $configuration]],
+    ])->assertOk()->assertJsonPath('components.0.configuration', $configuration);
+
+    expect($template->refresh()->items->first()->configuration)->toBe($configuration)
+        ->and($template->items->first()->quantity)->toBe(1);
+
+    $fan->update(['is_active' => false]);
+    $this->get(route('administration.pc-build-templates.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('templates.0.components.0.product_name', $fan->name)
+            ->where('templates.0.components.0.configuration', $configuration)
+            ->where('products', fn ($products) => ! collect($products)->contains('id', $fan->id)));
+});
+
 test('PC Builder analytics counts saved and carted configurations after intentional actions', function () {
     $administrator = User::factory()->administrator()->create();
     $customer = User::factory()->customer()->create();

@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { Button } from '@/components/ui/button';
+import { allowsMultipleComponents } from './builderActions';
 import { Input } from '@/components/ui/input';
 import {
     Dialog,
@@ -176,7 +177,11 @@ function restoreFocus(event) {
                                 @click="emit('select', product)"
                                 >{{
                                     selectedIds.includes(product.id)
-                                        ? 'Selected · add / keep'
+                                        ? allowsMultipleComponents(
+                                              product.component_type,
+                                          )
+                                            ? 'Add one more'
+                                            : 'Keep this part'
                                         : 'Select part'
                                 }}</Button
                             >

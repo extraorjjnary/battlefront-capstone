@@ -1,450 +1,641 @@
-<script setup>
+﻿<script setup>
 import { Head, router, useHttp } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 import ComponentSpecificationController from '@/actions/App/Http/Controllers/Administration/ComponentSpecificationController';
 import PageHeader from '@/components/PageHeader.vue';
 import InputError from '@/components/InputError.vue';
+import ConfirmActionDialog from '@/components/ConfirmActionDialog.vue';
+import { useActionConfirmation } from '@/composables/useActionConfirmation';
+import { useUnsavedEditor } from '@/composables/useUnsavedEditor';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import SpecificationField from './SpecificationField.vue';
+import {
+    componentLabels,
+    fieldsFor,
+    parseSpecifications,
+} from './specificationFields';
 
 const props = defineProps({
-    products: { type: Array, required: true },
-    profiles: { type: Array, required: true },
+    products: Array,
+    profiles: Array,
     candidates: { type: Array, default: () => [] },
 });
-
-const candidateSearch = ref('');
-const candidateStatus = ref('needs_identity');
-const candidateLabels = {
-    needs_identity: 'Identity / evidence needed',
-    needs_review: 'Draft needs review',
-    reviewed: 'Specifications reviewed',
-    not_core_component: 'Other products / manual classification',
-};
-const visibleCandidates = computed(() =>
-    props.candidates.filter(
-        (candidate) =>
-            candidate.status === candidateStatus.value &&
-            `${candidate.name} ${candidate.product_code}`
-                .toLowerCase()
-                .includes(candidateSearch.value.trim().toLowerCase()),
-    ),
-);
-function prepareCandidate(candidate) {
-    const profile = props.profiles.find(
-        (item) => item.id === candidate.profile_id,
-    );
-    if (profile) editProfile(profile);
-    else {
-        startNew();
-        productId.value = String(candidate.product_id);
-        componentType.value = candidate.suggested_type ?? 'processor';
-    }
-    document.getElementById('spec-product')?.focus();
-}
-
-const componentTypes = [
-    ['processor', 'Processor (CPU)'],
-    ['motherboard', 'Motherboard'],
-    ['memory', 'Memory (RAM)'],
-    ['storage', 'Storage'],
-    ['power_supply', 'Power Supply (PSU)'],
-    ['case', 'PC Case'],
-    ['graphics_card', 'Graphics Card (GPU)'],
-    ['cooler', 'CPU Cooler'],
-    ['fan', 'Case Fan'],
-    ['network_adapter', 'Network Adapter'],
-    ['monitor', 'Monitor'],
-    ['keyboard', 'Keyboard'],
-    ['mouse', 'Mouse'],
-    ['headset', 'Headset'],
-    ['speakers', 'Speakers'],
-    ['webcam', 'Webcam'],
-    ['ups_avr', 'UPS / AVR'],
-];
-const selectedProfileId = ref('');
+const { confirmation, confirm, answer } = useActionConfirmation();
+const search = ref('');
+const status = ref('all');
+const selected = ref(null);
 const productId = ref('');
 const componentType = ref('processor');
 const partNumber = ref('');
 const hardwareRevision = ref('');
-const editVersion = ref(null);
-const specificationsText = ref('{}');
-const evidenceText = ref(
-    '[\n  {\n    "url": "https://manufacturer.example/specifications",\n    "title": "Manufacturer product specification",\n    "section": "Specifications",\n    "verified_at": "2026-10-27",\n    "variant": "EXACT-MODEL-OR-PART-NUMBER"\n  }\n]',
-);
+const specifications = ref({});
+const evidence = ref([]);
 const message = ref('');
-const http = useHttp({});
-const selectedProfile = computed(
-    () =>
-        props.profiles.find(
-            (profile) => String(profile.id) === selectedProfileId.value,
-        ) ?? null,
+const advancedText = ref('');
+const advancedOpen = ref(false);
+const advancedError = ref('');
+const reviewOpen = ref(false);
+const http = useHttp({
+    product_id: null,
+    component_type: '',
+    manufacturer_part_number: null,
+    hardware_revision: null,
+    edit_version: null,
+    specifications: {},
+    evidence: [],
+});
+const snapshot = () =>
+    JSON.stringify([
+        productId.value,
+        componentType.value,
+        partNumber.value,
+        hardwareRevision.value,
+        specifications.value,
+        evidence.value,
+    ]);
+const baseline = ref(snapshot());
+const dirty = computed(
+    () => baseline.value !== snapshot() || Boolean(advancedError.value),
 );
-const productsWithProfile = computed(
-    () => new Set(props.profiles.map((profile) => profile.product_id)),
+const fields = computed(() => fieldsFor(componentType.value));
+const statusLabels = {
+    needs_identity: 'Needs specifications',
+    needs_review: 'Draft needs review',
+    reviewed: 'Reviewed',
+    not_core_component: 'Manual classification',
+};
+const queue = computed(() =>
+    [
+        ...props.candidates,
+        ...props.profiles
+            .filter(
+                (profile) =>
+                    !props.candidates.some(
+                        (candidate) =>
+                            candidate.product_id === profile.product_id,
+                    ),
+            )
+            .map((profile) => ({
+                product_id: profile.product_id,
+                profile_id: profile.id,
+                name: profile.product_name,
+                product_code: profile.product_code,
+                status:
+                    profile.review_status === 'approved'
+                        ? 'reviewed'
+                        : 'needs_review',
+                stock_quantity: null,
+                reason: 'Existing profile outside the current customer catalog.',
+            })),
+    ].filter(
+        (candidate) =>
+            (status.value === 'all' || candidate.status === status.value) &&
+            `${candidate.name} ${candidate.product_code}`
+                .toLowerCase()
+                .includes(search.value.trim().toLowerCase()),
+    ),
 );
-
-function startNew() {
-    selectedProfileId.value = '';
-    productId.value = '';
-    componentType.value = 'processor';
-    partNumber.value = '';
-    hardwareRevision.value = '';
-    editVersion.value = null;
-    specificationsText.value = '{}';
-    evidenceText.value = '[]';
+const availableProducts = computed(() =>
+    props.products.filter(
+        (product) =>
+            !props.profiles.some(
+                (profile) => profile.product_id === product.id,
+            ) || product.id === Number(productId.value),
+    ),
+);
+const errorEntries = computed(() => Object.entries(http.errors));
+const { mayDiscard } = useUnsavedEditor(dirty, confirm);
+async function openEditor(candidate = null, force = false) {
+    if (http.processing || (!force && !(await mayDiscard()))) return;
+    const profile = props.profiles.find(
+        (item) => item.id === candidate?.profile_id,
+    );
+    selected.value = profile ? { ...profile } : null;
+    productId.value = String(
+        profile?.product_id ?? candidate?.product_id ?? '',
+    );
+    componentType.value =
+        profile?.component_type ?? candidate?.suggested_type ?? 'processor';
+    partNumber.value = profile?.manufacturer_part_number ?? '';
+    hardwareRevision.value = profile?.hardware_revision ?? '';
+    specifications.value = JSON.parse(
+        JSON.stringify(profile?.specifications ?? {}),
+    );
+    if (Array.isArray(specifications.value)) specifications.value = {};
+    evidence.value = JSON.parse(JSON.stringify(profile?.evidence ?? []));
     message.value = '';
+    advancedError.value = '';
+    advancedOpen.value = false;
+    reviewOpen.value = false;
+    http.clearErrors();
+    baseline.value = snapshot();
+    await nextTick();
+    document.getElementById('specification-editor-heading')?.focus();
 }
-
-function editProfile(profile) {
-    selectedProfileId.value = String(profile.id);
-    productId.value = String(profile.product_id);
-    componentType.value = profile.component_type;
-    partNumber.value = profile.manufacturer_part_number ?? '';
-    hardwareRevision.value = profile.hardware_revision ?? '';
-    editVersion.value = profile.edit_version;
-    specificationsText.value = JSON.stringify(profile.specifications, null, 2);
-    evidenceText.value = JSON.stringify(profile.evidence, null, 2);
-    message.value = '';
+function toggleAdvanced() {
+    if (!advancedOpen.value)
+        advancedText.value = JSON.stringify(specifications.value, null, 2);
+    advancedOpen.value = !advancedOpen.value;
 }
-
-function parseJson(text, label) {
+function updateAdvanced(value) {
+    advancedText.value = value;
     try {
-        return JSON.parse(text);
+        specifications.value = parseSpecifications(value);
+        advancedError.value = '';
     } catch {
-        throw new Error(`${label} must contain valid JSON.`);
+        advancedError.value = 'Enter a valid JSON object before saving.';
     }
 }
-
 async function saveDraft() {
+    if (http.processing || advancedError.value) return;
     message.value = '';
+    http.product_id = Number(productId.value);
+    http.component_type = componentType.value;
+    http.manufacturer_part_number = partNumber.value || null;
+    http.hardware_revision = hardwareRevision.value || null;
+    http.edit_version = selected.value?.edit_version ?? null;
+    http.specifications = specifications.value;
+    http.evidence = evidence.value;
     try {
-        http.product_id = Number(productId.value);
-        http.component_type = componentType.value;
-        http.manufacturer_part_number = partNumber.value || null;
-        http.hardware_revision = hardwareRevision.value || null;
-        http.edit_version = editVersion.value;
-        http.specifications = parseJson(
-            specificationsText.value,
-            'Specifications',
-        );
-        http.evidence = parseJson(evidenceText.value, 'Evidence');
-        const profile = await http.post(
+        const result = await http.post(
             ComponentSpecificationController.store.url(),
         );
-        selectedProfileId.value = String(profile.id);
-        productId.value = String(profile.product_id);
-        componentType.value = profile.component_type;
-        partNumber.value = profile.manufacturer_part_number ?? '';
-        hardwareRevision.value = profile.hardware_revision ?? '';
-        editVersion.value = profile.edit_version;
-        message.value = `Saved draft revision ${profile.revision}. Compatibility stays unverified until an administrator approves it.`;
-        router.reload({ only: ['profiles', 'candidates'] });
-    } catch (error) {
-        message.value = error.message?.includes('valid JSON')
-            ? error.message
-            : 'Could not save this specification draft. Check the fields and try again.';
-    }
-}
-
-async function approveProfile(profile) {
-    try {
-        await http.post(
-            ComponentSpecificationController.approve.url({
-                componentSpecification: profile.id,
-            }),
-            {
-                data: { edit_version: profile.edit_version },
-            },
-        );
-        message.value = 'A new reviewed specification revision was approved.';
+        selected.value = {
+            ...selected.value,
+            ...result,
+            specifications: JSON.parse(JSON.stringify(specifications.value)),
+            evidence: JSON.parse(JSON.stringify(evidence.value)),
+        };
+        baseline.value = snapshot();
+        message.value =
+            'Draft saved. Review the saved specifications and source evidence before approving.';
         router.reload({ only: ['profiles', 'candidates'] });
     } catch {
         message.value =
-            'Could not approve this revision. Confirm exact-variant evidence and reload the profile.';
+            'The draft was not saved. Resolve the errors below and try again.';
     }
+}
+async function approve() {
+    if (dirty.value || !selected.value || http.processing) return;
+    try {
+        const result = await http.post(
+            ComponentSpecificationController.approve.url({
+                componentSpecification: selected.value.id,
+            }),
+            { data: { edit_version: selected.value.edit_version } },
+        );
+        selected.value = { ...selected.value, ...result };
+        reviewOpen.value = false;
+        message.value =
+            'Specifications approved. Missing facts still require verification.';
+        router.reload({ only: ['profiles', 'candidates'] });
+    } catch {
+        message.value =
+            'Approval did not complete. Check the review errors below.';
+    }
+}
+async function reloadRevision() {
+    if (!(await mayDiscard())) return;
+    router.reload({
+        only: ['profiles', 'candidates'],
+        onSuccess: () => openEditor({ profile_id: selected.value?.id }, true),
+    });
 }
 </script>
 
 <template>
-    <Head title="Component specifications" />
     <main
         class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
     >
+        <Head title="PC component specifications" />
         <PageHeader
             title="PC component specifications"
             heading-id="component-specifications-heading"
         />
         <p class="text-muted-foreground max-w-3xl text-sm leading-6">
-            Reuse existing catalog products. Record exact hardware facts and
-            source evidence. Compatibility uses only the latest approved
-            revision; missing attributes remain unknown.
+            Select a catalog product, record its verified hardware facts, then
+            review its source evidence. Unknown facts remain unverified.
         </p>
-
-        <section
-            class="border-border bg-card rounded-lg border p-5"
-            aria-labelledby="readiness-heading"
-        >
-            <h2 id="readiness-heading" class="font-semibold">
-                Catalog readiness
-            </h2>
-            <p class="text-muted-foreground mt-1 text-sm">
-                Category suggestions are a review queue, not proof of
-                compatibility. Profiles require exact-model evidence.
-            </p>
-            <div class="my-4 flex flex-wrap gap-3">
-                <Input
-                    v-model="candidateSearch"
-                    aria-label="Search readiness queue"
-                    placeholder="Search product or code"
-                    class="max-w-sm"
-                />
-                <select
-                    v-model="candidateStatus"
-                    aria-label="Readiness status"
-                    class="border-input bg-background rounded-md border p-2 text-sm"
-                >
-                    <option
-                        v-for="(label, status) in candidateLabels"
-                        :key="status"
-                        :value="status"
-                    >
-                        {{ label }} ({{
-                            candidates.filter((item) => item.status === status)
-                                .length
-                        }})
-                    </option>
-                </select>
-            </div>
-            <ul class="divide-border max-h-80 divide-y overflow-y-auto">
-                <li
-                    v-for="candidate in visibleCandidates"
-                    :key="candidate.product_id"
-                    class="flex items-center justify-between gap-4 py-3"
-                >
-                    <div>
-                        <p class="text-sm font-medium">{{ candidate.name }}</p>
-                        <p class="text-muted-foreground text-xs">
-                            {{ candidate.category }} ·
-                            {{ candidate.stock_quantity }} in stock ·
-                            {{ candidate.reason }}
-                        </p>
-                    </div>
-                    <Button
-                        size="sm"
-                        variant="outline"
-                        @click="prepareCandidate(candidate)"
-                        >{{
-                            candidate.profile_id ? 'Review' : 'Prepare'
-                        }}</Button
-                    >
-                </li>
-                <li
-                    v-if="!visibleCandidates.length"
-                    class="text-muted-foreground py-6 text-sm"
-                >
-                    No products match this readiness filter.
-                </li>
-            </ul>
-        </section>
-        <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
+        <div class="grid items-start gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
             <section
-                class="surface-panel border-border bg-card border"
-                aria-label="Component specification profiles"
+                class="border-border bg-card rounded-lg border p-4"
+                aria-label="Component review queue"
             >
-                <div
-                    class="border-border flex items-center justify-between gap-3 border-b p-5"
-                >
-                    <div>
-                        <h2 class="font-semibold">Specification profiles</h2>
-                        <p class="text-muted-foreground mt-1 text-sm">
-                            {{ profiles.length }} catalog products configured
-                        </p>
-                    </div>
-                    <Button variant="outline" @click="startNew"
-                        >New profile</Button
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="font-semibold">Products to review</h2>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        :disabled="http.processing"
+                        @click="openEditor()"
+                        >Add specifications</Button
                     >
                 </div>
-                <ul class="divide-border divide-y">
-                    <li
-                        v-for="profile in profiles"
-                        :key="profile.id"
-                        class="flex flex-wrap items-center justify-between gap-4 p-5"
+                <div class="my-4 grid gap-3">
+                    <Label for="queue-search">Find a product</Label
+                    ><Input
+                        id="queue-search"
+                        v-model="search"
+                        placeholder="Product name or code"
+                    />
+                    <Label for="queue-status">Review status</Label>
+                    <select
+                        id="queue-status"
+                        v-model="status"
+                        class="border-input bg-background h-10 rounded-md border px-3 text-sm"
                     >
-                        <div class="min-w-0">
-                            <p class="font-semibold">
-                                {{ profile.product_name }}
-                            </p>
-                            <p class="text-muted-foreground mt-1 text-xs">
-                                {{ profile.product_code }} ·
-                                {{ profile.component_type }} · revision
-                                {{ profile.revision ?? 'none' }}
-                            </p>
-                            <p
-                                v-if="profile.incomplete_attributes.length"
-                                class="mt-2 text-xs text-amber-600"
+                        <option value="all">All products</option>
+                        <option
+                            v-for="(label, value) in statusLabels"
+                            :key="value"
+                            :value="value"
+                        >
+                            {{ label }}
+                        </option>
+                    </select>
+                </div>
+                <p class="text-muted-foreground mb-2 text-xs">
+                    {{ queue.length }} matching products
+                </p>
+                <ul
+                    class="divide-border max-h-[36rem] divide-y overflow-y-auto"
+                >
+                    <li
+                        v-for="candidate in queue"
+                        :key="candidate.product_id"
+                        class="grid gap-2 py-4"
+                    >
+                        <p class="text-sm font-semibold">
+                            {{ candidate.name }}
+                        </p>
+                        <p class="text-muted-foreground text-xs">
+                            {{ candidate.product_code
+                            }}<template
+                                v-if="candidate.stock_quantity !== null"
                             >
-                                Missing:
-                                {{ profile.incomplete_attributes.join(', ') }}
-                            </p>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <Badge
-                                :variant="
-                                    profile.review_status === 'approved'
-                                        ? 'default'
-                                        : 'outline'
-                                "
-                                >{{ profile.review_status }}</Badge
+                                · {{ candidate.stock_quantity }} in
+                                stock</template
                             >
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                @click="editProfile(profile)"
-                                >Edit</Button
-                            >
-                            <Button
-                                v-if="profile.review_status !== 'approved'"
-                                size="sm"
-                                :disabled="http.processing"
-                                @click="approveProfile(profile)"
-                                >Approve</Button
-                            >
-                        </div>
+                        </p>
+                        <Badge variant="outline" class="w-fit">{{
+                            statusLabels[candidate.status]
+                        }}</Badge>
+                        <p class="text-muted-foreground text-xs">
+                            {{ candidate.reason }}
+                        </p>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            :disabled="http.processing"
+                            @click="openEditor(candidate)"
+                            >{{
+                                candidate.profile_id
+                                    ? candidate.status === 'reviewed'
+                                        ? 'Edit specifications'
+                                        : 'Review draft'
+                                    : 'Add specifications'
+                            }}</Button
+                        >
                     </li>
                     <li
-                        v-if="profiles.length === 0"
-                        class="text-muted-foreground p-8 text-center"
+                        v-if="!queue.length"
+                        class="text-muted-foreground py-6 text-sm"
                     >
-                        No component profiles yet. Select an existing product to
-                        begin.
+                        No products match. Try another name or review status.
                     </li>
                 </ul>
             </section>
-
             <section
-                class="surface-panel border-border bg-card h-fit border p-5"
+                class="border-border bg-card min-w-0 rounded-lg border p-5 sm:p-6"
                 aria-labelledby="specification-editor-heading"
             >
                 <h2
                     id="specification-editor-heading"
+                    tabindex="-1"
                     class="text-lg font-semibold"
                 >
                     {{
-                        selectedProfile
-                            ? 'Create a new revision'
-                            : 'Add a component profile'
+                        selected ? 'Edit specifications' : 'Add specifications'
                     }}
                 </h2>
-                <form class="mt-5 grid gap-4" @submit.prevent="saveDraft">
-                    <div class="grid gap-2">
-                        <Label for="spec-product"
-                            >Existing catalog product</Label
-                        >
-                        <select
-                            id="spec-product"
-                            v-model="productId"
-                            required
-                            class="border-input bg-background h-10 rounded-md border px-3 text-sm"
-                            :disabled="Boolean(selectedProfile)"
-                        >
-                            <option value="" disabled>Select a product</option>
-                            <option
-                                v-for="product in products"
-                                :key="product.id"
-                                :value="String(product.id)"
+                <p v-if="selected" class="text-muted-foreground mt-1 text-sm">
+                    Saved revision {{ selected.revision }} ·
+                    {{
+                        selected.review_status === 'approved'
+                            ? 'Reviewed'
+                            : 'Draft'
+                    }}
+                </p>
+                <form class="mt-6 grid gap-6" @submit.prevent="saveDraft">
+                    <fieldset
+                        :disabled="http.processing"
+                        class="grid min-w-0 gap-4"
+                    >
+                        <legend class="mb-4 font-semibold">
+                            Product identity
+                        </legend>
+                        <div class="grid gap-2">
+                            <Label for="spec-product">Catalog product</Label
+                            ><select
+                                id="spec-product"
+                                v-model="productId"
+                                required
+                                :disabled="Boolean(selected)"
+                                class="border-input bg-background h-10 w-full min-w-0 rounded-md border px-3 text-sm"
                             >
-                                {{ product.name }} · {{ product.product_code
-                                }}{{
-                                    productsWithProfile.has(product.id)
-                                        ? ' · profile exists'
-                                        : ''
-                                }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="spec-component-type"
-                            >Component category</Label
-                        >
-                        <select
-                            id="spec-component-type"
-                            v-model="componentType"
-                            required
-                            class="border-input bg-background h-10 rounded-md border px-3 text-sm"
-                            :disabled="Boolean(selectedProfile)"
-                        >
-                            <option
-                                v-for="[value, label] in componentTypes"
-                                :key="value"
-                                :value="value"
+                                <option value="" disabled>
+                                    Select a product
+                                </option>
+                                <option
+                                    v-for="product in availableProducts"
+                                    :key="product.id"
+                                    :value="String(product.id)"
+                                >
+                                    {{ product.name }} ·
+                                    {{ product.product_code }}
+                                </option></select
+                            ><InputError :message="http.errors.product_id" />
+                        </div>
+                        <div class="grid gap-2">
+                            <Label for="spec-type">Component category</Label
+                            ><select
+                                id="spec-type"
+                                v-model="componentType"
+                                :disabled="Boolean(selected)"
+                                class="border-input bg-background h-10 rounded-md border px-3 text-sm"
                             >
-                                {{ label }}
-                            </option>
-                        </select>
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="spec-part-number"
-                            >Manufacturer part number</Label
-                        >
-                        <Input
-                            id="spec-part-number"
-                            v-model="partNumber"
-                            maxlength="128"
-                        />
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="spec-hardware-revision"
-                            >Hardware revision (if applicable)</Label
-                        >
-                        <Input
-                            id="spec-hardware-revision"
-                            v-model="hardwareRevision"
-                            maxlength="80"
-                        />
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="spec-facts"
-                            >Technical specifications (JSON)</Label
-                        >
-                        <textarea
-                            id="spec-facts"
-                            v-model="specificationsText"
-                            rows="12"
-                            spellcheck="false"
-                            class="border-input bg-background rounded-md border p-3 font-mono text-xs"
-                            required
-                        ></textarea>
-                    </div>
-                    <div class="grid gap-2">
-                        <Label for="spec-evidence"
-                            >Manufacturer evidence (JSON)</Label
-                        >
-                        <textarea
-                            id="spec-evidence"
-                            v-model="evidenceText"
-                            rows="10"
-                            spellcheck="false"
-                            class="border-input bg-background rounded-md border p-3 font-mono text-xs"
-                            required
-                        ></textarea>
-                        <p class="text-muted-foreground text-xs leading-5">
-                            Each source records a URL, page/document title,
-                            section, verification date, and exact variant
-                            matching the part number.
+                                <option
+                                    v-for="(label, value) in componentLabels"
+                                    :key="value"
+                                    :value="value"
+                                >
+                                    {{ label }}
+                                </option></select
+                            ><InputError
+                                :message="http.errors.component_type"
+                            />
+                        </div>
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div class="grid gap-2">
+                                <Label for="spec-part"
+                                    >Manufacturer part number</Label
+                                ><Input
+                                    id="spec-part"
+                                    v-model="partNumber"
+                                    maxlength="128"
+                                /><InputError
+                                    :message="
+                                        http.errors.manufacturer_part_number
+                                    "
+                                />
+                            </div>
+                            <div class="grid gap-2">
+                                <Label for="spec-revision"
+                                    >Hardware revision (if applicable)</Label
+                                ><Input
+                                    id="spec-revision"
+                                    v-model="hardwareRevision"
+                                    maxlength="80"
+                                /><InputError
+                                    :message="http.errors.hardware_revision"
+                                />
+                            </div>
+                        </div>
+                    </fieldset>
+                    <fieldset
+                        :disabled="http.processing"
+                        class="border-border grid min-w-0 gap-4 border-t pt-5"
+                    >
+                        <legend class="font-semibold">
+                            Technical specifications
+                        </legend>
+                        <p class="text-muted-foreground text-sm">
+                            Use exact source names and units. Leave unverified
+                            values unknown; use “Confirm none” only when the
+                            source verifies that there are none.
                         </p>
+                        <template v-if="!advancedOpen"
+                            ><div
+                                v-for="field in fields"
+                                :key="field.key"
+                                class="border-border border-b pb-4 last:border-0"
+                            >
+                                <SpecificationField
+                                    :id="'spec-' + field.key"
+                                    :field="field"
+                                    :model-value="specifications[field.key]"
+                                    @update:model-value="
+                                        specifications = {
+                                            ...specifications,
+                                            [field.key]: $event,
+                                        }
+                                    "
+                                /><InputError
+                                    :message="
+                                        http.errors[
+                                            'specifications.' + field.key
+                                        ]
+                                    "
+                                /></div
+                        ></template>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            :aria-expanded="advancedOpen"
+                            aria-controls="advanced-specifications-panel"
+                            :disabled="Boolean(advancedError)"
+                            @click="toggleAdvanced"
+                            >{{
+                                advancedOpen
+                                    ? 'Return to guided fields'
+                                    : 'Advanced attributes (JSON)'
+                            }}</Button
+                        >
+                        <div
+                            v-if="advancedOpen"
+                            id="advanced-specifications-panel"
+                        >
+                            <p class="text-muted-foreground mb-2 text-sm">
+                                Includes all saved attributes. Uncommon fields
+                                are preserved by the guided form.
+                            </p>
+                            <Label for="advanced-specifications"
+                                >All technical attributes</Label
+                            ><textarea
+                                id="advanced-specifications"
+                                :value="advancedText"
+                                rows="10"
+                                spellcheck="false"
+                                class="border-input bg-background mt-2 w-full rounded-md border p-3 font-mono text-xs"
+                                @input="updateAdvanced($event.target.value)"
+                            ></textarea
+                            ><InputError :message="advancedError" />
+                        </div>
+                    </fieldset>
+                    <fieldset
+                        :disabled="http.processing"
+                        class="border-border grid min-w-0 gap-4 border-t pt-5"
+                    >
+                        <legend class="font-semibold">Source evidence</legend>
+                        <p class="text-muted-foreground text-sm">
+                            At least one source must identify the exact
+                            manufacturer part number before approval.
+                        </p>
+                        <div
+                            v-for="(source, index) in evidence"
+                            :key="index"
+                            class="border-border grid gap-3 rounded-md border p-4"
+                        >
+                            <h3 class="text-sm font-semibold">
+                                Source {{ index + 1 }}
+                            </h3>
+                            <div
+                                v-for="(label, key) in {
+                                    url: 'Source URL',
+                                    title: 'Page or document title',
+                                    section: 'Section',
+                                    verified_at: 'Verification date',
+                                    variant: 'Exact model / part number',
+                                }"
+                                :key="key"
+                                class="grid gap-2"
+                            >
+                                <Label :for="'source-' + index + '-' + key">{{
+                                    label
+                                }}</Label
+                                ><Input
+                                    :id="'source-' + index + '-' + key"
+                                    v-model="source[key]"
+                                    :type="
+                                        key === 'url'
+                                            ? 'url'
+                                            : key === 'verified_at'
+                                              ? 'date'
+                                              : 'text'
+                                    "
+                                    required
+                                /><InputError
+                                    :message="
+                                        http.errors[
+                                            'evidence.' + index + '.' + key
+                                        ]
+                                    "
+                                />
+                            </div>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                @click="evidence.splice(index, 1)"
+                                >Remove source {{ index + 1 }}</Button
+                            >
+                        </div>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            :disabled="evidence.length >= 20"
+                            @click="
+                                evidence.push({
+                                    url: '',
+                                    title: '',
+                                    section: '',
+                                    verified_at: '',
+                                    variant: '',
+                                })
+                            "
+                            >Add source evidence</Button
+                        >
+                    </fieldset>
+                    <div
+                        v-if="errorEntries.length"
+                        role="alert"
+                        class="border-destructive text-destructive rounded-md border p-4 text-sm"
+                    >
+                        <p class="font-semibold">Please resolve these issues</p>
+                        <ul class="mt-2 list-inside list-disc">
+                            <li v-for="[key, error] in errorEntries" :key="key">
+                                {{ error }}
+                            </li>
+                        </ul>
+                        <Button
+                            v-if="http.errors.edit_version"
+                            type="button"
+                            variant="outline"
+                            class="mt-3"
+                            @click="reloadRevision"
+                            >Reload saved revision</Button
+                        >
                     </div>
-                    <InputError :message="http.errors.specifications" />
-                    <p v-if="message" class="text-sm" role="status">
+                    <p v-if="message" role="status" class="text-sm">
                         {{ message }}
                     </p>
-                    <Button type="submit" :disabled="http.processing"
-                        >Save draft revision</Button
+                    <div class="flex flex-wrap gap-3">
+                        <Button
+                            type="submit"
+                            :variant="
+                                reviewOpen && !dirty ? 'outline' : 'default'
+                            "
+                            :disabled="
+                                http.processing || Boolean(advancedError)
+                            "
+                            >{{
+                                http.processing ? 'Working…' : 'Save draft'
+                            }}</Button
+                        ><Button
+                            v-if="selected?.review_status === 'draft'"
+                            type="button"
+                            variant="outline"
+                            :disabled="dirty || http.processing"
+                            @click="reviewOpen = !reviewOpen"
+                            >Review saved revision</Button
+                        >
+                    </div>
+                    <p
+                        v-if="dirty && selected"
+                        class="text-muted-foreground text-xs"
                     >
+                        Save your changes before reviewing this revision for
+                        approval.
+                    </p>
                 </form>
+                <section
+                    v-if="reviewOpen && !dirty"
+                    class="border-border mt-6 grid gap-4 rounded-md border p-4"
+                    aria-label="Review saved specifications"
+                >
+                    <h3 class="font-semibold">
+                        Review revision {{ selected.revision }}
+                    </h3>
+                    <p class="text-sm">
+                        Part number:
+                        {{
+                            selected.manufacturer_part_number || 'Not supplied'
+                        }}. Check the recorded facts above against the saved
+                        sources before approving. Approval does not make missing
+                        facts compatible.
+                    </p>
+                    <ul class="grid gap-2 text-sm">
+                        <li
+                            v-for="(source, index) in selected.evidence"
+                            :key="index"
+                        >
+                            <span class="font-medium">{{ source.title }}</span>
+                            · {{ source.section }} · {{ source.variant }} ·
+                            {{ source.verified_at }}
+                            <p class="text-muted-foreground break-all">
+                                {{ source.url }}
+                            </p>
+                        </li>
+                    </ul>
+                    <Button :disabled="http.processing" @click="approve"
+                        >Approve specifications</Button
+                    >
+                </section>
             </section>
         </div>
+        <ConfirmActionDialog :confirmation="confirmation" @answer="answer" />
     </main>
 </template>

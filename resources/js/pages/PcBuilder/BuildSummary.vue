@@ -64,6 +64,25 @@ defineEmits(['retry']);
                 <p class="font-semibold">
                     {{ statusLabel(validation.status) }}
                 </p>
+                <ul
+                    v-if="
+                        validation.findings.some(
+                            (finding) => finding.status !== 'compatible',
+                        )
+                    "
+                    class="mt-3 space-y-3 text-sm"
+                    aria-label="Compatibility findings to resolve"
+                >
+                    <li
+                        v-for="finding in validation.findings.filter(
+                            (item) => item.status !== 'compatible',
+                        )"
+                        :key="`${finding.rule}-${finding.component_keys.join('-')}`"
+                    >
+                        <strong>{{ statusLabel(finding.status) }}:</strong>
+                        {{ finding.message }}
+                    </li>
+                </ul>
                 <p
                     v-if="validation.estimated_power_w !== null"
                     class="text-muted-foreground mt-1 text-sm"
@@ -71,13 +90,22 @@ defineEmits(['retry']);
                     Estimated component draw:
                     {{ validation.estimated_power_w }} W
                 </p>
-                <details v-if="validation.findings.length" class="mt-3 text-sm">
+                <details
+                    v-if="
+                        validation.findings.some(
+                            (finding) => finding.status === 'compatible',
+                        )
+                    "
+                    class="mt-3 text-sm"
+                >
                     <summary class="cursor-pointer font-medium">
-                        View compatibility details
+                        View passed checks
                     </summary>
                     <ul class="mt-3 space-y-2">
                         <li
-                            v-for="finding in validation.findings"
+                            v-for="finding in validation.findings.filter(
+                                (item) => item.status === 'compatible',
+                            )"
                             :key="`${finding.rule}-${finding.component_keys.join('-')}`"
                         >
                             <strong>{{ statusLabel(finding.status) }}:</strong>

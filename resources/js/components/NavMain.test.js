@@ -88,15 +88,26 @@ function navigationHarness({
             '@/actions/App/Http/Controllers/Administration/ProductController': {
                 default: { index: route('/administration/products') },
             },
-            '@/actions/App/Http/Controllers/Administration/ComponentSpecificationController': {
-                default: { index: route('/administration/component-specifications') },
-            },
-            '@/actions/App/Http/Controllers/Administration/PcBuildTemplateController': {
-                default: { index: route('/administration/pc-build-templates') },
-            },
-            '@/actions/App/Http/Controllers/Administration/PcBuildAnalyticsController': {
-                default: { index: route('/administration/pc-build-analytics') },
-            },
+            '@/actions/App/Http/Controllers/Administration/ComponentSpecificationController':
+                {
+                    default: {
+                        index: route(
+                            '/administration/component-specifications',
+                        ),
+                    },
+                },
+            '@/actions/App/Http/Controllers/Administration/PcBuildTemplateController':
+                {
+                    default: {
+                        index: route('/administration/pc-build-templates'),
+                    },
+                },
+            '@/actions/App/Http/Controllers/Administration/PcBuildAnalyticsController':
+                {
+                    default: {
+                        index: route('/administration/pc-build-analytics'),
+                    },
+                },
             '@/actions/App/Http/Controllers/Administration/InventoryController':
                 {
                     default: { index: route('/administration/inventory') },
@@ -212,6 +223,35 @@ function navigationHarness({
 function cartLink(html) {
     return html.match(/<a\b[^>]*href="\/cart"[^>]*>.*?<\/a>/s)?.[0];
 }
+
+test('PC Builder destinations have distinct icons from catalog and reporting destinations', () => {
+    const admin = navigationHarness({
+        administrator: true,
+        manageCatalog: true,
+        capabilities: { manageProducts: true, viewReports: true },
+    });
+    const items = admin.navigation.mainNavItems.value;
+    const titles = [
+        'Manage products',
+        'PC specifications',
+        'PC build templates',
+        'PC Builder analytics',
+        'Sales reports',
+    ];
+    assert.equal(
+        new Set(
+            titles.map(
+                (title) => items.find((item) => item.title === title).icon,
+            ),
+        ).size,
+        titles.length,
+    );
+    const customer = navigationHarness().navigation.mainNavItems.value;
+    assert.notEqual(
+        customer.find((item) => item.title === 'Build a PC').icon,
+        customer.find((item) => item.title === 'Products').icon,
+    );
+});
 
 for (const mode of ['expanded', 'collapsed', 'mobile']) {
     test(`${mode} navigation presents actionable counts and clears resolved badges`, async () => {

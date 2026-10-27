@@ -18,7 +18,7 @@ class PcBuildTemplateController extends Controller
     {
         $products = Product::query()->where('is_active', true)
             ->whereHas('componentProfile', fn ($query) => $query->where('review_status', 'approved'))
-            ->with('componentProfile')->orderBy('name')->get(['id', 'name', 'product_code', 'brand']);
+            ->with('componentProfile.revisions')->orderBy('name')->get(['id', 'name', 'product_code', 'brand']);
 
         return Inertia::render('Administration/PcBuildTemplates/Index', [
             'templates' => $service->adminList()->map(fn (PcBuildTemplate $template): array => $this->present($template))->all(),
@@ -27,6 +27,9 @@ class PcBuildTemplateController extends Controller
                 'name' => $product->name,
                 'product_code' => $product->product_code,
                 'component_type' => $product->componentProfile->component_type,
+                'fan_mounting_positions' => $product->componentProfile->revisions
+                    ->firstWhere('revision', $product->componentProfile->current_revision)
+                    ?->specifications['fan_mounting_positions'] ?? [],
             ])->all(),
         ]);
     }
@@ -65,6 +68,9 @@ class PcBuildTemplateController extends Controller
                 'product_id' => $item->product_id,
                 'component_type' => $item->component_type,
                 'quantity' => $item->quantity,
+                'configuration' => $item->configuration ?? [],
+                'product_name' => $item->product?->name,
+                'product_code' => $item->product?->product_code,
             ])->all(),
         ];
     }

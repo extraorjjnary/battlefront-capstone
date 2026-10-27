@@ -1,5 +1,9 @@
 import {
     Boxes,
+    Cpu,
+    PanelsTopLeft,
+    ChartNoAxesCombined,
+    MonitorCog,
     ListTodo,
     ClipboardList,
     ClipboardCheck,
@@ -115,19 +119,19 @@ export function useAppNavigation() {
                 items.push({
                     title: 'PC specifications',
                     href: ComponentSpecificationController.index(),
-                    icon: PackageSearch,
+                    icon: Cpu,
                 });
             if (page.props.auth?.can?.manageProducts)
                 items.push({
                     title: 'PC build templates',
                     href: PcBuildTemplateController.index(),
-                    icon: PackageSearch,
+                    icon: PanelsTopLeft,
                 });
             if (page.props.auth?.can?.manageProducts)
                 items.push({
                     title: 'PC Builder analytics',
                     href: PcBuildAnalyticsController.index(),
-                    icon: ChartColumn,
+                    icon: ChartNoAxesCombined,
                 });
             if (page.props.auth?.can?.viewInventory)
                 items.push({
@@ -196,7 +200,11 @@ export function useAppNavigation() {
                     icon: ChartColumn,
                 });
             if (page.props.auth?.can?.viewReports)
-                items.push({ title: 'Wishlist analytics', href: WishlistReportController.index(), icon: ChartColumn });
+                items.push({
+                    title: 'Wishlist analytics',
+                    href: WishlistReportController.index(),
+                    icon: ChartColumn,
+                });
             if (page.props.auth?.can?.viewOrders)
                 items.push({
                     title: page.props.auth?.can?.viewStaffReports
@@ -240,10 +248,15 @@ export function useAppNavigation() {
             items.push({
                 title: 'Build a PC',
                 href: pcBuilderIndex(),
-                icon: PackageSearch,
+                icon: MonitorCog,
             });
             if (canUseCustomerCart.value)
-                items.push({ title: 'Wishlist', href: wishlistIndex(), icon: Heart, pendingCount: page.props.wishlistCount ?? 0 });
+                items.push({
+                    title: 'Wishlist',
+                    href: wishlistIndex(),
+                    icon: Heart,
+                    pendingCount: page.props.wishlistCount ?? 0,
+                });
             items.push({
                 title: 'Products',
                 href: productIndex(),
