@@ -2,6 +2,50 @@
 
 This document describes the implemented customer REST API, including guest chatbot access. Laravel owns all catalog, cart, checkout, order, recommendation, and chatbot business rules. React Native + Expo is a separate client maintained and run by the mobile group member. Administration remains on the web.
 
+## Customer parity additions
+
+The Expo client now handles mandatory email OTP before normal verified login,
+nationwide PSGC address selection, server wishlists, password changes, order returns
+and refunds, and foreground hosted-payment recovery. Profile responses include
+`appearance` (`light` or `dark`); `PATCH profile` accepts that optional field using
+the existing per-user preference. Legacy `system` values read as `light`.
+
+PC Builder uses the existing web services through these `/api/v1` JSON routes:
+
+| Method | Path | Result |
+| --- | --- | --- |
+| GET | `pc-builder` | Component catalog, published templates, ruleset version |
+| POST | `pc-builder/validate` | Shared compatibility findings for `components` |
+| GET | `pc-builds/shared/{token}` | Shared build; revoked links return 404 |
+| GET / POST | `pc-builds` | List owned builds / create a build |
+| PATCH / DELETE | `pc-builds/{uuid}` | Update / delete an owned build |
+| POST | `pc-builds/{uuid}/duplicate` | Create an owned copy |
+| POST / DELETE | `pc-builds/{uuid}/share` | Issue / revoke a web-compatible share link |
+| POST | `pc-builds/{uuid}/cart` | Atomically add a complete validated build |
+
+All responses use a `data` envelope. Catalog, validation, and shared reads accept
+guests or customer bearer tokens; a supplied invalid token returns 401 and an
+administration token returns 403. Saved-build operations require a verified customer
+bearer token and preserve ownership isolation. Web sessions alone do not authenticate
+these routes. Existing v1 and corresponding web operation limits apply.
+
+Save payloads retain `name`, `mode` (`simple` or `advanced`), optional `budget`, and
+`components` entries with `key`, `product_id`, `quantity`, and optional
+`configuration`. Updates require the returned `edit_version`; stale versions return
+422 without overwriting a newer build. Compatibility is server-owned and unknown
+specifications stay unknown. Existing schema and stored builds are reused.
+
+Cart rows now expose nullable `pc_build_group: {uuid, name}`. Clients must identify
+rows by the server cart-item ID, select all rows in a group together, and disallow
+grouped quantity edits. Removing a grouped row removes its entire configuration.
+Checkout and order presenters also retain group metadata. Build/cart/payment writes
+have no new automatic retry policy; after an uncertain response, read saved builds
+and cart/order state before an explicit retry.
+
+Automated contract and bundle checks do not close the physical-device integration
+gate. Actual uploads, payment return, push delivery, and iOS behavior remain subject
+to the existing native validation procedure.
+
 Companion files:
 
 - [Postman collection](Battlefront_API_v1.postman_collection.json)

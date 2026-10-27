@@ -40,6 +40,7 @@ class ProfileUpdateRequest extends FormRequest
             },
         ];
         $canManageAddress = $this->user()->can('use-customer-cart');
+        $rules['appearance'] = [Rule::excludeIf(! $this->routeIs('api.v1.profile.update')), 'sometimes', 'required', Rule::in(['light', 'dark'])];
         $addressAction = $this->addressAction();
         $rules['default_delivery_address'][] = Rule::excludeIf(
             ! $canManageAddress || $addressAction !== 'legacy',

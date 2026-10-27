@@ -38,6 +38,7 @@ test('a customer sees only their own profile fields and recommendation preferenc
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
+            'appearance' => 'light',
             'default_delivery_address' => '12 Mabini Street, Sagay City',
             'default_delivery_address_prefill' => [
                 'delivery_destination' => 'Sagay City', 'delivery_barangay_code' => '', 'delivery_address_details' => '',
@@ -70,6 +71,7 @@ test('a customer can update only their own approved profile fields', function ()
             'id' => $user->id,
             'name' => 'Updated Customer',
             'email' => $user->email,
+            'appearance' => 'dark',
             'default_delivery_address' => '45 Rizal Avenue, Escalante City',
             'default_delivery_address_prefill' => [
                 'delivery_destination' => 'Escalante City', 'delivery_barangay_code' => '', 'delivery_address_details' => '',
@@ -82,7 +84,7 @@ test('a customer can update only their own approved profile fields', function ()
 
     $user->refresh();
     expect($user->role)->toBe(UserRole::Customer)
-        ->and($user->appearance->value)->toBe('light')
+        ->and($user->appearance->value)->toBe('dark')
         ->and($user->getRawOriginal('email_verified_at'))->toBe($verifiedAt);
     expect(Hash::check('password', $user->password))->toBeTrue();
     $this->assertDatabaseHas('users', [
