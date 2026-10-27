@@ -12,6 +12,226 @@ const executable = process.env.BATTLEFRONT_UI_BROWSER;
 const widths = [320, 375, 390, 428, 768, 1024, 1440];
 
 test(
+    'team email OTP gates creation and preserves the account form',
+    { skip: !baseUrl || !executable, timeout: 60000 },
+    async (t) => {
+        const browser = await openBrowser(t);
+        const props = {
+            users: {
+                data: [],
+                total: 0,
+                current_page: 1,
+                last_page: 1,
+                links: [],
+            },
+            permissions: [],
+            grants: [],
+            availableRoles: ['staff', 'manager', 'owner', 'it'],
+            canManagePermissions: false,
+            roleVersions: {},
+            filters: {},
+            canViewOrders: false,
+            canAssignOrders: false,
+            teamEmailVerification: null,
+        };
+        const createButton = `document.querySelector('main form button[type="submit"]')`;
+        const button = (label) =>
+            `[...document.querySelectorAll('main button')].find(b => b.textContent.trim() === ${JSON.stringify(label)})`;
+        const input = (id, value) =>
+            `(() => { const field = document.getElementById(${JSON.stringify(id)}); field.value = ${JSON.stringify(value)}; field.dispatchEvent(new Event('input', { bubbles: true })); })()`;
+        async function waitFor(expression, message) {
+            for (let attempt = 0; attempt < 100; attempt++) {
+                if (await browser.evaluate(expression)) return;
+                await delay(25);
+            }
+            assert.fail(message + '; ' + browser.exceptions.join('; '));
+        }
+        for (const theme of ['light', 'dark']) {
+            await browser.show('Administration/Team', props, 'admin', theme);
+            for (const width of [320, 1440]) {
+                await browser.resize(width);
+                await assertFits(
+                    browser,
+                    'Team verification ' + theme + ' ' + width,
+                );
+            }
+            assert.equal(
+                await browser.evaluate(`${createButton}.disabled`),
+                true,
+            );
+        }
+        const verification = {
+            email: 'staff@example.test',
+            status: 'verification_required',
+            expires_at: new Date(Date.now() + 300000).toISOString(),
+            verified_until: null,
+            attempts_remaining: 5,
+            delivery_status: 'sent',
+            resend_available_at: new Date(Date.now() + 60000).toISOString(),
+        };
+        const sendPath = '/administration/team/email-verification';
+        const verifyPath = sendPath + '/verify';
+        browser.registerJson('POST', sendPath, {
+            message: 'Check the recipient inbox.',
+            data: verification,
+        });
+        await browser.evaluate(input('team-email', verification.email));
+        await browser.evaluate(
+            input('team-password', 'private-form-test-password'),
+        );
+        await browser.evaluate(`${button('Verify email')}.click()`);
+        await waitFor(
+            `!!document.getElementById('team-email-code')`,
+            'The code field appears inline',
+        );
+        assert.deepEqual(JSON.parse(browser.jsonRequests[0].postData), {
+            email: verification.email,
+        });
+        assert.equal(await browser.evaluate(`${createButton}.disabled`), true);
+        assert.match(
+            await browser.evaluate(
+                `${button('Resend in 60s')}?.textContent ?? document.querySelector('main').textContent`,
+            ),
+            /Resend in \d+s/,
+        );
+        const invalid = 'The code is invalid. Check your inbox.';
+        browser.registerJson(
+            'POST',
+            verifyPath,
+            {
+                message: 'Verification failed.',
+                errors: { code: [invalid] },
+                data: { ...verification, attempts_remaining: 4 },
+            },
+            422,
+        );
+        await browser.evaluate(input('team-email-code', '001234'));
+        await browser.evaluate(`${button('Confirm code')}.click()`);
+        await waitFor(
+            `document.getElementById('team-email-error').textContent.includes(${JSON.stringify(invalid)})`,
+            'An invalid code shows inline feedback',
+        );
+        assert.equal(
+            JSON.parse(browser.jsonRequests[1].postData).code,
+            '001234',
+        );
+        assert.equal(await browser.evaluate(`${createButton}.disabled`), true);
+        const verified = {
+            ...verification,
+            status: 'verified',
+            verified_until: new Date(Date.now() + 600000).toISOString(),
+        };
+        browser.registerJson('POST', verifyPath, {
+            message: 'Email verified.',
+            data: verified,
+        });
+        await browser.evaluate(`${button('Confirm code')}.click()`);
+        await waitFor(
+            `!${createButton}.disabled`,
+            'Successful verification enables creation',
+        );
+        assert.equal(
+            await browser.evaluate(
+                `document.getElementById('team-password').value === 'private-form-test-password'`,
+            ),
+            true,
+        );
+
+        browser.registerJson('DELETE', sendPath, { data: null });
+        await browser.evaluate(input('team-email', 'changed@example.test'));
+        await waitFor(
+            `${createButton}.disabled && !document.getElementById('team-email-code')`,
+            'Changing email clears eligibility',
+        );
+        await waitFor(
+            `!!${button('Verify email')} && !${button('Verify email')}.disabled`,
+            'Clearing verification completes',
+        );
+        assert.equal(browser.jsonRequests.at(-1).method, 'DELETE');
+        assert.deepEqual(JSON.parse(browser.jsonRequests.at(-1).postData), {
+            email: verification.email,
+        });
+
+        await browser.show(
+            'Administration/Team',
+            { ...props, teamEmailVerification: verified },
+            'admin',
+        );
+        await waitFor(
+            `!${createButton}.disabled`,
+            'A page reload recovers the server proof',
+        );
+        assert.equal(
+            await browser.evaluate(
+                `document.getElementById('team-email').value`,
+            ),
+            verification.email,
+        );
+        await browser.resize(320);
+        await assertFits(browser, 'Verified Team email at 320px');
+        if (process.env.BATTLEFRONT_TEAM_PREVIEW) {
+            const screenshot = await browser.command('Page.captureScreenshot', {
+                format: 'png',
+                captureBeyondViewport: false,
+            });
+            await writeFile(
+                process.env.BATTLEFRONT_TEAM_PREVIEW,
+                Buffer.from(screenshot.data, 'base64'),
+            );
+        }
+        await browser.show(
+            'Administration/Team',
+            {
+                ...props,
+                teamEmailVerification: {
+                    ...verified,
+                    verified_until: new Date(Date.now() - 1000).toISOString(),
+                },
+            },
+            'admin',
+        );
+        await waitFor(
+            `document.querySelector('main').textContent.includes('Email verification expired')`,
+            'Expired proof requires verification again',
+        );
+        assert.equal(await browser.evaluate(`${createButton}.disabled`), true);
+        await browser.show(
+            'Administration/Team',
+            {
+                ...props,
+                teamEmailVerification: {
+                    ...verification,
+                    delivery_status: 'failed',
+                    expires_at: null,
+                },
+            },
+            'admin',
+        );
+        assert.ok(
+            await browser.evaluate(
+                `document.querySelector('main').textContent.includes('Email delivery failed')`,
+            ),
+        );
+        assert.equal(await browser.evaluate(`${createButton}.disabled`), true);
+        await browser.show('Administration/Team', props, 'admin');
+        browser.registerJson(
+            'POST',
+            sendPath,
+            { message: 'Please wait before trying again.', retry_after: 60 },
+            429,
+        );
+        await browser.evaluate(input('team-email', verification.email));
+        await browser.evaluate(`${button('Verify email')}.click()`);
+        await waitFor(
+            `document.querySelector('main').textContent.includes('Resend in') && document.querySelector('main').textContent.includes('Please wait')`,
+            'Request limits show a cooldown and retry feedback',
+        );
+        assert.equal(await browser.evaluate(`${createButton}.disabled`), true);
+        assert.deepEqual(browser.exceptions, []);
+    },
+);
+
+test(
     'email OTP verification preserves leading zeros, cooldown, and recovery feedback',
     { skip: !baseUrl || !executable, timeout: 60000 },
     async (t) => {
@@ -643,6 +863,8 @@ async function openBrowser(t, { built = true } = {}) {
     let fixtureNumber = 0;
     const navigationFixtures = new Map();
     const formFixtures = new Map();
+    const jsonFixtures = new Map();
+    const jsonRequests = [];
     const formRequests = [];
     const navigationRequests = [];
     const filterRequests = [];
@@ -842,6 +1064,23 @@ async function openBrowser(t, { built = true } = {}) {
                 body: Buffer.from(JSON.stringify(page)).toString('base64'),
             });
         } else if (
+            jsonFixtures.has(
+                request.method + ' ' + new URL(request.url).pathname,
+            )
+        ) {
+            jsonRequests.push(request);
+            const { payload, status } = jsonFixtures.get(
+                request.method + ' ' + new URL(request.url).pathname,
+            );
+            await command('Fetch.fulfillRequest', {
+                requestId,
+                responseCode: status,
+                responseHeaders: [
+                    { name: 'Content-Type', value: 'application/json' },
+                ],
+                body: Buffer.from(JSON.stringify(payload)).toString('base64'),
+            });
+        } else if (
             request.method !== 'GET' &&
             formFixtures.has(new URL(request.url).pathname)
         ) {
@@ -893,6 +1132,10 @@ async function openBrowser(t, { built = true } = {}) {
         appearanceRequests,
         filterRequests,
         formRequests,
+        jsonRequests,
+        registerJson(method, url, payload, status = 200) {
+            jsonFixtures.set(method + ' ' + url, { payload, status });
+        },
         registerForm(url, props) {
             formFixtures.set(url, { ...fixture, props });
         },

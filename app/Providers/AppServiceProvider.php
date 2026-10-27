@@ -92,6 +92,18 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('api-v1', fn (Request $request): Limit => Limit::perMinute(60)
             ->by('ip:'.$request->ip()));
 
+        RateLimiter::for('team-email-verification', function (Request $request): array {
+            $response = fn (Request $request, array $headers): JsonResponse => response()->json([
+                'message' => 'Too many verification requests. Please wait before trying again.',
+                'retry_after' => max(1, (int) ($headers['Retry-After'] ?? 60)),
+            ], 429, $headers)->header('Cache-Control', 'no-store');
+
+            return [
+                Limit::perMinute(30)->by('actor:'.$request->user()?->id)->response($response),
+                Limit::perMinute(30)->by('ip:'.$request->ip())->response($response),
+            ];
+        });
+
         RateLimiter::for('chatbot', function (Request $request): Limit {
             $customer = $request->user();
 

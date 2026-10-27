@@ -5,8 +5,8 @@ use App\Mail\VerifyEmailOtp;
 use App\Models\EmailOtpChallenge;
 use App\Models\User;
 use App\Services\EmailOtpVerification;
-use App\Services\TeamAccessService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -150,7 +150,7 @@ test('registration resend retains automatic sign in eligibility for the replacem
     Mail::assertSentCount(2);
 });
 
-test('returning through login clears registration automatic sign in eligibility', function () {
+test('returning through login allows automatic sign in after completing registration verification', function (bool $freshSession) {
     Mail::fake();
     $this->post(route('register.store'), [
         'name' => 'New Customer',
@@ -159,16 +159,119 @@ test('returning through login clears registration automatic sign in eligibility'
         'password_confirmation' => 'password',
     ])->assertRedirectToRoute('verification.notice');
     $customer = User::query()->where('email', 'recovered-registration@example.test')->sole();
+    if ($freshSession) {
+        session()->flush();
+    }
     $this->post(route('login.store'), ['email' => $customer->email, 'password' => 'password'])
-        ->assertRedirectToRoute('verification.notice')->assertSessionMissing('email_verification.registration');
+        ->assertRedirectToRoute('verification.notice');
 
     $this->post(route('verification.verify'), ['code' => Mail::sent(VerifyEmailOtp::class)->sole()->code])
-        ->assertRedirectToRoute('login');
+        ->assertRedirectToRoute('dashboard')->assertSessionMissing('email_verification');
+
+    $this->assertAuthenticatedAs($customer);
+    expect($customer->fresh()->email_verified_at)->not->toBeNull();
+    Mail::assertSentCount(1);
+})->with(['original session' => false, 'new session' => true]);
+
+test('credential confirmed customers automatically sign in after OTP and retain their login preferences', function (bool $remember) {
+    Mail::fake();
+    $customer = User::factory()->customer()->unverified()->create();
+    $recaller = Auth::guard('web')->getRecallerName();
+    $this->withSession(['url.intended' => route('products.index')])
+        ->post(route('login.store'), ['email' => $customer->email, 'password' => 'password', 'remember' => $remember])
+        ->assertRedirectToRoute('verification.notice')->assertCookieMissing($recaller);
+    $this->assertGuest();
+    $pendingSessionId = session()->getId();
+
+    $response = $this->post(route('verification.verify'), ['code' => Mail::sent(VerifyEmailOtp::class)->sole()->code])
+        ->assertRedirectToRoute('products.index')->assertSessionMissing('email_verification');
+
+    if ($remember) {
+        $response->assertCookie($recaller);
+    } else {
+        $response->assertCookieMissing($recaller);
+    }
+    $this->assertAuthenticatedAs($customer);
+    expect($customer->fresh()->email_verified_at)->not->toBeNull();
+    expect(session()->getId())->not->toBe($pendingSessionId);
+    $this->assertDatabaseCount('email_otp_challenges', 0);
+    $this->assertDatabaseCount('personal_access_tokens', 0);
+    Mail::assertSentCount(1);
+})->with(['session only' => false, 'remember me' => true]);
+
+test('login verification cannot sign in when the password or customer role has changed', function (Closure $changeAccount) {
+    Mail::fake();
+    $customer = User::factory()->customer()->unverified()->create();
+    $this->post(route('login.store'), ['email' => $customer->email, 'password' => 'password'])
+        ->assertRedirectToRoute('verification.notice');
+    $changeAccount($customer);
+
+    $this->post(route('verification.verify'), ['code' => Mail::sent(VerifyEmailOtp::class)->sole()->code])
+        ->assertRedirectToRoute('login')->assertSessionMissing('email_verification');
 
     $this->assertGuest();
     expect($customer->fresh()->email_verified_at)->not->toBeNull();
     Mail::assertSentCount(1);
+})->with([
+    'password reset during verification' => [fn (User $customer) => $customer->forceFill(['password' => 'replacement-password'])->save()],
+    'administrator role assigned' => [fn (User $customer) => $customer->forceFill(['role' => UserRole::Administrator])->save()],
+]);
+
+test('login resend signs in only with the replacement code and cannot be replayed after logout', function () {
+    Mail::fake();
+    $this->freezeTime();
+    $customer = User::factory()->customer()->unverified()->create();
+    $this->post(route('login.store'), ['email' => $customer->email, 'password' => 'password'])
+        ->assertRedirectToRoute('verification.notice');
+    $previousCode = Mail::sent(VerifyEmailOtp::class)->sole()->code;
+    $pending = session('email_verification');
+    $this->travel(60)->seconds();
+    $this->post(route('verification.send'))->assertRedirectToRoute('verification.notice');
+
+    $this->from(route('verification.notice'))->post(route('verification.verify'), ['code' => $previousCode])
+        ->assertSessionHasErrors('code');
+    $this->assertGuest();
+    expect($customer->fresh()->email_verified_at)->toBeNull();
+    $replacementCode = Mail::sent(VerifyEmailOtp::class)->last()->code;
+    $this->post(route('verification.verify'), ['code' => $replacementCode])
+        ->assertRedirectToRoute('dashboard')->assertSessionMissing('email_verification');
+    $this->assertAuthenticatedAs($customer);
+    expect($customer->fresh()->email_verified_at)->not->toBeNull();
+    $this->post(route('logout'));
+
+    $this->withSession(['email_verification' => $pending])
+        ->post(route('verification.verify'), ['code' => $replacementCode])->assertRedirectToRoute('login');
+
+    $this->assertGuest();
+    $this->assertDatabaseCount('email_otp_challenges', 0);
+    $this->assertDatabaseCount('personal_access_tokens', 0);
+    Mail::assertSentCount(2);
 });
+
+test('login verification rejects expired codes and inactive accounts before automatic sign in', function (string $state) {
+    Mail::fake();
+    $this->freezeTime();
+    $customer = User::factory()->customer()->unverified()->create();
+    $this->post(route('login.store'), ['email' => $customer->email, 'password' => 'password'])
+        ->assertRedirectToRoute('verification.notice');
+    if ($state === 'expired') {
+        $this->travel(5)->minutes();
+    } else {
+        $customer->forceFill(['is_active' => false])->save();
+    }
+
+    $response = $this->from(route('verification.notice'))
+        ->post(route('verification.verify'), ['code' => Mail::sent(VerifyEmailOtp::class)->sole()->code]);
+    if ($state === 'expired') {
+        $response->assertRedirectToRoute('verification.notice')->assertSessionHasErrors('code');
+    } else {
+        $response->assertRedirectToRoute('login');
+    }
+
+    $this->assertGuest();
+    expect($customer->fresh()->email_verified_at)->toBeNull();
+    Mail::assertSentCount(1);
+})->with(['expired', 'inactive']);
 
 test('replacing a registration context cannot automatically sign in its verified account', function (bool $differentAccount) {
     Mail::fake();
@@ -408,13 +511,12 @@ test('web verification preserves the hourly issuance wait across redirects witho
     expect($customer->fresh()->email_verified_at)->toBeNull();
 });
 
-test('new team administrators verify ownership before their first login without changing access assignments', function () {
+test('existing unverified administrators verify ownership before login without changing access assignments', function () {
     Mail::fake();
-    $owner = User::factory()->administrator()->create();
-    $administrator = app(TeamAccessService::class)->create($owner, [
+    $administrator = User::factory()->administrator()->unverified()->create([
         'name' => 'New Staff',
         'email' => 'new.staff@example.test',
-        'role' => 'staff',
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
         'password' => 'CorrectHorseBatteryStaple!1',
     ]);
     $roleId = $administrator->administration_role_id;

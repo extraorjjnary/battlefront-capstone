@@ -44,13 +44,7 @@ class RegisteredUserController extends FortifyRegisteredUserController
             ]);
         }
 
-        $verification = app(BeginEmailVerification::class)->execute($request, $user);
-        $request->session()->put('email_verification.registration', [
-            'user_id' => $user->id,
-            'email' => $user->email,
-            'context_hash' => hash('sha256', $verification['verification_token']),
-            'password_fingerprint' => hash_hmac('sha256', $user->getAuthPassword(), (string) config('app.key')),
-        ]);
+        app(BeginEmailVerification::class)->execute($request, $user);
 
         return app(RegisterResponse::class);
     }

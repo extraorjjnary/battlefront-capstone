@@ -40,6 +40,7 @@ use App\Http\Controllers\Administration\StockReconciliationController;
 use App\Http\Controllers\Administration\SupplierController;
 use App\Http\Controllers\Administration\SupplierReturnController;
 use App\Http\Controllers\Administration\TeamController;
+use App\Http\Controllers\Administration\TeamEmailVerificationController;
 use App\Http\Controllers\Administration\WishlistReportController;
 use App\Http\Controllers\Administration\WorkQueueController;
 use App\Http\Controllers\Auth\EmailVerificationController;
@@ -429,6 +430,11 @@ Route::middleware(['auth', 'can:access-administration'])
             ->name('forecasting.store');
 
         Route::get('team', [TeamController::class, 'index'])->middleware('can:users.manage')->name('team.index');
+        Route::middleware(['can:users.manage', 'throttle:team-email-verification'])->group(function (): void {
+            Route::post('team/email-verification', [TeamEmailVerificationController::class, 'store'])->name('team.email-verification.store');
+            Route::post('team/email-verification/verify', [TeamEmailVerificationController::class, 'verify'])->name('team.email-verification.verify');
+            Route::delete('team/email-verification', [TeamEmailVerificationController::class, 'destroy'])->name('team.email-verification.destroy');
+        });
         Route::post('team', [TeamController::class, 'store'])->middleware('can:users.manage')->name('team.store');
         Route::patch('team/{user}', [TeamController::class, 'update'])->middleware('can:users.manage')->name('team.update');
         Route::put('team/roles/{role}/permissions', [RolePermissionController::class, 'update'])

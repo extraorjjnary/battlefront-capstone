@@ -2,20 +2,20 @@
 
 namespace App\Services;
 
-use App\Mail\VerifyEmailOtp;
+use App\Actions\Fortify\IssueEmailOtp;
 use App\Models\EmailOtpChallenge;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 use SensitiveParameter;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
-use Throwable;
 
 class EmailOtpVerification
 {
+    public function __construct(private IssueEmailOtp $issueCode) {}
+
     private const MAX_ATTEMPTS = 5;
 
     private const INVALID_CODE = 'The code is invalid, expired, or unavailable. Request a new code or return to login.';
@@ -187,29 +187,17 @@ class EmailOtpVerification
             }
         }
 
-        do {
-            $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        } while ($challenge->code_hash !== null && Hash::check($code, $challenge->code_hash));
-
-        $challenge->code_hash = Hash::make($code);
+        $previousHash = $challenge->code_hash;
+        $challenge->code_hash = null;
         $challenge->attempts = 0;
         $challenge->issued_at = now();
         $challenge->expires_at = now()->addMinutes(5);
         $challenge->save();
 
-        try {
-            $transport = config('mail.mailers.'.config('mail.default').'.transport');
-            if ($transport !== 'smtp' && ! (app()->runningUnitTests() && $transport === 'array')) {
-                $challenge->code_hash = null;
-                $challenge->expires_at = null;
-            } else {
-                Mail::to($challenge->email)->send(new VerifyEmailOtp($code));
-            }
-        } catch (Throwable) {
-            $challenge->code_hash = null;
+        $challenge->code_hash = $this->issueCode->execute($challenge->email, $previousHash);
+        if ($challenge->code_hash === null) {
             $challenge->expires_at = null;
         }
-        unset($code);
         $challenge->save();
 
         return 0;

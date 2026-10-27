@@ -11,6 +11,8 @@ import { Label } from '@/components/ui/label';
 import { edit } from '@/routes/profile';
 
 const props = defineProps({
+    emailVerified: { type: Boolean, required: true },
+    administrationRoleCode: { type: String, default: null },
     canManageDefaultDeliveryAddress: { type: Boolean, required: true },
     defaultDeliveryAddress: { type: String, default: '' },
     defaultDeliveryContactNumber: { type: String, default: '' },
@@ -40,6 +42,18 @@ defineOptions({
 });
 const page = usePage();
 const user = computed(() => page.props.auth.user);
+const accountRoleLabel = computed(() => {
+    if (user.value.role === 'customer') return 'Customer';
+
+    return (
+        {
+            owner: 'Owner',
+            manager: 'Manager',
+            staff: 'Staff',
+            it: 'IT Administrator',
+        }[props.administrationRoleCode] ?? 'Administrator'
+    );
+});
 const defaultAddress = ref({ ...props.defaultDeliveryAddressPrefill });
 const defaultAddressAction = ref('keep');
 const hasAddress = computed(
@@ -122,6 +136,22 @@ const productViewRecommendationsEnabled = ref(
                     Your account email address cannot be changed.
                 </p>
                 <InputError class="mt-2" :message="errors.email" />
+                <dl class="flex flex-wrap gap-2 text-xs">
+                    <div
+                        class="bg-muted flex items-center gap-1 rounded-md px-2 py-1"
+                    >
+                        <dt class="text-muted-foreground">Email Verified:</dt>
+                        <dd class="font-medium">
+                            {{ props.emailVerified ? 'Yes' : 'No' }}
+                        </dd>
+                    </div>
+                    <div
+                        class="bg-muted flex items-center gap-1 rounded-md px-2 py-1"
+                    >
+                        <dt class="text-muted-foreground">Account Role:</dt>
+                        <dd class="font-medium">{{ accountRoleLabel }}</dd>
+                    </div>
+                </dl>
             </div>
 
             <div
