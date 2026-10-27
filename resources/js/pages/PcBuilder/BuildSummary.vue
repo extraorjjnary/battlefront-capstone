@@ -16,14 +16,14 @@ defineEmits(['retry']);
 </script>
 <template>
     <div>
-        <div class="flex items-center justify-between gap-2">
+        <div class="flex flex-wrap items-center justify-between gap-2">
             <h2 class="text-lg font-semibold">Build summary</h2>
-            <span class="text-muted-foreground text-sm"
+            <span class="text-muted-foreground text-xs tabular-nums"
                 >{{ completion }}% selected</span
             >
         </div>
         <div
-            class="bg-muted mt-3 h-2 overflow-hidden rounded"
+            class="bg-muted mt-4 h-1.5 overflow-hidden rounded-full"
             role="progressbar"
             :aria-valuenow="completion"
             aria-valuemin="0"
@@ -38,15 +38,16 @@ defineEmits(['retry']);
         <p v-if="missing.length" class="text-muted-foreground mt-4 text-sm">
             Still needed: {{ missing.join(', ') }}
         </p>
-        <div class="border-border my-5 border-y py-4">
-            <p class="text-muted-foreground text-xs">Estimated total</p>
-            <p class="mt-1 text-3xl font-bold tracking-tight">{{ total }}</p>
-            <p v-if="budget !== '' && budget !== null" class="mt-2 text-sm">
+        <div class="border-border my-5 border-y py-5">
+            <p class="text-muted-foreground text-sm">Estimated total</p>
+            <p class="mt-2 text-3xl font-bold tracking-tight tabular-nums">{{ total }}</p>
+            <p v-if="budget !== '' && budget !== null" class="mt-2 text-sm" :class="budgetExceeded ? 'text-destructive' : 'text-muted-foreground'">
                 {{ difference }}
                 {{ budgetExceeded ? 'over budget' : 'remaining in budget' }}
             </p>
         </div>
-        <div aria-live="polite" :aria-busy="checking" class="mb-5">
+        <div aria-live="polite" :aria-busy="checking" class="bg-muted/30 mb-5 rounded-lg p-4">
+            <h3 class="text-muted-foreground mb-2 text-xs font-semibold uppercase tracking-wide">Compatibility review</h3>
             <p v-if="checking" class="text-muted-foreground text-sm">
                 Checking compatibility…
             </p>
