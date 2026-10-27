@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\UserRole;
+use App\Mail\VerifyEmailOtp;
 use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\User;
@@ -8,6 +9,7 @@ use App\Notifications\TeamAccessChanged;
 use App\Services\Notifications\NotificationHistory;
 use App\Services\TeamAccessService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -51,8 +53,13 @@ test('existing administrator roles are mapped explicitly and the mapping is audi
     $this->assertDatabaseHas('audit_logs', ['action' => 'team.role.assigned_by_cli', 'subject_id' => $administrator->id]);
 });
 
-test('owner can create a team account with immediate role-based access', function () {
+test('owner can create an email verified team account with its assigned role', function () {
+    Mail::fake();
     $owner = User::factory()->administrator()->create();
+    $this->actingAs($owner)->postJson(route('administration.team.email-verification.store'), ['email' => 'stock.clerk@example.test'])->assertOk();
+    $this->postJson(route('administration.team.email-verification.verify'), [
+        'email' => 'stock.clerk@example.test', 'code' => Mail::sent(VerifyEmailOtp::class)->sole()->code,
+    ])->assertOk();
     $this->actingAs($owner)->post(route('administration.team.store'), [
         'name' => 'Stock Clerk',
         'email' => 'stock.clerk@example.test',
@@ -63,9 +70,11 @@ test('owner can create a team account with immediate role-based access', functio
 
     $staff = User::query()->where('email', 'stock.clerk@example.test')->firstOrFail();
     expect($staff->administrationRoleCode())->toBe('staff')
+        ->and($staff->email_verified_at)->not->toBeNull()
         ->and($staff->must_change_password)->toBeFalse()
         ->and($staff->can('access-administration'))->toBeTrue();
     $this->assertDatabaseHas('audit_logs', ['action' => 'team.created', 'subject_id' => $staff->id]);
+    Mail::assertSentCount(1);
 });
 
 test('manager cannot edit permissions and owner cannot deactivate the last owner', function () {
@@ -273,12 +282,17 @@ test('default permissions are available only to the owner', function (string $ro
 })->with(['staff', 'manager', 'it']);
 
 test('creating a team member does not apply default permissions to a customized role', function () {
+    Mail::fake();
     $owner = User::factory()->administrator()->create();
     $roleId = DB::table('administration_roles')->where('code', 'staff')->value('id');
     $this->actingAs($owner)->put(route('administration.team.permissions.update', 'staff'), [
         'permissions' => ['inventory.view'], 'edit_version' => 1,
     ])->assertSessionHasNoErrors();
 
+    $this->postJson(route('administration.team.email-verification.store'), ['email' => 'custom-staff@example.test'])->assertOk();
+    $this->postJson(route('administration.team.email-verification.verify'), [
+        'email' => 'custom-staff@example.test', 'code' => Mail::sent(VerifyEmailOtp::class)->sole()->code,
+    ])->assertOk();
     $this->post(route('administration.team.store'), [
         'name' => 'Custom Staff', 'email' => 'custom-staff@example.test', 'role' => 'staff',
         'password' => 'CorrectHorseBatteryStaple!1', 'password_confirmation' => 'CorrectHorseBatteryStaple!1',
@@ -288,6 +302,7 @@ test('creating a team member does not apply default permissions to a customized 
     expect($staff->can('inventory.view'))->toBeTrue()->and($staff->can('orders.process'))->toBeFalse();
     $this->assertDatabaseHas('administration_roles', ['id' => $roleId, 'edit_version' => 2]);
     expect(DB::table('audit_logs')->where('action', 'role.permissions.updated')->count())->toBe(1);
+    Mail::assertSentCount(1);
 });
 
 test('owner receives the exact Staff permission allowlist', function () {

@@ -6,35 +6,53 @@ use App\Enums\UserRole;
 use App\Models\User;
 use App\Notifications\TeamAccessChanged;
 use App\Repositories\Administration\TeamRepository;
+use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Contracts\Session\Session;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class TeamAccessService
 {
-    public function __construct(private readonly TeamRepository $directory) {}
+    public function __construct(private readonly TeamRepository $directory, private TeamEmailVerification $verification) {}
 
     /**
      * @param  array{name: string, email: string, password: string, role: string}  $attributes
      */
-    public function create(User $actor, array $attributes): User
+    public function create(User $actor, array $attributes, Session $session): User
     {
         $this->authorizeRoleChange($actor, null, $attributes['role']);
 
-        return DB::transaction(function () use ($actor, $attributes): User {
-            $roleId = $this->roleId($attributes['role']);
-            $user = new User;
-            $user->name = $attributes['name'];
-            $user->email = $attributes['email'];
-            $user->password = $attributes['password'];
-            $user->role = UserRole::Administrator;
-            $user->administration_role_id = $roleId;
-            $user->is_active = true;
-            $user->save();
-            $this->audit($actor, 'team.created', $user->id, ['role' => $attributes['role']]);
+        return $this->verification->create($actor, $session, $attributes['email'], function (CarbonImmutable $verifiedAt) use ($actor, $attributes): User {
+            return DB::transaction(function () use ($actor, $attributes, $verifiedAt): User {
+                $actor = User::query()->lockForUpdate()->findOrFail($actor->id);
+                $this->authorizeRoleChange($actor, null, $attributes['role']);
+                if (! $actor->is_active || ! $actor->hasVerifiedEmail()) {
+                    throw new AuthorizationException;
+                }
+                if (User::query()->where('email', $attributes['email'])->exists()) {
+                    throw ValidationException::withMessages(['email' => 'That email address already belongs to an account.']);
+                }
+                $roleId = $this->roleId($attributes['role']);
+                $user = new User;
+                $user->name = $attributes['name'];
+                $user->email = $attributes['email'];
+                $user->password = $attributes['password'];
+                $user->role = UserRole::Administrator;
+                $user->administration_role_id = $roleId;
+                $user->is_active = true;
+                $user->forceFill(['email_verified_at' => $verifiedAt]);
+                try {
+                    $user->save();
+                } catch (UniqueConstraintViolationException) {
+                    throw ValidationException::withMessages(['email' => 'That email address already belongs to an account.']);
+                }
+                $this->audit($actor, 'team.created', $user->id, ['role' => $attributes['role']]);
 
-            return $user;
-        }, attempts: 3);
+                return $user;
+            }, attempts: 3);
+        });
     }
 
     public function update(User $actor, User $target, string $role, bool $active): void

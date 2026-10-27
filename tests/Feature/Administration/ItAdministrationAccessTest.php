@@ -1,7 +1,9 @@
 <?php
 
+use App\Mail\VerifyEmailOtp;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 
 test('IT administrators can manage staff accounts and review audits without business access', function () {
     $this->withoutVite();
@@ -61,7 +63,12 @@ test('IT administrators cannot create or alter owner and IT accounts', function 
 });
 
 test('an owner can create an IT account but cannot change its fixed permissions', function () {
+    Mail::fake();
     $owner = User::factory()->administrator()->create();
+    $this->actingAs($owner)->postJson(route('administration.team.email-verification.store'), ['email' => 'it-operator@example.test'])->assertOk();
+    $this->postJson(route('administration.team.email-verification.verify'), [
+        'email' => 'it-operator@example.test', 'code' => Mail::sent(VerifyEmailOtp::class)->sole()->code,
+    ])->assertOk();
     $this->actingAs($owner)->post(route('administration.team.store'), [
         'name' => 'IT Operator', 'email' => 'it-operator@example.test',
         'role' => 'it', 'password' => 'CorrectHorseBatteryStaple!1',
@@ -76,6 +83,7 @@ test('an owner can create an IT account but cannot change its fixed permissions'
     $this->actingAs($owner)->put(route('administration.team.permissions.update', 'it'), [
         'permissions' => ['orders.view'],
     ])->assertSessionHasErrors('role');
+    Mail::assertSentCount(1);
 });
 
 test('the rollout command assigns an existing administrator to IT and requires a password change', function () {

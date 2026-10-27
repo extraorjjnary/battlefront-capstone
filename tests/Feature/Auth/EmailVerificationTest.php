@@ -5,8 +5,8 @@ use App\Mail\VerifyEmailOtp;
 use App\Models\EmailOtpChallenge;
 use App\Models\User;
 use App\Services\EmailOtpVerification;
-use App\Services\TeamAccessService;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -511,13 +511,12 @@ test('web verification preserves the hourly issuance wait across redirects witho
     expect($customer->fresh()->email_verified_at)->toBeNull();
 });
 
-test('new team administrators verify ownership before their first login without changing access assignments', function () {
+test('existing unverified administrators verify ownership before login without changing access assignments', function () {
     Mail::fake();
-    $owner = User::factory()->administrator()->create();
-    $administrator = app(TeamAccessService::class)->create($owner, [
+    $administrator = User::factory()->administrator()->unverified()->create([
         'name' => 'New Staff',
         'email' => 'new.staff@example.test',
-        'role' => 'staff',
+        'administration_role_id' => DB::table('administration_roles')->where('code', 'staff')->value('id'),
         'password' => 'CorrectHorseBatteryStaple!1',
     ]);
     $roleId = $administrator->administration_role_id;

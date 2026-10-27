@@ -9,7 +9,7 @@ use SensitiveParameter;
 
 class VerifyEmailOtp extends Mailable
 {
-    public function __construct(#[SensitiveParameter] public readonly string $code) {}
+    public function __construct(#[SensitiveParameter] public readonly string $code, public readonly bool $forTeamAccount = false) {}
 
     /**
      * Get the message envelope.

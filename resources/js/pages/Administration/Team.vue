@@ -1,6 +1,7 @@
 <script setup>
 import PageHeader from '@/components/PageHeader.vue';
 import InlineEditor from '@/components/administration/InlineEditor.vue';
+import TeamEmailVerification from '@/components/administration/TeamEmailVerification.vue';
 import { Form, Head, Link, router } from '@inertiajs/vue3';
 import { reactive, ref, watch } from 'vue';
 import TeamController from '@/actions/App/Http/Controllers/Administration/TeamController';
@@ -24,7 +25,10 @@ const props = defineProps({
     filters: Object,
     canViewOrders: Boolean,
     canAssignOrders: Boolean,
+    teamEmailVerification: { type: Object, default: null },
 });
+const teamEmailVerified = ref(false);
+const teamEmailVerification = ref(null);
 const search = ref(props.filters.q ?? '');
 const status = ref(props.filters.status ?? 'all');
 const memberDrafts = reactive({});
@@ -135,6 +139,8 @@ defineOptions({
             <Form
                 v-bind="TeamController.store.form()"
                 v-slot="{ errors, processing }"
+                reset-on-success
+                @success="teamEmailVerification?.reset()"
                 class="grid max-w-full min-w-0 gap-4 md:grid-cols-2"
             >
                 <div class="space-y-2">
@@ -146,16 +152,12 @@ defineOptions({
                         required
                     /><InputError :message="errors.name" />
                 </div>
-                <div class="space-y-2">
-                    <Label for="team-email">Email</Label
-                    ><Input
-                        class="min-h-11"
-                        id="team-email"
-                        name="email"
-                        type="email"
-                        required
-                    /><InputError :message="errors.email" />
-                </div>
+                <TeamEmailVerification
+                    ref="teamEmailVerification"
+                    :verification="props.teamEmailVerification"
+                    :error="errors.email"
+                    @verified="teamEmailVerified = $event"
+                />
                 <div class="space-y-2">
                     <Label for="team-role">Role</Label
                     ><select
@@ -200,7 +202,7 @@ defineOptions({
                     <Button
                         class="min-h-11"
                         type="submit"
-                        :disabled="processing"
+                        :disabled="processing || !teamEmailVerified"
                         >Create account</Button
                     >
                 </div>
