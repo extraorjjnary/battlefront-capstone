@@ -108,7 +108,7 @@ test('new customers sign in only after verifying email in their registration ses
     Mail::assertSentCount(1);
 });
 
-test('new customers inherit guest recommendation history when verification signs them in', function () {
+test('new customers inherit guest recommendation history when verification signs them in', function (bool $returnThroughLogin) {
     Mail::fake();
     $token = 'new-customer-guest-profile-token';
     $profile = GuestRecommendationProfile::factory()->create([
@@ -139,6 +139,13 @@ test('new customers inherit guest recommendation history when verification signs
     $this->assertModelExists($profile);
     $this->assertGuest();
 
+    if ($returnThroughLogin) {
+        $this->withCookie('battlefront_recommendation_profile', $token)
+            ->post(route('login.store'), ['email' => $customer->email, 'password' => 'password'])
+            ->assertRedirectToRoute('verification.notice');
+        $this->assertGuest();
+    }
+
     $this->withCookie('battlefront_recommendation_profile', $token)
         ->post(route('verification.verify'), ['code' => Mail::sent(VerifyEmailOtp::class)->sole()->code])
         ->assertRedirectToRoute('dashboard')
@@ -153,7 +160,7 @@ test('new customers inherit guest recommendation history when verification signs
         ->and($view->dwell_seconds)->toBe(120);
     $this->assertModelMissing($profile);
     Mail::assertSentCount(1);
-});
+})->with(['immediate verification' => false, 'verification after login' => true]);
 
 test('registration cannot create an administrator', function () {
     Mail::fake();

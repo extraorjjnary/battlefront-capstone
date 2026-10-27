@@ -30,7 +30,7 @@ class AttemptVerifiedAuthentication extends AttemptToAuthenticate
         }
 
         if (! $user->hasVerifiedEmail()) {
-            $data = $this->beginVerification->execute($request, $user);
+            $data = $this->beginVerification->execute($request, $user, $request->boolean('remember'));
 
             return $request->wantsJson()
                 ? response()->json(['message' => 'Verify your email before logging in.', 'data' => $data], 403)->header('Cache-Control', 'no-store')

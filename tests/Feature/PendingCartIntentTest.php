@@ -125,7 +125,7 @@ test('customer login adds the pending quantity to the existing cart and redirect
     expect($item->refresh()->quantity)->toBe(5);
 });
 
-test('registration preserves a pending selection until verification signs the new customer in', function () {
+test('registration preserves a pending selection until verification signs the new customer in', function (bool $returnThroughLogin) {
     Mail::fake();
     $product = Product::factory()->available()->create();
     $this->post(route('cart.intent.store'), ['product_id' => $product->id, 'quantity' => 4]);
@@ -142,6 +142,11 @@ test('registration preserves a pending selection until verification signs the ne
 
     $this->assertGuest();
     $this->assertDatabaseCount('carts', 0);
+    if ($returnThroughLogin) {
+        $this->post(route('login.store'), ['email' => 'pending-cart@example.com', 'password' => 'password'])
+            ->assertRedirectToRoute('verification.notice')->assertSessionHas('pending_cart_intent.quantity', 4);
+        $this->assertGuest();
+    }
     $this->post(route('verification.verify'), ['code' => Mail::sent(VerifyEmailOtp::class)->sole()->code])
         ->assertRedirectToRoute('cart.index')
         ->assertInertiaFlash('toast', ['type' => 'success', 'message' => 'Product added to cart.'])
@@ -153,7 +158,7 @@ test('registration preserves a pending selection until verification signs the ne
     $this->assertDatabaseHas('cart_items', ['cart_id' => $customer->cart->id, 'product_id' => $product->id, 'quantity' => 4]);
     expect($product->inventory->quantity)->toBe(10);
     Mail::assertSentCount(1);
-});
+})->with(['immediate verification' => false, 'verification after login' => true]);
 
 test('failed authentication retains the intent for a successful retry', function (string $routeName, string $errorField) {
     $customer = User::factory()->customer()->create();

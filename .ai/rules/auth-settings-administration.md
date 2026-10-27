@@ -20,3 +20,7 @@ The approved web registration refinement supersedes the separate-login step only
 ## Isolate registration rate limits from guest activity
 
 Use the named registration limiter (5 attempts/minute/IP) for both Fortify web and API signup. Laravel's unprefixed numeric throttle keys are shared by guest domain/IP, so product activity or OTP requests can otherwise exhaust signup's smaller allowance. Keep OTP issuance/verification budgets and cooldowns independent; do not disable or flush security limits to solve a registration collision.
+
+## Extend customer OTP automatic sign-in to credential-confirmed web login
+
+The approved refinement supersedes the original-registration-only eligibility rule: active web customers may automatically sign in after OTP both from public registration and from a valid email/password login, including a new browser session. Replace and consume a server-only account/email/context/password-fingerprint binding; preserve the submitted login remember choice, with no remember-me at registration. Reuse Fortify LoginResponse and existing cart/intended redirects; guest recommendation transfer still requires its original account-bound registration continuation. Administrator and mobile verification retain a separate login; verification never issues Sanctum tokens.

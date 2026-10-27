@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
-use App\Actions\Fortify\AuthenticateVerifiedRegistration;
+use App\Actions\Fortify\AuthenticateVerifiedCustomer;
 use App\Http\Controllers\Controller;
 use App\Services\EmailOtpVerification;
 use Illuminate\Http\RedirectResponse;
@@ -40,7 +40,7 @@ class EmailVerificationController extends Controller
         return $response;
     }
 
-    public function store(Request $request, AuthenticateVerifiedRegistration $authenticateRegistration, LoginResponse $loginResponse): Response
+    public function store(Request $request, AuthenticateVerifiedCustomer $authenticateCustomer, LoginResponse $loginResponse): Response
     {
         $token = $request->session()->get('email_verification.token', '');
         if ($this->verification->details($token) === null) {
@@ -55,7 +55,7 @@ class EmailVerificationController extends Controller
             return $this->throttled($exception);
         }
 
-        $authenticated = $authenticateRegistration->execute($request, $user, $token);
+        $authenticated = $authenticateCustomer->execute($request, $user, $token);
         $request->session()->forget('email_verification');
         $request->session()->regenerate();
 
