@@ -213,6 +213,16 @@ class Product extends Model
     }
 
     /**
+     * Get the reviewed hardware profile for this product, when one exists.
+     *
+     * @return HasOne<ProductComponentProfile, $this>
+     */
+    public function componentProfile(): HasOne
+    {
+        return $this->hasOne(ProductComponentProfile::class);
+    }
+
+    /**
      * Scope a query to active products.
      *
      * @param  Builder<Product>  $query

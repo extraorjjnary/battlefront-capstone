@@ -27,6 +27,8 @@ class DatabaseSeeder extends Seeder
             return;
         }
 
+        $this->call(PcBuildTemplateSeeder::class);
+
         User::query()->firstOrCreate(
             ['email' => 'test@example.com'],
             [

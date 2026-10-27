@@ -340,6 +340,9 @@ function finishPaymentWindow(page) {
                                 class="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
                             >
                                 <div class="min-w-0">
+                                    <p v-if="item.pc_build_group" class="text-primary-ink text-xs font-semibold uppercase tracking-wide">
+                                        PC build · {{ item.pc_build_group.name }}
+                                    </p>
                                     <p
                                         v-if="item.product.brand"
                                         class="text-primary-ink text-xs font-semibold tracking-wide uppercase"

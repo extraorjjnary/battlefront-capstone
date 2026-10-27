@@ -1509,6 +1509,9 @@ defineOptions({
                                     />
                                 </div>
                                 <div class="min-w-0">
+                                    <p v-if="item.pc_build_group" class="text-primary-ink text-xs font-semibold uppercase tracking-wide">
+                                        PC build · {{ item.pc_build_group.name }}
+                                    </p>
                                     <h3 class="truncate font-semibold">
                                         {{ item.product.name }}
                                     </h3>

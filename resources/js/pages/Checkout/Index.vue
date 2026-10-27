@@ -1010,6 +1010,9 @@ defineOptions({
                             class="grid grid-cols-[1fr_auto] gap-4 py-4"
                         >
                             <div class="min-w-0">
+                                <p v-if="item.pc_build_group" class="text-primary-ink mb-1 text-xs font-semibold uppercase tracking-wide">
+                                    PC build · {{ item.pc_build_group.name }}
+                                </p>
                                 <p class="truncate text-sm font-semibold">
                                     {{ item.product.name }}
                                 </p>

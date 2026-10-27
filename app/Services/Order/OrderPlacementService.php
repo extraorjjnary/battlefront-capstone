@@ -16,10 +16,13 @@ use App\Models\CartItem;
 use App\Models\Category;
 use App\Models\Inventory;
 use App\Models\Order;
+use App\Models\PcBuildCartGroup;
 use App\Models\Product;
+use App\Models\ProductComponentProfile;
 use App\Models\User;
 use App\Services\Cart\CartService;
 use App\Services\Notifications\OrderNotificationPublisher;
+use App\Services\PcBuilder\CompatibilityEngine;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Config;
@@ -130,6 +133,30 @@ class OrderPlacementService
                 throw OrderPlacementException::invalidSelection();
             }
 
+            $selectedBuildGroupIds = $cartItems->pluck('pc_build_cart_group_id')->filter()->unique()->values();
+            $buildGroups = PcBuildCartGroup::query()
+                ->where('cart_id', $cart->id)
+                ->whereKey($selectedBuildGroupIds)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+            if ($buildGroups->count() !== $selectedBuildGroupIds->count()) {
+                throw OrderPlacementException::invalidSelection();
+            }
+
+            if ($selectedBuildGroupIds->isNotEmpty()) {
+                $allGroupedItemIds = CartItem::query()
+                    ->where('cart_id', $cart->id)
+                    ->whereIn('pc_build_cart_group_id', $selectedBuildGroupIds)
+                    ->pluck('id');
+                if ($allGroupedItemIds->diff($cartItemIds)->isNotEmpty()) {
+                    throw ValidationException::withMessages([
+                        'cart_item_ids' => 'Select every component in a PC configuration to check it out as a group.',
+                    ]);
+                }
+            }
+
             $productIds = $cartItems->pluck('product_id')->all();
             $products = Product::query()
                 ->whereKey($productIds)
@@ -137,6 +164,7 @@ class OrderPlacementService
                 ->lockForUpdate()
                 ->get()
                 ->keyBy('id');
+            $buildSnapshots = $this->validatePcBuildGroups($cartItems, $buildGroups);
             $categories = Category::query()
                 ->whereKey($products->pluck('category_id')->unique()->all())
                 ->orderBy('id')
@@ -152,6 +180,25 @@ class OrderPlacementService
             $lines = [];
             $total = '0.00';
 
+            foreach ($cartItems->groupBy('product_id') as $productId => $productCartItems) {
+                /** @var Product $product */
+                $product = $products->get($productId);
+                /** @var Category $category */
+                $category = $categories->get($product->category_id);
+                /** @var Inventory|null $inventory */
+                $inventory = $inventories->get($product->id);
+                try {
+                    $this->cartService->ensureAvailableForCheckout(
+                        $product,
+                        $category,
+                        $inventory,
+                        (int) $productCartItems->sum('quantity'),
+                    );
+                } catch (CartOperationException) {
+                    throw OrderPlacementException::unavailableItems();
+                }
+            }
+
             foreach ($cartItems as $cartItem) {
                 /** @var Product $product */
                 $product = $products->get($cartItem->product_id);
@@ -159,17 +206,6 @@ class OrderPlacementService
                 $category = $categories->get($product->category_id);
                 /** @var Inventory|null $inventory */
                 $inventory = $inventories->get($product->id);
-
-                try {
-                    $this->cartService->ensureAvailableForCheckout(
-                        $product,
-                        $category,
-                        $inventory,
-                        $cartItem->quantity,
-                    );
-                } catch (CartOperationException) {
-                    throw OrderPlacementException::unavailableItems();
-                }
 
                 $unitPrice = $product->discount_price ?? $product->price;
 
@@ -180,15 +216,20 @@ class OrderPlacementService
                 $lineTotal = bcmul($unitPrice, (string) $cartItem->quantity, 2);
                 $total = bcadd($total, $lineTotal, 2);
                 $lines[] = [
+                    'cart_item_id' => $cartItem->id,
                     'product' => $product,
                     'inventory' => $inventory,
                     'quantity' => $cartItem->quantity,
                     'unit_price' => $unitPrice,
+                    'build_snapshot' => $buildSnapshots[$cartItem->id] ?? null,
                 ];
             }
 
+            $cartQuantitiesByProduct = $cartItems->groupBy('product_id')
+                ->map(fn ($items): int => (int) $items->sum('quantity'))
+                ->all();
             $quote = $deliveryDestination !== null
-                ? $this->deliveryRules->quote(FulfillmentMethod::Delivery, $deliveryDestination, $products, $cartItems->mapWithKeys(fn (CartItem $item): array => [$item->product_id => $item->quantity])->all())
+                ? $this->deliveryRules->quote(FulfillmentMethod::Delivery, $deliveryDestination, $products, $cartQuantitiesByProduct)
                 : null;
             $zone = $deliveryDestination !== null ? $this->deliveryRules->zone($deliveryDestination) : null;
             $methodAvailableForZone = $checkout['payment_method'] === PaymentMethod::Online
@@ -259,6 +300,9 @@ class OrderPlacementService
                     'price_at_time' => $line['unit_price'],
                     'acquisition_cost_at_time' => $line['product']->acquisition_cost,
                     'acquisition_cost_source' => $line['product']->acquisition_cost_source,
+                    'pc_build_group_uuid' => $line['build_snapshot']['group_uuid'] ?? null,
+                    'pc_build_name_at_time' => $line['build_snapshot']['group_name'] ?? null,
+                    'pc_build_component_snapshot' => $line['build_snapshot']['component'] ?? null,
                 ]);
 
                 $this->adjustInventoryStock->decrease(
@@ -281,6 +325,9 @@ class OrderPlacementService
             }
 
             $cart->items()->whereKey($cartItemIds)->delete();
+            if ($selectedBuildGroupIds->isNotEmpty()) {
+                $cart->pcBuildGroups()->whereKey($selectedBuildGroupIds)->delete();
+            }
 
             if (! $cart->items()->exists()) {
                 $cart->delete();
@@ -293,5 +340,90 @@ class OrderPlacementService
 
             return $order->load('items');
         }, attempts: 3);
+    }
+
+    /**
+     * Revalidate complete PC cart groups against current reviewed specifications and prepare purchase snapshots.
+     *
+     * @param  Collection<int, CartItem>  $cartItems
+     * @param  Collection<int, PcBuildCartGroup>  $buildGroups
+     * @return array<int, array{group_uuid: string, group_name: string, component: array<string, mixed>}>
+     */
+    private function validatePcBuildGroups(Collection $cartItems, Collection $buildGroups): array
+    {
+        if ($buildGroups->isEmpty()) {
+            return [];
+        }
+
+        $profiles = ProductComponentProfile::query()
+            ->whereIn('product_id', $cartItems->pluck('product_id')->unique())
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->with('revisions')
+            ->get()
+            ->keyBy('product_id');
+        $snapshots = [];
+
+        foreach ($buildGroups as $group) {
+            $storedComponents = collect($group->configuration_snapshot['components'] ?? []);
+            $groupItems = $cartItems->where('pc_build_cart_group_id', $group->id)->values();
+            $components = [];
+            $snapshotParts = [];
+
+            foreach ($groupItems as $cartItem) {
+                $stored = $storedComponents->firstWhere('product_id', $cartItem->product_id);
+                if (! is_array($stored) || (int) ($stored['quantity'] ?? 0) !== $cartItem->quantity) {
+                    throw ValidationException::withMessages(['cart_item_ids' => 'A PC configuration changed. Remove it and add the current build again.']);
+                }
+
+                $profile = $profiles->get($cartItem->product_id);
+                $revision = $profile?->revisions->firstWhere('revision', $profile->current_revision);
+                $reviewed = $profile?->review_status === 'approved' && $revision?->review_status === 'approved';
+                $component = [
+                    'key' => (string) $stored['key'],
+                    'product_id' => $cartItem->product_id,
+                    'component_type' => $profile?->component_type ?? (string) ($stored['component_type'] ?? 'unknown'),
+                    'quantity' => $cartItem->quantity,
+                    'configuration' => $stored['configuration'] ?? [],
+                    'specifications' => $reviewed ? $revision->specifications : [],
+                ];
+                $components[] = $component;
+                $snapshotParts[$cartItem->id] = [
+                    'component_type' => $component['component_type'],
+                    'configuration' => $component['configuration'],
+                    'specifications' => $component['specifications'],
+                    'specification_revision' => $reviewed ? $revision->revision : null,
+                ];
+            }
+
+            if ($storedComponents->count() !== count($components)) {
+                throw ValidationException::withMessages(['cart_item_ids' => 'Select the full PC configuration to check out.']);
+            }
+
+            $validation = app(CompatibilityEngine::class)->evaluate($components);
+            if (! $validation['complete']) {
+                throw ValidationException::withMessages(['cart_item_ids' => 'A PC configuration is incompatible, incomplete, or requires specification verification.']);
+            }
+
+            foreach ($groupItems as $cartItem) {
+                $part = $snapshotParts[$cartItem->id];
+                $relatedFindings = array_values(array_filter(
+                    $validation['findings'],
+                    fn (array $finding): bool => in_array($storedComponents->firstWhere('product_id', $cartItem->product_id)['key'], $finding['component_keys'], true),
+                ));
+                $snapshots[$cartItem->id] = [
+                    'group_uuid' => $group->uuid,
+                    'group_name' => $group->name,
+                    'component' => [
+                        ...$part,
+                        'ruleset_version' => $validation['ruleset_version'],
+                        'compatibility_status' => $validation['status'],
+                        'compatibility_findings' => $relatedFindings,
+                    ],
+                ];
+            }
+        }
+
+        return $snapshots;
     }
 }

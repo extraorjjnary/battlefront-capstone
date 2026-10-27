@@ -16,6 +16,10 @@ void createInertiaApp({
                 name.startsWith('Branches/') ||
                 name.startsWith('Products/'):
                 return page.props.auth?.user ? AppLayout : null;
+            case name.startsWith('PcBuilder/'):
+                return name === 'PcBuilder/Shared' || !page.props.auth?.user
+                    ? null
+                    : AppLayout;
             case name.startsWith('auth/'):
                 return AuthLayout;
             case name.startsWith('settings/'):

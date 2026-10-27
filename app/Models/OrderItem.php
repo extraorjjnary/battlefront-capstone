@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property-read Order $order
  * @property-read Product $product
  */
-#[Fillable(['order_id', 'product_id', 'quantity', 'price_at_time', 'product_name_at_time', 'acquisition_cost_at_time', 'acquisition_cost_source'])]
+#[Fillable(['order_id', 'product_id', 'quantity', 'price_at_time', 'product_name_at_time', 'acquisition_cost_at_time', 'acquisition_cost_source', 'pc_build_group_uuid', 'pc_build_name_at_time', 'pc_build_component_snapshot'])]
 class OrderItem extends Model
 {
     /** @use HasFactory<OrderItemFactory> */
@@ -36,7 +36,12 @@ class OrderItem extends Model
     protected static function booted(): void
     {
         static::updating(function (OrderItem $item): void {
-            if ($item->isDirty('product_name_at_time')) {
+            if ($item->isDirty([
+                'product_name_at_time',
+                'pc_build_group_uuid',
+                'pc_build_name_at_time',
+                'pc_build_component_snapshot',
+            ])) {
                 throw new DomainException('Purchase name snapshots cannot be changed.');
             }
         });
@@ -78,6 +83,7 @@ class OrderItem extends Model
             'quantity' => 'integer',
             'price_at_time' => 'decimal:2',
             'acquisition_cost_at_time' => 'decimal:2',
+            'pc_build_component_snapshot' => 'array',
         ];
     }
 }

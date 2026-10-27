@@ -53,6 +53,7 @@ const isAtMaximum = computed(
 );
 const canUpdate = computed(
     () =>
+        !props.item.pc_build_group &&
         availableQuantity.value > 0 &&
         ['available', 'insufficient_stock'].includes(
             props.item.availability.status,
@@ -125,6 +126,9 @@ const availabilityCopy = computed(() => {
         </div>
 
         <div class="min-w-0">
+            <Badge v-if="item.pc_build_group" variant="outline" class="mb-2">
+                PC build · {{ item.pc_build_group.name }}
+            </Badge>
             <div
                 class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"
             >
@@ -284,9 +288,12 @@ const availabilityCopy = computed(() => {
                                     Remove {{ item.product.name }}?
                                 </DialogTitle>
                                 <DialogDescription>
-                                    This removes the product from your cart. You
-                                    can add it again later if it remains
-                                    available.
+                        <template v-if="item.pc_build_group">
+                            This removes the complete {{ item.pc_build_group.name }} configuration from your cart.
+                        </template>
+                        <template v-else>
+                            This removes the product from your cart. You can add it again later if it remains available.
+                        </template>
                                 </DialogDescription>
                             </DialogHeader>
                             <DialogFooter class="mt-6 gap-2">

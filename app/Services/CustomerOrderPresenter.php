@@ -145,6 +145,11 @@ class CustomerOrderPresenter
 
                 return [
                     'id' => $item->id,
+                    'pc_build_group' => $item->pc_build_group_uuid === null ? null : [
+                        'uuid' => $item->pc_build_group_uuid,
+                        'name' => $item->pc_build_name_at_time,
+                    ],
+                    'pc_build_component_snapshot' => $item->pc_build_component_snapshot,
                     'product' => [
                         'id' => $item->product->id,
                         'name' => $item->purchasedProductName(),

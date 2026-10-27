@@ -88,6 +88,15 @@ function navigationHarness({
             '@/actions/App/Http/Controllers/Administration/ProductController': {
                 default: { index: route('/administration/products') },
             },
+            '@/actions/App/Http/Controllers/Administration/ComponentSpecificationController': {
+                default: { index: route('/administration/component-specifications') },
+            },
+            '@/actions/App/Http/Controllers/Administration/PcBuildTemplateController': {
+                default: { index: route('/administration/pc-build-templates') },
+            },
+            '@/actions/App/Http/Controllers/Administration/PcBuildAnalyticsController': {
+                default: { index: route('/administration/pc-build-analytics') },
+            },
             '@/actions/App/Http/Controllers/Administration/InventoryController':
                 {
                     default: { index: route('/administration/inventory') },
@@ -96,6 +105,7 @@ function navigationHarness({
             '@/routes/cart': { index: route('/cart') },
             '@/routes/orders': { index: route('/orders') },
             '@/routes/products': { index: route('/products') },
+            '@/routes/pc-builder': { index: route('/pc-builder') },
             '@/routes/profile': { edit: route('/settings/profile') },
             '@/routes/wishlist': { index: route('/wishlist') },
             '@/components/ui/tooltip': {

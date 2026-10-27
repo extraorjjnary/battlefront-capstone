@@ -8,6 +8,7 @@ use App\Http\Controllers\Administration\CategoryController;
 use App\Http\Controllers\Administration\ChatbotKnowledgeActivationController;
 use App\Http\Controllers\Administration\ChatbotKnowledgeController;
 use App\Http\Controllers\Administration\ChatbotKnowledgePreviewController;
+use App\Http\Controllers\Administration\ComponentSpecificationController;
 use App\Http\Controllers\Administration\CustomerController;
 use App\Http\Controllers\Administration\CustomerReturnController;
 use App\Http\Controllers\Administration\DamageReportController;
@@ -28,6 +29,8 @@ use App\Http\Controllers\Administration\OrderShipmentOperationsController;
 use App\Http\Controllers\Administration\OrderShipmentReferenceController;
 use App\Http\Controllers\Administration\OrderShipmentStatusController;
 use App\Http\Controllers\Administration\OrderStatusController;
+use App\Http\Controllers\Administration\PcBuildAnalyticsController;
+use App\Http\Controllers\Administration\PcBuildTemplateController;
 use App\Http\Controllers\Administration\ProductActivationController;
 use App\Http\Controllers\Administration\ProductController;
 use App\Http\Controllers\Administration\RolePermissionController;
@@ -57,6 +60,8 @@ use App\Http\Controllers\OrderCancellationRequestController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderPaymentProofController as CustomerOrderPaymentProofController;
 use App\Http\Controllers\OrderPaymentRetryController;
+use App\Http\Controllers\PcBuildController;
+use App\Http\Controllers\PcBuilderController;
 use App\Http\Controllers\PendingCartIntentController;
 use App\Http\Controllers\ProductCatalogController;
 use App\Http\Controllers\ProductDwellController;
@@ -78,6 +83,29 @@ Route::middleware('guest')->group(function (): void {
 
 // public/customer branches
 Route::get('branches', [BranchController::class, 'index'])->name('branches.index');
+
+// customer PC Builder
+Route::get('pc-builder', [PcBuilderController::class, 'index'])->name('pc-builder.index');
+Route::post('pc-builder/validate', [PcBuilderController::class, 'validate'])
+    ->middleware('throttle:60,1')
+    ->name('pc-builder.validate');
+Route::get('pc-builds/shared/{token}', [PcBuildController::class, 'showShared'])
+    ->middleware('throttle:60,1')
+    ->whereUuid('token')
+    ->name('pc-builds.shared.show');
+Route::middleware(['auth', 'can:use-customer-cart'])
+    ->prefix('pc-builds')
+    ->name('pc-builds.')
+    ->group(function (): void {
+        Route::get('/', [PcBuildController::class, 'index'])->name('index');
+        Route::post('/', [PcBuildController::class, 'store'])->middleware('throttle:30,1')->name('store');
+        Route::patch('{uuid}', [PcBuildController::class, 'update'])->whereUuid('uuid')->middleware('throttle:30,1')->name('update');
+        Route::post('{uuid}/duplicate', [PcBuildController::class, 'duplicate'])->whereUuid('uuid')->middleware('throttle:30,1')->name('duplicate');
+        Route::post('{uuid}/cart', [PcBuildController::class, 'addToCart'])->whereUuid('uuid')->middleware('throttle:20,1')->name('cart.store');
+        Route::delete('{uuid}', [PcBuildController::class, 'destroy'])->whereUuid('uuid')->middleware('throttle:30,1')->name('destroy');
+        Route::post('{uuid}/share', [PcBuildController::class, 'share'])->whereUuid('uuid')->middleware('throttle:30,1')->name('share');
+        Route::delete('{uuid}/share', [PcBuildController::class, 'stopSharing'])->whereUuid('uuid')->middleware('throttle:30,1')->name('share.destroy');
+    });
 
 // public/customer product catalog
 Route::resource('products', ProductCatalogController::class)
@@ -199,6 +227,22 @@ Route::middleware(['auth', 'can:access-administration'])
         Route::patch('notifications/{notification}/read', [AdministrationNotificationController::class, 'update'])->whereUuid('notification')->name('notifications.update');
 
         // products
+        Route::get('component-specifications', [ComponentSpecificationController::class, 'index'])
+            ->middleware('can:products.manage')->name('component-specifications.index');
+        Route::post('component-specifications', [ComponentSpecificationController::class, 'store'])
+            ->middleware(['can:products.manage', 'throttle:30,1'])->name('component-specifications.store');
+        Route::post('component-specifications/{componentSpecification}/approve', [ComponentSpecificationController::class, 'approve'])
+            ->middleware(['can:products.manage', 'throttle:30,1'])->whereNumber('componentSpecification')->name('component-specifications.approve');
+        Route::get('pc-build-templates', [PcBuildTemplateController::class, 'index'])
+            ->middleware('can:products.manage')->name('pc-build-templates.index');
+        Route::post('pc-build-templates', [PcBuildTemplateController::class, 'store'])
+            ->middleware(['can:products.manage', 'throttle:30,1'])->name('pc-build-templates.store');
+        Route::put('pc-build-templates/{pcBuildTemplate}', [PcBuildTemplateController::class, 'update'])
+            ->middleware(['can:products.manage', 'throttle:30,1'])->whereNumber('pcBuildTemplate')->name('pc-build-templates.update');
+        Route::delete('pc-build-templates/{pcBuildTemplate}', [PcBuildTemplateController::class, 'destroy'])
+            ->middleware(['can:products.manage', 'throttle:30,1'])->whereNumber('pcBuildTemplate')->name('pc-build-templates.destroy');
+        Route::get('pc-build-analytics', [PcBuildAnalyticsController::class, 'index'])
+            ->middleware('can:products.manage')->name('pc-build-analytics.index');
         Route::post('products/{product}/restore', [ProductController::class, 'restore'])
             ->middleware('can:catalog.delete')
             ->name('products.restore');

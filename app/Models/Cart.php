@@ -47,6 +47,12 @@ class Cart extends Model
         return $this->hasMany(CartItem::class);
     }
 
+    /** @return HasMany<PcBuildCartGroup, $this> */
+    public function pcBuildGroups(): HasMany
+    {
+        return $this->hasMany(PcBuildCartGroup::class);
+    }
+
     /**
      * Register the cart persistence rules.
      */
