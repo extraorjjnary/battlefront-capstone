@@ -8,13 +8,17 @@ import PageHeader from '@/components/PageHeader.vue';
 import ProductImage from '@/components/catalog/ProductImage.vue';
 import ProductPrice from '@/components/catalog/ProductPrice.vue';
 import StockAvailability from '@/components/catalog/StockAvailability.vue';
+import { useWishlistInteractions } from '@/composables/useWishlistInteractions';
 import { Button } from '@/components/ui/button';
 import { index as productIndex, show as productShow } from '@/routes/products';
 import { index as wishlistIndex } from '@/routes/wishlist';
+import { index as cartIndex } from '@/routes/cart';
 
 defineProps({
     wishlist: { type: Object, required: true },
 });
+
+const interactions = useWishlistInteractions();
 
 defineOptions({
     layout: {
@@ -119,11 +123,18 @@ defineOptions({
                             />
 
                             <div class="flex flex-wrap gap-2">
+                                <Button v-if="item.is_in_cart" as-child size="sm">
+                                    <Link :href="cartIndex()">
+                                        <ShoppingCart aria-hidden="true" />
+                                        View cart
+                                    </Link>
+                                </Button>
                                 <Form
-                                    v-if="item.can_add_to_cart"
+                                    v-else-if="item.can_add_to_cart"
                                     v-bind="CartItemController.store.form()"
-                                    v-slot="{ processing, errors }"
-                                    preserve-scroll
+                                    v-slot="{ processing }"
+                                    :options="interactions.formOptions(item.product_id, { only: ['wishlist', 'wishlistCount', 'cartQuantity'] })"
+                                    :show-progress="false"
                                 >
                                     <input
                                         type="hidden"
@@ -138,43 +149,37 @@ defineOptions({
                                     <Button
                                         type="submit"
                                         size="sm"
-                                        :disabled="processing"
+                                        :disabled="interactions.isBusy(item.product_id)"
                                     >
                                         <ShoppingCart aria-hidden="true" />
                                         {{ processing ? 'Adding…' : 'Add to cart' }}
                                     </Button>
-                                    <p
-                                        v-if="errors.product_id || errors.quantity"
-                                        role="alert"
-                                        class="text-destructive basis-full text-xs"
-                                    >
-                                        {{ errors.product_id || errors.quantity }}
-                                    </p>
                                 </Form>
 
                                 <Form
                                     v-bind="WishlistController.destroy.form(item.product_id)"
-                                    v-slot="{ processing, errors }"
-                                    preserve-scroll
+                                    v-slot="{ processing }"
+                                    :options="interactions.formOptions(item.product_id, { only: ['wishlist', 'wishlistCount'], isSaved: false })"
+                                    :show-progress="false"
                                 >
                                     <Button
                                         type="submit"
                                         size="sm"
                                         variant="outline"
-                                        :disabled="processing"
+                                        :disabled="interactions.isBusy(item.product_id)"
                                         :aria-label="`Remove ${item.product?.name ?? 'unavailable product'} from wishlist`"
                                     >
                                         <Trash2 aria-hidden="true" />
                                         {{ processing ? 'Removing…' : 'Remove' }}
                                     </Button>
-                                    <p
-                                        v-if="errors.product_id"
-                                        role="alert"
-                                        class="text-destructive basis-full text-xs"
-                                    >
-                                        {{ errors.product_id }}
-                                    </p>
                                 </Form>
+                                <p
+                                    v-if="interactions.error(item.product_id)"
+                                    role="alert"
+                                    class="text-destructive basis-full text-xs"
+                                >
+                                    {{ interactions.error(item.product_id) }}
+                                </p>
                             </div>
                         </div>
                     </article>

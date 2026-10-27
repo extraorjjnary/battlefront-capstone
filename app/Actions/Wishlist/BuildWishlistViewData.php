@@ -2,6 +2,7 @@
 
 namespace App\Actions\Wishlist;
 
+use App\Models\CartItem;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
@@ -14,7 +15,7 @@ use Illuminate\Pagination\LengthAwarePaginator;
 /**
  * @phpstan-import-type CatalogProductData from CatalogProductPresenter
  *
- * @phpstan-type WishlistViewItem array{id:int, product_id:int, is_available:bool, can_add_to_cart:bool, product:CatalogProductData|null}
+ * @phpstan-type WishlistViewItem array{id:int, product_id:int, is_available:bool, can_add_to_cart:bool, is_in_cart:bool, product:CatalogProductData|null}
  */
 class BuildWishlistViewData
 {
@@ -38,11 +39,17 @@ class BuildWishlistViewData
         $count = $this->wishlistService->count($customer);
         $lastPage = max(1, (int) ceil($count / 12));
         $page = min(max(1, $this->request->integer('page', 1)), $lastPage);
-        $items = $query->paginate(12, ['*'], 'page', $page)
-            ->through(
-                /** @return WishlistViewItem */
-                fn (WishlistItem $item): array => $this->presentItem($item),
-            );
+        $items = $query->paginate(12, ['*'], 'page', $page);
+        $cartProductIds = CartItem::query()
+            ->whereHas('cart', fn ($query) => $query->where('user_id', $customer->id))
+            ->whereIn('product_id', $items->getCollection()->pluck('product_id'))
+            ->distinct()
+            ->pluck('product_id')
+            ->all();
+        $items->through(
+            /** @return WishlistViewItem */
+            fn (WishlistItem $item): array => $this->presentItem($item, in_array($item->product_id, $cartProductIds, true)),
+        );
 
         return [
             'items' => $items,
@@ -51,7 +58,7 @@ class BuildWishlistViewData
     }
 
     /** @return WishlistViewItem */
-    private function presentItem(WishlistItem $item): array
+    private function presentItem(WishlistItem $item, bool $isInCart): array
     {
         $product = $item->product;
         $category = $product?->getRelationValue('category');
@@ -65,6 +72,7 @@ class BuildWishlistViewData
         return [
             'id' => $item->id,
             'product_id' => $item->product_id,
+            'is_in_cart' => $isInCart,
             'is_available' => $isAvailable,
             'can_add_to_cart' => $isAvailable && (int) $product->inventory?->quantity > 0,
             'product' => $isAvailable

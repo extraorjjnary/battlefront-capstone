@@ -93,3 +93,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | routes/settings.php,app/Http/Controllers/Settings/**,resources/js/pages/settings/** | .ai/rules/settings.md |
 | tests/** | .ai/rules/tests.md |
 | app/Services/Notifications/**,app/Services/Order/**,app/Actions/Order/**,app/Jobs/**,app/Http/Controllers/**/*Notification*,app/Http/Controllers/Api/V1/PushDeviceController.php | .ai/rules/v1.md |
+| resources/js/{components/catalog/WishlistButton.vue,composables/useWishlistInteractions*,pages/Wishlist/**} | .ai/rules/wishlist.md |

@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\CartItem;
+use App\Models\PcBuildCartGroup;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\WishlistActivity;
@@ -16,14 +18,87 @@ test('customers can save once remove and view only their own wishlist', function
     $this->assertDatabaseCount('wishlist_items', 1);
     $this->assertDatabaseCount('wishlist_activities', 1);
     $this->actingAs($otherCustomer)->get(route('wishlist.index'))->assertOk()->assertInertia(fn ($page) => $page->component('Wishlist/Index')->where('wishlist.count', 0));
-    $this->actingAs($customer)->get(route('wishlist.index'))->assertOk()->assertInertia(fn ($page) => $page->where('wishlist.count', 1));
+    $this->actingAs($customer)->get(route('wishlist.index'))->assertInertia(fn ($page) => $page
+        ->where('wishlist.count', 1)
+        ->where('wishlist.items.data.0.is_in_cart', false));
     $this->actingAs($customer)->post(route('cart.items.store'), ['product_id' => $product->id, 'quantity' => 1])->assertRedirect();
     $this->assertDatabaseCount('cart_items', 1);
     $this->assertDatabaseCount('wishlist_items', 1);
+    $this->actingAs($customer)->get(route('wishlist.index'))->assertInertia(fn ($page) => $page->where('wishlist.items.data.0.is_in_cart', true));
     $this->actingAs($customer)->delete(route('wishlist.destroy', $product->id))->assertRedirect();
     $this->assertDatabaseCount('wishlist_items', 0);
     $this->assertDatabaseCount('wishlist_activities', 2);
     expect(WishlistActivity::query()->where('event_type', 'removed')->exists())->toBeTrue();
+});
+
+test('wishlist cart presence includes owned pc build components and excludes other customers carts', function () {
+    $customer = User::factory()->customer()->create();
+    $otherCustomer = User::factory()->customer()->create();
+    $component = Product::factory()->available()->create();
+    $otherProduct = Product::factory()->available()->create();
+    $cart = $customer->cart()->create();
+    $group = PcBuildCartGroup::factory()->for($cart)->create();
+    CartItem::factory()->for($cart)->for($component)->create(['pc_build_cart_group_id' => $group->id]);
+    CartItem::factory()->for($otherCustomer->cart()->create())->for($otherProduct)->create();
+    $this->actingAs($customer)->post(route('wishlist.store'), ['product_id' => $component->id]);
+    $this->post(route('wishlist.store'), ['product_id' => $otherProduct->id]);
+
+    $this->get(route('wishlist.index'))->assertInertia(fn ($page) => $page
+        ->where('wishlist.items.data.0.product_id', $otherProduct->id)
+        ->where('wishlist.items.data.0.is_in_cart', false)
+        ->where('wishlist.items.data.1.product_id', $component->id)
+        ->where('wishlist.items.data.1.is_in_cart', true));
+
+    $this->withToken($customer->createToken('Wishlist phone')->plainTextToken)
+        ->getJson(route('api.v1.wishlist.index'))
+        ->assertOk()
+        ->assertJsonCount(2, 'data')
+        ->assertJsonPath('data.0.is_in_cart', false)
+        ->assertJsonPath('data.1.is_in_cart', true)
+        ->assertJsonPath('count', 2)
+        ->assertJsonStructure(['data', 'links', 'meta', 'count']);
+});
+
+test('heart responses refresh counts without reloading catalog products or recommendations', function () {
+    $customer = User::factory()->customer()->create();
+    $product = Product::factory()->available()->create();
+    $initial = $this->actingAs($customer)->get(route('products.index'));
+    $this->actingAs($customer)->from(route('products.index'))
+        ->post(route('wishlist.store'), ['product_id' => $product->id])
+        ->assertRedirect(route('products.index'));
+
+    $this->get(route('products.index'), [
+        'X-Inertia' => 'true',
+        'X-Inertia-Version' => $initial->viewData('page')['version'],
+        'X-Inertia-Partial-Component' => 'Products/Index',
+        'X-Inertia-Partial-Data' => 'wishlistCount',
+    ])->assertOk()
+        ->assertJsonPath('props.wishlistCount', 1)
+        ->assertJsonMissingPath('props.products')
+        ->assertJsonMissingPath('props.recommendations');
+
+    $this->delete(route('wishlist.destroy', $product->id))->assertRedirect();
+    $this->delete(route('wishlist.destroy', $product->id))->assertRedirect();
+    $this->assertDatabaseCount('wishlist_items', 0);
+    $this->assertDatabaseCount('wishlist_activities', 2);
+});
+
+test('out of stock wishlist products stay saved and failed cart additions do not alter them', function () {
+    $customer = User::factory()->customer()->create();
+    $product = Product::factory()->available()->create();
+    $this->actingAs($customer)->post(route('wishlist.store'), ['product_id' => $product->id]);
+    $product->inventory()->update(['quantity' => 0]);
+
+    $this->get(route('wishlist.index'))->assertInertia(fn ($page) => $page
+        ->where('wishlist.items.data.0.is_available', true)
+        ->where('wishlist.items.data.0.can_add_to_cart', false)
+        ->where('wishlist.items.data.0.is_in_cart', false));
+
+    $this->post(route('cart.items.store'), ['product_id' => $product->id, 'quantity' => 1])
+        ->assertSessionHasErrors('quantity');
+    $this->assertDatabaseCount('cart_items', 0);
+    $this->assertDatabaseCount('wishlist_items', 1);
+    $this->assertDatabaseCount('wishlist_activities', 1);
 });
 
 test('wishlist actions require an authenticated customer and reject unavailable products', function () {
