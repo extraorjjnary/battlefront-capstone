@@ -11,6 +11,8 @@ import {
 
 function profileProps(overrides = {}) {
     return {
+        emailVerified: true,
+        administrationRoleCode: null,
         canManageDefaultDeliveryAddress: true,
         defaultDeliveryContactNumber: '',
         defaultDeliveryAddress: 'Saved legacy address <script>unsafe</script>',
@@ -21,6 +23,57 @@ function profileProps(overrides = {}) {
         personalizedRecommendationsEnabled: true,
         ...overrides,
     };
+}
+
+for (const [role, administrationRoleCode, label] of [
+    ['customer', null, 'Customer'],
+    ['administrator', 'owner', 'Owner'],
+    ['administrator', 'manager', 'Manager'],
+    ['administrator', 'staff', 'Staff'],
+    ['administrator', 'it', 'IT Administrator'],
+    ['administrator', null, 'Administrator'],
+]) {
+    test(`profile displays the assigned ${label} role as read-only account information`, async () => {
+        const html = await renderToString(
+            Vue.h(
+                loadAddressComponent('../pages/settings/Profile.vue', true, {
+                    user: {
+                        name: 'Profile User',
+                        email: 'profile@example.test',
+                        role,
+                    },
+                }),
+                profileProps({ administrationRoleCode }),
+            ),
+        );
+
+        assert.match(
+            html,
+            new RegExp(`<dt[^>]*>Account Role:</dt>\\s*<dd[^>]*>${label}</dd>`),
+        );
+        assert.doesNotMatch(
+            html,
+            /<(?:input|select)[^>]*name="(?:role|administration_role_id|email_verified_at|emailVerified)"/,
+        );
+    });
+}
+
+for (const emailVerified of [true, false]) {
+    test(`profile displays email verification as ${emailVerified ? 'Yes' : 'No'}`, async () => {
+        const html = await renderToString(
+            Vue.h(
+                loadAddressComponent('../pages/settings/Profile.vue', true),
+                profileProps({ emailVerified }),
+            ),
+        );
+
+        assert.match(
+            html,
+            new RegExp(
+                `<dt[^>]*>Email Verified:</dt>\\s*<dd[^>]*>\\s*${emailVerified ? 'Yes' : 'No'}\\s*</dd>`,
+            ),
+        );
+    });
 }
 
 test('ambiguous defaults start in keep mode and address edits or clearing set explicit save intent', () => {

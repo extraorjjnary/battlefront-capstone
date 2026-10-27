@@ -37,6 +37,33 @@ test('administrator profile excludes the default delivery address', function () 
             ->where('defaultDeliveryAddress', null));
 });
 
+test('profile shares verified email status and the assigned role without changing account data', function (string $role, ?string $administrationRoleCode) {
+    $user = User::factory()->create([
+        'role' => $role,
+        'administration_role_id' => $administrationRoleCode === null
+            ? null
+            : DB::table('administration_roles')->where('code', $administrationRoleCode)->value('id'),
+    ]);
+    $original = $user->refresh()->getAttributes();
+
+    $this->actingAs($user)
+        ->get(route('profile.edit'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('settings/Profile')
+            ->where('emailVerified', true)
+            ->where('auth.user.role', $role)
+            ->where('administrationRoleCode', $administrationRoleCode));
+
+    expect($user->fresh()->getAttributes())->toBe($original);
+})->with([
+    'customer' => ['customer', null],
+    'owner' => ['administrator', 'owner'],
+    'manager' => ['administrator', 'manager'],
+    'staff' => ['administrator', 'staff'],
+    'IT' => ['administrator', 'it'],
+    'administrator without a subrole' => ['administrator', null],
+]);
+
 test('all account types can update their name with omitted or unchanged email', function (string $role, bool $includeEmail) {
     $user = User::factory()->create([
         'role' => $role === 'customer' ? UserRole::Customer : UserRole::Administrator,

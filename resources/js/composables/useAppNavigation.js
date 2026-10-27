@@ -10,7 +10,7 @@ import {
     ChartColumnIncreasing,
     Logs,
     UserRoundCog,
-    ChartColumn,
+    ChartPie,
     LayoutDashboard,
     MapPin,
     MessageSquareText,
@@ -168,7 +168,7 @@ export function useAppNavigation() {
                 items.push({
                     title: 'Sales reports',
                     href: SalesReportController.index(),
-                    icon: ChartColumn,
+                    icon: ChartPie,
                 });
             if (page.props.auth?.can?.viewOrders)
                 items.push({

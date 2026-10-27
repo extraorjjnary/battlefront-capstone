@@ -561,6 +561,7 @@ test('administration tasks have distinct icons and clear labels without granting
             viewAudit: true,
             manageUsers: true,
             viewStaffReports: true,
+            viewReports: true,
         },
     });
     const expected = {
@@ -571,6 +572,7 @@ test('administration tasks have distinct icons and clear labels without granting
         'Supplier returns': icons.Truck,
         'Customer returns': icons.Undo2,
         Suppliers: icons.Handshake,
+        'Sales reports': icons.ChartPie,
         'Sales by handler': icons.ChartColumnIncreasing,
         'Activity log': icons.Logs,
         Team: icons.UserRoundCog,
@@ -584,7 +586,7 @@ test('administration tasks have distinct icons and clear labels without granting
         assert.equal(item?.icon, icon, title);
         assert.ok(html.includes(title), title + ' is visible');
     }
-    assert.equal(new Set(Object.values(expected)).size, 10);
+    assert.equal(new Set(Object.values(expected)).size, 11);
     for (const svg of html.matchAll(/<svg\b[^>]*>/g)) {
         assert.match(svg[0], /aria-hidden="true"/);
     }
@@ -594,10 +596,23 @@ test('administration tasks have distinct icons and clear labels without granting
     harness.page.props.auth.can.viewAudit = false;
     harness.page.props.auth.can.manageUsers = false;
     harness.page.props.auth.can.viewStaffReports = false;
+    harness.page.props.auth.can.viewReports = false;
     const titles = harness.navigation.mainNavItems.value.map(
         (item) => item.title,
     );
     assert.ok(titles.includes('My sales'));
+    assert.equal(
+        harness.navigation.mainNavItems.value.find(
+            (item) => item.title === 'My sales',
+        ).icon,
+        icons.ChartColumnIncreasing,
+    );
+    harness.page.props.auth.can.viewOrders = false;
+    assert.ok(
+        !harness.navigation.mainNavItems.value.some(
+            (item) => item.title === 'My sales',
+        ),
+    );
     for (const hidden of [
         'Stock requests',
         'Stock checks',
@@ -606,6 +621,7 @@ test('administration tasks have distinct icons and clear labels without granting
         'Suppliers',
         'Activity log',
         'Team',
+        'Sales reports',
     ]) {
         assert.ok(
             !titles.includes(hidden),

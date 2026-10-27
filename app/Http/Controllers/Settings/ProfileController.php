@@ -21,6 +21,8 @@ class ProfileController extends Controller
         $canManageDefaultDeliveryAddress = $request->user()->can('use-customer-cart');
 
         return Inertia::render('settings/Profile', [
+            'emailVerified' => $request->user()->hasVerifiedEmail(),
+            'administrationRoleCode' => $request->user()->administrationRoleCode(),
             'canManageDefaultDeliveryAddress' => $canManageDefaultDeliveryAddress,
             'defaultDeliveryAddress' => $canManageDefaultDeliveryAddress
                 ? $request->user()->default_delivery_address
