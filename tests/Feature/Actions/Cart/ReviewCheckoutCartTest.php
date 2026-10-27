@@ -29,6 +29,7 @@ test('returns a current checkout summary for only the customer cart', function (
         'items' => [[
             'id' => $item->id,
             'quantity' => 2,
+            'pc_build_group' => null,
             'product' => [
                 'id' => $product->id,
                 'name' => 'Battlefront Gaming GPU',

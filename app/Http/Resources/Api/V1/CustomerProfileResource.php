@@ -21,7 +21,7 @@ class CustomerProfileResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'email' => $this->email,
-            'appearance' => $this->appearance?->resolved()->value ?? 'light',
+            'appearance' => $this->appearance->resolved()->value,
             'default_delivery_address' => $this->default_delivery_address,
             'default_delivery_address_prefill' => app(PsgcDeliveryLocations::class)->prefill(
                 $this->default_delivery_address,

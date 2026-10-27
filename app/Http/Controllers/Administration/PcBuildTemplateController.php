@@ -36,12 +36,12 @@ class PcBuildTemplateController extends Controller
 
     public function store(SavePcBuildTemplateRequest $request, PcBuildTemplateService $service): JsonResponse
     {
-        return response()->json($this->present($service->save($request->user(), $request->validated())), 201);
+        return response()->json($this->present($service->save($request->user(), $request->templateData())), 201);
     }
 
     public function update(SavePcBuildTemplateRequest $request, PcBuildTemplate $pcBuildTemplate, PcBuildTemplateService $service): JsonResponse
     {
-        return response()->json($this->present($service->save($request->user(), $request->validated(), $pcBuildTemplate)));
+        return response()->json($this->present($service->save($request->user(), $request->templateData(), $pcBuildTemplate)));
     }
 
     public function destroy(Request $request, PcBuildTemplate $pcBuildTemplate, PcBuildTemplateService $service): JsonResponse

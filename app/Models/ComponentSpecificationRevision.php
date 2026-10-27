@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property array<string, mixed> $specifications
+ * @property list<array<string, string>> $evidence
+ */
 #[Fillable([
     'product_component_profile_id',
     'revision',

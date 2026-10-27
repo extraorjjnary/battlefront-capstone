@@ -9,10 +9,10 @@ class ComponentReadinessService
     /** @return list<array<string, mixed>> */
     public function candidates(): array
     {
-        return Product::query()->customerEligible()
+        return array_values(Product::query()->customerEligible()
             ->with(['category', 'inventory', 'componentProfile.revisions'])
             ->orderBy('name')->orderBy('id')->get()
-            ->map(fn (Product $product): array => $this->present($product))->all();
+            ->map(fn (Product $product): array => $this->present($product))->all());
     }
 
     /** @return array<string, mixed> */
@@ -25,7 +25,7 @@ class ComponentReadinessService
         ];
         $profile = $product->componentProfile;
         $revision = $profile?->revisions->firstWhere('revision', $profile->current_revision);
-        $type = $profile?->component_type ?? ($types[$product->category?->name] ?? null);
+        $type = $profile->component_type ?? ($types[$product->category->name] ?? null);
         $excluded = preg_match('/laptop ram|sodimm|flashdrive|flash drive|enclosure|external case|card reader/i', $product->name) === 1;
         $status = 'needs_identity';
         $reason = 'Confirm exact model, hardware revision, included accessories and manufacturer evidence.';
@@ -40,8 +40,8 @@ class ComponentReadinessService
 
         return [
             'product_id' => $product->id, 'name' => $product->name, 'product_code' => $product->product_code,
-            'category' => $product->category?->name, 'suggested_type' => $type,
-            'status' => $status, 'reason' => $reason, 'stock_quantity' => $product->inventory?->quantity ?? 0,
+            'category' => $product->category->name, 'suggested_type' => $type,
+            'status' => $status, 'reason' => $reason, 'stock_quantity' => $product->inventory->quantity ?? 0,
             'profile_id' => $profile?->id,
         ];
     }

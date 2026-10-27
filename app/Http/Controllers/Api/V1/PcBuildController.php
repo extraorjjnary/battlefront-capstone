@@ -19,12 +19,12 @@ class PcBuildController extends Controller
 
     public function store(SavePcBuildRequest $request, SavedPcBuildService $builds): JsonResponse
     {
-        return response()->json(['data' => $builds->present($builds->create($request->user(), $request->validated()))], 201);
+        return response()->json(['data' => $builds->present($builds->create($request->user(), $request->buildData()))], 201);
     }
 
     public function update(SavePcBuildRequest $request, string $uuid, SavedPcBuildService $builds): JsonResponse
     {
-        $data = $request->validated();
+        $data = $request->buildData();
         if (! array_key_exists('edit_version', $data)) {
             throw ValidationException::withMessages(['edit_version' => 'Reload this build before saving your changes.']);
         }

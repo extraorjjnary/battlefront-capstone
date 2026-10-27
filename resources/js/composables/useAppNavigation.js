@@ -12,6 +12,7 @@ import {
     Undo2,
     Handshake,
     Heart,
+    ChartColumn,
     ChartColumnIncreasing,
     Logs,
     UserRoundCog,

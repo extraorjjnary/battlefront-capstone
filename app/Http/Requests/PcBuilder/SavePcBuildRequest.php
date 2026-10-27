@@ -6,6 +6,27 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class SavePcBuildRequest extends FormRequest
 {
+    /** @return array{name: string, mode: string, budget: string|null, edit_version?: int, components: list<array{key: string, product_id: int, quantity: int, configuration: array<string, mixed>}>} */
+    public function buildData(): array
+    {
+        $data = [
+            'name' => $this->string('name')->toString(),
+            'mode' => $this->string('mode')->toString(),
+            'budget' => $this->filled('budget') ? $this->string('budget')->toString() : null,
+            'components' => array_values(array_map(fn (array $component): array => [
+                'key' => $component['key'],
+                'product_id' => (int) $component['product_id'],
+                'quantity' => (int) $component['quantity'],
+                'configuration' => $component['configuration'] ?? [],
+            ], $this->validated('components'))),
+        ];
+        if (array_key_exists('edit_version', $this->validated())) {
+            $data['edit_version'] = $this->integer('edit_version');
+        }
+
+        return $data;
+    }
+
     public function authorize(): bool
     {
         return $this->user()?->can('use-customer-cart') ?? false;

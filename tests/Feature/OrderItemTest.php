@@ -16,6 +16,9 @@ test('the order item schema includes the approved purchase name snapshot', funct
         'product_name_at_time',
         'acquisition_cost_at_time',
         'acquisition_cost_source',
+        'pc_build_group_uuid',
+        'pc_build_name_at_time',
+        'pc_build_component_snapshot',
     ]);
 });
 

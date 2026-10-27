@@ -4,12 +4,17 @@ namespace App\Models;
 
 use Database\Factories\PcBuildTemplateFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
+/**
+ * @property numeric-string|null $budget
+ * @property-read Collection<int, PcBuildTemplateItem> $items
+ */
 #[Fillable(['name', 'description', 'budget', 'is_active', 'edit_version', 'created_by_id'])]
 class PcBuildTemplate extends Model
 {

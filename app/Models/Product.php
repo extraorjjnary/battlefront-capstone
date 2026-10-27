@@ -52,6 +52,7 @@ use Illuminate\Support\Facades\Storage;
  * @property-read Collection<int, CartItem> $cartItems
  * @property-read Collection<int, OrderItem> $orderItems
  * @property-read Collection<int, Forecast> $forecasts
+ * @property-read ProductComponentProfile|null $componentProfile
  */
 #[Fillable([
     'product_code',

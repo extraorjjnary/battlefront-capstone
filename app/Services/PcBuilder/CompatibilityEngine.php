@@ -367,7 +367,7 @@ class CompatibilityEngine
         if ($integratedGraphics === true && is_array($boardOutputs) && $boardOutputs !== []) {
             $findings[] = $this->finding('graphics.required', 'compatible', [$processor['key'], $motherboard['key']], 'The processor has integrated graphics and the motherboard lists display outputs.');
         } else {
-            $findings[] = $this->unknown('graphics.required', [$processor['key'], ...($motherboard === null ? [] : [$motherboard['key']])], 'A usable graphics and display-output path requires verification.');
+            $findings[] = $this->unknown('graphics.required', [$processor['key'], $motherboard['key']], 'A usable graphics and display-output path requires verification.');
         }
     }
 
@@ -604,6 +604,7 @@ class CompatibilityEngine
             return;
         }
 
+        $slots = array_values($slots);
         $assignments = $this->allocateStorageSlots($drives, $slots);
         if ($assignments !== null) {
             foreach ($assignments as $leftIndex => $leftSlotIndex) {
@@ -674,12 +675,13 @@ class CompatibilityEngine
             }
 
             $used[$slotIndex] = true;
-            $assignments[$index] = $slotIndex;
+            $assignments[] = $slotIndex;
             if ($this->assignStorageDrive($index + 1, $drives, $slots, $used, $assignments)) {
                 return true;
             }
 
-            unset($used[$slotIndex], $assignments[$index]);
+            unset($used[$slotIndex]);
+            array_pop($assignments);
         }
 
         return false;
@@ -920,7 +922,7 @@ class CompatibilityEngine
         }
     }
 
-    /** @param list<array{rule: string, status: string, component_keys: list<string>, message: string}> $findings
+    /** @param list<string> $componentKeys
      * @return array{rule: string, status: string, component_keys: list<string>, message: string}
      */
     private function finding(string $rule, string $status, array $componentKeys, string $message): array

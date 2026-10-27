@@ -382,7 +382,7 @@ class OrderPlacementService
                 $component = [
                     'key' => (string) $stored['key'],
                     'product_id' => $cartItem->product_id,
-                    'component_type' => $profile?->component_type ?? (string) ($stored['component_type'] ?? 'unknown'),
+                    'component_type' => $profile->component_type ?? (string) ($stored['component_type'] ?? 'unknown'),
                     'quantity' => $cartItem->quantity,
                     'configuration' => $stored['configuration'] ?? [],
                     'specifications' => $reviewed ? $revision->specifications : [],

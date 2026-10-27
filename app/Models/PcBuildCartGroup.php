@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
+/** @property array{components: list<array<string, mixed>>, validation: array<string, mixed>} $configuration_snapshot */
 #[Fillable(['cart_id', 'name', 'mode', 'ruleset_version', 'configuration_snapshot'])]
 class PcBuildCartGroup extends Model
 {

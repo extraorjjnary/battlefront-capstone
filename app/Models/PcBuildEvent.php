@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
+/** @property array{components?: list<array{product_id: int, component_type: string, quantity: int}>, warning_count?: int, ruleset_version?: int, cart_group_uuid?: string, validation_status?: string} $context */
 #[Fillable([
     'pc_build_id',
     'user_id',

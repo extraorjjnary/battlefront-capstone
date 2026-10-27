@@ -12,6 +12,8 @@ test('the cart item schema follows the approved ERD decisions', function () {
     expect(Schema::getColumnListing('cart_items'))->toEqualCanonicalizing([
         'id',
         'cart_id',
+        'pc_build_cart_group_id',
+        'pc_build_group_identity',
         'product_id',
         'quantity',
     ]);

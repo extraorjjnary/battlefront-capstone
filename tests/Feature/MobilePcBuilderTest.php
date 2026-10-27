@@ -44,14 +44,14 @@ test('mobile validation retains unknown and incompatible findings from the share
 test('mobile saved builds support editing duplication sharing revocation and deletion', function () {
     $customer = User::factory()->customer()->create();
     $product = mobileBuilderProduct('processor', ['socket' => 'AM5']);
-    $payload = ['name' => 'My portable build', 'mode' => 'advanced', 'budget' => '50000.00', 'components' => [['key' => 'cpu', 'product_id' => $product->id, 'quantity' => 1]]];
+    $payload = ['name' => 'My portable build', 'mode' => 'advanced', 'budget' => 50000, 'components' => [['key' => 'cpu', 'product_id' => (string) $product->id, 'quantity' => '1']]];
     $this->withToken($customer->createToken('phone')->plainTextToken);
     $build = $this->postJson('/api/v1/pc-builds', $payload)->assertCreated()->json('data');
     $this->assertDatabaseHas('pc_builds', ['uuid' => $build['uuid'], 'user_id' => $customer->id, 'name' => $payload['name']]);
     $base = '/api/v1/pc-builds/'.$build['uuid'];
     $this->getJson('/api/v1/pc-builds')->assertOk()->assertJsonCount(1, 'data');
     $this->patchJson($base, $payload)->assertUnprocessable()->assertJsonValidationErrors('edit_version');
-    $this->patchJson($base, [...$payload, 'name' => 'Updated', 'edit_version' => $build['edit_version']])->assertOk()->assertJsonPath('data.edit_version', $build['edit_version'] + 1);
+    $this->patchJson($base, [...$payload, 'name' => 'Updated', 'edit_version' => (string) $build['edit_version']])->assertOk()->assertJsonPath('data.edit_version', $build['edit_version'] + 1);
     $this->patchJson($base, [...$payload, 'edit_version' => $build['edit_version']])->assertUnprocessable()->assertJsonValidationErrors('edit_version');
     $copy = $this->postJson($base.'/duplicate')->assertCreated()->json('data.uuid');
     expect($copy)->not->toBe($build['uuid']);

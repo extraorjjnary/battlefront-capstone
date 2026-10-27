@@ -148,7 +148,7 @@ class SavedPcBuildService
                 'quantity' => $item->quantity,
                 'configuration' => $item->configuration ?? [],
                 'name' => $item->product?->name,
-                'price' => $item->product?->discount_price ?? $item->product?->price,
+                'price' => $item->product->discount_price ?? $item->product?->price,
             ])->all(),
         ];
     }

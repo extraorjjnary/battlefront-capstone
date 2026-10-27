@@ -58,7 +58,7 @@ test('product managers create and approve immutable hardware specification revis
     $administrator = User::factory()->administrator()->create();
     $product = Product::factory()->create();
     $payload = [
-        'product_id' => $product->id,
+        'product_id' => (string) $product->id,
         'component_type' => 'processor',
         'manufacturer_part_number' => 'BF-CPU-9000',
         'hardware_revision' => '1.0',
@@ -214,8 +214,8 @@ test('admin template editing round trips component configuration and product ide
             ->where('products', fn ($products) => collect($products)->firstWhere('id', $case->id)['fan_mounting_positions'] === ['front', 'rear']));
 
     $this->putJson(route('administration.pc-build-templates.update', $template), [
-        'name' => 'Updated fan template', 'is_active' => false, 'edit_version' => $template->edit_version,
-        'components' => [['key' => 'fan-1', 'product_id' => $fan->id, 'quantity' => 1, 'configuration' => $configuration]],
+        'name' => 'Updated fan template', 'is_active' => '0', 'edit_version' => (string) $template->edit_version,
+        'components' => [['key' => 'fan-1', 'product_id' => (string) $fan->id, 'quantity' => '1', 'configuration' => $configuration]],
     ])->assertOk()->assertJsonPath('components.0.configuration', $configuration);
 
     expect($template->refresh()->items->first()->configuration)->toBe($configuration)

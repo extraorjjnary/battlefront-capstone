@@ -32,10 +32,10 @@ class ComponentSpecificationController extends Controller
                     'hardware_revision' => $profile->hardware_revision,
                     'review_status' => $profile->review_status,
                     'edit_version' => $profile->edit_version,
-                    'specifications' => $revision?->specifications ?? [],
-                    'evidence' => $revision?->evidence ?? [],
+                    'specifications' => $revision->specifications ?? [],
+                    'evidence' => $revision->evidence ?? [],
                     'revision' => $revision?->revision,
-                    'incomplete_attributes' => $this->incompleteAttributes($profile->component_type, $revision?->specifications ?? []),
+                    'incomplete_attributes' => $this->incompleteAttributes($profile->component_type, $revision->specifications ?? []),
                 ];
             });
 
@@ -48,7 +48,7 @@ class ComponentSpecificationController extends Controller
 
     public function store(SaveComponentSpecificationRequest $request, ComponentSpecificationService $service): JsonResponse
     {
-        $profile = $service->saveDraft($request->validated());
+        $profile = $service->saveDraft($request->specificationData());
 
         return response()->json([
             'id' => $profile->id,

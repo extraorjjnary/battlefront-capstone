@@ -91,6 +91,19 @@ test('it rejects storage assignments that conflict through shared PCIe lanes', f
     expect(collect($result['findings'])->firstWhere('rule', 'storage.slot_allocation')['status'])->toBe('incompatible');
 });
 
+test('it preserves storage lane conflict checks when slot indexes are sparse', function () {
+    $result = app(CompatibilityEngine::class)->evaluate([
+        component('drive-a', 'storage', ['interface' => 'NVMe', 'form_factor' => 'M.2 2280', 'length_mm' => 80]),
+        component('drive-b', 'storage', ['interface' => 'NVMe', 'form_factor' => 'M.2 2280', 'length_mm' => 80]),
+        component('board', 'motherboard', ['storage_slots' => [
+            2 => ['id' => 'm2_1', 'interfaces' => ['NVMe'], 'form_factors' => ['M.2 2280'], 'maximum_length_mm' => 80, 'conflicts_with' => ['m2_2']],
+            5 => ['id' => 'm2_2', 'interfaces' => ['NVMe'], 'form_factors' => ['M.2 2280'], 'maximum_length_mm' => 80],
+        ]]),
+    ]);
+
+    expect(collect($result['findings'])->firstWhere('rule', 'storage.slot_allocation')['status'])->toBe('incompatible');
+});
+
 test('it validates CPU cooler sockets and case height clearance', function () {
     $result = app(CompatibilityEngine::class)->evaluate([
         component('cpu', 'processor', ['socket' => 'AM5', 'included_cooler' => false]),

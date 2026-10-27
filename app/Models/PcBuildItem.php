@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
+/** @property array<string, mixed>|null $configuration */
 #[Fillable([
     'pc_build_id',
     'product_id',

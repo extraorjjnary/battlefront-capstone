@@ -18,7 +18,7 @@ class PcBuilderController extends Controller
 
         return response()->json(['data' => [
             'components' => $catalog,
-            'templates' => array_values($templates->forCatalog($catalog)),
+            'templates' => $templates->forCatalog($catalog),
             'ruleset_version' => CompatibilityEngine::RULESET_VERSION,
         ]]);
     }

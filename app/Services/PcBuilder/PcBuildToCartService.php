@@ -91,7 +91,7 @@ class PcBuildToCartService
                 $components[] = [
                     'key' => $item->slot_key,
                     'product_id' => $product->id,
-                    'component_type' => $profile?->component_type ?? $item->component_type,
+                    'component_type' => $profile->component_type ?? $item->component_type,
                     'quantity' => $item->quantity,
                     'configuration' => $item->configuration ?? [],
                     'specifications' => $specifications,
@@ -99,7 +99,7 @@ class PcBuildToCartService
                 $snapshots[] = [
                     'key' => $item->slot_key,
                     'product_id' => $product->id,
-                    'component_type' => $profile?->component_type ?? $item->component_type,
+                    'component_type' => $profile->component_type ?? $item->component_type,
                     'quantity' => $item->quantity,
                     'configuration' => $item->configuration ?? [],
                     'specifications' => $specifications,

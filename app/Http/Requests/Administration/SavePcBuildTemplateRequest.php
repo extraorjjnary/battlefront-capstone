@@ -7,6 +7,28 @@ use Illuminate\Validation\Rule;
 
 class SavePcBuildTemplateRequest extends FormRequest
 {
+    /** @return array{name: string, description: string|null, budget: string|null, is_active: bool, edit_version?: int, components: list<array{key: string, product_id: int, quantity: int, configuration: array<string, mixed>}>} */
+    public function templateData(): array
+    {
+        $data = [
+            'name' => $this->string('name')->toString(),
+            'description' => $this->filled('description') ? $this->string('description')->toString() : null,
+            'budget' => $this->filled('budget') ? $this->string('budget')->toString() : null,
+            'is_active' => $this->boolean('is_active'),
+            'components' => array_values(array_map(fn (array $component): array => [
+                'key' => $component['key'],
+                'product_id' => (int) $component['product_id'],
+                'quantity' => (int) $component['quantity'],
+                'configuration' => $component['configuration'] ?? [],
+            ], $this->validated('components'))),
+        ];
+        if ($this->filled('edit_version')) {
+            $data['edit_version'] = $this->integer('edit_version');
+        }
+
+        return $data;
+    }
+
     public function authorize(): bool
     {
         return $this->user()?->can('products.manage') ?? false;

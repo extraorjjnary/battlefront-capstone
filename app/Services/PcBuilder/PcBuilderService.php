@@ -21,15 +21,18 @@ class PcBuilderService
     {
         $wishlistedProductIds = $customer?->wishlistItems()->pluck('product_id')->flip();
 
-        return Product::query()
+        $products = Product::query()
             ->customerEligible()
             ->whereHas('componentProfile', fn ($query) => $query->whereIn('component_type', self::COMPONENT_TYPES))
             ->with(['componentProfile.revisions', 'inventory'])
             ->orderBy('name')
-            ->get()
-            ->map(fn (Product $product): array => $this->present($product, $wishlistedProductIds?->has($product->id) ?? false))
-            ->groupBy('component_type')
-            ->all();
+            ->get();
+        $catalog = [];
+        foreach ($products as $product) {
+            $catalog[$product->componentProfile->component_type][] = $this->present($product, $wishlistedProductIds?->has($product->id) ?? false);
+        }
+
+        return $catalog;
     }
 
     /**

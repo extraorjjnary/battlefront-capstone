@@ -3,6 +3,7 @@
 namespace App\Services\PcBuilder;
 
 use App\Models\PcBuildTemplate;
+use App\Models\PcBuildTemplateItem;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
@@ -99,31 +100,31 @@ class PcBuildTemplateService
     {
         $available = collect($catalog)->flatten(1)->keyBy('id');
 
-        return PcBuildTemplate::query()->where('is_active', true)->with(['items.product'])->orderBy('name')->get()
+        return array_values(PcBuildTemplate::query()->where('is_active', true)->with(['items.product'])->orderBy('name')->get()
             ->filter(fn (PcBuildTemplate $template): bool => $template->items->isNotEmpty()
                 && $template->items->every(fn ($item): bool => $available->has($item->product_id)
                     && ($available->get($item->product_id)['specifications_reviewed'] ?? false)
                     && ($available->get($item->product_id)['stock_quantity'] ?? 0) >= $item->quantity)
-                && $this->compatibilityEngine->evaluate($template->items->map(fn ($item): array => [
+                && $this->compatibilityEngine->evaluate(array_values($template->items->map(fn ($item): array => [
                     'key' => $item->slot_key,
                     'product_id' => $item->product_id,
                     'component_type' => $item->component_type,
                     'quantity' => $item->quantity,
                     'configuration' => $item->configuration ?? [],
                     'specifications' => $available->get($item->product_id)['specifications'],
-                ])->all())['complete'])
+                ])->all()))['complete'])
             ->map(fn (PcBuildTemplate $template): array => [
                 'uuid' => $template->uuid,
                 'name' => $template->name,
                 'description' => $template->description,
                 'budget' => $template->budget,
-                'components' => $template->items->map(fn ($item): array => [
+                'components' => $template->items->map(fn (PcBuildTemplateItem $item): array => [
                     'key' => $item->slot_key,
                     'product_id' => $item->product_id,
                     'component_type' => $item->component_type,
                     'quantity' => $item->quantity,
                     'configuration' => $item->configuration ?? [],
-                ])->all(),
-            ])->all();
+                ])->values()->all(),
+            ])->all());
     }
 }
