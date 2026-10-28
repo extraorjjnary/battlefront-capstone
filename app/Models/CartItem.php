@@ -14,10 +14,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $cart_id
  * @property int $product_id
  * @property int $quantity
+ * @property int $pc_build_group_identity
  * @property-read Cart $cart
  * @property-read Product $product
  */
-#[Fillable(['cart_id', 'product_id', 'quantity'])]
+#[Fillable(['cart_id', 'product_id', 'quantity', 'pc_build_cart_group_id'])]
 class CartItem extends Model
 {
     /** @use HasFactory<CartItemFactory> */
@@ -50,6 +51,12 @@ class CartItem extends Model
         return $this->belongsTo(Product::class)->withTrashed();
     }
 
+    /** @return BelongsTo<PcBuildCartGroup, $this> */
+    public function pcBuildGroup(): BelongsTo
+    {
+        return $this->belongsTo(PcBuildCartGroup::class, 'pc_build_cart_group_id');
+    }
+
     /**
      * Register the cart-item persistence rules.
      */
@@ -76,6 +83,7 @@ class CartItem extends Model
     {
         return [
             'quantity' => 'integer',
+            'pc_build_group_identity' => 'integer',
         ];
     }
 }

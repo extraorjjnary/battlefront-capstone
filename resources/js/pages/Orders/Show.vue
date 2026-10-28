@@ -1,6 +1,6 @@
 <script setup>
 import PageHeader from '@/components/PageHeader.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePoll } from '@inertiajs/vue3';
 import {
     ArrowRight,
     CircleAlert,
@@ -12,7 +12,7 @@ import {
     Upload,
     UserRound,
 } from '@lucide/vue';
-import { ref } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import OrderController from '@/actions/App/Http/Controllers/OrderController';
 import OrderPaymentProofController from '@/actions/App/Http/Controllers/OrderPaymentProofController';
 import InputError from '@/components/InputError.vue';
@@ -38,18 +38,65 @@ import { formatDateTime } from '@/lib/dateTime';
 import { orderStatusBadgeClass } from '@/lib/orderStatus';
 import { index as productIndex } from '@/routes/products';
 import { store as cancelOrder } from '@/routes/orders/cancel';
+import { retry as retryPayMongo } from '@/routes/orders/paymongo';
 import { store as requestWalletCancellation } from '@/routes/orders/cancellation-requests';
 
 const props = defineProps({
     order: { type: Object, required: true },
     isConfirmation: { type: Boolean, required: true },
+    isPayMongoReturn: { type: Boolean, required: true },
 });
 
 const replacementProofForm = useForm({
     payment_proof: null,
 });
+const paymentRetryForm = useForm({});
 const cancellationOpen = ref(false);
 const cancellationForm = useForm({});
+const paymentStatusPolling = usePoll(
+    5000,
+    { only: ['order'], preserveErrors: true },
+    { autoStart: false },
+);
+let paymentWindow = null;
+
+function updatePaymentStatusPolling() {
+    const shouldPoll =
+        props.order.payment.method.value === 'online' &&
+        props.order.payment.status.value === 'pending' &&
+        props.order.status.value === 'pending';
+
+    if (shouldPoll) {
+        paymentStatusPolling.start();
+    } else {
+        paymentStatusPolling.stop();
+    }
+}
+
+watch(
+    () => [
+        props.order.payment.method.value,
+        props.order.payment.status.value,
+        props.order.status.value,
+    ],
+    updatePaymentStatusPolling,
+    { immediate: true },
+);
+
+function refreshWhenVisible() {
+    if (document.visibilityState === 'visible' && props.order.payment.status.value === 'pending') {
+        paymentStatusPolling.start();
+    }
+}
+
+onMounted(() => {
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+
+    if (props.isPayMongoReturn) {
+        window.close();
+    }
+});
+onUnmounted(() => document.removeEventListener('visibilitychange', refreshWhenVisible));
 
 function requestCancellation() {
     if (
@@ -101,6 +148,29 @@ function submitReplacementProof() {
             replacementProofForm.reset();
         },
     });
+}
+
+function retryOnlinePayment() {
+    if (!(props.order.payment.can_retry || props.order.payment.can_retry_hosted) || paymentRetryForm.processing) return;
+    paymentWindow = window.open('about:blank', '_blank');
+    if (paymentWindow) {
+        paymentWindow.opener = null;
+    }
+    paymentRetryForm.submit(retryPayMongo(props.order.id), {
+        preserveScroll: true,
+        onSuccess: (page) => finishPaymentWindow(page),
+        onError: () => paymentWindow?.close(),
+    });
+}
+
+function finishPaymentWindow(page) {
+    const checkoutUrl = page.props.order?.payment?.checkout_url;
+    if (paymentWindow && checkoutUrl) {
+        paymentWindow.location.replace(checkoutUrl);
+    } else if (paymentWindow) {
+        paymentWindow.close();
+    }
+    paymentWindow = null;
 }
 </script>
 
@@ -270,6 +340,9 @@ function submitReplacementProof() {
                                 class="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"
                             >
                                 <div class="min-w-0">
+                                    <p v-if="item.pc_build_group" class="text-primary-ink text-xs font-semibold uppercase tracking-wide">
+                                        PC build · {{ item.pc_build_group.name }}
+                                    </p>
                                     <p
                                         v-if="item.product.brand"
                                         class="text-primary-ink text-xs font-semibold tracking-wide uppercase"
@@ -336,6 +409,12 @@ function submitReplacementProof() {
                                 </dt>
                                 <dd class="font-semibold tabular-nums">
                                     {{ formatCurrency(order.delivery_fee) }}
+                                    <p
+                                        v-if="order.delivery_quote?.fixed_delivery_fee"
+                                        class="text-muted-foreground mt-1 max-w-xs text-left text-xs font-normal leading-5"
+                                    >
+                                        This fee was fixed when you placed the order. Battlefront covers any difference from the courier's final charge.
+                                    </p>
                                 </dd>
                             </div>
                         </dl>
@@ -352,8 +431,8 @@ function submitReplacementProof() {
                         >
                             <template
                                 v-if="
-                                    order.delivery_quote.pricing_configured ===
-                                    false
+                                    order.delivery_quote.pricing_status ===
+                                    'not_configured'
                                 "
                             >
                                 <p class="font-semibold">
@@ -371,6 +450,26 @@ function submitReplacementProof() {
                                     {{ order.delivery_quote.assumption_label }}
                                 </p>
                             </template>
+                            <template
+                                v-else-if="order.delivery_quote.delivery_arrangement_required"
+                            >
+                                <p class="font-semibold">
+                                    Battlefront regional shipping estimate ·
+                                    {{ order.delivery_quote.destination }}
+                                </p>
+                                <p class="text-muted-foreground text-sm">
+                                    {{ order.delivery_quote.notice }}
+                                </p>
+                                <p v-if="order.delivery_quote.billable_weight_kg" class="text-sm">
+                                    Route {{ formatCurrency(order.delivery_quote.route_base_fee) }} + weight {{ formatCurrency(order.delivery_quote.weight_surcharge) }} + handling {{ formatCurrency(order.delivery_quote.handling_surcharge) }} · {{ order.delivery_quote.billable_weight_kg }} kg billable
+                                </p>
+                                <p class="text-muted-foreground text-xs">
+                                    {{ order.delivery_quote.assumption_label }}
+                                </p>
+                                <p v-if="order.delivery_quote.estimate_disclosure" class="text-muted-foreground text-xs">
+                                    {{ order.delivery_quote.estimate_disclosure }}
+                                </p>
+                            </template>
                             <template v-else>
                                 <p class="font-semibold">
                                     {{
@@ -382,6 +481,9 @@ function submitReplacementProof() {
                                     {{
                                         order.delivery_quote.packing_expectation
                                     }}
+                                </p>
+                                <p v-if="order.delivery_quote.billable_weight_kg" class="text-sm">
+                                    Route {{ formatCurrency(order.delivery_quote.route_base_fee) }} + weight {{ formatCurrency(order.delivery_quote.weight_surcharge) }} + handling {{ formatCurrency(order.delivery_quote.handling_surcharge) }} · {{ order.delivery_quote.billable_weight_kg }} kg billable
                                 </p>
                                 <p>
                                     Estimated preparation and transit:
@@ -514,6 +616,12 @@ function submitReplacementProof() {
                                     <dd class="mt-1 font-semibold">
                                         {{ order.payment.method.label }}
                                     </dd>
+                                    <dd v-if="order.payment.hosted_payment_method === 'qrph'" class="text-muted-foreground mt-1 text-sm">
+                                        QR Ph — GCash, Maya, and supported bank apps
+                                    </dd>
+                                    <dd v-else-if="order.payment.hosted_payment_method === 'card'" class="text-muted-foreground mt-1 text-sm">
+                                        Credit or debit card
+                                    </dd>
                                     <dd class="mt-2">
                                         <Badge
                                             variant="outline"
@@ -530,6 +638,55 @@ function submitReplacementProof() {
                                         class="text-muted-foreground mt-2 text-xs leading-5"
                                     >
                                         {{ order.payment.notice }}
+                                    </dd>
+                                    <dd v-if="order.payment.checkout_url" class="mt-3">
+                                        <Button as-child>
+                                            <a :href="order.payment.checkout_url" target="_blank" rel="noopener noreferrer">
+                                                Continue payment
+                                            </a>
+                                        </Button>
+                                    </dd>
+                                    <dd v-if="order.payment.qr_code_image_url" class="mt-4 grid justify-items-start gap-3">
+                                        <p class="font-semibold">Amount due: {{ formatCurrency(order.total) }}</p>
+                                        <img
+                                            :src="order.payment.qr_code_image_url"
+                                            :alt="`QR Ph payment code for order ${order.reference}`"
+                                            class="size-64 max-w-full border border-border bg-white p-2"
+                                        />
+                                        <p class="text-muted-foreground text-xs leading-5">
+                                            Scan with GCash, Maya, or a supported banking app. This code expires at {{ formatDateTime(order.payment.qr_expires_at, 'short') }}.
+                                        </p>
+                                        <a
+                                            :href="order.payment.qr_code_image_url"
+                                            :download="`${order.reference}-qrph.png`"
+                                            class="text-primary-ink text-sm font-semibold underline underline-offset-4"
+                                        >
+                                            Download QR code
+                                        </a>
+                                    </dd>
+                                    <dd v-if="order.payment.qr_can_retry" class="mt-3 grid gap-2">
+                                        <p class="text-muted-foreground text-xs leading-5">The previous QR code expired. Create a new code to continue payment.</p>
+                                        <Button type="button" size="sm" :disabled="paymentRetryForm.processing" @click="retryOnlinePayment">
+                                            <Spinner v-if="paymentRetryForm.processing" />
+                                            Generate new QR code
+                                        </Button>
+                                        <InputError :message="paymentRetryForm.errors.payment" />
+                                    </dd>
+                                    <dd v-if="order.payment.can_retry" class="mt-3 grid gap-2">
+                                        <p class="text-muted-foreground text-xs leading-5">The bank did not complete the payment. You can try again with {{ order.payment.bank_code }}.</p>
+                                        <Button type="button" size="sm" :disabled="paymentRetryForm.processing" @click="retryOnlinePayment">
+                                            <Spinner v-if="paymentRetryForm.processing" />
+                                            Retry bank payment
+                                        </Button>
+                                        <InputError :message="paymentRetryForm.errors.payment" />
+                                    </dd>
+                                    <dd v-if="order.payment.can_retry_hosted" class="mt-3 grid gap-2">
+                                        <p class="text-muted-foreground text-xs leading-5">Payment setup needs another check. Retry to resume this order's secure PayMongo checkout.</p>
+                                        <Button type="button" size="sm" :disabled="paymentRetryForm.processing" @click="retryOnlinePayment">
+                                            <Spinner v-if="paymentRetryForm.processing" />
+                                            Retry online payment
+                                        </Button>
+                                        <InputError :message="paymentRetryForm.errors.payment" />
                                     </dd>
                                 </div>
                             </div>

@@ -16,7 +16,7 @@ test('new bundle products use the same acquisition cost rate as migrated product
     $owner = User::factory()->administrator()->create();
     $category = Category::factory()->create(['name' => 'Bundles & Packages']);
 
-    $this->actingAs($owner)->post(route('administration.products.store'), [
+    $this->actingAs($owner)->post(route('administration.products.store'), [...validPackageMeasurements(),
         'name' => 'New computer bundle', 'category_id' => $category->id,
         'price' => '1000.00', 'is_featured' => false,
     ])->assertSessionHasNoErrors()->assertRedirect();
@@ -32,7 +32,7 @@ test('updated product codes are required and use the safe catalog format', funct
     $category = Category::factory()->create();
     $product = Product::factory()->for($category)->create(['product_code' => 'UNCHANGED']);
 
-    $this->actingAs($administrator)->put(route('administration.products.update', $product), [
+    $this->actingAs($administrator)->put(route('administration.products.update', $product), [...validPackageMeasurements(),
         'edit_version' => $product->edit_version,
         'product_code' => $code, 'name' => 'New product', 'category_id' => $category->id,
         'brand' => 'Brand', 'price' => '100', 'is_featured' => false,
@@ -51,7 +51,7 @@ test('updating cannot reuse another products code ignoring case', function (stri
     $administrator = User::factory()->administrator()->create();
     $existing = Product::factory()->create(['product_code' => 'ABC123']);
     $other = Product::factory()->create(['product_code' => 'OTHER']);
-    $payload = ['edit_version' => $other->edit_version, 'product_code' => $code, 'name' => 'Product', 'category_id' => $existing->category_id,
+    $payload = [...validPackageMeasurements(), 'edit_version' => $other->edit_version, 'product_code' => $code, 'name' => 'Product', 'category_id' => $existing->category_id,
         'brand' => 'Brand', 'price' => '100', 'is_featured' => false];
 
     $this->actingAs($administrator)->put(route('administration.products.update', $other), $payload)
@@ -68,7 +68,7 @@ test('imported codes are visible and protected from changes and forged origin fl
     $this->actingAs($administrator)->get(route('administration.products.edit', $product))
         ->assertInertia(fn (Assert $page) => $page->where('product.product_code', '000123')->where('product.is_catalog_imported', true)
             ->where('product.edit_version', $product->edit_version));
-    $this->put(route('administration.products.update', $product), [
+    $this->put(route('administration.products.update', $product), [...validPackageMeasurements(),
         'edit_version' => $product->edit_version,
         'product_code' => 'CHANGED', 'is_catalog_imported' => false,
         'name' => $product->name, 'category_id' => $product->category_id,
@@ -270,7 +270,7 @@ test('customers are forbidden from catalog product actions', function () {
         ->get(route('administration.products.index'))
         ->assertForbidden();
     $this->actingAs($customer)
-        ->post(route('administration.products.store'), [
+        ->post(route('administration.products.store'), [...validPackageMeasurements(),
             'name' => 'Unauthorized product',
         ])
         ->assertForbidden();
@@ -459,7 +459,7 @@ test('administrators can create products with an uploaded image and validated ta
 
     $response = $this
         ->actingAs($administrator)
-        ->post(route('administration.products.store'), [
+        ->post(route('administration.products.store'), [...validPackageMeasurements(),
             'name' => 'GeForce RTX 5070',
             'description' => 'A graphics card for modern games.',
             'category_id' => $category->id,
@@ -503,7 +503,7 @@ test('administrators can create a product without an unverified brand', function
     $administrator = User::factory()->administrator()->create();
     $category = Category::factory()->create();
 
-    $this->actingAs($administrator)->post(route('administration.products.store'), [
+    $this->actingAs($administrator)->post(route('administration.products.store'), [...validPackageMeasurements(),
         'name' => 'Product awaiting brand verification',
         'category_id' => $category->id,
         'brand' => '',
@@ -532,7 +532,7 @@ test('product details reject invalid catalog values', function (array $payload, 
         ->from(route('administration.products.create'))
         ->post(
             route('administration.products.store'),
-            [...$validPayload, ...$payload],
+            [...validPackageMeasurements(), ...$validPayload, ...$payload],
         );
 
     $response
@@ -584,7 +584,7 @@ test('product images reject invalid file types and files larger than 5 MB', func
 
     $this->actingAs($administrator)
         ->from(route('administration.products.create'))
-        ->post(route('administration.products.store'), [
+        ->post(route('administration.products.store'), [...validPackageMeasurements(),
             'product_code' => 'RTX5070',
             'name' => 'GeForce RTX 5070',
             'category_id' => $category->id,
@@ -622,7 +622,7 @@ test('administrators can update product details tags and shipping assignments', 
 
     $response = $this
         ->actingAs($administrator)
-        ->put(route('administration.products.update', $product), [
+        ->put(route('administration.products.update', $product), [...validPackageMeasurements(),
             'edit_version' => $product->edit_version,
             'price_change_reason' => 'New catalog price approved',
             'product_code' => 'UPDATED001',
@@ -660,7 +660,7 @@ test('administrators can add a verified brand to an imported product', function 
     $product->is_catalog_imported = true;
     $product->save();
 
-    $this->actingAs($administrator)->put(route('administration.products.update', $product), [
+    $this->actingAs($administrator)->put(route('administration.products.update', $product), [...validPackageMeasurements(),
         'edit_version' => $product->edit_version,
         'product_code' => $product->product_code,
         'name' => $product->name,
@@ -684,7 +684,7 @@ test('updating a product without a new image keeps the existing image', function
     ]);
 
     $this->actingAs($administrator)
-        ->post(route('administration.products.update', $product), [
+        ->post(route('administration.products.update', $product), [...validPackageMeasurements(),
             '_method' => 'put',
             'edit_version' => $product->edit_version,
             'product_code' => 'UPDATED001',
@@ -712,7 +712,7 @@ test('replacing a product image stores the new path and removes the old managed 
     ]);
 
     $this->actingAs($administrator)
-        ->post(route('administration.products.update', $product), [
+        ->post(route('administration.products.update', $product), [...validPackageMeasurements(),
             '_method' => 'put',
             'edit_version' => $product->edit_version,
             'product_code' => $product->product_code,
@@ -746,7 +746,7 @@ test('an invalid product relationship leaves details and tags unchanged', functi
     $response = $this
         ->actingAs($administrator)
         ->from(route('administration.products.edit', $product))
-        ->put(route('administration.products.update', $product), [
+        ->put(route('administration.products.update', $product), [...validPackageMeasurements(),
             'edit_version' => $product->edit_version,
             'product_code' => 'UPDATED001',
             'name' => 'Changed product',

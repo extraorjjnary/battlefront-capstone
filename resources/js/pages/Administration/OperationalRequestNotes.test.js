@@ -32,6 +32,7 @@ function harness(t, pageName, pageProps = {}) {
                 user: { id: 1 },
                 can: {
                     requestInventory: true,
+                    requestInventoryAdjustment: true,
                     requestReturns: true,
                     approveInventory: true,
                     approveReturns: true,
@@ -134,8 +135,16 @@ function harness(t, pageName, pageProps = {}) {
                 Head: primitive,
                 Link: primitive,
                 usePage: () => page,
-                useForm: (initial) =>
-                    Vue.reactive({ ...initial, errors: {}, processing: false }),
+                useForm(initial) {
+                    return Vue.reactive({
+                        ...initial,
+                        errors: {},
+                        processing: false,
+                        reset() {},
+                        clearErrors() {},
+                        submit() {},
+                    });
+                },
                 router: {},
             },
             '@/components/ui/input': { Input: input },
@@ -212,6 +221,10 @@ function selectReason(form, value) {
     else select.props['onUpdate:modelValue'](value);
 }
 
+function assertNotesAreOptional(form) {
+    assert.notEqual(field(form, 'reason').props.required, true);
+}
+
 const requestForms = [
     ['Inventory', 'Inventory', 'update', 1, 'count_error'],
     ['Inventory', 'Inventory', 'store', 3, 'receiving_error'],
@@ -233,7 +246,7 @@ for (const [pageName, controller, method, id, reasonCode] of requestForms) {
         let html = await app.html();
         const current = () => app.form(controller, method, id);
         assert.ok(field(current(), 'reason_code').props.required !== undefined);
-        assert.equal(field(current(), 'reason').props.required, false);
+        assertNotesAreOptional(current());
         assert.match(
             html,
             pageName === 'CustomerReturns'
@@ -255,7 +268,7 @@ for (const [pageName, controller, method, id, reasonCode] of requestForms) {
 
         selectReason(current(), reasonCode);
         html = await app.html();
-        assert.equal(field(current(), 'reason').props.required, false);
+        assertNotesAreOptional(current());
         assert.equal(field(current(), 'reason').props.minlength, '5');
         assert.equal(field(current(), 'reason').props.maxlength, '2000');
         assert.doesNotMatch(
@@ -280,16 +293,9 @@ for (const [pageName, controller, method] of [
             field(app.form(controller, method, 1), 'reason').props.required,
             true,
         );
-        assert.equal(
-            field(app.form(controller, method, 2), 'reason').props.required,
-            false,
-        );
+        assertNotesAreOptional(app.form(controller, method, 2));
         if (pageName === 'Inventory') {
-            assert.equal(
-                field(app.form(controller, 'store', 3), 'reason').props
-                    .required,
-                false,
-            );
+            assertNotesAreOptional(app.form(controller, 'store', 3));
         }
     });
 }
@@ -338,11 +344,7 @@ test('opening-stock replacement shows the Initial receipt label for its existing
     assert.equal(option.children.trim(), 'Initial receipt');
     selectReason(form, 'receiving_error');
     await app.html();
-    assert.equal(
-        field(app.form('InventoryAdjustment', 'replace', 4), 'reason').props
-            .required,
-        false,
-    );
+    assertNotesAreOptional(app.form('InventoryAdjustment', 'replace', 4));
 });
 
 for (const [pageName, controller, method, id] of [

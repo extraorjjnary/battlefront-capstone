@@ -75,6 +75,7 @@ function checkoutProps(prefill = {}) {
                 payment_account: null,
             },
         ],
+        paymongoHostedMethods: ['card', 'gcash', 'paymaya', 'qrph'],
         pickupQuote: {
             product_subtotal: '100.00',
             delivery_fee: '0.00',
@@ -86,6 +87,7 @@ function checkoutProps(prefill = {}) {
             delivery_fee: '80.00',
             total: '180.00',
             carrier: 'lbc',
+            measurement_sources: { measured: 0, estimated: 1 },
             base_fee: '80.00',
             handling_surcharge: '0.00',
             preparation_days: 1,
@@ -308,6 +310,7 @@ test('unconfigured delivery addresses allow subtotal-only checkout without a quo
                     destination: '1380300000',
                     destination_label: 'City of Makati',
                     pricing_configured: false,
+                    pricing_status: 'not_configured',
                     order_placement_allowed: true,
                     payment_methods: ['gcash', 'maya', 'cod'],
                     product_subtotal: '100.00',
@@ -557,8 +560,9 @@ test('COD checkout displays the server quote total with collection guidance and 
         const html = await renderToString(root());
         assert.match(html, /Total COD amount payable/);
         assert.match(html, /180\.00/);
-        assert.match(html, /Payment will\s+be collected upon delivery/);
-        assert.match(html, /does\s+not book or approve COD with LBC/);
+        assert.match(html, /LBC collects the full amount at delivery/);
+        assert.match(html, /records payment after LBC remits the full order amount/);
+        assert.match(html, /checkout does not create an LBC booking/);
         assert.match(html, /not official LBC quotations/);
         assert.doesNotMatch(html, /name="payment_proof"/);
         assert.doesNotMatch(html, /receiving account/);

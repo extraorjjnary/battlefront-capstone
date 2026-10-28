@@ -9,6 +9,7 @@ use App\Enums\PaymentStatus;
 use App\Enums\ShipmentStatus;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\PayMongoFlow;
 use App\Services\Order\OrderProcessingService;
 use App\Support\OperationalRequestReason;
 
@@ -65,6 +66,7 @@ class CustomerOrderPresenter
      */
     public function detail(Order $order): array
     {
+        $paymongoFlow = PayMongoFlow::query()->where('order_id', $order->id)->latest('id')->first();
         $returnItems = collect($this->returnEligibility->forOrder($order));
         $refundPayments = $this->returnRequests->paymentsForOrder($order);
 
@@ -110,12 +112,44 @@ class CustomerOrderPresenter
                 'notice' => $this->paymentNotice($order),
                 'rejection' => $this->paymentRejectionData($order),
                 'can_resubmit_proof' => $this->canResubmitPaymentProof($order),
+                'checkout_url' => $paymongoFlow?->channel === 'hosted_checkout' && $paymongoFlow->status === 'open' ? $paymongoFlow->checkout_url : null,
+                'qr_code_image_url' => $paymongoFlow?->channel === 'direct_qrph'
+                    && $paymongoFlow->status === 'open'
+                    && $paymongoFlow->qr_expires_at?->isFuture()
+                        ? $paymongoFlow->qr_code_image_url
+                        : null,
+                'qr_expires_at' => $paymongoFlow?->channel === 'direct_qrph'
+                    ? $paymongoFlow->qr_expires_at?->toIso8601String()
+                    : null,
+                'qr_can_retry' => $paymongoFlow?->channel === 'direct_qrph'
+                    && ($paymongoFlow->status === 'awaiting_payment_method'
+                        || ($paymongoFlow->status === 'open' && $paymongoFlow->qr_expires_at?->isPast()))
+                    && $paymongoFlow->merchant_cutoff_at->isFuture()
+                    && $order->status === OrderStatus::Pending
+                    && $order->payment_status === PaymentStatus::Pending,
+                'bank_code' => $paymongoFlow?->bank_code,
+                'hosted_payment_method' => data_get($paymongoFlow, 'hosted_payment_method') ?? $order->hosted_payment_method,
+                'can_retry_hosted' => $paymongoFlow?->channel === 'hosted_checkout'
+                    && $paymongoFlow->status === 'reconciliation_required'
+                    && $paymongoFlow->merchant_cutoff_at->isFuture()
+                    && $order->status === OrderStatus::Pending
+                    && $order->payment_status === PaymentStatus::Pending,
+                'can_retry' => $paymongoFlow?->channel === 'direct_online_banking'
+                    && $paymongoFlow->status === 'awaiting_payment_method'
+                    && $paymongoFlow->merchant_cutoff_at->isFuture()
+                    && $order->status === OrderStatus::Pending
+                    && $order->payment_status === PaymentStatus::Pending,
             ],
             'items' => $order->items->map(function (OrderItem $item) use ($returnItems): array {
                 $unitPrice = $item->price_at_time;
 
                 return [
                     'id' => $item->id,
+                    'pc_build_group' => $item->pc_build_group_uuid === null ? null : [
+                        'uuid' => $item->pc_build_group_uuid,
+                        'name' => $item->pc_build_name_at_time,
+                    ],
+                    'pc_build_component_snapshot' => $item->pc_build_component_snapshot,
                     'product' => [
                         'id' => $item->product->id,
                         'name' => $item->purchasedProductName(),
@@ -145,6 +179,16 @@ class CustomerOrderPresenter
         if ($order->status === OrderStatus::Cancelled && $order->cancellationRequest !== null) {
             return 'This order is cancelled. The original payment remains recorded separately; see the cancellation refund status.';
         }
+        if ($order->payment_origin === 'paymongo' && $order->status === OrderStatus::Cancelled) {
+            return 'This order is cancelled. Any payment received after cancellation requires Battlefront review; cancellation does not refund a payment.';
+        }
+
+        if ($order->payment_origin === 'paymongo') {
+            return $order->payment_status === PaymentStatus::Verified
+                ? 'PayMongo has confirmed your online payment. Battlefront will continue the existing order preparation and fulfillment process.'
+                : 'Your online payment is pending confirmation from PayMongo. This order remains reserved while payment is reconciled.';
+        }
+
         if ($order->status === OrderStatus::Cancelled) {
             return 'This order is cancelled. Cancellation does not refund or reverse any recorded payment.';
         }
@@ -154,13 +198,19 @@ class CustomerOrderPresenter
                 return 'The product subtotal is payable upon delivery. No delivery fee is included, and no LBC booking or carrier collection arrangement is represented.';
             }
 
-            if ($order->payment_status === PaymentStatus::Verified) {
-                return 'Battlefront has manually confirmed that LBC collected your COD payment.';
+            if (($order->delivery_quote_metadata['pricing_status'] ?? null) === 'regional_estimate' && $order->shipment === null) {
+                return 'The order total, including Battlefront’s regional delivery fee estimate, is payable upon delivery. Battlefront will confirm the delivery arrangement manually; the fee is not an official LBC quotation.';
             }
 
-            return $order->shipment?->status === ShipmentStatus::Delivered
-                ? 'Delivery is recorded. Your order remains Processing until Battlefront manually confirms LBC collected the COD payment.'
-                : 'The total COD amount, including the configured delivery fee, is payable upon delivery. No advance payment or uploaded proof is required. LBC booking and collection are managed manually by Battlefront.';
+            if ($order->payment_status === PaymentStatus::Verified) {
+                return 'Battlefront has manually reconciled the LBC COD remittance for your order.';
+            }
+
+            return $order->shipment?->carrier_cod_collected_at !== null
+                ? 'LBC collection is recorded. Your order remains Processing until Battlefront reconciles the remittance.'
+                : ($order->shipment?->status === ShipmentStatus::Delivered
+                    ? 'Delivery is recorded. Your order remains Processing until Battlefront confirms LBC collected the COD payment.'
+                    : 'The total COD amount, including the configured delivery fee, is payable upon delivery. No advance payment or uploaded proof is required. LBC booking and collection are managed manually by Battlefront.');
         }
 
         if ($order->payment_method->isPayAtPickup()) {

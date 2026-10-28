@@ -1,5 +1,9 @@
 import {
     Boxes,
+    Cpu,
+    PanelsTopLeft,
+    ChartNoAxesCombined,
+    MonitorCog,
     ListTodo,
     ClipboardList,
     ClipboardCheck,
@@ -7,6 +11,8 @@ import {
     Truck,
     Undo2,
     Handshake,
+    Heart,
+    ChartColumn,
     ChartColumnIncreasing,
     Logs,
     UserRoundCog,
@@ -31,7 +37,11 @@ import ForecastingController from '@/actions/App/Http/Controllers/Administration
 import InventoryController from '@/actions/App/Http/Controllers/Administration/InventoryController';
 import AdministrationOrderController from '@/actions/App/Http/Controllers/Administration/OrderController';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
+import ComponentSpecificationController from '@/actions/App/Http/Controllers/Administration/ComponentSpecificationController';
+import PcBuildTemplateController from '@/actions/App/Http/Controllers/Administration/PcBuildTemplateController';
+import PcBuildAnalyticsController from '@/actions/App/Http/Controllers/Administration/PcBuildAnalyticsController';
 import SalesReportController from '@/actions/App/Http/Controllers/Administration/SalesReportController';
+import WishlistReportController from '@/actions/App/Http/Controllers/Administration/WishlistReportController';
 import StaffPerformanceController from '@/actions/App/Http/Controllers/Administration/StaffPerformanceController';
 import StockReconciliationController from '@/actions/App/Http/Controllers/Administration/StockReconciliationController';
 import WorkQueueController from '@/actions/App/Http/Controllers/Administration/WorkQueueController';
@@ -45,9 +55,11 @@ import TeamController from '@/actions/App/Http/Controllers/Administration/TeamCo
 import { dashboard } from '@/routes';
 import { index as branchIndex } from '@/routes/branches';
 import { index as cartIndex } from '@/routes/cart';
+import { index as pcBuilderIndex } from '@/routes/pc-builder';
 import { index as orderIndex } from '@/routes/orders';
 import { index as productIndex } from '@/routes/products';
 import { edit as editProfile } from '@/routes/profile';
+import { index as wishlistIndex } from '@/routes/wishlist';
 
 export function useAppNavigation() {
     const page = usePage();
@@ -103,6 +115,24 @@ export function useAppNavigation() {
                         ProductController.index(),
                         CategoryController.index(),
                     ],
+                });
+            if (page.props.auth?.can?.manageProducts)
+                items.push({
+                    title: 'PC specifications',
+                    href: ComponentSpecificationController.index(),
+                    icon: Cpu,
+                });
+            if (page.props.auth?.can?.manageProducts)
+                items.push({
+                    title: 'PC build templates',
+                    href: PcBuildTemplateController.index(),
+                    icon: PanelsTopLeft,
+                });
+            if (page.props.auth?.can?.manageProducts)
+                items.push({
+                    title: 'PC Builder analytics',
+                    href: PcBuildAnalyticsController.index(),
+                    icon: ChartNoAxesCombined,
                 });
             if (page.props.auth?.can?.viewInventory)
                 items.push({
@@ -170,6 +200,12 @@ export function useAppNavigation() {
                     href: SalesReportController.index(),
                     icon: ChartPie,
                 });
+            if (page.props.auth?.can?.viewReports)
+                items.push({
+                    title: 'Wishlist analytics',
+                    href: WishlistReportController.index(),
+                    icon: ChartColumn,
+                });
             if (page.props.auth?.can?.viewOrders)
                 items.push({
                     title: page.props.auth?.can?.viewStaffReports
@@ -210,6 +246,18 @@ export function useAppNavigation() {
                     activeRoutes: [ChatbotKnowledgeController.index()],
                 });
         } else {
+            items.push({
+                title: 'Build a PC',
+                href: pcBuilderIndex(),
+                icon: MonitorCog,
+            });
+            if (canUseCustomerCart.value)
+                items.push({
+                    title: 'Wishlist',
+                    href: wishlistIndex(),
+                    icon: Heart,
+                    pendingCount: page.props.wishlistCount ?? 0,
+                });
             items.push({
                 title: 'Products',
                 href: productIndex(),

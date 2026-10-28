@@ -567,11 +567,13 @@ defineOptions({
                                     <Label
                                         :for="`reason-${product.inventory.id}`"
                                         >{{
-                                            canAdjustStock &&
                                             requestReasonCodes[product.id] ===
-                                                'theft_loss'
-                                                ? 'Notes (Required)'
-                                                : 'Notes (Optional)'
+                                                'other' ||
+                                            (canAdjustStock &&
+                                                requestReasonCodes[product.id] ===
+                                                    'theft_loss')
+                                                ? 'Additional notes (required)'
+                                                : 'Additional notes (optional)'
                                         }}</Label
                                     >
                                     <Input
@@ -579,9 +581,11 @@ defineOptions({
                                         :id="`reason-${product.inventory.id}`"
                                         name="reason"
                                         :required="
-                                            canAdjustStock &&
                                             requestReasonCodes[product.id] ===
-                                                'theft_loss'
+                                                'other' ||
+                                            (canAdjustStock &&
+                                                requestReasonCodes[product.id] ===
+                                                    'theft_loss')
                                         "
                                         minlength="5"
                                         maxlength="2000"
@@ -837,16 +841,20 @@ defineOptions({
                                     </select>
                                     <InputError :message="errors.reason_code" />
                                     <Label :for="`opening-reason-${product.id}`"
-                                        >Notes</Label
+                                        >{{
+                                            requestReasonCodes[product.id] ===
+                                            'other'
+                                                ? 'Additional notes (required)'
+                                                : 'Additional notes (optional)'
+                                        }}</Label
                                     >
                                     <Input
                                         class="min-h-11"
                                         :id="`opening-reason-${product.id}`"
                                         name="reason"
                                         :required="
-                                            canAdjustStock &&
                                             requestReasonCodes[product.id] ===
-                                                'theft_loss'
+                                            'other'
                                         "
                                         minlength="5"
                                         maxlength="2000"

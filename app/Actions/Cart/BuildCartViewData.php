@@ -19,6 +19,7 @@ class BuildCartViewData
      *     items: list<array{
      *         id: int,
      *         quantity: int,
+     *         pc_build_group: array{uuid: string, name: string}|null,
      *         product: array{id: int, name: string, brand: string|null, image_url: string|null, category: string, price: string, discount_price: string|null},
      *         unit_price: string,
      *         line_total: string,
@@ -40,10 +41,11 @@ class BuildCartViewData
             $cart = $customer->cart()
                 ->with([
                     'items' => fn ($query) => $query
-                        ->select(['id', 'cart_id', 'product_id', 'quantity'])
+                        ->select(['id', 'cart_id', 'product_id', 'quantity', 'pc_build_cart_group_id'])
                         ->orderBy('id'),
                     'items.product:id,name,brand,category_id,price,discount_price,image_path',
                     'items.product.category:id,name',
+                    'items.pcBuildGroup:id,uuid,name',
                 ])
                 ->first();
             $items = [];
@@ -61,6 +63,10 @@ class BuildCartViewData
                 $items[] = [
                     'id' => $item->id,
                     'quantity' => $item->quantity,
+                    'pc_build_group' => $item->pcBuildGroup === null ? null : [
+                        'uuid' => $item->pcBuildGroup->uuid,
+                        'name' => $item->pcBuildGroup->name,
+                    ],
                     'product' => [
                         'id' => $item->product->id,
                         'name' => $item->product->name,

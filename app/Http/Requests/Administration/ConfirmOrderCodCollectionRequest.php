@@ -24,6 +24,7 @@ class ConfirmOrderCodCollectionRequest extends FormRequest
     {
         return [
             'cod_collection_confirmed' => ['required', 'accepted'],
+            'carrier_cod_collection_reference' => ['nullable', 'string', 'max:100'],
         ];
     }
 

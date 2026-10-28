@@ -12,6 +12,7 @@ test('product stale saves and missing price reasons leave the catalog unchanged'
     $product = Product::factory()->create(['price' => '100.00']);
     $historicalItem = OrderItem::factory()->for($product)->create(['price_at_time' => '100.00']);
     $payload = [
+        ...validPackageMeasurements(),
         'edit_version' => 1, 'product_code' => $product->product_code, 'name' => $product->name,
         'category_id' => $product->category_id, 'brand' => $product->brand,
         'price' => '120.00', 'is_featured' => false,
@@ -21,7 +22,7 @@ test('product stale saves and missing price reasons leave the catalog unchanged'
         ->assertSessionHasErrors('price_change_reason');
     expect($product->fresh()->price)->toBe('100.00');
 
-    $this->put(route('administration.products.update', $product), [
+    $this->put(route('administration.products.update', $product), [...validPackageMeasurements(),
         ...$payload, 'price_change_reason' => 'Supplier price increased',
     ])->assertSessionHasNoErrors();
     $product->refresh();
@@ -33,7 +34,7 @@ test('product stale saves and missing price reasons leave the catalog unchanged'
         'reason' => 'Supplier price increased',
     ]);
 
-    $this->put(route('administration.products.update', $product), [
+    $this->put(route('administration.products.update', $product), [...validPackageMeasurements(),
         ...$payload, 'price' => '130.00', 'price_change_reason' => 'Another change',
     ])->assertSessionHasErrors('edit_version');
     expect($product->fresh()->price)->toBe('120.00');

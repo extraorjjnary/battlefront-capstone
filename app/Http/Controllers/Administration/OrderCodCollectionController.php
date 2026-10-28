@@ -13,11 +13,16 @@ class OrderCodCollectionController extends Controller
 {
     public function store(ConfirmOrderCodCollectionRequest $request, Order $order, OrderProcessingService $processing): RedirectResponse
     {
-        $processing->confirmCodCollection($order, $request->boolean('cod_collection_confirmed'), actor: $request->user());
+        $processing->confirmCodCollection(
+            $order,
+            $request->boolean('cod_collection_confirmed'),
+            $request->input('carrier_cod_collection_reference'),
+            actor: $request->user(),
+        );
 
         Inertia::flash('toast', [
             'type' => 'success',
-            'message' => 'COD collection confirmed. Order completed and sale recorded.',
+            'message' => 'LBC COD collection recorded. The order remains unpaid until remittance is reconciled.',
         ]);
 
         return back();

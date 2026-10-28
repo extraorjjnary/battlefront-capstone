@@ -8,6 +8,7 @@ use App\Http\Controllers\Administration\CategoryController;
 use App\Http\Controllers\Administration\ChatbotKnowledgeActivationController;
 use App\Http\Controllers\Administration\ChatbotKnowledgeController;
 use App\Http\Controllers\Administration\ChatbotKnowledgePreviewController;
+use App\Http\Controllers\Administration\ComponentSpecificationController;
 use App\Http\Controllers\Administration\CustomerController;
 use App\Http\Controllers\Administration\CustomerReturnController;
 use App\Http\Controllers\Administration\DamageReportController;
@@ -16,15 +17,20 @@ use App\Http\Controllers\Administration\InventoryAdjustmentController;
 use App\Http\Controllers\Administration\InventoryController;
 use App\Http\Controllers\Administration\NotificationController as AdministrationNotificationController;
 use App\Http\Controllers\Administration\OrderCodCollectionController;
+use App\Http\Controllers\Administration\OrderCodRemittanceController;
 use App\Http\Controllers\Administration\OrderController as AdministrationOrderController;
 use App\Http\Controllers\Administration\OrderHandlerController;
+use App\Http\Controllers\Administration\OrderLocalLbcBookingController;
 use App\Http\Controllers\Administration\OrderManualShipmentController;
 use App\Http\Controllers\Administration\OrderPaymentProofController;
 use App\Http\Controllers\Administration\OrderPaymentStatusController;
 use App\Http\Controllers\Administration\OrderPickupConfirmationController;
+use App\Http\Controllers\Administration\OrderShipmentOperationsController;
 use App\Http\Controllers\Administration\OrderShipmentReferenceController;
 use App\Http\Controllers\Administration\OrderShipmentStatusController;
 use App\Http\Controllers\Administration\OrderStatusController;
+use App\Http\Controllers\Administration\PcBuildAnalyticsController;
+use App\Http\Controllers\Administration\PcBuildTemplateController;
 use App\Http\Controllers\Administration\ProductActivationController;
 use App\Http\Controllers\Administration\ProductController;
 use App\Http\Controllers\Administration\RolePermissionController;
@@ -35,6 +41,7 @@ use App\Http\Controllers\Administration\SupplierController;
 use App\Http\Controllers\Administration\SupplierReturnController;
 use App\Http\Controllers\Administration\TeamController;
 use App\Http\Controllers\Administration\TeamEmailVerificationController;
+use App\Http\Controllers\Administration\WishlistReportController;
 use App\Http\Controllers\Administration\WorkQueueController;
 use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\BranchController;
@@ -53,11 +60,15 @@ use App\Http\Controllers\OrderCancellationController;
 use App\Http\Controllers\OrderCancellationRequestController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\OrderPaymentProofController as CustomerOrderPaymentProofController;
+use App\Http\Controllers\OrderPaymentRetryController;
+use App\Http\Controllers\PcBuildController;
+use App\Http\Controllers\PcBuilderController;
 use App\Http\Controllers\PendingCartIntentController;
 use App\Http\Controllers\ProductCatalogController;
 use App\Http\Controllers\ProductDwellController;
 use App\Http\Controllers\ProductViewController;
 use App\Http\Controllers\RecommendationInteractionController;
+use App\Http\Controllers\WishlistController;
 use Illuminate\Support\Facades\Route;
 
 // guest landing page
@@ -73,6 +84,29 @@ Route::middleware('guest')->group(function (): void {
 
 // public/customer branches
 Route::get('branches', [BranchController::class, 'index'])->name('branches.index');
+
+// customer PC Builder
+Route::get('pc-builder', [PcBuilderController::class, 'index'])->name('pc-builder.index');
+Route::post('pc-builder/validate', [PcBuilderController::class, 'validate'])
+    ->middleware('throttle:60,1')
+    ->name('pc-builder.validate');
+Route::get('pc-builds/shared/{token}', [PcBuildController::class, 'showShared'])
+    ->middleware('throttle:60,1')
+    ->whereUuid('token')
+    ->name('pc-builds.shared.show');
+Route::middleware(['auth', 'can:use-customer-cart'])
+    ->prefix('pc-builds')
+    ->name('pc-builds.')
+    ->group(function (): void {
+        Route::get('/', [PcBuildController::class, 'index'])->name('index');
+        Route::post('/', [PcBuildController::class, 'store'])->middleware('throttle:30,1')->name('store');
+        Route::patch('{uuid}', [PcBuildController::class, 'update'])->whereUuid('uuid')->middleware('throttle:30,1')->name('update');
+        Route::post('{uuid}/duplicate', [PcBuildController::class, 'duplicate'])->whereUuid('uuid')->middleware('throttle:30,1')->name('duplicate');
+        Route::post('{uuid}/cart', [PcBuildController::class, 'addToCart'])->whereUuid('uuid')->middleware('throttle:20,1')->name('cart.store');
+        Route::delete('{uuid}', [PcBuildController::class, 'destroy'])->whereUuid('uuid')->middleware('throttle:30,1')->name('destroy');
+        Route::post('{uuid}/share', [PcBuildController::class, 'share'])->whereUuid('uuid')->middleware('throttle:30,1')->name('share');
+        Route::delete('{uuid}/share', [PcBuildController::class, 'stopSharing'])->whereUuid('uuid')->middleware('throttle:30,1')->name('share.destroy');
+    });
 
 // public/customer product catalog
 Route::resource('products', ProductCatalogController::class)
@@ -120,6 +154,12 @@ Route::middleware(['auth', 'can:use-customer-cart'])
             ->name('items.destroy');
     });
 
+Route::middleware(['auth', 'can:use-customer-cart'])->prefix('wishlist')->name('wishlist.')->group(function () {
+    Route::get('/', [WishlistController::class, 'index'])->name('index');
+    Route::post('/', [WishlistController::class, 'store'])->middleware('throttle:60,1')->name('store');
+    Route::delete('/{product}', [WishlistController::class, 'destroy'])->whereNumber('product')->name('destroy');
+});
+
 // customer checkout preview
 Route::middleware(['auth', 'can:use-customer-cart'])
     ->prefix('checkout')
@@ -154,6 +194,10 @@ Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {
     Route::post('orders/{order}/cancel', OrderCancellationController::class)
         ->whereNumber('order')
         ->name('orders.cancel.store');
+    Route::post('orders/{order}/paymongo/retry', OrderPaymentRetryController::class)
+        ->middleware('throttle:10,1')
+        ->whereNumber('order')
+        ->name('orders.paymongo.retry');
     Route::post('orders/{order}/payment-proof', CustomerOrderPaymentProofController::class)
         ->whereNumber('order')
         ->name('orders.payment-proof.store');
@@ -184,6 +228,22 @@ Route::middleware(['auth', 'can:access-administration'])
         Route::patch('notifications/{notification}/read', [AdministrationNotificationController::class, 'update'])->whereUuid('notification')->name('notifications.update');
 
         // products
+        Route::get('component-specifications', [ComponentSpecificationController::class, 'index'])
+            ->middleware('can:products.manage')->name('component-specifications.index');
+        Route::post('component-specifications', [ComponentSpecificationController::class, 'store'])
+            ->middleware(['can:products.manage', 'throttle:30,1'])->name('component-specifications.store');
+        Route::post('component-specifications/{componentSpecification}/approve', [ComponentSpecificationController::class, 'approve'])
+            ->middleware(['can:products.manage', 'throttle:30,1'])->whereNumber('componentSpecification')->name('component-specifications.approve');
+        Route::get('pc-build-templates', [PcBuildTemplateController::class, 'index'])
+            ->middleware('can:products.manage')->name('pc-build-templates.index');
+        Route::post('pc-build-templates', [PcBuildTemplateController::class, 'store'])
+            ->middleware(['can:products.manage', 'throttle:30,1'])->name('pc-build-templates.store');
+        Route::put('pc-build-templates/{pcBuildTemplate}', [PcBuildTemplateController::class, 'update'])
+            ->middleware(['can:products.manage', 'throttle:30,1'])->whereNumber('pcBuildTemplate')->name('pc-build-templates.update');
+        Route::delete('pc-build-templates/{pcBuildTemplate}', [PcBuildTemplateController::class, 'destroy'])
+            ->middleware(['can:products.manage', 'throttle:30,1'])->whereNumber('pcBuildTemplate')->name('pc-build-templates.destroy');
+        Route::get('pc-build-analytics', [PcBuildAnalyticsController::class, 'index'])
+            ->middleware('can:products.manage')->name('pc-build-analytics.index');
         Route::post('products/{product}/restore', [ProductController::class, 'restore'])
             ->middleware('can:catalog.delete')
             ->name('products.restore');
@@ -303,12 +363,18 @@ Route::middleware(['auth', 'can:access-administration'])
         Route::post('orders/{order}/shipment/manual', [OrderManualShipmentController::class, 'store'])
             ->middleware('can:orders.process')
             ->name('orders.shipment.manual.store');
+        Route::post('orders/{order}/shipment/local-lbc-booking', [OrderLocalLbcBookingController::class, 'store'])
+            ->middleware('can:orders.process')
+            ->name('orders.shipment.local-lbc-booking.store');
         Route::patch('orders/{order}/shipment/status', [OrderShipmentStatusController::class, 'update'])
             ->middleware('can:orders.process')
             ->name('orders.shipment.status.update');
         Route::patch('orders/{order}/shipment/reference', [OrderShipmentReferenceController::class, 'update'])
             ->middleware('can:orders.process')
             ->name('orders.shipment.reference.update');
+        Route::patch('orders/{order}/shipment/operations', [OrderShipmentOperationsController::class, 'update'])
+            ->middleware('can:orders.process')
+            ->name('orders.shipment.operations.update');
         Route::patch('orders/{order}/payment-status', [OrderPaymentStatusController::class, 'update'])
             ->middleware('can:orders.process')
             ->name('orders.payment-status.update');
@@ -316,6 +382,10 @@ Route::middleware(['auth', 'can:access-administration'])
             ->middleware('can:orders.process')
             ->whereNumber('order')
             ->name('orders.cod-collection.store');
+        Route::post('orders/{order}/cod-remittance', [OrderCodRemittanceController::class, 'store'])
+            ->middleware('can:orders.process')
+            ->whereNumber('order')
+            ->name('orders.cod-remittance.store');
         Route::post('orders/{order}/pickup-confirmation', [OrderPickupConfirmationController::class, 'store'])
             ->middleware('can:orders.process')
             ->whereNumber('order')
@@ -328,6 +398,8 @@ Route::middleware(['auth', 'can:access-administration'])
         Route::get('reports/sales', [SalesReportController::class, 'index'])
             ->middleware('can:reports.view')
             ->name('reports.sales');
+        Route::get('reports/wishlist', [WishlistReportController::class, 'index'])->middleware('can:reports.view')->name('reports.wishlist');
+        Route::get('reports/wishlist/csv', [WishlistReportController::class, 'csv'])->middleware('can:reports.export')->name('reports.wishlist.csv');
         Route::get('reports/staff', [StaffPerformanceController::class, 'index'])
             ->middleware('can:orders.view')->name('reports.staff');
         Route::get('reports/stock-reconciliation', [StockReconciliationController::class, 'index'])

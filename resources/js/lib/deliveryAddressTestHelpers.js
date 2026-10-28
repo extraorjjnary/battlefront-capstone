@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { compileScript, parse } from '@vue/compiler-sfc';
 import * as Vue from 'vue';
 import { formatCurrency } from './currency.js';
+import { formatCalendarDate } from './dateTime.js';
 import { loadSkeletonComponent } from './skeletonTestHelpers.js';
 
 export const deliveryLocations = JSON.parse(
@@ -73,6 +74,8 @@ export function loadAddressComponent(
                 usePage: () => ({ props: { auth: { user } } }),
             },
             '@/lib/currency': { formatCurrency },
+            '@/lib/dateTime': { formatCalendarDate },
+            '@/lib/uuid': { createUuid: () => 'test-checkout-submission' },
             '@/components/ui/skeleton': {
                 Skeleton: loadSkeletonComponent('ui/skeleton/Skeleton.vue'),
             },

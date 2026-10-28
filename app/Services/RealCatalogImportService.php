@@ -204,6 +204,23 @@ class RealCatalogImportService
                         'brand' => $row['brand'] ?? $product->brand,
                         'price' => $row['price'],
                     ]);
+                    if ($isNew) {
+                        $packageEstimate = config('battlefront.shipping.package_estimates.categories.'.$category->name)
+                            ?? config('battlefront.shipping.package_estimates.fallback');
+                        if ($category->name === 'Laptops & Desktops') {
+                            $isLaptop = preg_match('/\b(laptop|notebook)\b/i', $row['name']) === 1;
+                            $packageEstimate = $isLaptop
+                                ? ['weight_kg' => '3.000', 'length_cm' => '45.00', 'width_cm' => '35.00', 'height_cm' => '12.00']
+                                : ['weight_kg' => '9.000', 'length_cm' => '55.00', 'width_cm' => '45.00', 'height_cm' => '35.00'];
+                        }
+                        $product->fill([
+                            'package_weight_kg' => $packageEstimate['weight_kg'],
+                            'package_length_cm' => $packageEstimate['length_cm'],
+                            'package_width_cm' => $packageEstimate['width_cm'],
+                            'package_height_cm' => $packageEstimate['height_cm'],
+                            'package_measurement_source' => 'estimated',
+                        ]);
+                    }
                     if ($product->acquisition_cost === null) {
                         $product->acquisition_cost = $this->acquisitionCostEstimator->forProduct($category->name, $row['price']);
                         $product->acquisition_cost_source = $product->acquisition_cost === null ? null : 'category_policy_v1';

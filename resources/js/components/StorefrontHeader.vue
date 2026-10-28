@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { dashboard, home, login, register } from '@/routes';
 import { index as branchIndex } from '@/routes/branches';
 import { index as productIndex } from '@/routes/products';
+import { index as pcBuilderIndex } from '@/routes/pc-builder';
 
 const props = defineProps({
     activeSection: { type: String, default: null },
@@ -17,6 +18,12 @@ const props = defineProps({
 const page = usePage();
 const isAuthenticated = computed(() => Boolean(page.props.auth?.user));
 const storefrontLinks = [
+    {
+        title: 'Build a PC',
+        mobileTitle: 'Builder',
+        section: 'pc-builder',
+        href: pcBuilderIndex(),
+    },
     {
         title: 'Products',
         mobileTitle: 'Shop',

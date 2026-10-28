@@ -78,6 +78,10 @@ use Illuminate\Support\Carbon;
     'status',
     'payment_status',
     'payment_method',
+    'hosted_payment_method',
+    'payment_origin',
+    'checkout_submission_key',
+    'checkout_request_fingerprint',
     'payment_proof_path',
     'payment_rejection_reason',
     'payment_rejection_note',
@@ -151,18 +155,26 @@ class Order extends Model
 
     public function paymentStatusLabel(): string
     {
-        return $this->payment_method === PaymentMethod::Cod
-            && $this->payment_status === PaymentStatus::Pending
-            && $this->status !== OrderStatus::Cancelled
-                ? 'COD — Awaiting Collection'
-                : $this->payment_status->label();
+        if ($this->payment_method !== PaymentMethod::Cod
+            || $this->payment_status !== PaymentStatus::Pending
+            || $this->status === OrderStatus::Cancelled) {
+            return $this->payment_status->label();
+        }
+
+        return $this->shipment?->carrier_cod_collected_at !== null
+            ? 'COD — Awaiting LBC Remittance'
+            : 'COD — Awaiting Collection';
     }
 
     public function customerStatusLabel(): string
     {
-        return $this->isDeliveredCodAwaitingCollection()
-            ? 'Delivered — awaiting COD confirmation'
-            : $this->status->customerLabel($this->fulfillment_method);
+        if (! $this->isDeliveredCodAwaitingCollection()) {
+            return $this->status->customerLabel($this->fulfillment_method);
+        }
+
+        return $this->shipment?->carrier_cod_collected_at !== null
+            ? 'Delivered — awaiting LBC remittance'
+            : 'Delivered — awaiting COD collection';
     }
 
     public function isDeliveredCodAwaitingCollection(): bool
@@ -195,7 +207,7 @@ class Order extends Model
                 throw new DomainException('Actual pickup handover timestamps cannot be changed.');
             }
             if ($order->getRawOriginal('product_subtotal') !== null && $order->isDirty([
-                'user_id', 'fulfillment_method', 'delivery_address', 'delivery_quote_metadata',
+                'user_id', 'fulfillment_method', 'delivery_address', 'delivery_quote_metadata', 'hosted_payment_method',
                 'product_subtotal', 'total_amount', 'delivery_destination', 'delivery_base_fee',
                 'shipping_profile', 'handling_surcharge', 'delivery_fee',
                 'delivery_origin_city', 'delivery_is_demo', 'delivery_assumption_label',

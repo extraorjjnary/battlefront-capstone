@@ -136,6 +136,9 @@ function teamHarness(t, overrides = {}) {
             '@/components/administration/InlineEditor.vue': {
                 default: primitive,
             },
+            '@/components/administration/TeamEmailVerification.vue': {
+                default: primitive,
+            },
             '@/components/InputError.vue': { default: primitive },
             '@/components/ui/button': { Button: button },
             '@/components/ui/input': { Input: primitive },

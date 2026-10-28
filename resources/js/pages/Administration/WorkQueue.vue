@@ -92,6 +92,7 @@ defineOptions({
                         Cancellation refund
                     </option>
                     <option value="order">Order</option>
+                    <option value="shipping">Shipping follow-up</option>
                 </select></label
             >
             <label class="grid max-w-full min-w-0 gap-1 text-sm"

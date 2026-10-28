@@ -11,7 +11,7 @@ use Illuminate\Validation\ValidationException;
 
 function catalogNamePayload(Category $category, string $name, string $code = 'NEW001'): array
 {
-    return ['product_code' => $code, 'name' => $name, 'category_id' => $category->id,
+    return [...validPackageMeasurements(), 'product_code' => $code, 'name' => $name, 'category_id' => $category->id,
         'price' => '100.00', 'is_featured' => false];
 }
 
@@ -21,10 +21,10 @@ test('product create and update reject normalized names across categories and ac
     $other = Product::factory()->create(['name' => 'Other model']);
     $payload = catalogNamePayload($other->category, $name, $other->product_code);
 
-    $this->actingAs($administrator)->post(route('administration.products.store'), [
+    $this->actingAs($administrator)->post(route('administration.products.store'), [...validPackageMeasurements(),
         ...$payload, 'product_code' => 'NEW001',
     ])->assertSessionHasErrors(['name' => CatalogName::PRODUCT_MESSAGE]);
-    $this->put(route('administration.products.update', $other), [...$payload, 'edit_version' => $other->edit_version])
+    $this->put(route('administration.products.update', $other), [...validPackageMeasurements(), ...$payload, 'edit_version' => $other->edit_version])
         ->assertSessionHasErrors(['name' => CatalogName::PRODUCT_MESSAGE]);
 
     expect($other->refresh()->name)->toBe('Other model');
@@ -63,7 +63,7 @@ test('administrator names are normalized and their unchanged edits succeed', fun
     $this->post(route('administration.products.store'), catalogNamePayload($category, '  RTX   4060  Ti '))
         ->assertSessionHasNoErrors();
     $product = Product::query()->sole();
-    $this->put(route('administration.products.update', $product), [
+    $this->put(route('administration.products.update', $product), [...validPackageMeasurements(),
         ...catalogNamePayload($category, $product->name, $product->product_code), 'edit_version' => $product->edit_version,
     ])
         ->assertSessionHasNoErrors();

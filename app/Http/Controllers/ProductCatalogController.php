@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Repositories\Catalog\ProductCatalogRepository;
 use App\Services\CatalogProductPresenter;
 use App\Services\Recommendation\RecordCustomerSearch;
+use App\Services\Wishlist\WishlistService;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
@@ -45,7 +46,7 @@ class ProductCatalogController extends Controller
             );
         }
 
-        $products = fn (): LengthAwarePaginator => $this->paginateProducts($filters);
+        $products = fn (): LengthAwarePaginator => $this->paginateProducts($filters, $request->user() instanceof User && $request->user()->can('use-customer-cart') ? $request->user() : null);
 
         $recommendationViewData = null;
         $resolveRecommendations = function () use (&$recommendationViewData, $hasDiscoveryFilters, $request, $buildRecommendationViewData): array {
@@ -111,11 +112,15 @@ class ProductCatalogController extends Controller
         $user = $request->user();
         $customer = $user instanceof User ? $user : null;
         $guestProfile = $request->attributes->get('guest_recommendation_profile');
+        $isWishlisted = $customer instanceof User && $customer->can('use-customer-cart')
+            ? app(WishlistService::class)->savedProductIds($customer, [$catalogProduct->id]) !== []
+            : false;
 
         return Inertia::render('Products/Show', [
             'product' => [
                 ...$this->catalogProductPresenter->present($catalogProduct),
                 'shipping_handling' => $this->catalogProductPresenter->handling($catalogProduct->shipping_profile),
+                'is_wishlisted' => $isWishlisted,
             ],
             'can_record_product_dwell' => $customer instanceof User
                 ? $customer->role === UserRole::Customer
@@ -140,9 +145,16 @@ class ProductCatalogController extends Controller
      *     inventory: array{quantity: int|null, status: string}
      * }>
      */
-    private function paginateProducts(array $filters): LengthAwarePaginator
+    private function paginateProducts(array $filters, ?User $customer): LengthAwarePaginator
     {
-        return $this->productCatalogRepository->paginate($filters)
-            ->through(fn (Product $product): array => $this->catalogProductPresenter->present($product));
+        $products = $this->productCatalogRepository->paginate($filters);
+        $savedIds = $customer instanceof User
+            ? app(WishlistService::class)->savedProductIds($customer, array_map('intval', array_values($products->getCollection()->modelKeys())))
+            : [];
+
+        return $products->through(fn (Product $product): array => [
+            ...$this->catalogProductPresenter->present($product),
+            'is_wishlisted' => in_array($product->id, $savedIds, true),
+        ]);
     }
 }

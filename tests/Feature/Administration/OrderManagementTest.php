@@ -38,7 +38,7 @@ test('completed transaction history identifies demonstration orders and their as
             ->where('orders.data.0.payment.status.value', 'verified')
             ->where('orders.data.0.item_count', $lastOrder->items->count())
             ->where('orders.data.0.total_quantity', $lastOrder->items->sum('quantity'))
-            ->where('orders.data.0.total', '6270.00'));
+            ->where('orders.data.0.total', '6540.00'));
 });
 
 test('guests are redirected from administrator order workflows', function () {

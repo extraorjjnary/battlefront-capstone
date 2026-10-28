@@ -108,6 +108,15 @@ const formProps = {
     categories: [{ id: 1, name: 'Hardware' }],
     tags: [],
     shippingProfiles: profiles,
+    packageEstimates: {
+        categories: {},
+        fallback: {
+            weight_kg: '1.000',
+            length_cm: '10.00',
+            width_cm: '10.00',
+            height_cm: '10.00',
+        },
+    },
     product: null,
     form: { action: '/products', method: 'post' },
     submitLabel: 'Save',
@@ -238,6 +247,7 @@ test('the add product page hides preparation wording and shows the zero surcharg
                 categories: formProps.categories,
                 tags: [],
                 shipping_profiles: profiles,
+                package_estimates: formProps.packageEstimates,
             },
         ),
     );

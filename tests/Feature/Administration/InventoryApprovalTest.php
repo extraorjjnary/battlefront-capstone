@@ -105,7 +105,7 @@ test('ordinary product editing cannot overwrite sellable or quarantined quantiti
     $inventory = $product->inventory;
     $before = $inventory->refresh()->getAttributes();
 
-    $this->actingAs(User::factory()->administrator()->create())->put(route('administration.products.update', $product), [
+    $this->actingAs(User::factory()->administrator()->create())->put(route('administration.products.update', $product), [...validPackageMeasurements(),
         'edit_version' => $product->edit_version, 'product_code' => $product->product_code,
         'name' => $product->name, 'category_id' => $product->category_id,
         'price' => $product->price, 'discount_price' => $product->discount_price, 'is_featured' => false,

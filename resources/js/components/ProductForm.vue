@@ -1,7 +1,7 @@
 <script setup>
 import { Form, Link, usePage } from '@inertiajs/vue3';
 import { Image, Save } from '@lucide/vue';
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import CategoryController from '@/actions/App/Http/Controllers/Administration/CategoryController';
 import ProductController from '@/actions/App/Http/Controllers/Administration/ProductController';
 import InputError from '@/components/InputError.vue';
@@ -25,6 +25,7 @@ const props = defineProps({
     categories: { type: Array, required: true },
     tags: { type: Array, required: true },
     shippingProfiles: { type: Array, required: true },
+    packageEstimates: { type: Object, required: true },
     showPreparation: { type: Boolean, default: true },
     product: { type: Object, default: null },
     form: { type: Object, required: true },
@@ -44,6 +45,20 @@ const categoryId = ref(
 );
 const isFeatured = ref(props.product?.is_featured ?? false);
 const shippingProfile = ref(props.product?.shipping_profile ?? 'standard');
+const packageMeasurementSource = ref(props.product?.package_measurement_source ?? 'estimated');
+const packageEstimate = computed(() => props.packageEstimates.categories[props.categories.find((category) => String(category.id) === categoryId.value)?.name] ?? props.packageEstimates.fallback);
+const packageWeight = ref(props.product?.package_weight_kg ?? packageEstimate.value.weight_kg);
+const packageLength = ref(props.product?.package_length_cm ?? packageEstimate.value.length_cm);
+const packageWidth = ref(props.product?.package_width_cm ?? packageEstimate.value.width_cm);
+const packageHeight = ref(props.product?.package_height_cm ?? packageEstimate.value.height_cm);
+watch([categoryId, packageMeasurementSource], () => {
+    if (packageMeasurementSource.value === 'estimated' && !props.product) {
+        packageWeight.value = packageEstimate.value.weight_kg;
+        packageLength.value = packageEstimate.value.length_cm;
+        packageWidth.value = packageEstimate.value.width_cm;
+        packageHeight.value = packageEstimate.value.height_cm;
+    }
+});
 const selectedHandling = computed(() =>
     props.shippingProfiles.find(
         (profile) => profile.profile === shippingProfile.value,
@@ -190,6 +205,45 @@ function firstTagError(errors) {
                         when you create this product.
                     </p>
                     <InputError :message="errors.product_code" />
+                </div>
+
+                <div class="grid gap-2 md:col-span-2">
+                    <h3 class="font-medium">Packed parcel measurements</h3>
+                    <p class="text-muted-foreground text-sm">
+                        Enter the packed item weight and outside box dimensions. New products start with a category estimate that you can adjust.
+                    </p>
+                </div>
+                <div class="grid gap-2">
+                    <Label for="package_weight_kg">Package weight (kg)</Label>
+                    <Input id="package_weight_kg" v-model="packageWeight" name="package_weight_kg" type="number" min="0.001" step="0.001" required :aria-invalid="Boolean(errors.package_weight_kg)" />
+                    <InputError :message="errors.package_weight_kg" />
+                </div>
+                <div class="grid gap-2">
+                    <Label for="package_length_cm">Length (cm)</Label>
+                    <Input id="package_length_cm" v-model="packageLength" name="package_length_cm" type="number" min="0.01" step="0.01" required :aria-invalid="Boolean(errors.package_length_cm)" />
+                    <InputError :message="errors.package_length_cm" />
+                </div>
+                <div class="grid gap-2">
+                    <Label for="package_width_cm">Width (cm)</Label>
+                    <Input id="package_width_cm" v-model="packageWidth" name="package_width_cm" type="number" min="0.01" step="0.01" required :aria-invalid="Boolean(errors.package_width_cm)" />
+                    <InputError :message="errors.package_width_cm" />
+                </div>
+                <div class="grid gap-2">
+                    <Label for="package_height_cm">Height (cm)</Label>
+                    <Input id="package_height_cm" v-model="packageHeight" name="package_height_cm" type="number" min="0.01" step="0.01" required :aria-invalid="Boolean(errors.package_height_cm)" />
+                    <InputError :message="errors.package_height_cm" />
+                </div>
+                <div class="grid gap-2">
+                    <Label for="package_measurement_source">Measurement source</Label>
+                    <Select v-model="packageMeasurementSource">
+                        <SelectTrigger id="package_measurement_source" class="w-full"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="estimated">Category estimate</SelectItem>
+                            <SelectItem value="measured">Measured package</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <input type="hidden" name="package_measurement_source" :value="packageMeasurementSource" />
+                    <InputError :message="errors.package_measurement_source" />
                 </div>
                 <div class="grid gap-2 md:col-span-2">
                     <Label for="name">Product name</Label>

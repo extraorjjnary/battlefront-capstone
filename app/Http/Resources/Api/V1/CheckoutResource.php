@@ -24,6 +24,7 @@ class CheckoutResource extends JsonResource
             'pickup_location' => $this->resource['pickupLocation'],
             'fulfillment_methods' => $this->resource['fulfillmentMethods'],
             'payment_methods' => $this->resource['paymentMethods'],
+            'paymongo_hosted_methods' => $this->resource['paymongoHostedMethods'],
         ];
     }
 }

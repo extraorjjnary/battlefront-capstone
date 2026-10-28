@@ -26,6 +26,11 @@ use Illuminate\Support\Facades\Storage;
  * @property bool $is_catalog_imported
  * @property ShippingProfile $shipping_profile
  * @property string|null $shipping_profile_source
+ * @property string|null $package_weight_kg
+ * @property string|null $package_length_cm
+ * @property string|null $package_width_cm
+ * @property string|null $package_height_cm
+ * @property string $package_measurement_source
  * @property string $name
  * @property string|null $description
  * @property int $category_id
@@ -47,10 +52,16 @@ use Illuminate\Support\Facades\Storage;
  * @property-read Collection<int, CartItem> $cartItems
  * @property-read Collection<int, OrderItem> $orderItems
  * @property-read Collection<int, Forecast> $forecasts
+ * @property-read ProductComponentProfile|null $componentProfile
  */
 #[Fillable([
     'product_code',
     'shipping_profile',
+    'package_weight_kg',
+    'package_length_cm',
+    'package_width_cm',
+    'package_height_cm',
+    'package_measurement_source',
     'name',
     'description',
     'category_id',
@@ -203,6 +214,16 @@ class Product extends Model
     }
 
     /**
+     * Get the reviewed hardware profile for this product, when one exists.
+     *
+     * @return HasOne<ProductComponentProfile, $this>
+     */
+    public function componentProfile(): HasOne
+    {
+        return $this->hasOne(ProductComponentProfile::class);
+    }
+
+    /**
      * Scope a query to active products.
      *
      * @param  Builder<Product>  $query
@@ -266,6 +287,10 @@ class Product extends Model
         return [
             'is_catalog_imported' => 'boolean',
             'shipping_profile' => ShippingProfile::class,
+            'package_weight_kg' => 'decimal:3',
+            'package_length_cm' => 'decimal:2',
+            'package_width_cm' => 'decimal:2',
+            'package_height_cm' => 'decimal:2',
             'price' => 'decimal:2',
             'acquisition_cost' => 'decimal:2',
             'is_featured' => 'boolean',

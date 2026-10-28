@@ -6,6 +6,7 @@ use App\Enums\AppearancePreference;
 use App\Services\AdministrationWorkQueue;
 use App\Services\Cart\CartService;
 use App\Services\Notifications\NotificationHistory;
+use App\Services\Wishlist\WishlistService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Middleware;
@@ -53,6 +54,7 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             ...($customer !== null && $canUseCustomerCart ? [
                 'cartQuantity' => Inertia::always(fn (): int => app(CartService::class)->totalQuantity($customer)),
+                'wishlistCount' => Inertia::always(fn (): int => app(WishlistService::class)->count($customer)),
             ] : []),
             'name' => config('app.name'),
             'workQueueCounts' => fn (): array => $request->user()?->can('access-administration')

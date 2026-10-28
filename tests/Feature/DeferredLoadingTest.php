@@ -5,6 +5,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Repositories\Catalog\ProductCatalogRepository;
 use App\Services\Dashboard\DashboardService;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -124,13 +125,13 @@ test('recommendation-only requests do not paginate catalog products again', func
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->available()->create()->load(['category', 'inventory', 'tags']);
     $repository = $this->mock(ProductCatalogRepository::class);
-    $repository->shouldReceive('paginate')->once()->andReturn(new LengthAwarePaginator([$product], 1, 12));
+    $repository->shouldReceive('paginate')->once()->andReturn(new LengthAwarePaginator(new EloquentCollection([$product]), 1, 12));
     $repository->shouldReceive('filterOptions')->once()->andReturn(['categories' => [], 'brands' => [], 'tags' => []]);
     $this->mock(BuildRecommendationViewData::class)->shouldReceive('__invoke')->once()->andReturn([
         'recommendations' => [], 'is_personalized' => false, 'has_featured_fallback' => false, 'guest_recommendation_scope' => null,
     ]);
 
-    $this->actingAs($customer)->get(route('products.index'))->assertInertia(fn (Assert $page) => $page
+    $this->actingAs($customer)->get(route('products.index'))->assertOk()->assertInertia(fn (Assert $page) => $page
         ->where('products.data.0.id', $product->id)
         ->loadDeferredProps('recommendations', fn (Assert $page) => $page->where('recommendations', [])));
 });

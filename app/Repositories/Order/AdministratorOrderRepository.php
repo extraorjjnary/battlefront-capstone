@@ -57,7 +57,7 @@ class AdministratorOrderRepository
     }
 
     /**
-     * @return array{has_sale: bool, sales_returns: string, cost_recovered: string}
+     * @return array{has_sale: bool, sales_returns: numeric-string, cost_recovered: numeric-string}
      */
     public function profitabilityInputs(Order $order): array
     {

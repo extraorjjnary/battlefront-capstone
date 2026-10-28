@@ -71,6 +71,7 @@ function loadPage(path, inlineTemplate = false) {
             '@inertiajs/vue3': {
                 Head: primitive,
                 Link: primitive,
+                usePoll: () => ({ start() {}, stop() {} }),
                 usePage: () => ({
                     props: {
                         auth: {
@@ -147,6 +148,7 @@ function loadPage(path, inlineTemplate = false) {
 function orderProps(overrides = {}) {
     return {
         isConfirmation: false,
+        isPayMongoReturn: false,
         order: {
             id: 7,
             reference: 'BF-000007',
@@ -325,6 +327,7 @@ test('customer detail labels an unconfigured zero-fee delivery without showing a
                 total: '100.00',
                 delivery_quote: {
                     pricing_configured: false,
+                    pricing_status: 'not_configured',
                     destination: 'City of Makati',
                     notice: 'Delivery fee not configured.',
                     assumption_label: 'No LBC quotation or booking exists.',
@@ -383,11 +386,11 @@ test('customer loading and stale-state errors remain visible when cancellation b
         const render = scope.run(() =>
             loaded.component.setup(props, { expose() {} }),
         );
-        loaded.forms[1].processing = true;
+        loaded.forms[2].processing = true;
         const pending = await renderToString(render({}, []));
         assert.match(pending, /<button[^>]*disabled[^>]*>[\s\S]*?Cancel order/);
-        loaded.forms[1].processing = false;
-        loaded.forms[1].errors.status =
+        loaded.forms[2].processing = false;
+        loaded.forms[2].errors.status =
             'Payment has changed. Refresh your order.';
         props.order.can_cancel = false;
         props.order.status = { value: 'processing', label: 'Processing' };
@@ -460,6 +463,8 @@ test('admin detail flags unconfigured delivery logistics without offering LBC tr
         },
         delivery_quote: {
             pricing_configured: false,
+            pricing_status: 'not_configured',
+            delivery_arrangement_required: true,
             assumption_label: 'No LBC quotation or booking exists.',
         },
         shipment: null,
@@ -527,6 +532,8 @@ function codOrderProps(canConfirm = false) {
             rejection_reasons: [],
         },
     });
+    props.order.can_process = true;
+
     return { order: props.order };
 }
 
@@ -739,7 +746,7 @@ test('admin COD controls show collection confirmation only when eligible and hid
         );
         assert.match(
             html,
-            /Delivered does not verify payment or record a sale/,
+            /LBC collection and seller remittance are recorded separately/,
         );
         assert.match(
             html,
@@ -749,7 +756,7 @@ test('admin COD controls show collection confirmation only when eligible and hid
             html,
             /Apply payment decision|manually at the store|decision is final/,
         );
-        assert.equal(html.includes('Confirm COD Collection'), eligible);
+        assert.equal(html.includes('Record LBC COD Collection'), eligible);
     }
 });
 

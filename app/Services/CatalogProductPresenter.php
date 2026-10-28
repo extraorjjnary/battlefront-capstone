@@ -7,6 +7,16 @@ use App\Models\Product;
 use App\Models\Tag;
 use App\Services\Order\DeliveryRules;
 
+/**
+ * @phpstan-type CatalogProductData array{
+ *     id: int, name: string, description: string|null, brand: string|null,
+ *     price: string, discount_price: string|null, image_url: string|null,
+ *     is_featured: bool, shipping_profile: string,
+ *     category: array{id: int, name: string},
+ *     tags: list<array{id: int, name: string}>,
+ *     inventory: array{quantity: int|null, status: string}
+ * }
+ */
 class CatalogProductPresenter
 {
     public function __construct(private readonly DeliveryRules $deliveryRules) {}
@@ -30,20 +40,7 @@ class CatalogProductPresenter
     /**
      * Convert an eagerly loaded product into the customer catalog contract.
      *
-     * @return array{
-     *     id: int,
-     *     name: string,
-     *     description: string|null,
-     *     brand: string|null,
-     *     price: string,
-     *     discount_price: string|null,
-     *     image_url: string|null,
-     *     is_featured: bool,
-     *     shipping_profile: string,
-     *     category: array{id: int, name: string},
-     *     tags: list<array{id: int, name: string}>,
-     *     inventory: array{quantity: int|null, status: string}
-     * }
+     * @return CatalogProductData
      */
     public function present(Product $product): array
     {

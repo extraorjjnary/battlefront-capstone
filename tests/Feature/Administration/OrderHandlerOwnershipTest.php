@@ -105,7 +105,13 @@ test('the assigned handler can perform each eligible processing action', functio
     expect(DB::table('audit_logs')->where('subject_id', $order->id)->where('actor_id', $actor->id)->count())->toBeGreaterThan(0);
     expect(Inventory::sole()->quantity)->toBe($operation === 'cancel' ? 9 : 7);
     expect($order->fresh()->assigned_handler_id)->toBe($actor->id);
-    if (in_array($operation, ['complete', 'delivered', 'pickup', 'cod'], true)) {
+    if ($operation === 'cod') {
+        expect($order->fresh()->status)->toBe(OrderStatus::Processing);
+        expect($order->fresh()->payment_status)->toBe(PaymentStatus::Pending);
+        $this->assertDatabaseCount('sales', 0);
+    }
+
+    if (in_array($operation, ['complete', 'delivered', 'pickup'], true)) {
         expect($order->fresh()->status)->toBe(OrderStatus::Completed);
         expect($order->sale()->sole()->handler_id)->toBe($actor->id);
         $this->assertDatabaseCount('sales', 1);

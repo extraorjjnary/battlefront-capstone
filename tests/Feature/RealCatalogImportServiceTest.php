@@ -412,7 +412,7 @@ test('an admin replacement preserves its manifest image and survives future impo
         $manifestBytes = Storage::disk('public')->get($manifestImage);
         $manifestContents = file_get_contents($manifest);
 
-        $this->actingAs($administrator)->post(route('administration.products.update', $product), [
+        $this->actingAs($administrator)->post(route('administration.products.update', $product), [...validPackageMeasurements(),
             '_method' => 'put',
             'edit_version' => $product->edit_version,
             'product_code' => $product->product_code,

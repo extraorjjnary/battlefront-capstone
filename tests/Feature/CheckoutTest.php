@@ -8,8 +8,102 @@ use App\Models\User;
 use App\Services\Cart\CartService;
 use Database\Seeders\BranchSeeder;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia as Assert;
+
+beforeEach(function () {
+    config(['services.paymongo.enabled' => false]);
+});
+
+test('checkout offers configured hosted methods with QR Ph first and no direct banks', function () {
+    config([
+        'services.paymongo.enabled' => true,
+        'services.paymongo.hosted_methods' => ['card', 'gcash', 'paymaya', 'qrph'],
+        'services.paymongo.direct_banking_enabled' => true,
+        'services.paymongo.direct_banking_banks' => ['bpi' => 'BPI'],
+    ]);
+    $this->seed(BranchSeeder::class);
+    $customer = User::factory()->customer()->create();
+    $product = Product::factory()->create();
+    Inventory::factory()->for($product)->create(['quantity' => 5]);
+    $item = app(CartService::class)->add($customer, $product->id, 1);
+
+    $this->actingAs($customer)
+        ->get(route('checkout.index', ['cart_item_ids' => [$item->id]]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Checkout/Index')
+            ->where('paymongoHostedMethods', ['qrph', 'card', 'gcash', 'paymaya'])
+            ->where('paymongoBanks', []));
+});
+
+test('new orders reject direct banking even when the old configuration enables it', function (string $endpoint) {
+    config([
+        'services.paymongo.enabled' => true,
+        'services.paymongo.direct_banking_enabled' => true,
+        'services.paymongo.direct_banking_banks' => ['bpi' => 'BPI'],
+    ]);
+    Http::preventStrayRequests();
+    $customer = User::factory()->customer()->create();
+
+    $this->actingAs($customer, $endpoint === 'api.v1.orders.store' ? 'sanctum' : 'web')
+        ->postJson(route($endpoint), [
+            'cart_item_ids' => [PHP_INT_MAX],
+            'recipient_name' => $customer->name,
+            'contact_number' => '09171234567',
+            'fulfillment_method' => 'pickup',
+            'payment_method' => 'online',
+            'checkout_submission_key' => (string) Str::uuid(),
+            'payment_channel' => 'direct_online_banking',
+            'payment_bank' => 'bpi',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['payment_channel', 'payment_bank']);
+
+    $this->assertDatabaseCount('orders', 0);
+    Http::assertNothingSent();
+})->with(['orders.store', 'api.v1.orders.store']);
+
+test('hosted checkout preserves the selected card or wallet payment method', function (string $method) {
+    config([
+        'services.paymongo.enabled' => true,
+        'services.paymongo.hosted_methods' => ['qrph', 'card', 'gcash', 'paymaya'],
+        'services.paymongo.secret_key' => 'sk_test_fake',
+    ]);
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://api.paymongo.com/v2/checkout_sessions' => Http::response([
+            'data' => [
+                'id' => 'cs_selected_method',
+                'attributes' => ['checkout_url' => 'https://checkout.paymongo.com/cs_selected_method'],
+            ],
+        ]),
+    ]);
+    $this->seed(BranchSeeder::class);
+    $customer = User::factory()->customer()->create();
+    $product = Product::factory()->create(['price' => '1000.00']);
+    Inventory::factory()->for($product)->create(['quantity' => 5]);
+    $item = app(CartService::class)->add($customer, $product->id, 1);
+
+    $this->actingAs($customer)->post(route('orders.store'), [
+        'cart_item_ids' => [$item->id],
+        'recipient_name' => $customer->name,
+        'contact_number' => '09171234567',
+        'fulfillment_method' => 'pickup',
+        'payment_method' => 'online',
+        'checkout_submission_key' => (string) Str::uuid(),
+        'payment_channel' => 'hosted_checkout',
+        'hosted_payment_method' => $method,
+    ])->assertRedirect(route('orders.show', Order::query()->firstOrFail()));
+
+    $this->assertDatabaseHas('orders', [
+        'user_id' => $customer->id,
+        'hosted_payment_method' => $method,
+        'payment_status' => 'pending',
+    ]);
+    Http::assertSent(fn ($request): bool => $request['data']['attributes']['payment_method_types'] === [$method]);
+})->with(['card', 'gcash', 'paymaya']);
 
 test('guests are redirected from checkout', function (string $method) {
     $response = $method === 'get'

@@ -22,7 +22,7 @@ class CustomerOrderRepository
                 'payment_method',
                 'created_at',
             ])
-            ->with(['shipment:id,order_id,status', 'cancellationRequest.refund'])
+            ->with(['shipment:id,order_id,status,carrier_cod_collected_at', 'cancellationRequest.refund'])
             ->withCount('items')
             ->withSum('items as total_quantity', 'quantity')
             ->orderByDesc('created_at')
@@ -55,6 +55,7 @@ class CustomerOrderRepository
                 'status',
                 'payment_status',
                 'payment_method',
+                'payment_origin',
                 'payment_proof_path',
                 'payment_rejection_reason',
                 'payment_rejection_note',

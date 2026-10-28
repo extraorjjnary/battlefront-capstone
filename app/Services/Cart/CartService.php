@@ -9,11 +9,13 @@ use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Category;
 use App\Models\Inventory;
+use App\Models\PcBuildCartGroup;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 
 class CartService
@@ -43,6 +45,7 @@ class CartService
             $cartItem = CartItem::query()
                 ->where('cart_id', $cart->id)
                 ->where('product_id', $productId)
+                ->whereNull('pc_build_cart_group_id')
                 ->lockForUpdate()
                 ->first();
             [$product, $category, $inventory] = $this->lockProductContext($productId);
@@ -76,6 +79,9 @@ class CartService
             $cartItem = $this->ownedCartItemQuery($lockedCustomer, $cartItemId)
                 ->lockForUpdate()
                 ->firstOrFail();
+            if ($cartItem->pc_build_cart_group_id !== null) {
+                throw ValidationException::withMessages(['quantity' => 'Remove this complete PC configuration from the cart before changing component quantities.']);
+            }
             [$product, $category, $inventory] = $this->lockProductContext($cartItem->product_id);
 
             $this->ensureAvailable($product, $category, $inventory, $quantity);
@@ -97,7 +103,14 @@ class CartService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $cartItem->delete();
+            if ($cartItem->pc_build_cart_group_id !== null) {
+                PcBuildCartGroup::query()
+                    ->where('cart_id', $cartItem->cart_id)
+                    ->whereKey($cartItem->pc_build_cart_group_id)
+                    ->delete();
+            } else {
+                $cartItem->delete();
+            }
         }, attempts: 3);
     }
 
@@ -203,6 +216,27 @@ class CartService
             && array_is_list($cartItemIds)
             && ! collect($cartItemIds)->contains(fn ($id): bool => ! is_int($id) || $id <= 0)
             && count(array_unique($cartItemIds)) === count($cartItemIds);
+    }
+
+    /** @param list<int> $cartItemIds */
+    public function selectionContainsCompletePcBuilds(User $customer, array $cartItemIds): bool
+    {
+        $customer = $this->currentCustomer($customer);
+        $selectedBuildGroupIds = $this->customerItemsQuery($customer)
+            ->whereKey($cartItemIds)
+            ->whereNotNull('pc_build_cart_group_id')
+            ->pluck('pc_build_cart_group_id')
+            ->unique();
+
+        if ($selectedBuildGroupIds->isEmpty()) {
+            return true;
+        }
+
+        $allBuildItemIds = CartItem::query()
+            ->whereIn('pc_build_cart_group_id', $selectedBuildGroupIds)
+            ->pluck('id');
+
+        return $allBuildItemIds->diff($cartItemIds)->isEmpty();
     }
 
     /**

@@ -14,7 +14,7 @@ use Symfony\Component\Uid\Ulid;
 
 function generatedProductPayload(Category $category, string $name = 'New administrator product'): array
 {
-    return ['name' => $name, 'category_id' => $category->id, 'price' => '100.00', 'is_featured' => false];
+    return [...validPackageMeasurements(), 'name' => $name, 'category_id' => $category->id, 'price' => '100.00', 'is_featured' => false];
 }
 
 test('administrator creation assigns distinct valid product codes without manual entry', function () {
@@ -38,7 +38,7 @@ test('administrator creation assigns distinct valid product codes without manual
 test('administrator creation ignores submitted codes and forged import origin', function (mixed $submittedCode) {
     $existing = Product::factory()->create(['product_code' => 'SOURCE001', 'is_catalog_imported' => true]);
 
-    $this->actingAs(User::factory()->administrator()->create())->post(route('administration.products.store'), [
+    $this->actingAs(User::factory()->administrator()->create())->post(route('administration.products.store'), [...validPackageMeasurements(),
         ...generatedProductPayload($existing->category), 'product_code' => $submittedCode, 'is_catalog_imported' => true,
     ])->assertSessionHasNoErrors();
 
@@ -70,7 +70,7 @@ test('a generated code collision retries without changing the existing product o
     Str::createUlidsUsingSequence([new Ulid($first), new Ulid($second)]);
 
     try {
-        $this->actingAs(User::factory()->administrator()->create())->post(route('administration.products.store'), [
+        $this->actingAs(User::factory()->administrator()->create())->post(route('administration.products.store'), [...validPackageMeasurements(),
             ...generatedProductPayload($existing->category), 'tag_ids' => [$tag->id],
             'image' => UploadedFile::fake()->image('new.png'),
         ])->assertSessionHasNoErrors();
@@ -102,7 +102,7 @@ test('repeated generated code collisions return a recoverable error without crea
     });
 
     try {
-        $this->actingAs(User::factory()->administrator()->create())->post(route('administration.products.store'), [
+        $this->actingAs(User::factory()->administrator()->create())->post(route('administration.products.store'), [...validPackageMeasurements(),
             ...generatedProductPayload($existing->category), 'image' => UploadedFile::fake()->image('new.png'),
         ])->assertSessionHasErrors(['product_code' => 'A product code could not be generated. Please try saving the product again.']);
     } finally {

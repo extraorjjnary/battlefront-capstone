@@ -9,6 +9,7 @@ use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\PayMongoFlow;
 use App\Models\User;
 use App\Repositories\Order\AdministratorOrderRepository;
 use App\Services\Order\OrderProcessingService;
@@ -131,6 +132,7 @@ class AdministratorOrderPresenter
     {
         $canProcess = $this->processing->canProcess($order, $actor);
         $nextShipmentStatus = $canProcess ? $this->processing->nextShipmentStatus($order) : null;
+        $payMongoFlow = PayMongoFlow::query()->where('order_id', $order->id)->first();
         $canViewProfitability = $actor->can('reports.profit');
         $profitability = $this->profitability->calculate($order, $this->orderRepository->profitabilityInputs($order));
 
@@ -162,7 +164,8 @@ class AdministratorOrderPresenter
                 ],
                 'status' => $this->statusData($order->status),
                 'delivery_quote' => $this->quotes->stored($order),
-                'shipment' => $this->shipments->detail($order),
+                'delivery_next_step' => $this->processing->deliveryNextStep($order),
+                'shipment' => $this->shipments->detail($order, includeInternal: true),
                 'can_create_manual_shipment' => $canProcess && $this->processing->canCreateManualShipment($order),
                 'shipment_actions' => $order->shipment === null ? null : [
                     'next_status' => $nextShipmentStatus === null ? null : [
@@ -170,6 +173,10 @@ class AdministratorOrderPresenter
                         'label' => $nextShipmentStatus->label(),
                     ],
                     'can_update_reference' => $canProcess && $this->processing->canUpdateShipmentReference($order),
+                    'can_simulate_local_lbc_booking' => $canProcess && $this->processing->canSimulateLocalLbcBooking($order),
+                    'can_update_package_details' => $canProcess && $this->processing->canUpdateShipmentOperations($order, 'package'),
+                    'can_record_carrier_cost' => $canProcess && $this->processing->canUpdateShipmentOperations($order, 'carrier_cost'),
+                    'can_update_shipment_exception' => $canProcess && $this->processing->canUpdateShipmentOperations($order, 'exception'),
                 ],
                 'allowed_status_transitions' => collect($canProcess ? $this->processing->allowedOrderTransitions($order) : [])
                     ->map(fn (OrderStatus $status): array => $this->statusData($status))
@@ -186,7 +193,14 @@ class AdministratorOrderPresenter
                         'value' => $order->payment_status->value,
                         'label' => $order->paymentStatusLabel(),
                     ],
+                    'gateway' => $payMongoFlow === null ? null : [
+                        'channel' => $payMongoFlow->channel,
+                        'bank' => $payMongoFlow->bank_code,
+                        'status' => $payMongoFlow->status,
+                        'merchant_cutoff_at' => $payMongoFlow->merchant_cutoff_at->toIso8601String(),
+                    ],
                     'can_confirm_cod_collection' => $canProcess && $this->processing->canConfirmCodCollection($order),
+                    'can_confirm_cod_remittance' => $canProcess && $this->processing->canConfirmCodRemittance($order),
                     'pay_at_pickup' => $order->payment_method->isPayAtPickup(),
                     'can_confirm_pickup' => $canProcess && $this->processing->canConfirmPickup($order),
                     'proof_submitted' => $order->payment_proof_path !== null,
@@ -209,6 +223,11 @@ class AdministratorOrderPresenter
 
                     return [
                         'id' => $item->id,
+                        'pc_build_group' => $item->pc_build_group_uuid === null ? null : [
+                            'uuid' => $item->pc_build_group_uuid,
+                            'name' => $item->pc_build_name_at_time,
+                        ],
+                        'pc_build_component_snapshot' => $item->pc_build_component_snapshot,
                         'product' => [
                             'id' => $item->product->id,
                             'name' => $item->purchasedProductName(),

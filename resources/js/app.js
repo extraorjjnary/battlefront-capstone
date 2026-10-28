@@ -4,7 +4,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import AuthLayout from '@/layouts/AuthLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { initializeFlashToast } from '@/lib/flashToast';
-const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const appName = import.meta.env.VITE_APP_NAME || 'Battlefront Computer Trading';
 void createInertiaApp({
     withApp: (_app, { page }) => {
         initializeTheme(page.props);
@@ -16,6 +16,10 @@ void createInertiaApp({
                 name.startsWith('Branches/') ||
                 name.startsWith('Products/'):
                 return page.props.auth?.user ? AppLayout : null;
+            case name.startsWith('PcBuilder/'):
+                return name === 'PcBuilder/Shared' || !page.props.auth?.user
+                    ? null
+                    : AppLayout;
             case name.startsWith('auth/'):
                 return AuthLayout;
             case name.startsWith('settings/'):

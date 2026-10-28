@@ -28,7 +28,7 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
     /**
      * Return the validated checkout fields shared by web and API placement.
      *
-     * @return array{cart_item_ids: list<int>, recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address: string|null, delivery_destination: string|null, payment_method: string, delivery_address_components: array<string, mixed>|null}
+     * @return array{cart_item_ids: list<int>, recipient_name: string, contact_number: string, fulfillment_method: string, delivery_address: string|null, delivery_address_components: array<string, mixed>|null, delivery_destination: string|null, payment_method: string, payment_channel: string|null, payment_bank: string|null, hosted_payment_method: string|null, checkout_submission_key: string|null}
      */
     public function checkoutData(): array
     {
@@ -55,6 +55,10 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
                 ? $this->string('delivery_destination')->toString()
                 : null,
             'payment_method' => $this->string('payment_method')->toString(),
+            'payment_channel' => $this->input('payment_channel'),
+            'payment_bank' => $this->input('payment_bank'),
+            'hosted_payment_method' => $this->input('hosted_payment_method'),
+            'checkout_submission_key' => $this->input('checkout_submission_key'),
         ];
     }
 
@@ -122,6 +126,21 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
                 'max:255',
             ],
             'payment_method' => ['bail', 'required', new Enum(PaymentMethod::class)],
+            'checkout_submission_key' => [Rule::requiredIf($this->input('payment_method') === PaymentMethod::Online->value), 'nullable', 'uuid'],
+            'payment_channel' => [
+                Rule::requiredIf($this->input('payment_method') === PaymentMethod::Online->value),
+                Rule::prohibitedIf($this->input('payment_method') !== PaymentMethod::Online->value),
+                'nullable',
+                Rule::in(['hosted_checkout']),
+            ],
+            'payment_bank' => [
+                'prohibited',
+            ],
+            'hosted_payment_method' => [
+                Rule::prohibitedIf($this->input('payment_method') !== PaymentMethod::Online->value),
+                'nullable',
+                Rule::in(['card', 'qrph', 'gcash', 'paymaya']),
+            ],
             'payment_proof' => [
                 'bail',
                 Rule::requiredIf($requiresPaymentProof),
@@ -147,6 +166,9 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
                 if ($this->input('fulfillment_method') !== 'delivery') {
                     return;
                 }
+                if (! is_string($this->input('delivery_destination'))) {
+                    return;
+                }
                 $this->checkGeography($validator, 'delivery');
                 if ($validator->errors()->hasAny(['delivery_destination', 'delivery_city_code', 'delivery_region_code', 'delivery_province_code'])) {
                     return;
@@ -156,7 +178,9 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
                     $zone = app(DeliveryRules::class)->zone($this->string('delivery_destination')->toString());
                     if ($paymentMethod !== null
                         && $paymentMethod->isAvailableFor(FulfillmentMethod::Delivery)
-                        && ! in_array($paymentMethod->value, $zone['payment_methods'], true)) {
+                        && ! ($paymentMethod === PaymentMethod::Online
+                            ? array_intersect(['gcash', 'maya'], $zone['payment_methods'])
+                            : in_array($paymentMethod->value, $zone['payment_methods'], true))) {
                         $validator->errors()->add('payment_method', 'This payment method is unavailable for the selected delivery route.');
                     }
                 } catch (DomainException $exception) {
@@ -186,7 +210,53 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
                 $fulfillmentMethod = FulfillmentMethod::from($this->string('fulfillment_method')->toString());
                 $paymentMethod = PaymentMethod::from($this->string('payment_method')->toString());
 
-                if (! $paymentMethod->isAvailableFor($fulfillmentMethod)) {
+                if (config('services.paymongo.enabled') && in_array($paymentMethod, [PaymentMethod::GCash, PaymentMethod::Maya], strict: true)) {
+                    $validator->errors()->add('payment_method', 'Select Pay online for new GCash or Maya payments.');
+
+                    return;
+                }
+
+                $hostedPaymentMethod = $this->input('hosted_payment_method');
+                $paymentChannel = $this->input('payment_channel');
+
+                if ($paymentMethod === PaymentMethod::Online
+                    && $paymentChannel === 'hosted_checkout'
+                    && ! is_string($hostedPaymentMethod)
+                    && config('services.paymongo.hosted_methods', []) === []) {
+                    $validator->errors()->add('payment_channel', 'Hosted online payment is not currently available.');
+
+                    return;
+                }
+
+                if ($paymentMethod === PaymentMethod::Online
+                    && $paymentChannel === 'hosted_checkout'
+                    && is_string($hostedPaymentMethod)
+                    && ! in_array($hostedPaymentMethod, config('services.paymongo.hosted_methods', []), true)) {
+                    $validator->errors()->add('hosted_payment_method', 'This online payment option is not currently available.');
+
+                    return;
+                }
+
+                $onlineMethodAvailableForDestination = true;
+
+                if ($paymentMethod === PaymentMethod::Online && $fulfillmentMethod === FulfillmentMethod::Delivery) {
+                    if (! is_string($this->input('delivery_destination')) || $validator->errors()->has('delivery_destination')) {
+                        return;
+                    }
+
+                    try {
+                        $onlineMethodAvailableForDestination = (bool) array_intersect(
+                            ['gcash', 'maya'],
+                            app(DeliveryRules::class)->zone($this->string('delivery_destination')->toString())['payment_methods'],
+                        );
+                    } catch (DomainException $exception) {
+                        $validator->errors()->add('delivery_destination', $exception->getMessage());
+                        $onlineMethodAvailableForDestination = false;
+                    }
+                }
+
+                if (! $paymentMethod->isAvailableFor($fulfillmentMethod)
+                    || ($paymentMethod === PaymentMethod::Online && (! config('services.paymongo.enabled') || ! $onlineMethodAvailableForDestination))) {
                     $validator->errors()->add(
                         'payment_method',
                         $fulfillmentMethod === FulfillmentMethod::Pickup
@@ -229,6 +299,8 @@ class ValidateCheckoutRequest extends CheckoutPreviewRequest
             'delivery_address_details.string' => 'Enter the house, building, street, or landmark details.',
             'delivery_address_details.max' => 'Delivery address details may not exceed 255 characters.',
             'payment_method.required' => 'Select a payment method.',
+            'checkout_submission_key.required' => 'Refresh checkout before starting online payment.',
+            'checkout_submission_key.uuid' => 'Refresh checkout before starting online payment.',
             'payment_method.*' => 'Select a valid payment method.',
             'payment_proof.required' => 'Upload a screenshot or snapshot of your successful payment.',
             'payment_proof.prohibited' => 'Payment proof is not required for this payment method.',

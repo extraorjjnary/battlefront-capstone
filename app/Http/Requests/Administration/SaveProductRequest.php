@@ -62,6 +62,11 @@ class SaveProductRequest extends FormRequest
             'acquisition_cost' => ['sometimes', 'nullable', 'numeric', 'decimal:0,2', 'min:0', 'max:9999999999.99'],
             'cost_change_reason' => $product instanceof Product ? ['nullable', 'string', 'min:5', 'max:1000'] : ['exclude'],
             'shipping_profile' => ['sometimes', 'required', Rule::enum(ShippingProfile::class)],
+            'package_weight_kg' => ['required', 'numeric', 'decimal:0,3', 'gt:0', 'max:99999.999'],
+            'package_length_cm' => ['required', 'numeric', 'decimal:0,2', 'gt:0', 'max:999999.99'],
+            'package_width_cm' => ['required', 'numeric', 'decimal:0,2', 'gt:0', 'max:999999.99'],
+            'package_height_cm' => ['required', 'numeric', 'decimal:0,2', 'gt:0', 'max:999999.99'],
+            'package_measurement_source' => ['required', Rule::in(['estimated', 'measured'])],
             'product_code' => $product instanceof Product ? [
                 'bail', 'required', 'string', 'regex:'.Product::CODE_PATTERN,
                 Rule::unique(Product::class, 'product_code')->ignore($product),

@@ -87,6 +87,7 @@ test('partial refund preserves decimal typing and resets to full or zero when it
 
 test('clear selection empties the pending file input and resets its selection state', () => {
     const selections = [];
+    let cleared = false;
     const state = load('./EvidenceFileInput.vue', false).setup(
         { label: 'Inspection evidence' },
         {
@@ -96,7 +97,6 @@ test('clear selection empties the pending file input and resets its selection st
             },
         },
     );
-    let cleared = false;
     state.input.value = {
         clear() {
             cleared = true;

@@ -8,10 +8,12 @@ use App\Enums\ShipmentStatus;
 use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\PayMongoFlow;
 use App\Models\Shipment;
 use App\Models\User;
 use App\Services\Order\OrderProcessingService;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -82,6 +84,65 @@ test('customers cannot cancel ineligible order or payment states and stock remai
     'GCash verified without proof' => [['payment_method' => PaymentMethod::GCash, 'payment_status' => PaymentStatus::Verified]],
     'Maya rejected without proof' => [['payment_method' => PaymentMethod::Maya, 'payment_status' => PaymentStatus::Rejected]],
 ]);
+
+test('customer cancellation reports a confirmed PayMongo payment without cancelling or restoring inventory', function () {
+    Http::preventStrayRequests();
+    $sessionUrl = 'https://api.paymongo.com/v1/checkout_sessions/cs_test_paid_before_cancel';
+    Http::fake([
+        $sessionUrl => Http::response(['data' => [
+            'id' => 'cs_test_paid_before_cancel',
+            'attributes' => [
+                'livemode' => false,
+                'status' => 'active',
+                'payments' => [[
+                    'id' => 'pay_test_paid_before_cancel',
+                    'attributes' => [
+                        'status' => 'paid',
+                        'amount' => 10000,
+                        'net_amount' => 9600,
+                        'currency' => 'PHP',
+                        'source' => ['type' => 'gcash'],
+                    ],
+                ]],
+            ],
+        ]]),
+    ]);
+    config([
+        'services.paymongo.enabled' => true,
+        'services.paymongo.mode' => 'test',
+        'services.paymongo.secret_key' => 'sk_test_fake',
+    ]);
+    $order = customerCancellationOrder([
+        'payment_method' => PaymentMethod::Online,
+        'payment_origin' => 'paymongo',
+        'total_amount' => '100.00',
+    ]);
+    $flow = PayMongoFlow::query()->create([
+        'order_id' => $order->id,
+        'mode' => 'test',
+        'channel' => 'hosted_checkout',
+        'status' => 'open',
+        'checkout_session_id' => 'cs_test_paid_before_cancel',
+        'amount_minor' => 10000,
+        'currency' => 'PHP',
+        'merchant_cutoff_at' => now()->addDay(),
+    ]);
+    $inventory = Inventory::query()->sole();
+    $inventory->update(['quantity' => 1]);
+
+    $this->actingAs($order->user)
+        ->from(route('orders.show', $order))
+        ->post(route('orders.cancel.store', $order))
+        ->assertRedirect(route('orders.show', $order))
+        ->assertSessionHasErrors([
+            'status' => 'PayMongo confirmed your payment, so this order was not cancelled. Cancellation does not refund a payment. Contact Battlefront for help with this paid order.',
+        ]);
+
+    expect($order->fresh()->status)->toBe(OrderStatus::Pending)
+        ->and($order->fresh()->payment_status)->toBe(PaymentStatus::Verified)
+        ->and($flow->fresh()->status)->toBe('paid')
+        ->and($inventory->fresh()->quantity)->toBe(1);
+});
 
 test('customers cannot cancel once their shipment has progressed', function (ShipmentStatus $status) {
     $order = customerCancellationOrder(delivery: true);

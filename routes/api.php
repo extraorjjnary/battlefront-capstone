@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\CartController;
 use App\Http\Controllers\Api\V1\CartItemController;
 use App\Http\Controllers\Api\V1\ChatbotController;
 use App\Http\Controllers\Api\V1\CheckoutController;
+use App\Http\Controllers\Api\V1\CustomerPasswordController;
 use App\Http\Controllers\Api\V1\CustomerReturnRequestController;
 use App\Http\Controllers\Api\V1\EmailVerificationController;
 use App\Http\Controllers\Api\V1\NotificationController;
@@ -13,17 +14,27 @@ use App\Http\Controllers\Api\V1\OrderCancellationController;
 use App\Http\Controllers\Api\V1\OrderCancellationRequestController;
 use App\Http\Controllers\Api\V1\OrderController;
 use App\Http\Controllers\Api\V1\OrderPaymentProofController;
+use App\Http\Controllers\Api\V1\OrderPaymentRetryController;
+use App\Http\Controllers\Api\V1\PcBuildController;
+use App\Http\Controllers\Api\V1\PcBuilderController;
 use App\Http\Controllers\Api\V1\ProductController;
+use App\Http\Controllers\Api\V1\ProductDwellController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\PushDeviceController;
 use App\Http\Controllers\Api\V1\RecommendationController;
+use App\Http\Controllers\Api\V1\WishlistController;
 use App\Http\Controllers\CustomerRefundProofController;
 use App\Http\Controllers\DeliveryLocationController;
 use App\Http\Controllers\DeliveryQuoteController;
+use App\Http\Controllers\PayMongoWebhookController;
+use App\Http\Controllers\ProductViewController;
 use App\Http\Controllers\RecommendationInteractionController;
 use App\Http\Middleware\AuthorizeApiChatbot;
+use App\Http\Middleware\AuthorizeApiCustomerOrGuest;
 use App\Http\Middleware\AuthorizeApiRecommendations;
 use Illuminate\Support\Facades\Route;
+
+Route::post('paymongo/webhook', PayMongoWebhookController::class)->name('paymongo.webhook');
 
 // Version 1 endpoints: (note: mobile is customer-centric only it's exclude administration responsibility/operations.)
 Route::prefix('v1')
@@ -49,8 +60,18 @@ Route::prefix('v1')
         Route::get('products/filters', [ProductController::class, 'filters'])->name('products.filters');
         Route::get('products/{product}', [ProductController::class, 'show'])
             ->whereNumber('product')->name('products.show');
+        Route::post('products/{product}/view', [ProductViewController::class, 'store'])
+            ->middleware([AuthorizeApiRecommendations::class, 'throttle:60,1'])->whereNumber('product')->name('products.view');
+        Route::post('products/{product}/dwell', ProductDwellController::class)
+            ->middleware([AuthorizeApiRecommendations::class, 'throttle:60,1'])->whereNumber('product')->name('products.dwell');
 
         // branch
+        Route::middleware(AuthorizeApiCustomerOrGuest::class)->group(function (): void {
+            Route::get('pc-builder', [PcBuilderController::class, 'index'])->name('pc-builder.index');
+            Route::post('pc-builder/validate', [PcBuilderController::class, 'validate'])->middleware('throttle:30,1')->name('pc-builder.validate');
+            Route::get('pc-builds/shared/{token}', [PcBuildController::class, 'showShared'])->whereUuid('token')->name('pc-builds.shared.show');
+        });
+
         Route::get('branches', [BranchController::class, 'index'])->name('branches.index');
 
         // recommendations
@@ -66,6 +87,20 @@ Route::prefix('v1')
 
         // auth customers endpoint
         Route::middleware(['auth:sanctum', 'can:use-customer-cart'])->group(function (): void {
+            Route::prefix('pc-builds')->name('pc-builds.')->group(function (): void {
+                Route::get('/', [PcBuildController::class, 'index'])->name('index');
+                Route::post('/', [PcBuildController::class, 'store'])->middleware('throttle:30,1')->name('store');
+                Route::patch('{uuid}', [PcBuildController::class, 'update'])->whereUuid('uuid')->middleware('throttle:30,1')->name('update');
+                Route::post('{uuid}/duplicate', [PcBuildController::class, 'duplicate'])->whereUuid('uuid')->middleware('throttle:30,1')->name('duplicate');
+                Route::delete('{uuid}', [PcBuildController::class, 'destroy'])->whereUuid('uuid')->middleware('throttle:30,1')->name('destroy');
+                Route::post('{uuid}/share', [PcBuildController::class, 'share'])->whereUuid('uuid')->middleware('throttle:30,1')->name('share');
+                Route::delete('{uuid}/share', [PcBuildController::class, 'stopSharing'])->whereUuid('uuid')->middleware('throttle:30,1')->name('share.destroy');
+                Route::post('{uuid}/cart', [PcBuildController::class, 'addToCart'])->whereUuid('uuid')->middleware('throttle:20,1')->name('cart.store');
+            });
+            Route::put('profile/password', CustomerPasswordController::class)->middleware('throttle:6,1')->name('profile.password');
+            Route::get('wishlist', [WishlistController::class, 'index'])->name('wishlist.index');
+            Route::post('wishlist', [WishlistController::class, 'store'])->middleware('throttle:60,1')->name('wishlist.store');
+            Route::delete('wishlist/{product}', [WishlistController::class, 'destroy'])->whereNumber('product')->name('wishlist.destroy');
             Route::get('orders/{order}/refund-payments/{payment}/proof/{evidence}', CustomerRefundProofController::class)
                 ->whereNumber(['order', 'payment', 'evidence'])->name('orders.refund-payments.proof.show');
             Route::get('orders/{order}/return-requests', [CustomerReturnRequestController::class, 'index'])
@@ -117,6 +152,9 @@ Route::prefix('v1')
                 ->whereNumber('order')->name('orders.cancellation-requests.store');
             Route::post('orders/{order}/cancel', OrderCancellationController::class)
                 ->whereNumber('order')->name('orders.cancel.store');
+            Route::post('orders/{order}/paymongo/retry', OrderPaymentRetryController::class)
+                ->middleware('throttle:10,1')
+                ->whereNumber('order')->name('orders.paymongo.retry');
             Route::get('orders/{order}', [OrderController::class, 'show'])
                 ->whereNumber('order')->name('orders.show');
             Route::post('orders/{order}/payment-proof', OrderPaymentProofController::class)

@@ -7,9 +7,9 @@ use App\Models\Product;
 use App\Models\User;
 use App\Services\Cart\CartService;
 use Database\Seeders\BranchSeeder;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /** @return array{User, CartItem, Inventory} */
 function psgcCheckoutCart(?string $defaultAddress = null): array
@@ -27,7 +27,7 @@ function psgcCheckoutCart(?string $defaultAddress = null): array
  */
 function psgcCheckoutPayload(CartItem $item, array $overrides = []): array
 {
-    return array_replace([
+    $payload = array_replace([
         'cart_item_ids' => [$item->id],
         'recipient_name' => 'Delivery Customer',
         'contact_number' => '09171234567',
@@ -35,9 +35,17 @@ function psgcCheckoutPayload(CartItem $item, array $overrides = []): array
         'delivery_destination' => 'Sagay City',
         'delivery_barangay_code' => '1804523018',
         'delivery_address_details' => '12 Mabini Street',
-        'payment_method' => 'gcash',
-        'payment_proof' => UploadedFile::fake()->image('proof.png'),
+        'payment_method' => 'online',
+        'payment_channel' => 'hosted_checkout',
+        'hosted_payment_method' => 'qrph',
+        'checkout_submission_key' => (string) Str::uuid(),
     ], $overrides);
+
+    if ($payload['payment_method'] !== 'online') {
+        unset($payload['payment_channel'], $payload['hosted_payment_method'], $payload['checkout_submission_key']);
+    }
+
+    return $payload;
 }
 
 test('web and mobile previews expose identical local dropdown data and conservative prefills', function () {
@@ -84,7 +92,7 @@ test('structured delivery placement saves each supported destination with its un
     if ($channel === 'web') {
         $response->assertSessionHasNoErrors()->assertRedirectToRoute('orders.show', Order::sole());
     } else {
-        $response->assertCreated()->assertJsonPath('data.fulfillment.delivery_address', $address);
+        $response->assertSuccessful()->assertJsonPath('data.fulfillment.delivery_address', $address);
     }
     $order = Order::sole();
     expect($order->delivery_address)->toBe($address);
@@ -95,7 +103,7 @@ test('structured delivery placement saves each supported destination with its un
     expect($stock->refresh()->quantity)->toBe(4);
     expect($customer->refresh()->default_delivery_address)->toBe('Saved address');
     $this->assertModelMissing($item);
-    Storage::disk('local')->assertExists($order->payment_proof_path);
+    expect($order->payment_proof_path)->toBeNull();
 })->with(['web', 'api'])->with([
     ['Sagay City', '1804523018', '12 Mabini Street, Poblacion I, Sagay City, Negros Occidental', '80.00', '180.00'],
     ['Escalante City', '1804509002', '12 Mabini Street, Balintawak, Escalante City, Negros Occidental', '100.00', '200.00'],
@@ -182,7 +190,7 @@ test('legacy mobile delivery still saves its original address contract', functio
     unset($payload['delivery_barangay_code'], $payload['delivery_address_details']);
 
     $this->withToken($customer->createToken('Phone')->plainTextToken)
-        ->post('/api/v1/orders', $payload)->assertCreated()
+        ->post('/api/v1/orders', $payload)->assertSuccessful()
         ->assertJsonPath('data.fulfillment.delivery_address', '12 Mabini Street, Sagay City');
 
     expect(Order::sole()->delivery_address)->toBe('12 Mabini Street, Sagay City');
@@ -227,7 +235,7 @@ test('pickup needs no structured address and rejects nonempty delivery fields', 
     $this->assertDatabaseCount('orders', 0);
     unset($payload['delivery_barangay_code'], $payload['delivery_address_details']);
     $valid = $this->post($url, $payload);
-    $channel === 'web' ? $valid->assertSessionHasNoErrors() : $valid->assertCreated();
+    $channel === 'web' ? $valid->assertSessionHasNoErrors() : $valid->assertSuccessful();
 
     expect(Order::sole()->delivery_address)->toBeNull();
     expect(Order::sole()->delivery_fee)->toBe('0.00');

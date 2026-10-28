@@ -94,20 +94,18 @@ test('customers see authoritative persisted order confirmation details', functio
             'delivery_address' => 'Sagay City, Negros Occidental',
             'delivery_destination' => null,
         ])
-        ->where('order.payment', [
-            'method' => [
-                'value' => PaymentMethod::GCash->value,
-                'label' => 'GCash',
-            ],
-            'status' => [
-                'value' => PaymentStatus::Pending->value,
-                'label' => 'Pending',
-            ],
-            'proof_submitted' => true,
-            'notice' => 'Your uploaded proof is awaiting manual verification by Battlefront.',
-            'rejection' => null,
-            'can_resubmit_proof' => false,
+        ->where('order.payment.method', [
+            'value' => PaymentMethod::GCash->value,
+            'label' => 'GCash',
         ])
+        ->where('order.payment.status', [
+            'value' => PaymentStatus::Pending->value,
+            'label' => 'Pending',
+        ])
+        ->where('order.payment.proof_submitted', true)
+        ->where('order.payment.notice', 'Your uploaded proof is awaiting manual verification by Battlefront.')
+        ->where('order.payment.rejection', null)
+        ->where('order.payment.can_resubmit_proof', false)
         ->has('order.items', 1)
         ->where('order.items.0.id', $item->id)
         ->where('order.items.0.product.name', 'Battlefront Graphics Card')

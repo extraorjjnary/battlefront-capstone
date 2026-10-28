@@ -105,6 +105,7 @@ function loadComponent(
                 show: route,
             },
             '@/routes/branches': { index: route },
+            '@/routes/pc-builder': { index: route },
             '@/routes/cart': { index: route },
             '@/routes/orders': { index: route },
             '@/routes/profile': { edit: () => ({ url: '/settings/profile' }) },

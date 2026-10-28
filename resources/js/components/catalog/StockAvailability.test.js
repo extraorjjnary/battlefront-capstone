@@ -26,7 +26,11 @@ const generic = new Proxy(
 const modules = new Proxy(
     {
         vue: Vue,
-        '@inertiajs/vue3': { Form: primitive, Link: primitive },
+        '@inertiajs/vue3': {
+            Form: primitive,
+            Link: primitive,
+            usePage: () => ({ props: { auth: { can: {} } } }),
+        },
         '@/components/ui/input': {
             Input: {
                 props: ['defaultValue'],

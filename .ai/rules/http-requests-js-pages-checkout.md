@@ -5,6 +5,6 @@ paths:
 
 # Http Requests Js Pages Checkout
 
-## Offer product-subtotal COD on unconfigured nationwide routes
+## Offer COD on regional estimate routes
 
-Supersedes the earlier GCash/Maya-only eligibility for valid routes without configured pricing. Include COD in the server quote and permit proof-free placement with delivery_fee=0.00 and total equal to product subtotal; snapshot that no delivery fee or LBC collection arrangement is represented. Do not create a Shipment or change existing COD progression/collection-confirmation rules; configured-route COD remains unchanged.
+Preserve COD eligibility for newly regional-priced routes. COD remains proof-free and uses the saved total, including the Battlefront delivery estimate; delivery arrangement and ETA are confirmed manually, and existing explicit COD collection/remittance confirmation remains required. Do not create a Shipment at checkout or infer LBC collection from the estimate. Historical not_configured orders retain their original product-subtotal-only totals.

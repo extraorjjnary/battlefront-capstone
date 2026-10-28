@@ -24,7 +24,7 @@ test('staff can browse available storefront products but cannot access administr
     $this->actingAs($staff)->get(route('administration.products.show', $product))->assertForbidden();
     $this->actingAs($staff)->get(route('administration.products.create'))->assertForbidden();
     $this->actingAs($staff)->get(route('administration.products.edit', $product))->assertForbidden();
-    $this->actingAs($staff)->post(route('administration.products.store'), [])->assertForbidden();
+    $this->actingAs($staff)->post(route('administration.products.store'), [...validPackageMeasurements()])->assertForbidden();
     $this->actingAs($staff)->patch(route('administration.products.activation.update', $product), [
         'is_active' => true,
     ])->assertForbidden();
@@ -48,7 +48,7 @@ test('manager can manage products while owner retains price and deletion control
     $this->actingAs($manager)->get(route('administration.products.edit', $product))->assertOk();
     $this->actingAs($manager)->get(route('administration.products.create'))->assertForbidden();
     $this->actingAs($manager)->delete(route('administration.products.destroy', $product))->assertForbidden();
-    $this->actingAs($manager)->put(route('administration.products.update', $product), [
+    $this->actingAs($manager)->put(route('administration.products.update', $product), [...validPackageMeasurements(),
         'edit_version' => $product->edit_version,
         'product_code' => $product->product_code,
         'name' => $product->name,
@@ -89,6 +89,7 @@ test('owners receive validation errors for scientific notation in product amount
     ]);
     $before = $product->refresh()->toArray();
     $payload = [
+        ...validPackageMeasurements(),
         'edit_version' => $product->edit_version,
         'product_code' => $product->product_code,
         'name' => $product->name,
@@ -133,7 +134,7 @@ test('managers can save nonmonetary changes with numerically unchanged prices', 
         'price' => '1000.00', 'discount_price' => $discountPrice, 'acquisition_cost' => '800.00',
     ]);
 
-    $this->actingAs($manager)->put(route('administration.products.update', $product), [
+    $this->actingAs($manager)->put(route('administration.products.update', $product), [...validPackageMeasurements(),
         'edit_version' => $product->edit_version,
         'product_code' => $product->product_code,
         'name' => 'Updated product description',

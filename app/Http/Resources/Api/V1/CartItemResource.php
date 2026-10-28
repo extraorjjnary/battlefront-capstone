@@ -17,6 +17,7 @@ class CartItemResource extends JsonResource
         return [
             'id' => $this->resource['id'],
             'quantity' => $this->resource['quantity'],
+            'pc_build_group' => $this->resource['pc_build_group'] ?? null,
             'product' => [
                 'id' => $this->resource['product']['id'],
                 'name' => $this->resource['product']['name'],

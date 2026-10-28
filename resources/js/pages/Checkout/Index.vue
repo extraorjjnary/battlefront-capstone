@@ -27,6 +27,7 @@ import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Spinner } from '@/components/ui/spinner';
 import { formatCurrency } from '@/lib/currency';
+import { createUuid } from '@/lib/uuid';
 import { index as cartIndex } from '@/routes/cart';
 
 const props = defineProps({
@@ -35,6 +36,7 @@ const props = defineProps({
     pickupLocation: { type: Object, required: true },
     fulfillmentMethods: { type: Array, required: true },
     paymentMethods: { type: Array, required: true },
+    paymongoHostedMethods: { type: Array, required: true },
     deliveryQuotes: { type: Array, required: true },
     deliveryLocations: { type: Array, required: true },
     deliveryAddressPrefill: { type: Object, required: true },
@@ -43,6 +45,13 @@ const props = defineProps({
 
 const fulfillmentMethod = ref('pickup');
 const paymentMethod = ref('cash');
+const hostedPaymentMethod = ref(
+    props.paymongoHostedMethods.includes('qrph')
+        ? 'qrph'
+        : (props.paymongoHostedMethods[0] ?? ''),
+);
+const checkoutSubmissionKey = createUuid();
+let paymentWindow = null;
 const paymentProofKey = ref(0);
 const deliveryAddress = ref({ ...props.deliveryAddressPrefill });
 const deliveryDestination = computed(
@@ -69,16 +78,26 @@ function formatDeliveryDate(value) {
 }
 
 const availablePaymentMethods = computed(() =>
-    props.paymentMethods.filter(
-        (method) =>
-            method.available_for.includes(fulfillmentMethod.value) &&
-            (fulfillmentMethod.value !== 'delivery' ||
-                (selectedQuote.value?.order_placement_allowed !== false &&
-                    (!selectedQuote.value?.payment_methods ||
-                        selectedQuote.value.payment_methods.includes(
-                            method.value,
-                        )))),
-    ),
+    props.paymentMethods.filter((method) => {
+        if (!method.available_for.includes(fulfillmentMethod.value)) {
+            return false;
+        }
+
+        if (fulfillmentMethod.value !== 'delivery') {
+            return true;
+        }
+
+        if (selectedQuote.value?.order_placement_allowed === false) {
+            return false;
+        }
+
+        const quotePaymentMethods = selectedQuote.value?.payment_methods;
+
+        return !quotePaymentMethods ||
+            quotePaymentMethods.includes(method.value) ||
+            (method.value === 'online' &&
+                quotePaymentMethods.some((value) => ['gcash', 'maya'].includes(value)));
+    }),
 );
 const selectedPaymentMethod = computed(() =>
     props.paymentMethods.find((method) => method.value === paymentMethod.value),
@@ -117,6 +136,29 @@ function chooseFulfillment(value) {
 function choosePayment(value) {
     paymentMethod.value = value;
     paymentProofKey.value += 1;
+}
+
+function preparePaymentWindow() {
+    if (paymentMethod.value !== 'online') {
+        return;
+    }
+
+    paymentWindow = window.open('about:blank', '_blank');
+    if (paymentWindow) {
+        paymentWindow.opener = null;
+        paymentWindow.document.title = 'Opening secure payment';
+        paymentWindow.document.body.innerHTML = '<p style="font-family: sans-serif; padding: 2rem">Preparing your secure payment…</p>';
+    }
+}
+
+function finishPaymentWindow(page) {
+    const checkoutUrl = page.props.order?.payment?.checkout_url;
+    if (paymentWindow && checkoutUrl) {
+        paymentWindow.location.replace(checkoutUrl);
+    } else if (paymentWindow) {
+        paymentWindow.close();
+    }
+    paymentWindow = null;
 }
 
 async function refreshQuote() {
@@ -181,7 +223,8 @@ defineOptions({
 
             <Form
                 v-bind="storeOrder.form()"
-                :options="{ preserveScroll: true }"
+                :options="{ preserveScroll: true, onSuccess: finishPaymentWindow, onError: () => paymentWindow?.close() }"
+                @submit="preparePaymentWindow"
                 class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start"
                 v-slot="{ errors, processing, progress }"
             >
@@ -192,6 +235,9 @@ defineOptions({
                     name="cart_item_ids[]"
                     :value="item.id"
                 />
+                <input type="hidden" name="checkout_submission_key" :value="checkoutSubmissionKey" />
+                <input v-if="paymentMethod === 'online'" type="hidden" name="payment_channel" value="hosted_checkout" />
+                <input v-if="paymentMethod === 'online'" type="hidden" name="hosted_payment_method" :value="hostedPaymentMethod" />
                 <div class="grid gap-6">
                     <Alert v-if="errors.cart" variant="destructive">
                         <AlertTitle>Your cart changed</AlertTitle>
@@ -489,10 +535,7 @@ defineOptions({
                                 aria-live="polite"
                             >
                                 <template
-                                    v-if="
-                                        selectedQuote.pricing_configured ===
-                                        false
-                                    "
+                                    v-if="selectedQuote.pricing_status === 'not_configured'"
                                 >
                                     <p class="font-semibold">
                                         No delivery estimate configured ·
@@ -518,6 +561,70 @@ defineOptions({
                                     >
                                         {{ selectedQuote.assumption_label }}
                                     </p>
+                                    <a
+                                        class="text-primary underline underline-offset-4"
+                                        href="https://ratecalcapi.lbcapps.com/Tools/PH_Rate_Calculator"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        Check this route with LBC’s official rate calculator
+                                    </a>
+                                </template>
+                                <template
+                                    v-else-if="selectedQuote.delivery_arrangement_required"
+                                >
+                                    <p class="font-semibold">
+                                        Battlefront regional shipping estimate ·
+                                        {{
+                                            selectedQuote.destination_label ??
+                                            selectedQuote.destination
+                                        }}
+                                    </p>
+                                    <p>
+                                        Route base
+                                        {{
+                                            formatCurrency(
+                                                selectedQuote.route_base_fee,
+                                            )
+                                        }}
+                                        + weight
+                                        {{ formatCurrency(selectedQuote.weight_surcharge) }}
+                                        + handling
+                                        {{
+                                            formatCurrency(
+                                                selectedQuote.handling_surcharge,
+                                            )
+                                        }}
+                                    </p>
+                                    <p class="text-muted-foreground text-xs">
+                                        Billable weight: {{ selectedQuote.billable_weight_kg }} kg (actual {{ selectedQuote.actual_weight_kg }} kg; volumetric {{ selectedQuote.volumetric_weight_kg }} kg).
+                                    </p>
+                                    <p class="text-muted-foreground text-xs">
+                                        Package measurements: {{ selectedQuote.measurement_sources.measured }} item units measured and {{ selectedQuote.measurement_sources.estimated }} estimated.
+                                    </p>
+                                    <p class="leading-6">
+                                        The estimated shipping fee is included
+                                        in your total. Battlefront will confirm
+                                        the delivery arrangement and ETA
+                                        manually.
+                                    </p>
+                                    <p class="text-muted-foreground text-xs leading-5">
+                                        {{ selectedQuote.notice }}
+                                    </p>
+                                    <p class="text-muted-foreground text-xs leading-5">
+                                        {{ selectedQuote.assumption_label }}
+                                    </p>
+                                    <p class="text-muted-foreground text-xs leading-5">
+                                        {{ selectedQuote.estimate_disclosure }}
+                                    </p>
+                                    <a
+                                        class="text-primary underline underline-offset-4"
+                                        href="https://www.lbcexpress.com/rates/"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        Check LBC’s official rate calculator
+                                    </a>
                                 </template>
                                 <template v-else>
                                     <p class="font-semibold">
@@ -542,18 +649,29 @@ defineOptions({
                                         }}
                                     </p>
                                     <p class="text-muted-foreground">
-                                        Base fee
+                                        Route base
                                         {{
                                             formatCurrency(
-                                                selectedQuote.base_fee,
+                                                selectedQuote.route_base_fee,
                                             )
                                         }}
+                                        + weight
+                                        {{ formatCurrency(selectedQuote.weight_surcharge) }}
                                         + handling
                                         {{
                                             formatCurrency(
                                                 selectedQuote.handling_surcharge,
                                             )
                                         }}
+                                    </p>
+                                    <p class="text-muted-foreground text-xs">
+                                        Billable weight: {{ selectedQuote.billable_weight_kg }} kg (actual {{ selectedQuote.actual_weight_kg }} kg; volumetric {{ selectedQuote.volumetric_weight_kg }} kg).
+                                    </p>
+                                    <p class="text-muted-foreground text-xs">
+                                        Package measurements: {{ selectedQuote.measurement_sources.measured }} item units measured and {{ selectedQuote.measurement_sources.estimated }} estimated.
+                                    </p>
+                                    <p class="text-muted-foreground text-xs leading-5">
+                                        {{ selectedQuote.estimate_disclosure }}
                                     </p>
                                     <p class="font-semibold">
                                         Estimated delivery:
@@ -578,6 +696,14 @@ defineOptions({
                                     >
                                         {{ selectedQuote.notice }}
                                     </p>
+                                    <a
+                                        class="text-primary underline underline-offset-4"
+                                        href="https://ratecalcapi.lbcapps.com/Tools/PH_Rate_Calculator"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        Check this route with LBC’s official rate calculator
+                                    </a>
                                     <p
                                         v-if="selectedQuote.is_demo"
                                         class="text-muted-foreground text-xs leading-5"
@@ -585,6 +711,17 @@ defineOptions({
                                         {{ selectedQuote.assumption_label }}
                                     </p>
                                 </template>
+                                <p
+                                    v-if="
+                                        selectedQuote.pricing_status ===
+                                            'configured_estimate' ||
+                                        selectedQuote.pricing_status ===
+                                            'regional_estimate'
+                                    "
+                                    class="border-border text-muted-foreground border-t pt-2 text-xs leading-5"
+                                >
+                                    The shipping fee shown here is fixed when you place the order. Battlefront covers any difference from the courier's final charge.
+                                </p>
                             </div>
                         </div>
                     </section>
@@ -646,6 +783,8 @@ defineOptions({
                                             method.description ??
                                             (method.value === 'cod'
                                                 ? 'Pay upon delivery. Delivery orders only.'
+                                                : method.value === 'online'
+                                                  ? 'Pay securely on PayMongo using an available online method. No receipt upload is required.'
                                                 : method.requires_proof
                                                   ? 'Manual e-wallet payment with proof.'
                                                   : fulfillmentMethod ===
@@ -658,6 +797,23 @@ defineOptions({
                             </label>
                         </div>
                         <InputError :message="errors.payment_method" />
+
+                        <div v-if="paymentMethod === 'online'" class="grid gap-4 border-border bg-secondary/40 border p-4">
+                            <div class="grid gap-2">
+                                <InputError :message="errors.payment_channel" />
+                                <Label for="hosted-payment-method">Pay with</Label>
+                                <select id="hosted-payment-method" v-model="hostedPaymentMethod" class="border-input bg-background h-10 w-full border px-3 text-sm">
+                                    <option v-if="paymongoHostedMethods.includes('qrph')" value="qrph">QR Ph — GCash, Maya, and supported bank apps</option>
+                                    <option v-if="paymongoHostedMethods.includes('card')" value="card">Credit or debit card</option>
+                                    <option v-if="paymongoHostedMethods.includes('gcash')" value="gcash">GCash</option>
+                                    <option v-if="paymongoHostedMethods.includes('paymaya')" value="paymaya">Maya</option>
+                                </select>
+                                <InputError :message="errors.hosted_payment_method" />
+                                <p v-if="hostedPaymentMethod === 'qrph'" class="text-muted-foreground text-xs leading-5">After you place the order, PayMongo will open in a new tab and display your QR Ph code. Keep this page open to check your order.</p>
+                                <p v-else-if="hostedPaymentMethod === 'card'" class="text-muted-foreground text-xs leading-5">Pay securely by card on PayMongo.</p>
+                                <p v-else class="text-muted-foreground text-xs leading-5">Continue to PayMongo to pay with your selected wallet.</p>
+                            </div>
+                        </div>
 
                         <Alert v-if="isCod">
                             <AlertTitle>Pay upon delivery</AlertTitle>
@@ -673,14 +829,21 @@ defineOptions({
                                     arrangement is included; delivery
                                     arrangements must be confirmed separately.
                                 </template>
+                                <template
+                                    v-else-if="selectedQuote?.delivery_arrangement_required"
+                                >
+                                    The total COD amount includes the product subtotal and Battlefront’s regional delivery fee estimate. Battlefront will confirm the delivery arrangement manually. No advance payment or payment proof is required.
+                                </template>
                                 <template v-else>
                                     The total COD amount includes your products
                                     and the configured demo delivery fee.
-                                    Payment will be collected upon delivery; no
-                                    advance payment or payment proof is
-                                    required. Battlefront manually arranges
-                                    delivery. This selection does not book or
-                                    approve COD with LBC.
+                                    LBC collects the full amount at delivery.
+                                    Battlefront records payment after LBC
+                                    remits the full order amount. No advance
+                                    payment or payment proof is required.
+                                    Battlefront arranges delivery manually;
+                                    this checkout does not create an LBC
+                                    booking.
                                 </template>
                             </AlertDescription>
                         </Alert>
@@ -706,6 +869,11 @@ defineOptions({
                                     only; no delivery fee is included. Any
                                     delivery arrangement and charge must be
                                     confirmed separately.
+                                </template>
+                                <template
+                                    v-else-if="selectedQuote.delivery_arrangement_required"
+                                >
+                                    Pay {{ formatCurrency(selectedQuote.total) }} to Battlefront, including the product subtotal and regional delivery fee estimate. Battlefront will confirm delivery arrangements manually.
                                 </template>
                                 <template v-else>
                                     Pay
@@ -842,6 +1010,9 @@ defineOptions({
                             class="grid grid-cols-[1fr_auto] gap-4 py-4"
                         >
                             <div class="min-w-0">
+                                <p v-if="item.pc_build_group" class="text-primary-ink mb-1 text-xs font-semibold uppercase tracking-wide">
+                                    PC build · {{ item.pc_build_group.name }}
+                                </p>
                                 <p class="truncate text-sm font-semibold">
                                     {{ item.product.name }}
                                 </p>
@@ -889,7 +1060,7 @@ defineOptions({
                             <dt class="text-muted-foreground">Delivery fee</dt>
                             <dd class="font-semibold tabular-nums">
                                 {{
-                                    selectedQuote?.pricing_configured === false
+                                    selectedQuote?.pricing_status === 'not_configured'
                                         ? 'Not quoted'
                                         : selectedQuote
                                           ? formatCurrency(
@@ -906,7 +1077,7 @@ defineOptions({
                         >
                             <dt class="font-semibold">
                                 {{
-                                    selectedQuote?.pricing_configured === false
+                                    selectedQuote?.pricing_status === 'not_configured'
                                         ? isCod
                                             ? 'Product subtotal payable upon delivery'
                                             : 'Product subtotal payable'
@@ -917,7 +1088,7 @@ defineOptions({
                             </dt>
                             <dd class="text-2xl font-bold tabular-nums">
                                 {{
-                                    selectedQuote?.pricing_configured === false
+                                    selectedQuote?.pricing_status === 'not_configured'
                                         ? formatCurrency(
                                               selectedQuote.product_subtotal,
                                           )

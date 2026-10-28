@@ -17,7 +17,7 @@ class ReviewCheckoutCart
      *
      * @param  list<int>  $cartItemIds
      * @return array{
-     *     items: list<array{id: int, quantity: int, product: array{id: int, name: string, brand: string|null, image_url: string|null}, unit_price: string, line_total: string}>,
+     *     items: list<array{id: int, quantity: int, pc_build_group: array{uuid: string, name: string}|null, product: array{id: int, name: string, brand: string|null, image_url: string|null}, unit_price: string, line_total: string}>,
      *     item_count: int,
      *     total_quantity: int,
      *     total: string
@@ -36,6 +36,10 @@ class ReviewCheckoutCart
                 throw CheckoutUnavailableException::invalidSelection();
             }
 
+            if (! $this->cartService->selectionContainsCompletePcBuilds($customer, $cartItemIds)) {
+                throw CheckoutUnavailableException::invalidSelection();
+            }
+
             $availability = $this->cartService->availability($customer, $cartItemIds);
 
             if (collect($availability)->contains(
@@ -48,10 +52,11 @@ class ReviewCheckoutCart
             $cart = $customer->cart()
                 ->with([
                     'items' => fn ($query) => $query
-                        ->select(['id', 'cart_id', 'product_id', 'quantity'])
+                        ->select(['id', 'cart_id', 'product_id', 'quantity', 'pc_build_cart_group_id'])
                         ->whereKey($cartItemIds)
                         ->orderBy('id'),
                     'items.product:id,name,brand,image_path',
+                    'items.pcBuildGroup:id,uuid,name',
                 ])
                 ->first();
             $items = [];
@@ -63,6 +68,10 @@ class ReviewCheckoutCart
                 $items[] = [
                     'id' => $item->id,
                     'quantity' => $item->quantity,
+                    'pc_build_group' => $item->pcBuildGroup === null ? null : [
+                        'uuid' => $item->pcBuildGroup->uuid,
+                        'name' => $item->pcBuildGroup->name,
+                    ],
                     'product' => [
                         'id' => $item->product->id,
                         'name' => $item->product->name,
