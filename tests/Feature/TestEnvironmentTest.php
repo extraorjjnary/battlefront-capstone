@@ -1,12 +1,34 @@
 <?php
 
 use App\Services\Order\PsgcDeliveryLocations;
+use App\Services\PayMongo\PayMongoClient;
 use Illuminate\Foundation\Exceptions\Renderer\Renderer;
+use Illuminate\Http\Client\StrayRequestException;
 use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\ParallelTesting;
 use Symfony\Component\Process\Process;
+
+test('checkout tests enable test mode without inheriting provider credentials', function () {
+    expect(config('services.paymongo.enabled'))->toBeTrue();
+    expect(config('services.paymongo.mode'))->toBe('test');
+    expect(config('services.paymongo.secret_key'))->toBe('');
+    expect(config('services.paymongo.public_key'))->toBe('');
+    expect(config('services.paymongo.webhook_secret'))->toBe('');
+
+    expect(fn () => app(PayMongoClient::class)->request())
+        ->toThrow(RuntimeException::class, 'PayMongo test checkout is not configured.');
+    Http::assertNothingSent();
+});
+
+test('feature tests reject unfaked HTTP requests before reaching the network', function () {
+    expect(fn () => Http::get('https://unfaked-provider.invalid/test'))
+        ->toThrow(StrayRequestException::class);
+
+    Http::assertNothingSent();
+});
 
 test('HTTP errors avoid the browser debug renderer while still reporting failures', function () {
     expect(config('app.debug'))->toBeFalse();

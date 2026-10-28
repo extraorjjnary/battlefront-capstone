@@ -17,6 +17,38 @@ beforeEach(function () {
     config(['services.paymongo.enabled' => false]);
 });
 
+test('disabled gateway rejects online checkout without consuming the cart or stock', function (string $endpoint) {
+    $customer = User::factory()->customer()->create();
+    $product = Product::factory()->standard()->create();
+    $stock = Inventory::factory()->for($product)->create(['quantity' => 5]);
+    $item = app(CartService::class)->add($customer, $product->id, 1);
+
+    $this->actingAs($customer, $endpoint === 'api.v1.orders.store' ? 'sanctum' : 'web')
+        ->postJson(route($endpoint), [
+            'cart_item_ids' => [$item->id],
+            'recipient_name' => $customer->name,
+            'contact_number' => '09171234567',
+            'fulfillment_method' => 'delivery',
+            'delivery_destination' => 'Sagay City',
+            'delivery_barangay_code' => '1804523018',
+            'delivery_address_details' => '12 Mabini Street',
+            'payment_method' => 'online',
+            'payment_channel' => 'hosted_checkout',
+            'hosted_payment_method' => 'qrph',
+            'checkout_submission_key' => (string) Str::uuid(),
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('payment_method');
+
+    $this->assertDatabaseCount('orders', 0);
+    $this->assertDatabaseCount('order_items', 0);
+    $this->assertDatabaseCount('shipments', 0);
+    $this->assertDatabaseCount('paymongo_flows', 0);
+    $this->assertModelExists($item);
+    expect($stock->refresh()->quantity)->toBe(5);
+    Http::assertNothingSent();
+})->with(['orders.store', 'api.v1.orders.store']);
+
 test('checkout offers configured hosted methods with QR Ph first and no direct banks', function () {
     config([
         'services.paymongo.enabled' => true,

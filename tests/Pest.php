@@ -20,10 +20,12 @@ use Tests\TestCase;
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
     ->beforeEach(function () {
+        config()->set('inertia.ssr.enabled', false);
         // Chatbot verification must never consume the configured Gemini quota.
         config()->set('ai.providers.gemini.key', 'testing-only');
         ChatbotResponseAgent::fake()->preventStrayPrompts();
         ChatbotIntentAgent::fake()->preventStrayPrompts();
+        Http::preventStrayRequests();
         Http::fake([
             'generativelanguage.googleapis.com/*' => fn () => throw new RuntimeException('Gemini HTTP requests must be explicitly faked in tests.'),
         ]);

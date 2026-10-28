@@ -31,6 +31,21 @@
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
+        <!-- Isolate process variables and PHP's higher-priority $_SERVER values. -->
+        <env name="PAYMONGO_ENABLED" value="(true)" force="true"/>
+        <env name="PAYMONGO_MODE" value="test" force="true"/>
+        <env name="PAYMONGO_SECRET_KEY" value="" force="true"/>
+        <env name="PAYMONGO_PUBLIC_KEY" value="" force="true"/>
+        <env name="PAYMONGO_WEBHOOK_SECRET" value="" force="true"/>
+        <env name="PAYMONGO_HOSTED_METHODS" value="card,gcash,paymaya,qrph" force="true"/>
+        <env name="PAYMONGO_DIRECT_BANKING_ENABLED" value="(false)" force="true"/>
+        <server name="PAYMONGO_ENABLED" value="(true)" force="true"/>
+        <server name="PAYMONGO_MODE" value="test" force="true"/>
+        <server name="PAYMONGO_SECRET_KEY" value="" force="true"/>
+        <server name="PAYMONGO_PUBLIC_KEY" value="" force="true"/>
+        <server name="PAYMONGO_WEBHOOK_SECRET" value="" force="true"/>
+        <server name="PAYMONGO_HOSTED_METHODS" value="card,gcash,paymaya,qrph" force="true"/>
+        <server name="PAYMONGO_DIRECT_BANKING_ENABLED" value="(false)" force="true"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
