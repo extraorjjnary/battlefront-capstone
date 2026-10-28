@@ -3,9 +3,11 @@
 use App\Console\Commands\ResetDevCommand;
 use App\Enums\ChatbotCategory;
 use App\Models\CartItem;
+use App\Models\Category;
 use App\Models\ChatbotKnowledge;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\ProductComponentProfile;
 use App\Models\Sale;
 use App\Models\User;
 use App\Services\Dashboard\DashboardService;
@@ -15,6 +17,7 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DevelopmentCustomerSeeder;
 use Database\Seeders\DevelopmentHistoricalSalesSeeder;
+use Database\Seeders\PcBuilderCatalogDraftSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -128,6 +131,8 @@ test('reset stops when an orchestration stage fails', function (string $stage) {
             $mock->shouldReceive('execute')->once()->andThrow(new RuntimeException('Import failed.'));
         } elseif ($stage === 'count') {
             $mock->shouldReceive('execute')->once()->andReturn(['created' => 653, 'updated' => 0]);
+        } elseif ($stage === 'pc-builder') {
+            $mock->shouldReceive('execute')->once()->andReturn(['created' => 654, 'updated' => 0]);
         } else {
             $mock->shouldNotReceive('execute');
         }
@@ -142,15 +147,66 @@ test('reset stops when an orchestration stage fails', function (string $stage) {
     if (! in_array($stage, ['migration', 'seeding'], true)) {
         $command->shouldReceive('call')->with('db:seed', ['--class' => DevelopmentCustomerSeeder::class, '--force' => true, '--no-interaction' => true])->once()->andReturn($stage === 'customers' ? 1 : 0);
     }
+    if ($stage === 'pc-builder') {
+        $command->shouldReceive('call')->with('db:seed', ['--class' => PcBuilderCatalogDraftSeeder::class, '--force' => true, '--no-interaction' => true])->once()->andReturn(1);
+    } else {
+        $command->shouldNotReceive('call')->with('db:seed', ['--class' => PcBuilderCatalogDraftSeeder::class, '--force' => true, '--no-interaction' => true]);
+    }
+    $command->shouldNotReceive('call')->with('db:seed', ['--class' => DevelopmentHistoricalSalesSeeder::class, '--force' => true, '--no-interaction' => true]);
     Artisan::registerCommand($command);
 
     $this->artisan('battlefront:reset-dev', ['--force' => true])
+        ->expectsOutputToContain($stage === 'pc-builder' ? 'PC Builder draft seeding failed' : 'failed:')
         ->expectsOutputToContain('Reset incomplete')
         ->doesntExpectOutput('Development reset completed.')
         ->assertFailed();
 
     $this->assertModelExists($sentinel);
-})->with(['migration', 'seeding', 'customers', 'import', 'count']);
+})->with(['migration', 'seeding', 'customers', 'import', 'count', 'pc-builder']);
+
+test('reset prepares component drafts after catalog import and before optional history', function (bool $withHistory) {
+    $this->mock(RealCatalogImportService::class, function ($mock) {
+        $mock->shouldReceive('inspectFiles')->once()->andReturn(array_pad(array_map(fn (string $code): array => ['product_code' => $code], DevelopmentHistoricalSalesSeeder::PRODUCT_CODES), 654, []));
+        $mock->shouldReceive('execute')->once()->andReturnUsing(function (): array {
+            expect(ProductComponentProfile::query()->count())->toBe(0);
+            Product::factory()->available()->for(Category::factory()->create(['name' => 'Motherboard']))->create([
+                'product_code' => '62504865', 'name' => 'MSI B450M-A PRO MAX II',
+            ]);
+
+            return ['created' => 654, 'updated' => 0];
+        });
+    });
+    $command = Mockery::mock(ResetDevCommand::class)->makePartial();
+    $command->setName('battlefront:reset-dev');
+    $command->setDefinition((new ResetDevCommand)->getDefinition());
+    $command->shouldReceive('call')->with('migrate:fresh', Mockery::any())->once()->andReturn(0);
+    foreach ([DatabaseSeeder::class, DevelopmentCustomerSeeder::class] as $seeder) {
+        $command->shouldReceive('call')->with('db:seed', ['--class' => $seeder, '--force' => true, '--no-interaction' => true])->once()->andReturn(0);
+    }
+    if ($withHistory) {
+        $command->shouldReceive('call')->with('db:seed', ['--class' => DevelopmentHistoricalSalesSeeder::class, '--force' => true, '--no-interaction' => true])->once()->andReturnUsing(function (): int {
+            expect(ProductComponentProfile::query()->sole()->review_status)->toBe('draft');
+
+            return 0;
+        });
+    } else {
+        $command->shouldNotReceive('call')->with('db:seed', ['--class' => DevelopmentHistoricalSalesSeeder::class, '--force' => true, '--no-interaction' => true]);
+    }
+    Artisan::registerCommand($command);
+
+    $this->artisan('battlefront:reset-dev', ['--force' => true, '--with-sales-history' => $withHistory])
+        ->expectsOutput('PC Builder catalog drafts seeded. Review specifications before publishing predefined builds.')
+        ->assertSuccessful();
+
+    $profile = ProductComponentProfile::query()->sole();
+    expect($profile->review_status)->toBe('draft');
+    expect($profile->revisions()->sole()->review_status)->toBe('draft');
+    $this->get(route('pc-builder.index'))->assertInertia(fn (Assert $page) => $page
+        ->where('components.motherboard.0.id', $profile->product_id)
+        ->where('components.motherboard.0.specifications_reviewed', false)
+        ->where('components.motherboard.0.specifications', [])
+        ->has('templates', 0));
+})->with([false, true]);
 
 test('reset restores the complete real catalog with historical sales only when requested', function (bool $withHistory) {
     $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00'));
@@ -202,6 +258,10 @@ test('reset restores the complete real catalog with historical sales only when r
         expect($products)->toHaveCount(654);
         $this->assertDatabaseCount('products', 654);
         $this->assertDatabaseCount('inventories', 654);
+        $this->assertDatabaseCount('product_component_profiles', 14);
+        expect(ProductComponentProfile::query()->where('review_status', '!=', 'draft')->count())->toBe(0);
+        $this->assertDatabaseCount('pc_build_templates', 6);
+        $this->assertDatabaseCount('pc_build_template_items', 0);
         foreach ($expected as $row) {
             $product = $products->get($row['product_code']);
             expect($product)->not->toBeNull();
@@ -345,6 +405,7 @@ test('reset reports optional historical seeding failure after a successful catal
     $command->shouldReceive('call')->with('migrate:fresh', Mockery::any())->once()->andReturn(0);
     $command->shouldReceive('call')->with('db:seed', ['--class' => DatabaseSeeder::class, '--force' => true, '--no-interaction' => true])->once()->andReturn(0);
     $command->shouldReceive('call')->with('db:seed', ['--class' => DevelopmentCustomerSeeder::class, '--force' => true, '--no-interaction' => true])->once()->andReturn(0);
+    $command->shouldReceive('call')->with('db:seed', ['--class' => PcBuilderCatalogDraftSeeder::class, '--force' => true, '--no-interaction' => true])->once()->andReturn(0);
     $command->shouldReceive('call')->with('db:seed', ['--class' => DevelopmentHistoricalSalesSeeder::class, '--force' => true, '--no-interaction' => true])->once()->andReturn(1);
     Artisan::registerCommand($command);
 

@@ -7,6 +7,7 @@ use App\Services\RealCatalogImportService;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DevelopmentCustomerSeeder;
 use Database\Seeders\DevelopmentHistoricalSalesSeeder;
+use Database\Seeders\PcBuilderCatalogDraftSeeder;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -86,6 +87,13 @@ class ResetDevCommand extends Command
                 throw new RuntimeException('Expected 654 newly imported products and no updates.');
             }
             $this->info("{$result['created']} products imported.");
+
+            $stage = 'PC Builder draft seeding';
+            if ($this->call('db:seed', ['--class' => PcBuilderCatalogDraftSeeder::class, '--force' => true, '--no-interaction' => true]) !== self::SUCCESS) {
+                throw new RuntimeException('PC Builder draft seeding failed.');
+            }
+            $this->info('PC Builder catalog drafts seeded. Review specifications before publishing predefined builds.');
+
             if ($this->option('with-sales-history')) {
                 $stage = 'Synthetic historical sales seeding';
                 if ($this->call('db:seed', ['--class' => DevelopmentHistoricalSalesSeeder::class, '--force' => true, '--no-interaction' => true]) !== self::SUCCESS) {
