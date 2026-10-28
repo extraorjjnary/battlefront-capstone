@@ -58,6 +58,10 @@
       "Composer\\Config::disableProcessTimeout",
       "@php artisan dev"
     ],
+    "dev:herd": [
+      "Composer\\Config::disableProcessTimeout",
+      "@php artisan dev:herd"
+    ],
     "lint": [
       "pint --parallel"
     ],

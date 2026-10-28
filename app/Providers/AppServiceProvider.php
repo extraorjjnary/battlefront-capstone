@@ -40,6 +40,7 @@ class AppServiceProvider extends ServiceProvider
     {
         DevCommands::artisan('queue:listen --queue=notifications,default --tries=1 --timeout=0', 'queue');
         DevCommands::artisan('queue:listen --queue=payments --sleep=1 --tries=3 --timeout=30', 'payments');
+        DevCommands::artisan('schedule:work', 'scheduler');
 
         $this->configureDefaults();
         $this->monitorRecommendationQueryTime();
