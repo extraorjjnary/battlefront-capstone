@@ -95,12 +95,12 @@ test('COD checkout places quoted delivery without proof and consumes only select
     } else {
         $this->withToken($customer->createToken('Phone')->plainTextToken)->postJson('/api/v1/orders', $payload)
             ->assertCreated()->assertJsonPath('data.payment.method.value', 'cod')->assertJsonPath('data.payment.proof_submitted', false)
-            ->assertJsonPath('data.payment.can_resubmit_proof', false)->assertJsonPath('data.total', '325.00');
+            ->assertJsonPath('data.payment.can_resubmit_proof', false)->assertJsonPath('data.total', '395.00');
     }
 
     $order = Order::sole();
     expect($order)->status->toBe(OrderStatus::Pending)->payment_status->toBe(PaymentStatus::Pending)
-        ->product_subtotal->toBe('200.00')->delivery_fee->toBe('125.00')->total_amount->toBe('325.00')
+        ->product_subtotal->toBe('200.00')->delivery_fee->toBe('195.00')->total_amount->toBe('395.00')
         ->payment_proof_path->toBeNull()->delivery_is_demo->toBeTrue();
     expect($order->delivery_address)->toBe($legacyAddress ? 'Legacy delivery address' : '12 Mabini Street, Poblacion I, Sagay City, Negros Occidental');
     expect($order->shipment)->status->toBe(ShipmentStatus::AwaitingPreparation)->carrier->toBe('lbc');
@@ -212,7 +212,7 @@ test('COD progresses through shipment milestones and separates collection from r
         ->assertSessionHasNoErrors()->assertInertiaFlash('toast.message', 'LBC COD collection recorded. The order remains unpaid until remittance is reconciled.');
 
     expect($order->refresh())->status->toBe(OrderStatus::Processing)->payment_status->toBe(PaymentStatus::Pending);
-    expect($order->shipment)->carrier_cod_collected_amount->toBe('180.00')->carrier_cod_collected_at->not->toBeNull();
+    expect($order->shipment)->carrier_cod_collected_amount->toBe('250.00')->carrier_cod_collected_at->not->toBeNull();
     expect($order->sale)->toBeNull();
     $this->assertDatabaseCount('sales', 0);
     $this->get(route('administration.orders.show', $order))->assertInertia(fn (Assert $page) => $page
@@ -225,7 +225,7 @@ test('COD progresses through shipment milestones and separates collection from r
 
     expect($order->refresh())->status->toBe(OrderStatus::Completed)->payment_status->toBe(PaymentStatus::Verified);
     expect($order->sale)->amount->toBe('100.00')->sale_date->toDateString()->toBe('2026-10-12');
-    expect($order->total_amount)->toBe('180.00');
+    expect($order->total_amount)->toBe('250.00');
     expect($order->shipment->delivered_at->toDateTimeString())->toBe($deliveredSnapshot['delivered_at']);
     expect(Inventory::sole()->quantity)->toBe(8);
     expect($order->user->notifications()->pluck('data')->pluck('event')->sort()->values()->all())->toBe([

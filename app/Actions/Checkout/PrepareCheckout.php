@@ -40,7 +40,8 @@ class PrepareCheckout
         $anchor = CarbonImmutable::now(config('app.timezone'))->startOfDay();
         $deliveryQuotes = [];
 
-        foreach (array_keys($this->deliveryRules->destinations()) as $destination) {
+        foreach ($this->deliveryLocations->destinations() as $location) {
+            $destination = $location['destination'];
             try {
                 $quote = $this->deliveryRules->quote(FulfillmentMethod::Delivery, $destination, $products, $this->quantities($cart['items']));
                 $deliveryQuotes[] = $this->deliveryQuotePresenter->checkout($quote, $cart['total'], $anchor);
