@@ -20,6 +20,87 @@ const handlerSource = descriptor.scriptSetup.content.slice(
     handler.end,
 );
 
+function functionSource(name) {
+    const declaration = script.scriptSetupAst.find(
+        (node) => node.type === 'FunctionDeclaration' && node.id.name === name,
+    );
+    return descriptor.scriptSetup.content.slice(
+        declaration.start,
+        declaration.end,
+    );
+}
+
+test('New chat clears transcript, token, errors and saved reading position', () => {
+    const context = {
+        conversationVersion: 1,
+        savedScrollTop: 500,
+        readerScrolledBack: true,
+        messages: { value: [{ content: 'old reply' }] },
+        inquiry: {
+            message: 'old question',
+            context_token: 'old-token',
+            clearErrors() {},
+        },
+        inputError: { value: 'error' },
+        requestError: { value: 'error' },
+        pendingMessage: { value: 'pending' },
+    };
+    runInNewContext(
+        `${functionSource('startNewChat')}; startNewChat();`,
+        context,
+    );
+    assert.equal(context.messages.value.length, 0);
+    assert.equal(context.inquiry.context_token, null);
+    assert.equal(context.inquiry.message, '');
+    assert.equal(context.requestError.value, '');
+    assert.equal(context.pendingMessage.value, '');
+    assert.equal(context.conversationVersion, 2);
+    assert.equal(context.savedScrollTop, 0);
+});
+
+for (const failure of [false, true]) {
+    test(`late ${failure ? 'errors' : 'replies'} cannot enter a reset conversation`, async () => {
+        let finish;
+        const response = new Promise((resolve, reject) => {
+            finish = failure ? reject : resolve;
+        });
+        const context = {
+            conversationVersion: 1,
+            nextMessageId: 1,
+            readerScrolledBack: false,
+            messages: { value: [] },
+            pendingMessage: { value: '' },
+            inputError: { value: '' },
+            requestError: { value: '' },
+            inquiry: {
+                processing: false,
+                message: 'monitor',
+                clearErrors() {},
+                post: () => response,
+            },
+            scrollToLatest() {},
+            showReply() {},
+            ChatbotController: { store: { url: () => '/chatbot' } },
+        };
+        const submit = runInNewContext(
+            `(${functionSource('submitMessage')})`,
+            context,
+        );
+        const request = submit();
+        context.conversationVersion++;
+        context.pendingMessage.value = '';
+        finish(
+            failure
+                ? new Error('old request')
+                : { message: 'old reply', context_token: 'old-token' },
+        );
+        await request;
+        assert.equal(context.messages.value.length, 0);
+        assert.equal(context.requestError.value, '');
+        assert.equal(context.pendingMessage.value, '');
+    });
+}
+
 for (const [name, event, shouldSubmit] of [
     ['Enter submits instead of inserting a new line', { key: 'Enter' }, true],
     [

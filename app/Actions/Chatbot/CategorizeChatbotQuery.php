@@ -108,6 +108,10 @@ class CategorizeChatbotQuery
 
     /** @var list<string> */
     private const PRODUCT_PHRASES = [
+        'monitor',
+        'monitors',
+        'battery',
+        'batteries',
         'price',
         'prices',
         'pricing',

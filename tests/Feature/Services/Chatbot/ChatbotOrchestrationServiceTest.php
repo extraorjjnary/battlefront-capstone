@@ -47,7 +47,7 @@ test('categorizes before resolving context and resolves context before generatin
     $adapter = mock(ChatbotAiAdapter::class);
     $categorizer->shouldReceive('execute')
         ->once()
-        ->with('Is the Aurelius Link Station available?')
+        ->with('Is the Aurelius Link Station available?', true)
         ->globally()->ordered()
         ->andReturn(['category' => ChatbotQueryCategory::Product, 'choices' => []]);
     $productResolver->shouldReceive('execute')

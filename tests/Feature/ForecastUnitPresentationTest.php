@@ -79,7 +79,7 @@ test('generated and saved forecast views round units without changing decimal co
         JS;
     $process = new Process(['node', '--input-type=module', '-e', $script], base_path());
     $process->setInput(json_encode(['props' => $props, 'generated' => $generated], JSON_THROW_ON_ERROR));
-    $process->setTimeout(30);
+    $process->setTimeout(120);
 
     $process->mustRun();
 

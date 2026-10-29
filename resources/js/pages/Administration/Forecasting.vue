@@ -381,9 +381,7 @@ const chartOptions = computed(() => ({
                             </dd>
                         </div>
                         <div>
-                            <dt class="text-muted-foreground">
-                                Target period
-                            </dt>
+                            <dt class="text-muted-foreground">Target period</dt>
                             <dd class="mt-1 font-medium">
                                 {{ readiness.target_label }}
                             </dd>
@@ -398,8 +396,8 @@ const chartOptions = computed(() => ({
                     <p class="text-muted-foreground text-xs">
                         Additive Holt–Winters uses 36 completed months to
                         estimate three full months, including the current month.
-                        All target-month sales are excluded from training.
-                        Dates use {{ readiness.timezone }}.
+                        All target-month sales are excluded from training. Dates
+                        use {{ readiness.timezone }}.
                     </p>
                 </div>
                 <form
@@ -428,8 +426,8 @@ const chartOptions = computed(() => ({
                     </Button>
                 </form>
                 <p class="text-muted-foreground mt-4 text-xs">
-                    Generating again replaces the saved forecast for this product,
-                    method, and exact period.
+                    Generating again replaces the saved forecast for this
+                    product, method, and exact period.
                 </p>
             </section>
         </div>
