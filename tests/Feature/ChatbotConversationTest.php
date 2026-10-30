@@ -303,7 +303,7 @@ test('an explicit earlier order can be revisited after a FAQ without retaining i
     $order->update(['payment_status' => PaymentStatus::Verified]);
     $third = $chat->respond('Payment for the earlier order?', $customer, $second['context_token'], 'session-a');
 
-    expect($second['message'])->toBe('Pickup orders support Cash (Pay at Pickup), Debit/Credit Card (Pay at Store), GCash, Maya, Pay online. Delivery orders support GCash, Maya, Cash on Delivery (COD), Pay online.');
+    expect($second['message'])->toBe('Pickup orders support Cash (Pay at Pickup), Debit/Credit Card (Pay at Store), Pay online. Delivery orders support Cash on Delivery (COD), Pay online. Pay online uses PayMongo Hosted Checkout for QR Ph, online card, GCash, Maya. New online payments require no receipt or screenshot upload. Confirmation comes from authenticated server processing; a browser return is not proof of payment. Use Continue payment in your saved order when available. Development transactions are test mode only. Route restrictions still apply; use the options offered at checkout. Direct online banking is not offered for new orders.');
     expect($third['message'])->toBe('Current order payment.');
     ChatbotResponseAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, 'earlier order') && str_contains($prompt->prompt, 'verified'));
     ChatbotResponseAgent::assertPromptedTimes(2);

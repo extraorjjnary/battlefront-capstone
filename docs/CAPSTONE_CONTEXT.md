@@ -612,6 +612,8 @@ Do not delete historical forecasts. The database retains both legacy method iden
 
 # 10. Chatbot Module
 
+**Customer-support refinement (30 October 2026):** The existing shared web/mobile pipeline now gives configuration-backed PayMongo/manual-payment guidance, separates COD collection from remittance, and explains regional shipping estimates and gateway-safe cancellation. Application rules remain authoritative over managed FAQs. Five approved PC Builder usage FAQs cover getting started, selecting components, saved/shared builds, templates, and where to view compatibility results; they do not authorize hardware advice or recommendations. The development FAQ seeder now contains nine presets, preserving administrator edits and inactive entries on rerun. Missing/inactive help returns unavailable information rather than another builder topic. The web panel offers six quick-question topics with return/refund and PC Builder submenus. Leaf questions submit through the existing endpoint, preserve the composer draft, and start fresh topic context without clearing the transcript. Personal statuses still require an owned BF reference; the chatbot performs no commerce or payment actions. No automatic seeding or manuscript amendment is part of this refinement.
+
 The chatbot uses a **hybrid deterministic + generative architecture**.
 
 **Status: complete.** EXT-47 and its knowledge-management, routing, resolver, provider, orchestration, interface, and testing issues are Done. EXT-61 provides the completed mobile endpoint. Web and mobile share the same backend pipeline.

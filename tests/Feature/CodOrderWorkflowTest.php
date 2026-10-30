@@ -453,10 +453,19 @@ test('COD collection does not accept prepaid orders or an internal unconfirmed a
 })->with([true, false]);
 
 test('chatbot rules distinguish proof-free COD delivery from pickup payment', function () {
+    config(['services.paymongo.enabled' => true, 'services.paymongo.hosted_methods' => ['qrph', 'card', 'gcash', 'paymaya']]);
     $rules = app(ResolveChatbotRuleGuidance::class);
 
-    expect($rules->execute('payment_methods')['guidance'])->toBe('Pickup orders support Cash (Pay at Pickup), Debit/Credit Card (Pay at Store), GCash, Maya, Pay online. Delivery orders support GCash, Maya, Cash on Delivery (COD), Pay online.');
-    expect($rules->execute('payment_proof')['guidance'])->toContain('COD) is delivery-only, requires no upload', 'manually confirms LBC collection after delivery');
+    expect($rules->execute('payment_methods')['guidance'])->toContain(
+        'Pickup orders support Cash (Pay at Pickup), Debit/Credit Card (Pay at Store), Pay online.',
+        'Delivery orders support Cash on Delivery (COD), Pay online.',
+        'PayMongo Hosted Checkout for QR Ph, online card, GCash, Maya.',
+    );
+    expect($rules->execute('payment_proof')['guidance'])->toContain(
+        'COD is delivery-only and requires no upload.',
+        'Collection after delivery and full remittance reconciliation are separate; collection alone does not complete payment.',
+        'New online payments require no receipt or screenshot upload.',
+    );
 });
 
 test('COD completion cannot bypass collection when a shipment is missing even if payment was marked verified outside the workflow', function () {

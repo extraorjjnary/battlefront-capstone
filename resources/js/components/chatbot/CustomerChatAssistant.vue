@@ -5,6 +5,7 @@ import { nextTick, onMounted, ref, watch } from 'vue';
 import ChatbotController from '@/actions/App/Http/Controllers/ChatbotController';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { quickQuestions } from './quickQuestions';
 
 const inquiry = useHttp({ message: '', context_token: null });
 const page = usePage();
@@ -17,6 +18,8 @@ const conversation = ref(null);
 const composer = ref(null);
 const launcher = ref(null);
 const isMounted = ref(false);
+const quickMenu = ref('main');
+const showQuickQuestions = ref(true);
 let readerScrolledBack = false;
 let savedScrollTop = 0;
 let nextMessageId = 1;
@@ -35,6 +38,8 @@ function startNewChat() {
     inputError.value = '';
     requestError.value = '';
     pendingMessage.value = '';
+    quickMenu.value = 'main';
+    showQuickQuestions.value = true;
     readerScrolledBack = false;
     savedScrollTop = 0;
 }
@@ -92,7 +97,16 @@ async function showReply(messageId) {
     }
 }
 
-async function submitMessage() {
+async function chooseQuickQuestion(item) {
+    if (inquiry.processing) return;
+    if (item.menu) {
+        quickMenu.value = item.menu;
+        return;
+    }
+    await submitMessage(item.question);
+}
+
+async function submitMessage(quickQuestion = null) {
     if (inquiry.processing) {
         return;
     }
@@ -101,7 +115,9 @@ async function submitMessage() {
     requestError.value = '';
     inquiry.clearErrors();
 
-    const message = inquiry.message.trim();
+    const draft = inquiry.message;
+    const previousToken = inquiry.context_token;
+    const message = (quickQuestion ?? draft).trim();
 
     if (!message) {
         inputError.value = 'Please enter a question.';
@@ -111,6 +127,11 @@ async function submitMessage() {
     pendingMessage.value = message;
     readerScrolledBack = false;
     const submittedVersion = conversationVersion;
+    let receivedReply = false;
+    if (quickQuestion !== null) {
+        inquiry.message = message;
+        inquiry.context_token = null;
+    }
     void scrollToLatest();
 
     try {
@@ -130,6 +151,7 @@ async function submitMessage() {
         }
 
         const replyId = nextMessageId + 1;
+        receivedReply = true;
         messages.value.push(
             { id: nextMessageId++, role: 'customer', content: message },
             {
@@ -139,8 +161,9 @@ async function submitMessage() {
                 source: response.source,
             },
         );
-        inquiry.message = '';
+        inquiry.message = quickQuestion !== null ? draft : '';
         inquiry.context_token = response.context_token ?? null;
+        showQuickQuestions.value = false;
         void showReply(replyId);
     } catch {
         if (submittedVersion === conversationVersion) {
@@ -149,6 +172,10 @@ async function submitMessage() {
         }
     } finally {
         if (submittedVersion === conversationVersion) {
+            if (quickQuestion !== null) {
+                inquiry.message = draft;
+                if (!receivedReply) inquiry.context_token = previousToken;
+            }
             pendingMessage.value = '';
         }
     }
@@ -231,18 +258,19 @@ async function submitMessage() {
                 >
                     <div
                         v-if="messages.length === 0 && !inquiry.processing"
-                        class="flex min-h-full flex-col items-center justify-center text-center"
+                        class="flex flex-col items-center justify-center text-center"
                     >
                         <MessageSquareText
                             class="text-primary-ink size-8"
                             aria-hidden="true"
                         />
-                        <h2 class="mt-3 font-semibold">How can we help?</h2>
+                        <h2 class="mt-3 font-semibold">
+                            Hello! I’m the Battlefront assistant.
+                        </h2>
                         <p
                             class="text-muted-foreground mt-2 max-w-xs text-sm leading-5"
                         >
-                            Ask about products, your orders, store information,
-                            payment, pickup, or delivery.
+                            Choose a question below or type your own.
                         </p>
                     </div>
 
@@ -322,12 +350,53 @@ async function submitMessage() {
                             </div>
                         </li>
                     </ol>
+                    <div
+                        v-if="showQuickQuestions && !inquiry.processing"
+                        id="battlefront-quick-questions"
+                        class="mt-4"
+                        role="group"
+                        aria-label="Quick questions"
+                    >
+                        <Button
+                            v-if="quickMenu !== 'main'"
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            @click="quickMenu = 'main'"
+                            >Back to topics</Button
+                        >
+                        <div class="flex flex-wrap gap-2">
+                            <Button
+                                v-for="item in quickQuestions[quickMenu]"
+                                :key="item.label"
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                class="min-h-10 max-w-full text-left whitespace-normal"
+                                @click="chooseQuickQuestion(item)"
+                                >{{ item.label }}</Button
+                            >
+                        </div>
+                    </div>
                 </div>
 
                 <form
                     class="border-border bg-card shrink-0 border-t p-3"
-                    @submit.prevent="submitMessage"
+                    @submit.prevent="submitMessage()"
                 >
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        :disabled="inquiry.processing"
+                        :aria-expanded="showQuickQuestions"
+                        aria-controls="battlefront-quick-questions"
+                        @click="
+                            showQuickQuestions = !showQuickQuestions;
+                            quickMenu = 'main';
+                        "
+                        >Quick questions</Button
+                    >
                     <label
                         for="floating-chatbot-message"
                         class="text-sm font-semibold"
