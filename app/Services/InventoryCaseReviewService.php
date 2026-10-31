@@ -59,6 +59,7 @@ class InventoryCaseReviewService
 
         return [
             'returns' => $returns,
+            'supplier_product_links' => $this->inventory->supplierProductLinks(),
             'filters' => ['q' => $filters['q'] ?? null, 'overdue' => $overdue],
             'selected_case' => $case,
             'products' => $this->inventory->availableCaseProducts(),

@@ -42,6 +42,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/Shipment.php,app/Services/Order/**,app/Http/Controllers/**/*Order*,resources/js/pages/**/Orders/** | .ai/rules/http-controllers-js-pages-orders.md |
 | app/Http/Controllers/** | .ai/rules/http-controllers.md |
 | app/Services/Order/**,app/Services/CustomerOrderPresenter.php,app/Http/Requests/ValidateCheckoutRequest.php,config/battlefront.php,resources/js/pages/Checkout/**,docs/*API*,docs/PSGC_DELIVERY_DATA.md | .ai/rules/http-requests-js-pages-checkout.md |
+| database/seeders/DevelopmentSupplierSeeder.php,app/Actions/Inventory/HandleSupplierReturn.php,app/Repositories/Inventory/**,resources/js/pages/Administration/SupplierReturns.vue | .ai/rules/inventory-js-pages-administration.md |
 | app/Actions/Inventory/HandleCustomerReturn*.php,app/Services/CustomerReturn*.php, app/Actions/Inventory/HandleCustomerReturn.php,app/Services/CustomerReturnRequestPresenter.php | .ai/rules/inventory-services.md |
 | app/Services/Dashboard/**,app/Repositories/Inventory/** | .ai/rules/inventory.md |
 | app/Http/Controllers/BranchController.php,resources/js/pages/Branches/**,resources/js/components/BranchMap.vue | .ai/rules/js-components.md |

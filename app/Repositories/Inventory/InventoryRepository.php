@@ -175,6 +175,12 @@ class InventoryRepository
         return DB::table('suppliers')->where('is_active', true)->orderBy('name')->get(['id', 'name']);
     }
 
+    /** @return \Illuminate\Support\Collection<int, \stdClass> */
+    public function supplierProductLinks(): \Illuminate\Support\Collection
+    {
+        return DB::table('product_supplier')->get(['supplier_id', 'product_id']);
+    }
+
     /**
      * @param  array<string, mixed>  $filters
      * @return LengthAwarePaginator<int, \stdClass>
