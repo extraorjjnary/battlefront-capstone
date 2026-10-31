@@ -16,7 +16,7 @@ function shipmentPresentationOrder(): Order
     $order = Order::factory()->withDeliverySnapshot('Bacolod City')->create([
         'status' => OrderStatus::Processing, 'payment_status' => PaymentStatus::Verified,
     ]);
-    Shipment::factory()->for($order)->withHandoffDetails($order->total_amount)->create(['created_at' => '2026-10-08 08:00:00']);
+    Shipment::factory()->for($order)->withHandoffDetails($order->total_amount)->create(['created_at' => '2026-10-08 08:00:00', 'actual_carrier_cost' => $order->delivery_fee, 'carrier_cost_reference' => 'RECEIPT', 'carrier_cost_recorded_at' => now()]);
 
     return $order->refresh();
 }

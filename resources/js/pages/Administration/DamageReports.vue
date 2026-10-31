@@ -1,4 +1,5 @@
 <script setup>
+import OperationalExports from '@/components/administration/OperationalExports.vue';
 import { formatAgeDays } from '@/lib/dateTime';
 import PageHeader from '@/components/PageHeader.vue';
 import { Form, Head, Link, usePage } from '@inertiajs/vue3';
@@ -82,6 +83,11 @@ defineOptions({
             >
         </p>
         <PageHeader title="Damage reports" />
+        <OperationalExports
+            feature="damage-reports"
+            :filters="filters"
+            :case-id="selected_case"
+        />
         <p class="text-muted-foreground text-sm" role="note">
             Reported units are removed from available stock and held until
             reviewed.

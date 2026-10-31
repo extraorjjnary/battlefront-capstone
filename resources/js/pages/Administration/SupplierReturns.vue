@@ -1,4 +1,5 @@
 <script setup>
+import OperationalExports from '@/components/administration/OperationalExports.vue';
 import PageHeader from '@/components/PageHeader.vue';
 import { Form, Head, Link, usePage } from '@inertiajs/vue3';
 import SupplierReturnController from '@/actions/App/Http/Controllers/Administration/SupplierReturnController';
@@ -88,6 +89,11 @@ defineOptions({
                 ></template
             >
         </PageHeader>
+        <OperationalExports
+            feature="supplier-returns"
+            :filters="filters"
+            :case-id="selected_case"
+        />
         <Form
             v-if="page.props.auth.can?.requestReturns"
             v-bind="SupplierReturnController.store.form()"
@@ -243,7 +249,9 @@ defineOptions({
                         </p>
                     </div>
                     <span class="text-sm capitalize">{{
-                        returnLabels[entry.status] ??
+                        (entry.status === 'closed' && !entry.resolution_outcome
+                            ? 'Received by supplier ? outcome pending'
+                            : returnLabels[entry.status]) ??
                         entry.status.replaceAll('_', ' ')
                     }}</span>
                 </div>

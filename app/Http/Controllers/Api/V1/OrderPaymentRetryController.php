@@ -7,8 +7,11 @@ use App\Models\PayMongoFlow;
 use App\Models\User;
 use App\Services\CustomerOrderPresenter;
 use App\Services\PayMongo\RetryDirectOnlineBanking;
+use App\Services\PayMongo\RetryOrderPayment;
 use App\Services\PayMongo\StartDirectQrPh;
 use App\Services\PayMongo\StartHostedCheckout;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
@@ -28,10 +31,10 @@ class OrderPaymentRetryController extends Controller
         $persistedOrder = $customer->orders()->whereKey($order)->firstOrFail();
 
         try {
-            $flow = PayMongoFlow::query()->where('order_id', $persistedOrder->id)->where('active_slot', 'active')->firstOrFail();
+            $flow = PayMongoFlow::query()->where('order_id', $persistedOrder->id)->latest('id')->firstOrFail();
 
             if ($flow->channel === 'direct_qrph') {
-                $retryQrPh->execute($persistedOrder);
+                app(RetryOrderPayment::class)->execute($persistedOrder, fn ($currentOrder) => $retryQrPh->execute($currentOrder));
                 $data = $presenter->detail($persistedOrder->fresh());
                 $qrIsReady = data_get($data, 'payment.qr_code_image_url') !== null;
 
@@ -42,7 +45,7 @@ class OrderPaymentRetryController extends Controller
             }
 
             if ($flow->channel === 'hosted_checkout') {
-                $checkoutUrl = $retryHostedCheckout->execute($persistedOrder);
+                $checkoutUrl = app(RetryOrderPayment::class)->execute($persistedOrder, fn ($currentOrder) => $retryHostedCheckout->execute($currentOrder));
 
                 return response()->json([
                     'data' => $presenter->detail($persistedOrder->fresh()),
@@ -50,8 +53,8 @@ class OrderPaymentRetryController extends Controller
                 ]);
             }
 
-            return response()->json(['payment' => ['redirect_url' => $retryBank->execute($persistedOrder)]]);
-        } catch (RuntimeException) {
+            return response()->json(['payment' => ['redirect_url' => app(RetryOrderPayment::class)->execute($persistedOrder, fn ($currentOrder) => $retryBank->execute($currentOrder))]]);
+        } catch (RuntimeException|RequestException|ConnectionException) {
             return response()->json(['message' => 'The online payment is being reconciled. Check this order again shortly.'], 202);
         }
     }

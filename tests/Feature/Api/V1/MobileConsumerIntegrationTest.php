@@ -195,6 +195,8 @@ test('placed delivery milestones share read state and owned deep links while log
         'package_height_cm' => '10.00',
         'declared_value' => $order->total_amount,
         'handoff_mode' => 'branch_dropoff',
+        'actual_carrier_cost' => $order->delivery_fee,
+        'carrier_cost_reference' => 'SYNTHETIC-TEST-RECEIPT',
     ], $handler);
     foreach ([ShipmentStatus::Preparing, ShipmentStatus::ReadyForDispatch, ShipmentStatus::HandedToLbc,
         ShipmentStatus::InTransit, ShipmentStatus::OutForDelivery, ShipmentStatus::Delivered] as $status) {

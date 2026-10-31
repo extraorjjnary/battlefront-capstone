@@ -67,7 +67,35 @@ class CustomerOrderPresenter
     public function detail(Order $order): array
     {
         $paymongoFlow = PayMongoFlow::query()->where('order_id', $order->id)->latest('id')->first();
+        $canRetryPayment = $order->payment_origin === 'paymongo'
+            && $order->payment_closure_requested_at === null
+            && ! $order->paymongoFlows()->where('requires_attention', true)->exists()
+            && config('services.paymongo.enabled')
+            && $order->status === OrderStatus::Pending
+            && $order->payment_status === PaymentStatus::Pending
+            && $order->created_at->copy()->addDay()->isFuture()
+            && ! $this->orderProcessingService->hasCancellationHold($order);
         $returnItems = collect($this->returnEligibility->forOrder($order));
+        $hostedAction = null;
+        if ($canRetryPayment && $paymongoFlow?->channel === 'hosted_checkout'
+            && $paymongoFlow->merchant_cutoff_at->isFuture()) {
+            $resumed = $paymongoFlow->operations()->where('kind', 'resume_hosted_failure')->pluck('provider_reference');
+            $hasConfirmedFailure = $paymongoFlow->operations()->where('kind', 'observe_hosted_failure')
+                ->where('status', 'completed')->whereNotIn('provider_reference', $resumed)->exists();
+            if ($paymongoFlow->last_checked_at !== null) {
+                $hasConfirmedFailure = in_array($paymongoFlow->recovery_outcome, ['failed', 'expired'], true);
+            }
+            $setupFailed = $paymongoFlow->status === 'failed'
+                && $paymongoFlow->checkout_session_id === null
+                && $paymongoFlow->operations()->where('kind', 'create_checkout_session')->where('status', 'failed')->exists()
+                && ! $paymongoFlow->operations()->whereIn('status', ['pending', 'dispatched', 'unknown'])->exists();
+            if ($paymongoFlow->status === 'closed' || $setupFailed
+                || ($paymongoFlow->status === 'open' && $hasConfirmedFailure)) {
+                $hostedAction = 'retry';
+            } elseif ($paymongoFlow->status === 'open' && is_string($paymongoFlow->checkout_url)) {
+                $hostedAction = 'continue';
+            }
+        }
         $refundPayments = $this->returnRequests->paymentsForOrder($order);
 
         return [
@@ -112,7 +140,8 @@ class CustomerOrderPresenter
                 'notice' => $this->paymentNotice($order),
                 'rejection' => $this->paymentRejectionData($order),
                 'can_resubmit_proof' => $this->canResubmitPaymentProof($order),
-                'checkout_url' => $paymongoFlow?->channel === 'hosted_checkout' && $paymongoFlow->status === 'open' ? $paymongoFlow->checkout_url : null,
+                'action' => $hostedAction,
+                'checkout_url' => $hostedAction === 'continue' ? $paymongoFlow->checkout_url : null,
                 'qr_code_image_url' => $paymongoFlow?->channel === 'direct_qrph'
                     && $paymongoFlow->status === 'open'
                     && $paymongoFlow->qr_expires_at?->isFuture()
@@ -121,24 +150,16 @@ class CustomerOrderPresenter
                 'qr_expires_at' => $paymongoFlow?->channel === 'direct_qrph'
                     ? $paymongoFlow->qr_expires_at?->toIso8601String()
                     : null,
-                'qr_can_retry' => $paymongoFlow?->channel === 'direct_qrph'
+                'qr_can_retry' => $canRetryPayment && $paymongoFlow?->channel === 'direct_qrph'
                     && ($paymongoFlow->status === 'awaiting_payment_method'
                         || ($paymongoFlow->status === 'open' && $paymongoFlow->qr_expires_at?->isPast()))
-                    && $paymongoFlow->merchant_cutoff_at->isFuture()
-                    && $order->status === OrderStatus::Pending
-                    && $order->payment_status === PaymentStatus::Pending,
+                    && $paymongoFlow->merchant_cutoff_at->isFuture(),
                 'bank_code' => $paymongoFlow?->bank_code,
                 'hosted_payment_method' => data_get($paymongoFlow, 'hosted_payment_method') ?? $order->hosted_payment_method,
-                'can_retry_hosted' => $paymongoFlow?->channel === 'hosted_checkout'
-                    && $paymongoFlow->status === 'reconciliation_required'
-                    && $paymongoFlow->merchant_cutoff_at->isFuture()
-                    && $order->status === OrderStatus::Pending
-                    && $order->payment_status === PaymentStatus::Pending,
-                'can_retry' => $paymongoFlow?->channel === 'direct_online_banking'
+                'can_retry_hosted' => $hostedAction === 'retry',
+                'can_retry' => $canRetryPayment && $paymongoFlow?->channel === 'direct_online_banking'
                     && $paymongoFlow->status === 'awaiting_payment_method'
-                    && $paymongoFlow->merchant_cutoff_at->isFuture()
-                    && $order->status === OrderStatus::Pending
-                    && $order->payment_status === PaymentStatus::Pending,
+                    && $paymongoFlow->merchant_cutoff_at->isFuture(),
             ],
             'items' => $order->items->map(function (OrderItem $item) use ($returnItems): array {
                 $unitPrice = $item->price_at_time;
@@ -184,6 +205,10 @@ class CustomerOrderPresenter
         }
 
         if ($order->payment_origin === 'paymongo') {
+            if ($order->payment_closure_requested_at !== null && $order->payment_status !== PaymentStatus::Verified) {
+                return 'Cancellation is requested. Payment actions are paused while PayMongo confirms that payment is closed and unpaid. Your stock remains reserved until cancellation completes.';
+            }
+
             return $order->payment_status === PaymentStatus::Verified
                 ? 'PayMongo has confirmed your online payment. Battlefront will continue the existing order preparation and fulfillment process.'
                 : 'Your online payment is pending confirmation from PayMongo. This order remains reserved while payment is reconciled.';

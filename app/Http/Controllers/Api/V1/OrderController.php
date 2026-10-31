@@ -65,6 +65,9 @@ class OrderController extends Controller
         if ($request->boolean('paymongo_return')) {
             $reconcilePayMongoReturn->execute($persistedOrder);
             $persistedOrder = $orders->find($customer, $order);
+        } else {
+            $reconcilePayMongoReturn->refreshHosted($persistedOrder);
+            $persistedOrder = $orders->find($customer, $order);
         }
 
         return new OrderResource($persistedOrder);

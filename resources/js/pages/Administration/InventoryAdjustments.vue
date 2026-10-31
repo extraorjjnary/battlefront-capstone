@@ -1,4 +1,5 @@
 <script setup>
+import OperationalExports from '@/components/administration/OperationalExports.vue';
 import PageHeader from '@/components/PageHeader.vue';
 import StockAdjustmentSummary from '@/components/administration/StockAdjustmentSummary.vue';
 import DamageReportController from '@/actions/App/Http/Controllers/Administration/DamageReportController';
@@ -79,6 +80,11 @@ defineOptions({
                 ></template
             >
         </PageHeader>
+        <OperationalExports
+            feature="stock-requests"
+            :filters="filters"
+            :case-id="selected_case"
+        />
         <nav
             v-if="can_view_all_requests"
             aria-label="Stock request filters"

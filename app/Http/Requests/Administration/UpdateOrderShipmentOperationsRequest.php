@@ -29,9 +29,9 @@ class UpdateOrderShipmentOperationsRequest extends FormRequest
             'package_length_cm' => ['sometimes', 'required', 'numeric', 'gt:0', 'max:99999.99'],
             'package_width_cm' => ['sometimes', 'required', 'numeric', 'gt:0', 'max:99999.99'],
             'package_height_cm' => ['sometimes', 'required', 'numeric', 'gt:0', 'max:99999.99'],
-            'declared_value' => ['sometimes', 'required', 'numeric', 'min:0', 'max:9999999999.99'],
+            'declared_value' => ['missing'],
             'handoff_mode' => ['sometimes', 'required', 'in:rider_pickup,branch_dropoff'],
-            'actual_carrier_cost' => ['sometimes', 'required', 'numeric', 'min:0', 'max:9999999999.99'],
+            'actual_carrier_cost' => ['missing'],
             'carrier_cost_reference' => ['sometimes', 'required', 'string', 'max:100'],
             'carrier_cost_confirmed' => ['sometimes', 'accepted'],
             'shipment_exception_code' => ['sometimes', 'nullable', 'in:booking_failed,pickup_missed,delivery_attempt_failed,damaged,lost,return_to_sender,other'],
@@ -44,7 +44,7 @@ class UpdateOrderShipmentOperationsRequest extends FormRequest
     public function after(): array
     {
         return [function (Validator $validator): void {
-            $packageFields = ['package_count', 'package_weight_kg', 'package_length_cm', 'package_width_cm', 'package_height_cm', 'declared_value', 'handoff_mode'];
+            $packageFields = ['package_count', 'package_weight_kg', 'package_length_cm', 'package_width_cm', 'package_height_cm', 'handoff_mode'];
             $hasPackageFields = collect($packageFields)->contains(fn (string $field): bool => $this->exists($field));
 
             if ($hasPackageFields) {
@@ -55,16 +55,16 @@ class UpdateOrderShipmentOperationsRequest extends FormRequest
                 }
             }
 
-            if ($this->exists('actual_carrier_cost') !== $this->exists('carrier_cost_reference')) {
-                $validator->errors()->add('actual_carrier_cost', 'Provide the carrier cost and its receipt or reference together.');
+            if ($this->exists('carrier_cost_confirmed') && ! $this->filled('carrier_cost_reference')) {
+                $validator->errors()->add('carrier_cost_reference', 'Provide the carrier receipt or reference.');
             }
 
-            if (! $hasPackageFields && ! $this->exists('actual_carrier_cost')
+            if (! $hasPackageFields && ! $this->exists('carrier_cost_reference')
                 && ! $this->filled('shipment_exception_code') && ! $this->boolean('shipment_exception_resolved')) {
                 $validator->errors()->add('shipment', 'Submit package details, carrier cost, or a shipment issue to update.');
             }
 
-            if ($this->filled('actual_carrier_cost') && ! $this->boolean('carrier_cost_confirmed')) {
+            if ($this->exists('carrier_cost_reference') && ! $this->boolean('carrier_cost_confirmed')) {
                 $validator->errors()->add('carrier_cost_confirmed', 'Confirm the carrier cost against its receipt or LBC reference.');
             }
         }];

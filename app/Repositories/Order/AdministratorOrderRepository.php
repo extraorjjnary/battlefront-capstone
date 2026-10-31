@@ -27,12 +27,12 @@ class AdministratorOrderRepository
             ->selectRaw('status, COUNT(*) as aggregate')
             ->groupBy('status')
             ->pluck('aggregate', 'status');
-        $orders = $this->applyStatusFilter($filteredOrders, $statusFilter)
+        $orders = (($filters['gateway_state'] ?? null) === 'needs_attention' ? $filteredOrders : $this->applyStatusFilter($filteredOrders, $statusFilter))
             ->select([
                 'id', 'user_id', 'recipient_name', 'fulfillment_method',
-                'total_amount', 'status', 'payment_status', 'payment_method', 'created_at',
+                'total_amount', 'status', 'payment_status', 'payment_method', 'created_at', 'payment_origin', 'payment_closure_requested_at',
             ])
-            ->with(['user:id,name,email', 'shipment:id,order_id,status', 'cancellationRequest.refund'])
+            ->with(['paymongoFlows', 'user:id,name,email', 'shipment:id,order_id,status', 'cancellationRequest.refund'])
             ->withCount('items')
             ->withSum('items as total_quantity', 'quantity')
             ->orderByDesc('created_at')
@@ -46,6 +46,7 @@ class AdministratorOrderRepository
     public function loadDetails(Order $order): Order
     {
         return $order->load([
+            'paymongoFlows',
             'cancellationRequest.refund',
             'shipment',
             'user:id,name,email',
@@ -102,6 +103,24 @@ class AdministratorOrderRepository
     private function applyIndexFilters(Builder $query, array $filters): Builder
     {
         return $query
+            ->when($filters['gateway_state'] ?? null, function (Builder $query, string $state): void {
+                $query->where('payment_origin', 'paymongo');
+                if ($state === 'needs_attention') {
+                    $query->where(fn ($exceptions) => $exceptions->whereDoesntHave('paymongoFlows')->orWhereHas('paymongoFlows', fn ($flows) => $flows->where('requires_attention', true)));
+
+                    return;
+                }
+                $query->where('payment_status', 'pending')->whereDoesntHave('paymongoFlows', fn ($flows) => $flows->where('requires_attention', true));
+                if ($state === 'closing') {
+                    $query->whereNotNull('payment_closure_requested_at');
+
+                    return;
+                }
+                $query->whereNull('payment_closure_requested_at')->whereHas('paymongoFlows', function ($flows) use ($state): void {
+                    $flows->whereRaw('paymongo_flows.id = (select coalesce(max(case when selected.active_slot = ? then selected.id end), max(selected.id)) from paymongo_flows selected where selected.order_id = orders.id)', ['active'])
+                        ->whereRaw("CASE WHEN status IN ('reconciliation_required', 'creating', 'retrying') THEN 'checking' WHEN status = 'closed' THEN 'expired' WHEN status = 'failed' THEN 'failed' WHEN recovery_outcome IN ('failed', 'expired') THEN recovery_outcome ELSE 'awaiting' END = ?", [$state]);
+                });
+            })
             ->when($filters['q'] ?? null, function (Builder $query, string $search): void {
                 $referenceId = $this->referenceIdFromSearch($search);
 

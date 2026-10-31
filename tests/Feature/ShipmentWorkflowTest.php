@@ -22,7 +22,11 @@ use Inertia\Testing\AssertableInertia as Assert;
 function shipmentWorkflowOrder(OrderStatus $status = OrderStatus::Processing, PaymentStatus $payment = PaymentStatus::Verified): Order
 {
     $order = Order::factory()->withDeliverySnapshot('Bacolod City')->create(['status' => $status, 'payment_status' => $payment]);
-    Shipment::factory()->for($order)->withHandoffDetails($order->total_amount)->create();
+    Shipment::factory()->for($order)->withHandoffDetails($order->total_amount)->create([
+        'actual_carrier_cost' => $order->delivery_fee,
+        'carrier_cost_reference' => 'CARRIER-RECEIPT',
+        'carrier_cost_recorded_at' => now(),
+    ]);
     $product = Product::factory()->create();
     Inventory::factory()->for($product)->create(['quantity' => 5]);
     OrderItem::factory()->for($order)->for($product)->create(['quantity' => 2, 'price_at_time' => '50.00']);
@@ -34,7 +38,8 @@ function advanceShipmentForTest(Order $order, ShipmentStatus $target): void
 {
     $processing = app(OrderProcessingService::class);
     while ($order->refresh()->shipment->status !== $target) {
-        $processing->updateShipmentStatus($order, $order->shipment->status->next());
+        $next = $order->shipment->status->next();
+        $processing->updateShipmentStatus($order, $next, $next === ShipmentStatus::HandedToLbc && blank($order->shipment->tracking_reference) ? 'LBC-TEST' : null);
     }
 }
 
@@ -84,13 +89,16 @@ function recordManualShipmentOperationsForTest(Order $order, User $actor): void
         'package_length_cm' => '10.00',
         'package_width_cm' => '10.00',
         'package_height_cm' => '10.00',
-        'declared_value' => $order->total_amount,
+
         'handoff_mode' => 'branch_dropoff',
+        'carrier_cost_reference' => 'RECEIPT',
     ], $actor);
+    $order->shipment()->update(['tracking_reference' => 'LBC-MANUAL']);
 }
 
 test('shipment operations accept decimal numbers from JSON requests', function () {
     $order = shipmentWorkflowOrder();
+    $order->shipment()->update(['actual_carrier_cost' => null, 'carrier_cost_recorded_at' => null]);
     $administrator = User::factory()->administrator()->create();
     $order->assigned_handler_id = $administrator->id;
     $order->save();
@@ -102,9 +110,7 @@ test('shipment operations accept decimal numbers from JSON requests', function (
             'package_length_cm' => 0.1,
             'package_width_cm' => 0.1,
             'package_height_cm' => 0.09,
-            'declared_value' => 350,
             'handoff_mode' => 'branch_dropoff',
-            'actual_carrier_cost' => 349,
             'carrier_cost_reference' => 'RECEIPT-62',
             'carrier_cost_confirmed' => true,
             'shipment_exception_code' => null,
@@ -118,7 +124,8 @@ test('shipment operations accept decimal numbers from JSON requests', function (
     expect($shipment->package_weight_kg)->toBe('0.100')
         ->and($shipment->package_length_cm)->toBe('0.10')
         ->and($shipment->package_height_cm)->toBe('0.09')
-        ->and($shipment->actual_carrier_cost)->toBe('349.00')
+        ->and($shipment->declared_value)->toBe($order->product_subtotal)
+        ->and($shipment->actual_carrier_cost)->toBe('250.00')
         ->and($shipment->carrier_cost_reference)->toBe('RECEIPT-62');
 });
 
@@ -356,7 +363,7 @@ test('cancellation and LBC handoff recheck persisted shipment state rather than 
         expect($order->refresh()->shipment)->status->toBe(ShipmentStatus::Cancelled)->handed_to_carrier_at->toBeNull();
         expect(Inventory::sole()->quantity)->toBe(7);
     } else {
-        $service->updateShipmentStatus($order, ShipmentStatus::HandedToLbc);
+        $service->updateShipmentStatus($order, ShipmentStatus::HandedToLbc, 'LBC-TEST');
         expect(fn () => $service->updateStatus($staleOrder, OrderStatus::Cancelled))
             ->toThrow(ValidationException::class, 'This shipment has been handed to LBC.');
         expect($order->refresh()->status)->toBe(OrderStatus::Processing);
@@ -438,6 +445,7 @@ test('references reject early entry and malformed values', function (mixed $refe
     $order = shipmentWorkflowOrder();
     if ($handoff) {
         advanceShipmentForTest($order, ShipmentStatus::HandedToLbc);
+        $order->shipment->update(['tracking_reference' => null]);
     }
 
     $administrator = User::factory()->administrator()->create();
@@ -903,6 +911,7 @@ test('manual COD delivery still waits for explicit collection confirmation', fun
 test('a missing LBC reference may be assigned once after handoff', function () {
     $order = shipmentWorkflowOrder();
     advanceShipmentForTest($order, ShipmentStatus::HandedToLbc);
+    $order->shipment->update(['tracking_reference' => null]);
     $administrator = User::factory()->administrator()->create();
     $order->assigned_handler_id = $administrator->id;
     $order->save();
@@ -929,3 +938,91 @@ test('handoff cannot replace a reference already assigned to a manual shipment',
 
     expect($order->refresh()->shipment)->tracking_reference->toBe('ASSIGNED-REFERENCE')->status->toBe(ShipmentStatus::ReadyForDispatch);
 });
+
+test('LBC handoff requires matching confirmed cost and a real tracking reference', function (?string $cost, ?string $reference, string $error) {
+    $order = shipmentWorkflowOrder();
+    advanceShipmentForTest($order, ShipmentStatus::ReadyForDispatch);
+    $order->shipment()->update([
+        'actual_carrier_cost' => $cost,
+        'carrier_cost_recorded_at' => $cost === null ? null : now(),
+        'tracking_reference' => null,
+    ]);
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+    $before = $order->fresh()->getAttributes();
+    $this->actingAs($administrator)->patch(route('administration.orders.shipment.status.update', $order), [
+        'status' => 'handed_to_lbc', 'tracking_reference' => $reference,
+    ])->assertSessionHasErrors($error);
+    expect($order->refresh()->getAttributes())->toBe($before);
+    expect($order->shipment)->status->toBe(ShipmentStatus::ReadyForDispatch)->handed_to_carrier_at->toBeNull();
+    expect(Sale::query()->count())->toBe(0);
+})->with([
+    'missing confirmation' => [null, 'REAL-LBC', 'status'],
+    'different carrier cost' => ['1.00', 'REAL-LBC', 'status'],
+    'missing reference' => ['250.00', null, 'tracking_reference'],
+]);
+
+test('a mismatched carrier cost cannot be confirmed before handoff', function () {
+    $order = shipmentWorkflowOrder();
+    $order->shipment()->update(['actual_carrier_cost' => null, 'carrier_cost_recorded_at' => null]);
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+    $this->actingAs($administrator)->patch(route('administration.orders.shipment.operations.update', $order), [
+        'actual_carrier_cost' => '1.00',
+        'carrier_cost_reference' => 'RECEIPT',
+        'carrier_cost_confirmed' => true,
+    ])->assertSessionHasErrors('actual_carrier_cost');
+    expect($order->fresh()->shipment->carrier_cost_recorded_at)->toBeNull();
+    expect($order->fresh()->delivery_fee)->toBe('250.00');
+});
+
+test('order detail names the missing LBC handoff evidence before offering the next milestone', function () {
+    $order = shipmentWorkflowOrder();
+    advanceShipmentForTest($order, ShipmentStatus::ReadyForDispatch);
+    $order->shipment()->update(['actual_carrier_cost' => null, 'carrier_cost_recorded_at' => null]);
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+
+    $this->actingAs($administrator)->get(route('administration.orders.show', $order))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('order.delivery_next_step.title', 'Complete LBC handoff details')
+            ->where('order.delivery_fee', $order->delivery_fee)
+            ->where('order.product_subtotal', $order->product_subtotal));
+});
+
+test('shipment amounts reject client overrides even when they match the order', function () {
+    $order = shipmentWorkflowOrder();
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+    $this->actingAs($administrator)->patch(route('administration.orders.shipment.operations.update', $order), [
+        'declared_value' => $order->product_subtotal,
+        'actual_carrier_cost' => $order->delivery_fee,
+    ])->assertSessionHasErrors(['declared_value', 'actual_carrier_cost']);
+});
+
+test('carrier confirmation derives the fee and still requires receipt evidence', function (string $fee) {
+    $order = shipmentWorkflowOrder();
+    $order->shipment()->update(['actual_carrier_cost' => null, 'carrier_cost_recorded_at' => null]);
+    Order::query()->whereKey($order->id)->update([
+        'delivery_base_fee' => $fee,
+        'handling_surcharge' => '0.00',
+        'delivery_fee' => $fee,
+        'total_amount' => bcadd($order->product_subtotal, $fee, 2),
+    ]);
+    $administrator = User::factory()->administrator()->create();
+    $order->assigned_handler_id = $administrator->id;
+    $order->save();
+    $this->actingAs($administrator)->patch(route('administration.orders.shipment.operations.update', $order), [
+        'carrier_cost_reference' => 'RECEIPT',
+    ])->assertSessionHasErrors('carrier_cost_confirmed');
+    expect($order->fresh()->shipment->carrier_cost_recorded_at)->toBeNull();
+    $this->actingAs($administrator->fresh())->patch(route('administration.orders.shipment.operations.update', $order), [
+        'carrier_cost_reference' => 'RECEIPT',
+        'carrier_cost_confirmed' => true,
+    ])->assertRedirect()->assertSessionHasNoErrors();
+    expect($order->fresh()->shipment->actual_carrier_cost)->toBe($fee);
+})->with(['0.00', '250.25']);

@@ -67,6 +67,9 @@ class OrderController extends Controller
             ]);
         }
 
+        $reconcilePayMongoReturn->refreshHosted($persistedOrder);
+        $persistedOrder->refresh();
+
         return Inertia::render('Orders/Show', [
             'order' => $presenter->detail($persistedOrder),
             'isConfirmation' => $request->session()->get('confirmed_order_id') === $persistedOrder->id,

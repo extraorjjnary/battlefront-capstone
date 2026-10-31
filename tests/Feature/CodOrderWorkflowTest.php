@@ -33,6 +33,9 @@ function codWorkflowOrder(ShipmentStatus $milestone = ShipmentStatus::AwaitingPr
     $order = Order::factory()->cashOnDelivery()->create(['status' => $status]);
     Shipment::factory()->for($order)->withHandoffDetails($order->total_amount)->create([
         'status' => $milestone,
+        'actual_carrier_cost' => $order->delivery_fee,
+        'carrier_cost_reference' => 'COD-RECEIPT',
+        'carrier_cost_recorded_at' => now(),
         'delivered_at' => $milestone === ShipmentStatus::Delivered ? now() : null,
     ]);
     $product = Product::factory()->create();

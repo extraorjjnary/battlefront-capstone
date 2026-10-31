@@ -16,6 +16,7 @@ use App\Http\Controllers\Administration\ForecastingController;
 use App\Http\Controllers\Administration\InventoryAdjustmentController;
 use App\Http\Controllers\Administration\InventoryController;
 use App\Http\Controllers\Administration\NotificationController as AdministrationNotificationController;
+use App\Http\Controllers\Administration\OperationalExportController;
 use App\Http\Controllers\Administration\OrderCodCollectionController;
 use App\Http\Controllers\Administration\OrderCodRemittanceController;
 use App\Http\Controllers\Administration\OrderController as AdministrationOrderController;
@@ -23,6 +24,7 @@ use App\Http\Controllers\Administration\OrderHandlerController;
 use App\Http\Controllers\Administration\OrderLocalLbcBookingController;
 use App\Http\Controllers\Administration\OrderManualShipmentController;
 use App\Http\Controllers\Administration\OrderPaymentProofController;
+use App\Http\Controllers\Administration\OrderPaymentReconciliationController;
 use App\Http\Controllers\Administration\OrderPaymentStatusController;
 use App\Http\Controllers\Administration\OrderPickupConfirmationController;
 use App\Http\Controllers\Administration\OrderShipmentOperationsController;
@@ -297,6 +299,9 @@ Route::middleware(['auth', 'can:access-administration'])
         Route::get('suppliers', [SupplierController::class, 'index'])->middleware('can:suppliers.manage')->name('suppliers.index');
         Route::post('suppliers', [SupplierController::class, 'store'])->middleware('can:suppliers.manage')->name('suppliers.store');
         Route::patch('suppliers/{supplier}', [SupplierController::class, 'update'])->middleware('can:suppliers.manage')->name('suppliers.update');
+        Route::get('operations/{feature}/export/{format}', OperationalExportController::class)
+            ->whereIn('feature', ['stock-requests', 'supplier-returns', 'customer-returns', 'customer-requests', 'damage-reports'])
+            ->whereIn('format', ['csv', 'pdf', 'print'])->middleware('can:reports.export')->name('operations.export');
         Route::get('supplier-returns', [SupplierReturnController::class, 'index'])->middleware('can:inventory.view')->name('supplier-returns.index');
         Route::post('supplier-returns', [SupplierReturnController::class, 'store'])->middleware('can:returns.request')->name('supplier-returns.store');
         Route::post('supplier-returns/{supplierReturn}/decision', [SupplierReturnController::class, 'decide'])
@@ -375,6 +380,9 @@ Route::middleware(['auth', 'can:access-administration'])
         Route::patch('orders/{order}/shipment/operations', [OrderShipmentOperationsController::class, 'update'])
             ->middleware('can:orders.process')
             ->name('orders.shipment.operations.update');
+        Route::post('orders/{order}/payment-reconciliation', OrderPaymentReconciliationController::class)
+            ->middleware(['can:orders.view', 'can:orders.process', 'throttle:10,1'])
+            ->name('orders.payment-reconciliation.store');
         Route::patch('orders/{order}/payment-status', [OrderPaymentStatusController::class, 'update'])
             ->middleware('can:orders.process')
             ->name('orders.payment-status.update');

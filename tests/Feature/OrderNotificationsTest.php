@@ -103,14 +103,13 @@ test('replacement proof notifies administrators once and later rejection remains
 
 test('shipment milestones create meaningful customer history while reference edits remain silent', function () {
     $order = Order::factory()->withDeliverySnapshot()->create(['status' => OrderStatus::Processing, 'payment_status' => PaymentStatus::Verified]);
-    Shipment::factory()->for($order)->withHandoffDetails($order->total_amount)->create();
+    Shipment::factory()->for($order)->withHandoffDetails($order->total_amount)->create(['actual_carrier_cost' => $order->delivery_fee, 'carrier_cost_reference' => 'RECEIPT', 'carrier_cost_recorded_at' => now()]);
     $service = app(OrderProcessingService::class);
 
     foreach ([ShipmentStatus::Preparing, ShipmentStatus::ReadyForDispatch, ShipmentStatus::HandedToLbc, ShipmentStatus::InTransit, ShipmentStatus::OutForDelivery, ShipmentStatus::Delivered] as $status) {
-        $service->updateShipmentStatus($order, $status);
+        $service->updateShipmentStatus($order, $status, $status === ShipmentStatus::HandedToLbc ? 'REAL-REFERENCE' : null);
         expect(fn () => $service->updateShipmentStatus($order, $status))->toThrow(ValidationException::class);
     }
-    $service->updateShipmentReference($order, 'REAL-REFERENCE');
 
     expect($order->user->notifications()->pluck('data')->pluck('event')->sort()->values()->all())->toBe([
         'shipment.delivered', 'shipment.handed_to_lbc', 'shipment.in_transit',

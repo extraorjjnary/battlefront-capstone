@@ -18,6 +18,7 @@ use App\Models\Shipment;
 use App\Models\User;
 use App\Services\Notifications\OrderNotificationPublisher;
 use App\Services\PayMongo\CloseHostedCheckout;
+use App\Services\PayMongo\PaymentRecovery;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -158,12 +159,21 @@ class OrderProcessingService
     public function cancelForCustomer(User $customer, int $orderId): Order
     {
         $order = $customer->orders()->findOrFail($orderId);
-
-        if ($order->payment_origin === 'paymongo' && ! $this->closeHostedCheckout->execute($order->id)) {
-            throw ValidationException::withMessages([
-                'status' => $this->payMongoCancellationBlockedMessage($order),
-            ]);
+        if ($order->payment_origin !== 'paymongo') {
+            return $this->completeCustomerCancellation($customer, $orderId);
         }
+
+        return PaymentRecovery::locked($orderId, function () use ($customer, $orderId): Order {
+            $this->prepareGatewayClosure($orderId, $customer, true);
+            $this->closeGatewayFlows($orderId);
+
+            return $this->completeCustomerCancellation($customer, $orderId);
+        });
+    }
+
+    private function completeCustomerCancellation(User $customer, int $orderId): Order
+    {
+        $order = $customer->orders()->findOrFail($orderId);
 
         return DB::transaction(function () use ($customer, $orderId): Order {
             $order = $customer->orders()->whereKey($orderId)->lockForUpdate()->firstOrFail();
@@ -177,10 +187,66 @@ class OrderProcessingService
                 ]);
             }
 
+            $this->assertGatewayClosed($order);
             $this->transitionLockedOrder($order, OrderStatus::Cancelled, $shipment, cancellationInitiator: UserRole::Customer);
 
             return $order->refresh();
         }, attempts: 3);
+    }
+
+    private function prepareGatewayClosure(int $orderId, ?User $actor, bool $customer): void
+    {
+        DB::transaction(function () use ($orderId, $actor, $customer): void {
+            $order = Order::query()->lockForUpdate()->findOrFail($orderId);
+            $order->setRelation('shipment', $order->shipment()->lockForUpdate()->first());
+            if ($customer) {
+                abort_unless($actor !== null && $order->user_id === $actor->id && $actor->role === UserRole::Customer, 403);
+                if (! $this->canCustomerCancel($order)) {
+                    throw ValidationException::withMessages(['status' => 'This order is not eligible for cancellation.']);
+                }
+            } else {
+                $this->authorizeHandler($order, $actor?->fresh());
+            }
+            if ($order->status !== OrderStatus::Pending || $order->payment_status !== PaymentStatus::Pending
+                || $this->shipmentCancellationBlockedReason($order->shipment) !== null) {
+                throw ValidationException::withMessages(['status' => 'Only an eligible unpaid order can request payment closure.']);
+            }
+            if ($order->payment_closure_requested_at === null) {
+                $order->forceFill([
+                    'payment_closure_requested_at' => now(),
+                    'payment_closure_requested_by' => $actor?->id,
+                    'payment_closure_initiator' => $customer ? 'customer' : ($actor === null ? 'system' : 'administrator'),
+                ])->save();
+                $this->auditOrderChange($order, 'payment.closure_requested', ['initiator' => $order->payment_closure_initiator], $actor);
+            }
+        }, attempts: 3);
+    }
+
+    private function closeGatewayFlows(int $orderId): void
+    {
+        $flows = PayMongoFlow::query()->where('order_id', $orderId)->orderBy('id')->get();
+        if ($flows->isEmpty()) {
+            throw ValidationException::withMessages(['status' => 'Payment history is missing and requires investigation. Stock remains reserved.']);
+        }
+        foreach ($flows as $flow) {
+            if (! $this->closeHostedCheckout->execute($orderId, $flow->id)) {
+                app(PaymentRecovery::class)->uncertain($flow->fresh());
+                throw ValidationException::withMessages(['status' => $this->payMongoCancellationBlockedMessage(Order::query()->findOrFail($orderId))]);
+            }
+            app(PaymentRecovery::class)->observed($flow->fresh(), 'closed');
+        }
+    }
+
+    private function assertGatewayClosed(Order $order): void
+    {
+        if ($order->payment_origin !== 'paymongo') {
+            return;
+        }
+        $flows = PayMongoFlow::query()->where('order_id', $order->id)->lockForUpdate()->get();
+        if ($order->payment_status !== PaymentStatus::Pending || $flows->isEmpty()
+            || $flows->contains(fn (PayMongoFlow $flow): bool => $flow->status !== 'closed' || $flow->requires_attention)) {
+            throw ValidationException::withMessages(['status' => 'Every payment flow must be confirmed closed and unpaid before stock can be restored.']);
+        }
     }
 
     public function shipmentCancellationBlockedReason(?Shipment $shipment): ?string
@@ -199,13 +265,20 @@ class OrderProcessingService
      */
     public function updateStatus(Order $order, OrderStatus $status, ?User $actor = null, bool $productsHandedOver = false): Order
     {
-        if ($status === OrderStatus::Cancelled && $order->payment_origin === 'paymongo'
-            && ! $this->closeHostedCheckout->execute($order->id)) {
-            throw ValidationException::withMessages([
-                'status' => $this->payMongoCancellationBlockedMessage($order),
-            ]);
+        if ($status !== OrderStatus::Cancelled || $order->payment_origin !== 'paymongo') {
+            return $this->completeStatusUpdate($order, $status, $actor, $productsHandedOver);
         }
 
+        return PaymentRecovery::locked($order->id, function () use ($order, $status, $actor, $productsHandedOver): Order {
+            $this->prepareGatewayClosure($order->id, $actor, false);
+            $this->closeGatewayFlows($order->id);
+
+            return $this->completeStatusUpdate($order, $status, $actor, $productsHandedOver);
+        });
+    }
+
+    private function completeStatusUpdate(Order $order, OrderStatus $status, ?User $actor, bool $productsHandedOver): Order
+    {
         return DB::transaction(function () use ($order, $status, $actor, $productsHandedOver): Order {
             $lockedOrder = Order::query()
                 ->whereKey($order->getKey())
@@ -215,10 +288,8 @@ class OrderProcessingService
             $this->authorizeHandler($lockedOrder, $actor);
             $shipment = $lockedOrder->shipment()->lockForUpdate()->first();
             $lockedOrder->setRelation('shipment', $shipment);
-            if ($status === OrderStatus::Cancelled && $lockedOrder->payment_origin === 'paymongo'
-                && ($lockedOrder->payment_status !== PaymentStatus::Pending
-                    || PayMongoFlow::query()->where('order_id', $lockedOrder->id)->where('status', 'closed')->doesntExist())) {
-                throw ValidationException::withMessages(['status' => 'Online payment must be confirmed closed and unpaid before this order can be cancelled.']);
+            if ($status === OrderStatus::Cancelled) {
+                $this->assertGatewayClosed($lockedOrder);
             }
             if ($status === OrderStatus::Completed && $lockedOrder->payment_method->isPayAtPickup()) {
                 throw ValidationException::withMessages(['status' => 'Use Confirm Payment & Complete Pickup after receiving payment and handing over the products.']);
@@ -342,6 +413,15 @@ class OrderProcessingService
 
         $nextShipmentStatus = $this->nextShipmentStatus($order);
         if ($nextShipmentStatus !== null) {
+            if ($nextShipmentStatus === ShipmentStatus::HandedToLbc && (
+                $order->shipment?->package_count === null
+                || $order->shipment->handoff_mode === null
+                || $order->shipment->carrier_cost_recorded_at === null
+                || bccomp($this->decimalString($order->shipment->actual_carrier_cost), $this->decimalString($order->delivery_fee), 2) !== 0
+            )) {
+                return ['title' => 'Complete LBC handoff details', 'detail' => 'Save the packed parcel details and confirm a carrier cost matching the customer delivery fee. Enter the real LBC tracking number at handoff.'];
+            }
+
             return ['title' => 'Mark '.$nextShipmentStatus->label(), 'detail' => 'Advance delivery by one recorded milestone after confirming the physical shipment state.'];
         }
 
@@ -468,6 +548,12 @@ class OrderProcessingService
             }
 
             $hasPackageDetails = array_key_exists('package_count', $operations);
+            $declaredValue = $lockedOrder->product_subtotal ?? bcsub($lockedOrder->total_amount, $lockedOrder->delivery_fee, 2);
+            foreach (['declared_value' => $declaredValue, 'actual_carrier_cost' => $lockedOrder->delivery_fee] as $field => $expected) {
+                if (array_key_exists($field, $operations) && bccomp($this->decimalString($operations[$field]), $this->decimalString($expected), 2) !== 0) {
+                    throw ValidationException::withMessages([$field => 'This amount is locked to the saved order.']);
+                }
+            }
             if ($hasPackageDetails && ! $this->canUpdateShipmentOperations($lockedOrder, 'package')) {
                 throw ValidationException::withMessages([
                     'package_count' => 'Package details can only be recorded before LBC handoff on an active order.',
@@ -480,7 +566,6 @@ class OrderProcessingService
                 || bccomp($this->decimalString($shipment->package_length_cm), $this->decimalString($operations['package_length_cm']), 2) !== 0
                 || bccomp($this->decimalString($shipment->package_width_cm), $this->decimalString($operations['package_width_cm']), 2) !== 0
                 || bccomp($this->decimalString($shipment->package_height_cm), $this->decimalString($operations['package_height_cm']), 2) !== 0
-                || bccomp($this->decimalString($shipment->declared_value), $this->decimalString($operations['declared_value']), 2) !== 0
                 || $shipment->handoff_mode !== $operations['handoff_mode']
             )) {
                 throw ValidationException::withMessages([
@@ -494,12 +579,14 @@ class OrderProcessingService
                 $shipment->package_length_cm = $this->decimalString($operations['package_length_cm']);
                 $shipment->package_width_cm = $this->decimalString($operations['package_width_cm']);
                 $shipment->package_height_cm = $this->decimalString($operations['package_height_cm']);
-                $shipment->declared_value = $this->decimalString($operations['declared_value']);
+                if ($shipment->handed_to_carrier_at === null) {
+                    $shipment->declared_value = $this->decimalString($declaredValue);
+                }
                 $shipment->handoff_mode = (string) $operations['handoff_mode'];
             }
 
-            $carrierCost = $operations['actual_carrier_cost'] ?? null;
-            if (array_key_exists('actual_carrier_cost', $operations)) {
+            $carrierCost = $lockedOrder->delivery_fee;
+            if (array_key_exists('carrier_cost_reference', $operations)) {
                 if (! $this->canUpdateShipmentOperations($lockedOrder, 'carrier_cost')) {
                     throw ValidationException::withMessages(['actual_carrier_cost' => 'Carrier cost can be recorded once for an active or completed delivery.']);
                 }
@@ -511,6 +598,10 @@ class OrderProcessingService
                     throw ValidationException::withMessages([
                         'actual_carrier_cost' => 'A recorded carrier cost cannot be changed. Use the reconciliation record to review discrepancies.',
                     ]);
+                }
+
+                if ($shipment->handed_to_carrier_at === null && bccomp($this->decimalString($carrierCost), $this->decimalString($lockedOrder->delivery_fee), 2) !== 0) {
+                    throw ValidationException::withMessages(['actual_carrier_cost' => 'The carrier cost must match the saved customer delivery fee. Resolve the discrepancy before confirmation; the order cannot be repriced.']);
                 }
 
                 if ($shipment->carrier_cost_recorded_at === null) {
@@ -685,6 +776,15 @@ class OrderProcessingService
                 ]);
             }
 
+            if ($status === ShipmentStatus::HandedToLbc) {
+                if ($shipment->carrier_cost_recorded_at === null || bccomp($this->decimalString($shipment->actual_carrier_cost), $this->decimalString($lockedOrder->delivery_fee), 2) !== 0) {
+                    throw ValidationException::withMessages(['status' => 'Confirm a carrier cost matching the saved customer delivery fee before handing the shipment to LBC.']);
+                }
+                if (blank($shipment->tracking_reference) && blank($trackingReference)) {
+                    throw ValidationException::withMessages(['tracking_reference' => 'Enter the real LBC tracking number before confirming handoff.']);
+                }
+            }
+
             $changes = ['status' => $status, $status->timestampColumn() => now()];
             if (
                 $status === ShipmentStatus::Preparing
@@ -780,7 +880,7 @@ class OrderProcessingService
         }
 
         if (($status === OrderStatus::Processing && ! $this->paymentAllowsFulfillment($order))
-            || ($status === OrderStatus::Completed && $order->payment_status !== PaymentStatus::Verified)) {
+            || ($status === OrderStatus::Completed && ($order->payment_status !== PaymentStatus::Verified || ! $this->paymentAllowsFulfillment($order)))) {
             throw ValidationException::withMessages(['status' => 'Verify payment before processing or completing this order.']);
         }
 
@@ -945,6 +1045,10 @@ class OrderProcessingService
 
     private function paymentAllowsFulfillment(Order $order): bool
     {
+        if ($order->payment_origin === 'paymongo' && $order->paymongoFlows()->where('requires_attention', true)->exists()) {
+            return false;
+        }
+
         return $order->payment_status === PaymentStatus::Verified
             || ($order->payment_status === PaymentStatus::Pending && ($this->isCodDelivery($order) || $this->isPayAtPickupOrder($order)));
     }

@@ -22,10 +22,13 @@ Schedule::call(static function (): void {
         ->where(function ($query): void {
             $query->whereNull('next_check_at')->orWhere('next_check_at', '<=', now());
         })
-        ->orderBy('id')
+        ->orderBy('next_check_at')->orderBy('id')
         ->limit(100)
         ->pluck('id')
-        ->each(static fn (int $id) => ProcessPayMongoWebhook::dispatch($id)->onQueue('payments'));
+        ->each(static function (int $id): void {
+            PayMongoWebhookInbox::query()->whereKey($id)->update(['next_check_at' => now()->addMinute()]);
+            ProcessPayMongoWebhook::dispatch($id)->onQueue('payments');
+        });
 })->name('paymongo-webhook-inbox-recovery')->everyMinute()->withoutOverlapping();
 Schedule::command(ReconcilePayMongoOrders::class)
     ->name('paymongo-overdue-order-reconciliation')

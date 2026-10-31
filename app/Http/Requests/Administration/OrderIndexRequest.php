@@ -29,6 +29,7 @@ class OrderIndexRequest extends FormRequest
         return [
             'q' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'string', Rule::in(['active', 'completed', 'cancelled'])],
+            'gateway_state' => ['nullable', Rule::in(['awaiting', 'failed', 'expired', 'checking', 'closing', 'needs_attention'])],
             'payment_status' => ['nullable', Rule::enum(PaymentStatus::class)],
             'payment_method' => ['nullable', Rule::enum(PaymentMethod::class)],
             'fulfillment_method' => ['nullable', Rule::enum(FulfillmentMethod::class)],

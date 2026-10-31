@@ -42,7 +42,7 @@ class ProcessPayMongoWebhook implements ShouldQueue
             $intentId = data_get($inbox->verified_data, 'attributes.payment_intent_id');
             $flow = PayMongoFlow::query()
                 ->where('checkout_session_id', $inbox->resource_id)
-                ->when(is_string($intentId), fn ($query) => $query->orWhere('payment_intent_id', $intentId))
+                ->when(is_string($intentId), fn ($query) => $query->orWhere('payment_intent_id', $intentId)->orWhereHas('attempts', fn ($attempt) => $attempt->where('payment_intent_id', $intentId)))
                 ->first();
 
             if ($flow === null) {
@@ -59,8 +59,23 @@ class ProcessPayMongoWebhook implements ShouldQueue
 
             $flow = PayMongoFlow::query()->lockForUpdate()->findOrFail($flow->id);
 
+            if (in_array($inbox->event_type, ['payment.failed', 'qrph.expired'], true)
+                && ($flow->payment_id !== null || (is_string($intentId) && $flow->payment_intent_id !== $intentId))) {
+                $inbox->update(['status' => 'processed', 'processed_at' => now()]);
+
+                return;
+            }
             $providerPayments = $this->providerPayments($inbox);
             $providerPayment = $providerPayments[0] ?? null;
+
+            if ($flow->channel === 'hosted_checkout' && $flow->status !== 'paid'
+                && in_array($inbox->event_type, ['payment.failed', 'qrph.expired'], true)) {
+                $flow->update(['status' => 'reconciliation_required']);
+                ReconcilePayMongoOrder::dispatch($flow->id)->onQueue('payments')->afterCommit();
+                $inbox->update(['status' => 'processed', 'processed_at' => now()]);
+
+                return;
+            }
 
             if ($inbox->event_type === 'qrph.expired') {
                 if ($flow->channel === 'direct_qrph' && $flow->status !== 'paid') {

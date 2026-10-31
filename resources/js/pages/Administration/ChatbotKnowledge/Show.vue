@@ -117,7 +117,7 @@ defineOptions({
             </div>
 
             <div class="surface-panel border-border bg-card border p-6">
-                <p class="text-sm leading-7 whitespace-pre-wrap">
+                <p class="text-sm leading-7 whitespace-pre-wrap break-words">
                     {{ knowledge.response_template }}
                 </p>
             </div>

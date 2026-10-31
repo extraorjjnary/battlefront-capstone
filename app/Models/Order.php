@@ -131,6 +131,12 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    /** @return HasMany<PayMongoFlow, $this> */
+    public function paymongoFlows(): HasMany
+    {
+        return $this->hasMany(PayMongoFlow::class);
+    }
+
     /**
      * Get the sale recorded for the completed order.
      *

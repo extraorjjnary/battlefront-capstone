@@ -74,6 +74,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Models/Order.php,app/Http/Controllers/OrderController.php,resources/js/pages/Orders/** | .ai/rules/pages-orders.md |
 | app/Http/Requests/Settings/ProfileUpdateRequest.php,app/Support/PhilippineMobileNumber.php,resources/js/pages/settings/Profile.vue,resources/js/pages/Checkout/Index.vue | .ai/rules/pages-settings-js-pages-checkout.md |
 | resources/js/app.js,resources/js/pages/** | .ai/rules/pages.md |
+| app/Services/PayMongo/**,app/Services/Order/**,resources/js/pages/Administration/Orders/** | .ai/rules/pay-mongo-services-order-js-pages-administration-orders.md |
 | app/Services/PcBuilder/**,resources/js/pages/PcBuilder/**,database/seeders/PcBuilder* | .ai/rules/pc-builder-seeders.md |
 | app/Services/RealCatalogImportService.php,app/Services/CatalogShippingClassification.php,app/Actions/Product/** | .ai/rules/product.md |
 | app/Models/{Product,Category}.php,database/migrations/**,app/Actions/{Product,Category}/**,resources/js/pages/Administration/{Products,Categories}/** | .ai/rules/products-categories.md |
@@ -87,6 +88,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | routes/api.php,app/Http/Controllers/Api/**,app/Http/Resources/** | .ai/rules/resources.md |
 | app/Actions/Chatbot/**,database/seeders/DevelopmentChatbotKnowledgeSeeder.php | .ai/rules/seeders.md |
 | app/Services/Chatbot/** | .ai/rules/services-chatbot.md |
+| app/Services/PayMongo/**,app/Services/CustomerOrderPresenter.php,resources/js/pages/Orders/** | .ai/rules/services-js-pages-orders.md |
 | app/Services/Order/**,resources/js/pages/Administration/Orders/** | .ai/rules/services-order-js-pages-administration-orders.md |
 | app/Console/Commands/**,app/Services/RealCatalogImportService.php,database/PrepareCatalogImageManifest.ps1 | .ai/rules/services.md |
 | app/Services/Order/PsgcDeliveryLocations.php,app/Http/Requests/Settings/ProfileUpdateRequest.php,app/Models/User.php,resources/js/components/DeliveryAddressFields.vue,resources/js/pages/settings/Profile.vue,resources/js/pages/Checkout/Index.vue | .ai/rules/settings-js-pages-checkout.md |

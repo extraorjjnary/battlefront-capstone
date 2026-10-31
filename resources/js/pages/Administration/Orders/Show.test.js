@@ -584,3 +584,32 @@ test('cancellation review retains its processing hold notice without ownership i
         /Update order status|Save reference|Only the assigned handler/,
     );
 });
+
+
+test('handoff stays disabled until matching confirmed cost and tracking are available', async (t) => {
+    const view = orderHarness(t, {
+        can_process: true,
+        assigned_handler_id: 1,
+        delivery_fee: '250.00',
+        shipment: {
+            status: { value: 'ready_for_dispatch', label: 'Ready for dispatch' },
+            tracking_reference: null,
+            operations: { actual_carrier_cost: null, carrier_cost_recorded_at: null },
+        },
+        shipment_actions: { next_status: { value: 'handed_to_lbc', label: 'Handed to LBC' } },
+    });
+    await view.html();
+    assert.equal(Boolean(findButton(view.tree(), 'Mark Handed to LBC').props.disabled), true);
+});
+
+test('shipment amounts remain read-only while preparing package and receipt records', async (t) => {
+    const view = orderHarness(t, {
+        can_process: true, assigned_handler_id: 1, product_subtotal: '1200.50', delivery_fee: '250.25',
+        shipment: { status: { value: 'preparing', label: 'Preparing' }, operations: {} },
+        shipment_actions: { can_update_package_details: true, can_record_carrier_cost: true },
+    });
+    const html = await view.html();
+    assert.match(html, /Saved merchandise amount, excluding delivery/);
+    assert.match(html, /Locked to the saved customer delivery fee/);
+    assert.doesNotMatch(html, /<input[^>]*id="shipment-(declared-value|carrier-cost)"/);
+});

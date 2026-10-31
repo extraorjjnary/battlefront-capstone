@@ -35,6 +35,7 @@ const props = defineProps({
     status_counts: { type: Object, required: true },
 });
 
+const gatewayState = ref(props.filters.gateway_state ?? 'all');
 const paymentStatus = ref(props.filters.payment_status ?? 'all');
 const paymentMethod = ref(props.filters.payment_method ?? 'all');
 const fulfillmentMethod = ref(props.filters.fulfillment_method ?? 'all');
@@ -90,7 +91,7 @@ const viewCopy = computed(() => {
 
 const hasSearchInput = computed(() => Boolean(search.value.trim()));
 const hasAppliedFilters = computed(() =>
-    ['payment_status', 'payment_method', 'fulfillment_method'].some(
+    ['gateway_state', 'payment_status', 'payment_method', 'fulfillment_method'].some(
         (filter) => props.filters[filter] !== null,
     ),
 );
@@ -105,6 +106,7 @@ function selectedValue(value) {
 
 function appliedFilters() {
     return {
+        gateway_state: props.filters.gateway_state ?? undefined,
         payment_status: props.filters.payment_status ?? undefined,
         payment_method: props.filters.payment_method ?? undefined,
         fulfillment_method: props.filters.fulfillment_method ?? undefined,
@@ -117,6 +119,7 @@ function selectedFilters() {
             props.filters.status === 'active'
                 ? undefined
                 : props.filters.status,
+        gateway_state: selectedValue(gatewayState.value),
         payment_status: selectedValue(paymentStatus.value),
         payment_method: selectedValue(paymentMethod.value),
         fulfillment_method: selectedValue(fulfillmentMethod.value),
@@ -127,7 +130,7 @@ function filtersAreCurrent() {
     const selected = selectedFilters();
     const applied = appliedFilters();
 
-    return ['payment_status', 'payment_method', 'fulfillment_method'].every(
+    return ['gateway_state', 'payment_status', 'payment_method', 'fulfillment_method'].every(
         (filter) =>
             String(selected[filter] ?? '') === String(applied[filter] ?? ''),
     );
@@ -157,6 +160,7 @@ function updateFilters() {
 
 function clearFilters() {
     cancelPendingSearch();
+    gatewayState.value = 'all';
     paymentStatus.value = 'all';
     paymentMethod.value = 'all';
     fulfillmentMethod.value = 'all';
@@ -183,7 +187,7 @@ function orderPage(options) {
     });
 }
 
-watch([paymentStatus, paymentMethod, fulfillmentMethod], updateFilters);
+watch([gatewayState, paymentStatus, paymentMethod, fulfillmentMethod], updateFilters);
 
 defineOptions({
     layout: {
@@ -232,6 +236,17 @@ defineOptions({
         </nav>
 
         <section class="space-y-3" aria-labelledby="order-query-heading">
+            <div class="mb-4">
+                <Label for="gateway-state">Online payment recovery</Label>
+                <Select v-model="gatewayState">
+                    <SelectTrigger id="gateway-state"><SelectValue placeholder="All payment states" /></SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All payment states</SelectItem>
+                        <SelectItem v-for="option in filter_options.gateway_states" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
+                    </SelectContent>
+                </Select>
+                <p v-if="gatewayState === 'needs_attention'" class="text-muted-foreground mt-2 text-sm">Includes payment exceptions on completed and cancelled orders.</p>
+            </div>
             <h2 id="order-query-heading" class="sr-only">Search and filters</h2>
 
             <div
@@ -436,7 +451,7 @@ defineOptions({
                             <p class="text-muted-foreground">Payment</p>
                             <div class="mt-1 flex flex-wrap items-center gap-2">
                                 <span class="font-medium">
-                                    {{ order.payment.method.label }}
+                                    {{ order.payment.method.label }}<span v-if="order.payment.gateway" class="text-muted-foreground block text-xs">{{ order.payment.gateway.label }}</span>
                                 </span>
                                 <Badge
                                     variant="outline"

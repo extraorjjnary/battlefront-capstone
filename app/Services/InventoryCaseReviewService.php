@@ -14,10 +14,10 @@ class InventoryCaseReviewService
      * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
-    public function damageReports(array $filters, int|string|null $case, bool $overdue): array
+    public function damageReports(array $filters, int|string|null $case, bool $overdue, ?int $page = null): array
     {
         $overdueCutoff = now()->startOfDay()->subDays(3);
-        $reports = $this->inventory->paginateDamageReports($filters, $case, $overdue, $overdueCutoff);
+        $reports = $this->inventory->paginateDamageReports($filters, $case, $overdue, $overdueCutoff, $page);
         $heldBySupplierReturn = $this->inventory->damageSupplierHolds($reports->getCollection()->pluck('id'));
         $reports->getCollection()->transform(function ($report) use ($heldBySupplierReturn, $overdueCutoff) {
             $report->held_quantity = $report->status === 'pending' || ($report->disposition === 'supplier_return' && $heldBySupplierReturn->has($report->id))
@@ -43,10 +43,10 @@ class InventoryCaseReviewService
      * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
-    public function supplierReturns(array $filters, int|string|null $case, bool $overdue): array
+    public function supplierReturns(array $filters, int|string|null $case, bool $overdue, ?int $page = null): array
     {
         $overdueCutoff = now()->startOfDay()->subDays(30);
-        $returns = $this->inventory->paginateSupplierReturns($filters, $case, $overdue, $overdueCutoff);
+        $returns = $this->inventory->paginateSupplierReturns($filters, $case, $overdue, $overdueCutoff, $page);
         $returns->getCollection()->transform(function ($return) use ($overdueCutoff) {
             $return->held_quantity = in_array($return->status, ['pending', 'approved', 'rejected_follow_up'], true) ? $return->quantity : 0;
             $return->age_days = (int) now()->startOfDay()->diffInDays($return->created_at, true);

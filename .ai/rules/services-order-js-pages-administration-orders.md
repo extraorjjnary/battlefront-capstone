@@ -16,3 +16,9 @@ Delivery orders with saved pricing_status=not_configured must have a Manual Ship
 ## Delay wallet delivery arrangements until Processing
 
 For unconfigured GCash/Maya deliveries, expose and accept Confirm delivery arrangement only when the order is Processing, including when payment is already verified while Pending. Enforce through shared canCreateManualShipment eligibility under the existing locks. Preserve Pending COD arrangement creation because COD requires an LBC shipment before Processing; retain all other eligibility, payment and completion gates.
+
+## Match confirmed LBC handoff evidence to the saved order
+Before Handed to LBC, require confirmed actual carrier cost equal to the saved customer delivery fee and a real tracking reference. Reject a mismatched cost before its immutable confirmation; do not reprice saved product lines or order totals. Share the shipment tracking reference with customer and admin views; receipt reference remains separate.
+
+## Derive locked shipment amounts from saved order charges
+Declared value uses saved product_subtotal (legacy fallback: total_amount minus delivery_fee); carrier cost uses saved delivery_fee. Both are always read-only and HTTP writes reject supplied amounts. Staff must still enter receipt evidence and explicitly confirm a match; prefill does not reconcile or establish payment. Preserve immutable historical shipment values and show discrepancies separately.

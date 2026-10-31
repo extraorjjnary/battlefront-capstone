@@ -6,12 +6,35 @@ use App\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\PayMongoFlow;
 use App\Services\Notifications\OrderNotificationPublisher;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
 
 class ReconcilePayMongoReturn
 {
+    public function refreshHosted(Order $order): void
+    {
+        if ($order->payment_origin !== 'paymongo' || $order->payment_status !== PaymentStatus::Pending
+            || $order->status->value !== 'pending'
+            || ! PayMongoFlow::query()->where('order_id', $order->id)->where('channel', 'hosted_checkout')
+                ->where('active_slot', 'active')->whereNotNull('checkout_session_id')->exists()
+            || ! Cache::add('paymongo-status-refresh:'.$order->id, true, 5)) {
+            return;
+        }
+
+        try {
+            $flow = PayMongoFlow::query()->where('order_id', $order->id)->where('active_slot', 'active')->first();
+            if ($flow !== null) {
+                app(ObserveHostedCheckout::class)->execute($flow);
+            }
+        } catch (Throwable) {
+            PayMongoFlow::query()->where('order_id', $order->id)->where('active_slot', 'active')
+                ->where('channel', 'hosted_checkout')->where('status', 'open')
+                ->update(['status' => 'reconciliation_required']);
+        }
+    }
+
     public function __construct(
         private readonly PayMongoClient $client,
         private readonly RecordPayMongoPayment $recordPayment,
@@ -73,6 +96,17 @@ class ReconcilePayMongoReturn
                     && data_get($payment, 'attributes.status') === 'paid');
 
             if ($paidPayments->isEmpty()) {
+                if ($flow->channel === 'hosted_checkout'
+                    && (data_get($resource, 'attributes.status') === 'expired'
+                        || ! empty(data_get($resource, 'attributes.payment_intent.attributes.last_payment_error'))
+                        || collect($payments)->contains(fn (mixed $payment): bool => in_array(data_get($payment, 'attributes.status'), ['failed', 'pending', 'processing'], true)))) {
+                    try {
+                        app(StartHostedCheckout::class)->execute($order, allowReplacement: false);
+                    } catch (Throwable) {
+                        PayMongoFlow::query()->whereKey($flow->id)->where('status', 'open')
+                            ->update(['status' => 'reconciliation_required']);
+                    }
+                }
                 $operation->update([
                     'status' => 'completed',
                     'provider_reference' => $providerReference,

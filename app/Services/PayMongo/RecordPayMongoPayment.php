@@ -8,6 +8,7 @@ use App\Models\PayMongoAttempt;
 use App\Models\PayMongoFlow;
 use App\Services\Notifications\OrderNotificationPublisher;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class RecordPayMongoPayment
 {
@@ -27,12 +28,19 @@ class RecordPayMongoPayment
                     && $payment['method'] !== ($lockedFlow->hosted_payment_method ?? $order->hosted_payment_method))
                 || $order->status->value === 'cancelled'
                 || ($lockedFlow->payment_id !== null && $lockedFlow->payment_id !== $payment['id'])) {
-                $lockedFlow->update(['status' => 'reconciliation_required']);
+                $lockedFlow->operations()->firstOrCreate(['kind' => 'payment_anomaly', 'provider_reference' => $payment['id']], [
+                    'operation_id' => (string) Str::uuid(),
+                    'idempotency_key' => (string) Str::uuid(),
+                    'request_fingerprint' => hash('sha256', json_encode($payment, JSON_THROW_ON_ERROR)),
+                    'status' => 'unknown', 'next_check_at' => now()->addMinutes(15),
+                ]);
+                app(PaymentRecovery::class)->uncertain($lockedFlow, reason: 'financial_anomaly');
 
                 return false;
             }
 
-            $duplicatePayment = PayMongoFlow::query()
+            $otherPaidFlow = PayMongoFlow::query()->where('order_id', $order->id)->where('id', '!=', $lockedFlow->id)->whereNotNull('payment_id')->exists();
+            $duplicatePayment = $otherPaidFlow || PayMongoFlow::query()
                 ->where('payment_id', $payment['id'])
                 ->where('id', '<>', $lockedFlow->id)
                 ->exists()
@@ -53,6 +61,9 @@ class RecordPayMongoPayment
                 'status' => 'paid',
                 'active_slot' => null,
                 'paid_at' => $lockedFlow->paid_at ?? now(),
+                'recovery_outcome' => 'paid', 'last_checked_at' => now(),
+                'requires_attention' => $lockedFlow->recovery_reason === 'financial_anomaly',
+                'exception_since' => $lockedFlow->recovery_reason === 'financial_anomaly' ? $lockedFlow->exception_since : null,
             ]);
             $attempt = PayMongoAttempt::query()
                 ->where('paymongo_flow_id', $lockedFlow->id)

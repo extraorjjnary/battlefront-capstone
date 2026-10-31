@@ -95,7 +95,7 @@ class InventoryRepository
      * @param  array<string, mixed>  $filters
      * @return LengthAwarePaginator<int, \stdClass>
      */
-    public function paginateDamageReports(array $filters, int|string|null $case, bool $overdue, CarbonInterface $overdueCutoff): LengthAwarePaginator
+    public function paginateDamageReports(array $filters, int|string|null $case, bool $overdue, CarbonInterface $overdueCutoff, ?int $page = null): LengthAwarePaginator
     {
         return DB::table('damage_reports as reports')
             ->join('products', 'products.id', '=', 'reports.product_id')
@@ -108,7 +108,7 @@ class InventoryRepository
                 ->orWhere('reports.reason', 'like', '%'.$search.'%')))
             ->when($overdue, fn ($query) => $query->where('reports.status', 'pending')
                 ->where('reports.created_at', '<', $overdueCutoff))
-            ->orderByDesc('reports.created_at')->paginate(20)->withQueryString();
+            ->orderByDesc('reports.created_at')->orderByDesc('reports.id')->paginate(20, ['*'], 'page', $page)->withQueryString();
     }
 
     /**
@@ -144,7 +144,7 @@ class InventoryRepository
      * @param  array<string, mixed>  $filters
      * @return LengthAwarePaginator<int, \stdClass>
      */
-    public function paginateSupplierReturns(array $filters, int|string|null $case, bool $overdue, CarbonInterface $overdueCutoff): LengthAwarePaginator
+    public function paginateSupplierReturns(array $filters, int|string|null $case, bool $overdue, CarbonInterface $overdueCutoff, ?int $page = null): LengthAwarePaginator
     {
         return DB::table('supplier_returns as returns')
             ->join('products', 'products.id', '=', 'returns.product_id')
@@ -166,7 +166,7 @@ class InventoryRepository
                 $query->whereIn('returns.status', ['pending', 'approved', 'dispatched', 'rejected_follow_up'])
                     ->orWhere(fn ($query) => $query->where('returns.status', 'closed')->whereNull('resolutions.supplier_return_id'));
             })->where('returns.created_at', '<', $overdueCutoff))
-            ->orderByDesc('returns.created_at')->paginate(20)->withQueryString();
+            ->orderByDesc('returns.created_at')->paginate(20, ['*'], 'page', $page)->withQueryString();
     }
 
     /** @return \Illuminate\Support\Collection<int, \stdClass> */
@@ -179,7 +179,7 @@ class InventoryRepository
      * @param  array<string, mixed>  $filters
      * @return LengthAwarePaginator<int, \stdClass>
      */
-    public function paginateAdjustments(array $filters, int|string|null $case, int $viewerId, bool $canApprove): LengthAwarePaginator
+    public function paginateAdjustments(array $filters, int|string|null $case, int $viewerId, bool $canApprove, ?int $page = null): LengthAwarePaginator
     {
         $requests = DB::table('inventory_adjustment_requests as requests')
             ->join('products', 'products.id', '=', 'requests.product_id')
@@ -199,7 +199,7 @@ class InventoryRepository
                 ->orWhere('requests.reason', 'like', '%'.$search.'%')))
             ->orderByRaw("CASE WHEN requests.status = 'pending' THEN 0 ELSE 1 END")
             ->orderByDesc('requests.created_at')
-            ->paginate(20)->withQueryString();
+            ->paginate(20, ['*'], 'page', $page)->withQueryString();
         $replacementIds = DB::table('inventory_adjustment_requests')
             ->whereIn('replaces_request_id', $requests->getCollection()->pluck('id'))
             ->pluck('id', 'replaces_request_id');
