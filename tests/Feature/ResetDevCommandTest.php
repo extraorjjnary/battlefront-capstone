@@ -212,7 +212,8 @@ test('reset restores the complete real catalog with historical sales only when r
     $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00'));
     $manifestPath = storage_path('app/private/product-catalog-images/manifest.json');
     $mappingPath = storage_path('app/imports/product_catalog/verified-product-details.csv');
-    if (! is_file($manifestPath) || ! is_file($mappingPath)) {
+    $approvalsPath = storage_path('app/private/product-catalog-images/development-value-approvals.json');
+    if (! is_file($manifestPath) || ! is_file($mappingPath) || ! is_file($approvalsPath)) {
         $this->markTestSkipped('The private catalog data is unavailable.');
     }
     $manifest = json_decode(file_get_contents($manifestPath), true, flags: JSON_THROW_ON_ERROR);
@@ -258,7 +259,7 @@ test('reset restores the complete real catalog with historical sales only when r
         expect($products)->toHaveCount(654);
         $this->assertDatabaseCount('products', 654);
         $this->assertDatabaseCount('inventories', 654);
-        $this->assertDatabaseCount('product_component_profiles', 14);
+        $this->assertDatabaseCount('product_component_profiles', 193);
         expect(ProductComponentProfile::query()->where('review_status', '!=', 'draft')->count())->toBe(0);
         $this->assertDatabaseCount('pc_build_templates', 6);
         $this->assertDatabaseCount('pc_build_template_items', 0);

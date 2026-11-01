@@ -237,19 +237,25 @@ test('verified shipment delivery records the product subtotal while preserving p
 
     $processing->updatePaymentStatus($order, PaymentStatus::Verified);
     $processing->updateStatus($order, OrderStatus::Processing);
-    $processing->updateShipmentOperations($order, [
+    $handoff = [
         'package_count' => '1',
         'package_weight_kg' => '1.000',
         'package_length_cm' => '10.00',
         'package_width_cm' => '10.00',
         'package_height_cm' => '10.00',
-        'declared_value' => $order->product_subtotal,
         'handoff_mode' => 'branch_dropoff',
         'carrier_cost_reference' => 'LBC-RECEIPT',
         'carrier_cost_confirmed' => true,
-    ], $handler);
+    ];
     foreach ([ShipmentStatus::Preparing, ShipmentStatus::ReadyForDispatch, ShipmentStatus::HandedToLbc, ShipmentStatus::InTransit, ShipmentStatus::OutForDelivery, ShipmentStatus::Delivered] as $status) {
-        $processing->updateShipmentStatus($order, $status, $status === ShipmentStatus::HandedToLbc ? 'LBC-TRACKING' : null);
+        $isHandoff = $status === ShipmentStatus::HandedToLbc;
+        $processing->updateShipmentStatus(
+            $order,
+            $status,
+            $isHandoff ? 'LBC-TRACKING' : null,
+            actor: $handler,
+            handoff: $isHandoff ? $handoff : [],
+        );
     }
 
     expect($order->refresh()->sale->amount)->toBe('200.00');
