@@ -68,7 +68,7 @@ class OrderController extends Controller
         }
 
         $reconcilePayMongoReturn->refreshHosted($persistedOrder);
-        $persistedOrder->refresh();
+        $persistedOrder = $orders->find($customer, $order);
 
         return Inertia::render('Orders/Show', [
             'order' => $presenter->detail($persistedOrder),

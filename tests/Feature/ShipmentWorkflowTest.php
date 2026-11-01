@@ -96,8 +96,12 @@ function recordManualShipmentOperationsForTest(Order $order, User $actor): void
     $order->shipment()->update(['tracking_reference' => 'LBC-MANUAL']);
 }
 
-test('shipment operations accept decimal numbers from JSON requests', function () {
+test('shipment operations accept decimal numbers from JSON requests', function (string $savedBaseFee) {
+    config(['battlefront.delivery.regional_estimates.fees.visayas' => $savedBaseFee]);
     $order = shipmentWorkflowOrder();
+    $savedDeliveryFee = $order->delivery_fee;
+    $savedTotal = $order->total_amount;
+    config(['battlefront.delivery.regional_estimates.fees.visayas' => '150.00']);
     $order->shipment()->update(['actual_carrier_cost' => null, 'carrier_cost_recorded_at' => null]);
     $administrator = User::factory()->administrator()->create();
     $order->assigned_handler_id = $administrator->id;
@@ -125,9 +129,14 @@ test('shipment operations accept decimal numbers from JSON requests', function (
         ->and($shipment->package_length_cm)->toBe('0.10')
         ->and($shipment->package_height_cm)->toBe('0.09')
         ->and($shipment->declared_value)->toBe($order->product_subtotal)
-        ->and($shipment->actual_carrier_cost)->toBe('250.00')
+        ->and($shipment->actual_carrier_cost)->toBe($savedDeliveryFee)
         ->and($shipment->carrier_cost_reference)->toBe('RECEIPT-62');
-});
+    expect($order->delivery_fee)->toBe($savedDeliveryFee)
+        ->and($order->total_amount)->toBe($savedTotal);
+})->with([
+    'current regional fee' => ['150.00'],
+    'historical fee before regional pricing change' => ['250.00'],
+]);
 
 test('administrators advance the full manual lifecycle and complete one sale without deducting stock', function () {
     $this->travelTo('2026-10-08 09:00:00');
@@ -943,7 +952,7 @@ test('LBC handoff requires matching confirmed cost and a real tracking reference
     $order = shipmentWorkflowOrder();
     advanceShipmentForTest($order, ShipmentStatus::ReadyForDispatch);
     $order->shipment()->update([
-        'actual_carrier_cost' => $cost,
+        'actual_carrier_cost' => $cost === 'saved_fee' ? $order->delivery_fee : $cost,
         'carrier_cost_recorded_at' => $cost === null ? null : now(),
         'tracking_reference' => null,
     ]);
@@ -960,11 +969,12 @@ test('LBC handoff requires matching confirmed cost and a real tracking reference
 })->with([
     'missing confirmation' => [null, 'REAL-LBC', 'status'],
     'different carrier cost' => ['1.00', 'REAL-LBC', 'status'],
-    'missing reference' => ['250.00', null, 'tracking_reference'],
+    'missing reference' => ['saved_fee', null, 'tracking_reference'],
 ]);
 
 test('a mismatched carrier cost cannot be confirmed before handoff', function () {
     $order = shipmentWorkflowOrder();
+    $savedDeliveryFee = $order->delivery_fee;
     $order->shipment()->update(['actual_carrier_cost' => null, 'carrier_cost_recorded_at' => null]);
     $administrator = User::factory()->administrator()->create();
     $order->assigned_handler_id = $administrator->id;
@@ -975,7 +985,7 @@ test('a mismatched carrier cost cannot be confirmed before handoff', function ()
         'carrier_cost_confirmed' => true,
     ])->assertSessionHasErrors('actual_carrier_cost');
     expect($order->fresh()->shipment->carrier_cost_recorded_at)->toBeNull();
-    expect($order->fresh()->delivery_fee)->toBe('250.00');
+    expect($order->fresh()->delivery_fee)->toBe($savedDeliveryFee);
 });
 
 test('order detail names the missing LBC handoff evidence before offering the next milestone', function () {

@@ -16,3 +16,6 @@ The test simulator can leave an active session pointing at an expired Source; ac
 
 ## Do not infer payment-state conflicts from unchanged MySQL updates
 MySQL reports zero affected rows when status, checkout URL and updated_at are unchanged, including repeated observations within one second. Verify allowed flow state under the existing order-then-flow row locks instead of treating an update count of zero as a race. Keep a frozen-time MySQL regression for repeated QR failure observations followed by customer retry; SQLite alone does not reproduce this defect.
+
+## Observe unpaid hosted returns even when the session is still active
+A hosted test return may leave its session active with an empty payments array and no intent error while the current QR Source is expired. Always pass unpaid hosted returns through ObserveHostedCheckout; session-level negative evidence is not a prerequisite. Observation must not acknowledge failure, create a replacement, or release stock. Customer expiry guidance must use confirmed recovery state while order/payment status remains pending.

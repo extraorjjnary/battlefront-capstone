@@ -52,9 +52,9 @@ class DevelopmentSupplierSeeder extends Seeder
             }
         });
 
-        $this->command?->info('Demo suppliers ready: 3 suppliers with saved relationships to 6 existing catalog products. Products and stock preserved. Selecting a supplier filters its linked products.');
+        $this->command->info('Demo suppliers ready: 3 suppliers with saved relationships to 6 existing catalog products. Products and stock preserved. Selecting a supplier filters its linked products.');
         foreach (self::catalog() as $supplier) {
-            $this->command?->info($supplier['name'].': '.implode(', ', array_keys($supplier['products'])));
+            $this->command->info($supplier['name'].': '.implode(', ', array_keys($supplier['products'])));
         }
     }
 

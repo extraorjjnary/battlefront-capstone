@@ -23,7 +23,10 @@ test('supplier seeding uses existing selectable products without changing catalo
         $before[$table] = DB::table($table)->orderBy('id')->get()->all();
     }
 
-    $this->seed(DevelopmentSupplierSeeder::class);
+    $this->artisan('db:seed', ['--class' => DevelopmentSupplierSeeder::class, '--no-interaction' => true])
+        ->expectsOutputToContain('Demo suppliers ready: 3 suppliers')
+        ->expectsOutputToContain('Demo Supplier - Components: 10035, 11026')
+        ->assertSuccessful();
     $this->seed(DevelopmentSupplierSeeder::class);
 
     $this->assertDatabaseCount('suppliers', 3);

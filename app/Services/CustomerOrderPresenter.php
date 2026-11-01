@@ -11,6 +11,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\PayMongoFlow;
 use App\Services\Order\OrderProcessingService;
+use App\Services\PayMongo\PaymentRecoveryPresenter;
 use App\Support\OperationalRequestReason;
 
 class CustomerOrderPresenter
@@ -23,6 +24,7 @@ class CustomerOrderPresenter
         private readonly CustomerReturnRequestPresenter $returnRequests,
         private readonly BranchDirectory $branches,
         private readonly OrderCancellationPresenter $cancellations,
+        private readonly PaymentRecoveryPresenter $paymentRecovery,
     ) {}
 
     /**
@@ -207,6 +209,13 @@ class CustomerOrderPresenter
         if ($order->payment_origin === 'paymongo') {
             if ($order->payment_closure_requested_at !== null && $order->payment_status !== PaymentStatus::Verified) {
                 return 'Cancellation is requested. Payment actions are paused while PayMongo confirms that payment is closed and unpaid. Your stock remains reserved until cancellation completes.';
+            }
+
+            if ($order->status === OrderStatus::Pending && $order->payment_status === PaymentStatus::Pending) {
+                $state = $this->paymentRecovery->detail($order, history: false)['state'];
+                if ($state === 'expired') {
+                    return 'Your payment attempt expired. Your order is still unpaid and stock remains reserved. You can try payment again before the payment deadline when available.';
+                }
             }
 
             return $order->payment_status === PaymentStatus::Verified

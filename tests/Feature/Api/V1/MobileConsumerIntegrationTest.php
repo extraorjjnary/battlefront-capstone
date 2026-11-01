@@ -193,7 +193,7 @@ test('placed delivery milestones share read state and owned deep links while log
         'package_length_cm' => '10.00',
         'package_width_cm' => '10.00',
         'package_height_cm' => '10.00',
-        'declared_value' => $order->total_amount,
+        'declared_value' => $order->product_subtotal,
         'handoff_mode' => 'branch_dropoff',
         'actual_carrier_cost' => $order->delivery_fee,
         'carrier_cost_reference' => 'SYNTHETIC-TEST-RECEIPT',

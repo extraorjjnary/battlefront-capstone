@@ -363,7 +363,7 @@ test('current failed intent overrides stale checkout data and can resume', funct
     Http::assertSentCount(4);
 })->with([[true, 'error'], [false, 'error'], [true, 'payment'], [false, 'payment']]);
 
-test('QR test source failure selects retry while its intent still awaits action', function (string $status, array $overrides = []) {
+test('QR test source failure selects retry while its intent still awaits action', function (string $status, array $overrides = [], bool $returning = false) {
     $this->flow->update(['hosted_payment_method' => 'qrph']);
     $this->order->update(['hosted_payment_method' => 'qrph']);
     Http::fake([
@@ -383,7 +383,13 @@ test('QR test source failure selects retry while its intent still awaits action'
         ]]),
     ]);
 
-    app(ReconcilePayMongoReturn::class)->refreshHosted($this->order);
+    if ($returning) {
+        $this->actingAs($this->customer)
+            ->get(route('orders.show', ['order' => $this->order, 'paymongo_return' => 1]))
+            ->assertRedirect(route('orders.show', ['order' => $this->order, 'paymongo_returned' => 1]));
+    } else {
+        app(ReconcilePayMongoReturn::class)->refreshHosted($this->order);
+    }
     $payment = app(CustomerOrderPresenter::class)->detail($this->order->fresh())['payment'];
     $uncertain = $overrides !== [] || in_array($status, ['consumed', 'processing'], true);
     $failed = ! $uncertain && in_array($status, ['failed', 'expired', 'cancelled'], true);
@@ -392,12 +398,20 @@ test('QR test source failure selects retry while its intent still awaits action'
     if ($failed) {
         expect($payment['checkout_url'])->toBeNull();
     }
+    if ($status === 'expired' && ! $uncertain) {
+        expect($payment['notice'])->toContain('Your payment attempt expired.');
+        expect($this->flow->fresh()->recovery_outcome)->toBe('expired');
+    }
+    expect($this->order->fresh()->status->value)->toBe('pending')
+        ->and($this->order->fresh()->payment_status->value)->toBe('pending');
     expect(PayMongoFlow::query()->count())->toBe(1);
-    Http::assertSentCount(3);
+    Http::assertSentCount($returning ? 4 : 3);
     Http::assertNotSent(fn ($request) => $request->method() === 'POST');
 })->with([
     ['failed'], ['expired'], ['cancelled'], ['pending'], ['chargeable'], ['consumed'], ['processing'],
     ['failed', ['currency' => 'USD']], ['failed', ['amount' => 9999]], ['failed', ['livemode' => true]],
+    ['expired', [], true], ['failed', [], true], ['processing', [], true],
+    ['expired', ['amount' => 9999], true],
 ]);
 
 test('terminal QR test sources require confirmed session closure before a fresh retry', function (string $sourceStatus, string $closure) {

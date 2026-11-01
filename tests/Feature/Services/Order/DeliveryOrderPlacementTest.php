@@ -243,11 +243,13 @@ test('verified shipment delivery records the product subtotal while preserving p
         'package_length_cm' => '10.00',
         'package_width_cm' => '10.00',
         'package_height_cm' => '10.00',
-        'declared_value' => $order->total_amount,
+        'declared_value' => $order->product_subtotal,
         'handoff_mode' => 'branch_dropoff',
+        'carrier_cost_reference' => 'LBC-RECEIPT',
+        'carrier_cost_confirmed' => true,
     ], $handler);
     foreach ([ShipmentStatus::Preparing, ShipmentStatus::ReadyForDispatch, ShipmentStatus::HandedToLbc, ShipmentStatus::InTransit, ShipmentStatus::OutForDelivery, ShipmentStatus::Delivered] as $status) {
-        $processing->updateShipmentStatus($order, $status);
+        $processing->updateShipmentStatus($order, $status, $status === ShipmentStatus::HandedToLbc ? 'LBC-TRACKING' : null);
     }
 
     expect($order->refresh()->sale->amount)->toBe('200.00');

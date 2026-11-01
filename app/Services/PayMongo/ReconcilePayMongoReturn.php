@@ -96,12 +96,9 @@ class ReconcilePayMongoReturn
                     && data_get($payment, 'attributes.status') === 'paid');
 
             if ($paidPayments->isEmpty()) {
-                if ($flow->channel === 'hosted_checkout'
-                    && (data_get($resource, 'attributes.status') === 'expired'
-                        || ! empty(data_get($resource, 'attributes.payment_intent.attributes.last_payment_error'))
-                        || collect($payments)->contains(fn (mixed $payment): bool => in_array(data_get($payment, 'attributes.status'), ['failed', 'pending', 'processing'], true)))) {
+                if ($flow->channel === 'hosted_checkout') {
                     try {
-                        app(StartHostedCheckout::class)->execute($order, allowReplacement: false);
+                        app(ObserveHostedCheckout::class)->execute($flow);
                     } catch (Throwable) {
                         PayMongoFlow::query()->whereKey($flow->id)->where('status', 'open')
                             ->update(['status' => 'reconciliation_required']);

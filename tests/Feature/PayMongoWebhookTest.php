@@ -485,7 +485,8 @@ test('hosted checkout return alone cannot verify an unpaid payment', function ()
     Http::fake([
         'https://api.paymongo.com/v1/checkout_sessions/cs_test_return_unpaid' => Http::response(['data' => [
             'id' => 'cs_test_return_unpaid',
-            'attributes' => ['livemode' => false, 'status' => 'active', 'payments' => []],
+            'attributes' => ['livemode' => false, 'status' => 'active', 'payments' => [],
+                'checkout_url' => 'https://checkout.paymongo.com/cs_test_return_unpaid'],
         ]]),
     ]);
     config([
