@@ -413,13 +413,8 @@ class OrderProcessingService
 
         $nextShipmentStatus = $this->nextShipmentStatus($order);
         if ($nextShipmentStatus !== null) {
-            if ($nextShipmentStatus === ShipmentStatus::HandedToLbc && (
-                $order->shipment?->package_count === null
-                || $order->shipment->handoff_mode === null
-                || $order->shipment->carrier_cost_recorded_at === null
-                || bccomp($this->decimalString($order->shipment->actual_carrier_cost), $this->decimalString($order->delivery_fee), 2) !== 0
-            )) {
-                return ['title' => 'Complete LBC handoff details', 'detail' => 'Save the packed parcel details and confirm a carrier cost matching the customer delivery fee. Enter the real LBC tracking number at handoff.'];
+            if ($nextShipmentStatus === ShipmentStatus::HandedToLbc) {
+                return ['title' => 'Hand over to LBC', 'detail' => 'Record the final package details, confirm the carrier receipt, and enter the real tracking number together when handing the parcel to LBC.'];
             }
 
             return ['title' => 'Mark '.$nextShipmentStatus->label(), 'detail' => 'Advance delivery by one recorded milestone after confirming the physical shipment state.'];
@@ -459,10 +454,7 @@ class OrderProcessingService
         }
 
         return match ($operation) {
-            'package' => $order->status === OrderStatus::Processing
-                && $shipment->handed_to_carrier_at === null,
-            'carrier_cost' => $shipment->carrier_cost_recorded_at === null
-                && in_array($order->status, [OrderStatus::Processing, OrderStatus::Completed], strict: true),
+            'package', 'carrier_cost' => false,
             'exception' => in_array($order->status, [OrderStatus::Processing, OrderStatus::Completed], strict: true),
             default => false,
         };
@@ -535,9 +527,22 @@ class OrderProcessingService
      */
     public function updateShipmentOperations(Order $order, array $operations, User $actor): Shipment
     {
-        return DB::transaction(function () use ($order, $operations, $actor): Shipment {
+        return $this->saveShipmentOperations($order, $operations, $actor);
+    }
+
+    /** @param array<string, mixed> $operations */
+    private function saveShipmentOperations(Order $order, array $operations, ?User $actor, bool $handoff = false): Shipment
+    {
+        return DB::transaction(function () use ($order, $operations, $actor, $handoff): Shipment {
             $lockedOrder = Order::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
             $this->authorizeHandler($lockedOrder, $actor);
+            if (! $handoff) {
+                foreach (['package_count', 'package_weight_kg', 'package_length_cm', 'package_width_cm', 'package_height_cm', 'handoff_mode', 'declared_value', 'actual_carrier_cost', 'carrier_cost_reference', 'carrier_cost_confirmed'] as $field) {
+                    if (array_key_exists($field, $operations)) {
+                        throw ValidationException::withMessages([$field => 'Package and carrier records can only be saved through Hand over to LBC.']);
+                    }
+                }
+            }
             $shipment = $lockedOrder->shipment()->lockForUpdate()->first();
             $lockedOrder->setRelation('shipment', $shipment);
 
@@ -554,7 +559,7 @@ class OrderProcessingService
                     throw ValidationException::withMessages([$field => 'This amount is locked to the saved order.']);
                 }
             }
-            if ($hasPackageDetails && ! $this->canUpdateShipmentOperations($lockedOrder, 'package')) {
+            if ($hasPackageDetails && (! $handoff || $this->nextShipmentStatus($lockedOrder) !== ShipmentStatus::HandedToLbc)) {
                 throw ValidationException::withMessages([
                     'package_count' => 'Package details can only be recorded before LBC handoff on an active order.',
                 ]);
@@ -587,7 +592,7 @@ class OrderProcessingService
 
             $carrierCost = $lockedOrder->delivery_fee;
             if (array_key_exists('carrier_cost_reference', $operations)) {
-                if (! $this->canUpdateShipmentOperations($lockedOrder, 'carrier_cost')) {
+                if (! $handoff || $this->nextShipmentStatus($lockedOrder) !== ShipmentStatus::HandedToLbc) {
                     throw ValidationException::withMessages(['actual_carrier_cost' => 'Carrier cost can be recorded once for an active or completed delivery.']);
                 }
 
@@ -744,9 +749,10 @@ class OrderProcessingService
                 || ($order->status === OrderStatus::Completed && $shipment->status === ShipmentStatus::Delivered));
     }
 
-    public function updateShipmentStatus(Order $order, ShipmentStatus $status, ?string $trackingReference = null, ?User $actor = null): Order
+    /** @param array<string, mixed> $handoff */
+    public function updateShipmentStatus(Order $order, ShipmentStatus $status, ?string $trackingReference = null, ?User $actor = null, array $handoff = []): Order
     {
-        return DB::transaction(function () use ($order, $status, $trackingReference, $actor): Order {
+        return DB::transaction(function () use ($order, $status, $trackingReference, $actor, $handoff): Order {
             $lockedOrder = Order::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
             $this->authorizeHandler($lockedOrder, $actor);
             $shipment = $lockedOrder->shipment()->lockForUpdate()->first();
@@ -760,6 +766,15 @@ class OrderProcessingService
 
             if ($shipment === null) {
                 throw ValidationException::withMessages(['status' => 'This order has no shipment.']);
+            }
+
+            if ($handoff !== [] && $status !== ShipmentStatus::HandedToLbc) {
+                throw ValidationException::withMessages(['handoff' => 'Handoff records can only accompany Handed to LBC.']);
+            }
+
+            if ($status === ShipmentStatus::HandedToLbc && $handoff !== []) {
+                $this->recordHandoff($lockedOrder, $shipment, $handoff, $actor);
+                $shipment->refresh();
             }
 
             if ($status === ShipmentStatus::HandedToLbc && (
@@ -821,6 +836,38 @@ class OrderProcessingService
 
             return $lockedOrder->refresh();
         }, attempts: 3);
+    }
+
+    /** @param array<string, mixed> $handoff */
+    private function recordHandoff(Order $order, Shipment $shipment, array $handoff, ?User $actor): void
+    {
+        $fields = ['package_count', 'package_weight_kg', 'package_length_cm', 'package_width_cm', 'package_height_cm', 'handoff_mode'];
+        $rules = [
+            'handoff' => ['array:'.implode(',', [...$fields, 'carrier_cost_reference', 'carrier_cost_confirmed'])],
+            'handoff.package_count' => ['required', 'integer', 'between:1,99'],
+            'handoff.package_weight_kg' => ['required', 'numeric', 'gt:0', 'max:99999.999'],
+            'handoff.package_length_cm' => ['required', 'numeric', 'gt:0', 'max:99999.99'],
+            'handoff.package_width_cm' => ['required', 'numeric', 'gt:0', 'max:99999.99'],
+            'handoff.package_height_cm' => ['required', 'numeric', 'gt:0', 'max:99999.99'],
+            'handoff.handoff_mode' => ['required', 'in:rider_pickup,branch_dropoff'],
+            'handoff.carrier_cost_reference' => ['required', 'string', 'max:100'],
+            'handoff.carrier_cost_confirmed' => ['required', 'accepted'],
+        ];
+        $package = array_intersect_key($shipment->getAttributes(), array_flip($fields));
+        $data = [...$package, ...$handoff];
+        if ($shipment->carrier_cost_recorded_at !== null) {
+            if (array_key_exists('carrier_cost_reference', $handoff) && (! is_string($handoff['carrier_cost_reference']) || trim($handoff['carrier_cost_reference']) !== $shipment->carrier_cost_reference)) {
+                throw ValidationException::withMessages(['handoff.carrier_cost_reference' => 'The confirmed carrier receipt cannot be changed.']);
+            }
+            $data['carrier_cost_reference'] = $shipment->carrier_cost_reference;
+            $data['carrier_cost_confirmed'] = true;
+        }
+        $data['carrier_cost_reference'] = is_string($data['carrier_cost_reference'] ?? null) ? trim($data['carrier_cost_reference']) : ($data['carrier_cost_reference'] ?? null);
+        $validated = Validator::make(['handoff' => $data], $rules)->validate()['handoff'];
+        if ($shipment->carrier_cost_recorded_at !== null) {
+            unset($validated['carrier_cost_reference'], $validated['carrier_cost_confirmed']);
+        }
+        $this->saveShipmentOperations($order, $validated, $actor, handoff: true);
     }
 
     public function updateShipmentReference(Order $order, ?string $trackingReference, ?User $actor = null): Order

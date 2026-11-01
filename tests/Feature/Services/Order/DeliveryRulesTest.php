@@ -32,7 +32,7 @@ test('all configured destinations resolve approved fees and transit ranges witho
         'origin_city' => 'Sagay City',
         'destination' => $destination,
         'is_demo' => true,
-        'assumption_label' => 'Battlefront demonstration estimates. Regional base fees apply to all destinations. Negros Occidental transit bands use OSM administrative-boundary centroids as straight-line proxies; they are not official LBC rates or verified production shipping charges.',
+        'assumption_label' => 'Battlefront nationwide demonstration estimates from Sagay City. Regional base fees and transit estimates apply, with existing Negros route overrides. Negros Occidental transit bands use OSM administrative-boundary centroids as straight-line proxies. These are not official LBC rates, verified serviceability, or guaranteed delivery dates.',
         'pricing_configured' => true,
         'pricing_status' => 'configured_estimate',
         'delivery_arrangement_required' => false,
@@ -75,6 +75,7 @@ test('all configured destinations resolve approved fees and transit ranges witho
 ]);
 
 test('regional fee changes apply to local listings and fallback routes without changing fulfillment', function () {
+    config(['battlefront.delivery.zones.regions' => []]);
     config(['battlefront.delivery.regional_estimates.fees.visayas' => '170.00']);
     $rules = app(DeliveryRules::class);
     expect($rules->destinations()['Sagay City']['base_fee'])->toBe('170.00');
@@ -272,6 +273,7 @@ test('persisted mixed carts keep one surcharge when line quantities change', fun
 });
 
 test('valid nationwide destinations outside configured routes receive a regional fee estimate without an ETA', function () {
+    config(['battlefront.delivery.zones.regions' => []]);
     $product = Product::factory()->bulky()->make(['category_id' => 1]);
 
     $quote = app(DeliveryRules::class)->quote(FulfillmentMethod::Delivery, '1380300000', [$product]);

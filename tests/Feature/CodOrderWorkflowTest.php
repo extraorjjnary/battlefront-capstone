@@ -28,9 +28,9 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia as Assert;
 
-function codWorkflowOrder(ShipmentStatus $milestone = ShipmentStatus::AwaitingPreparation, OrderStatus $status = OrderStatus::Pending): Order
+function codWorkflowOrder(ShipmentStatus $milestone = ShipmentStatus::AwaitingPreparation, OrderStatus $status = OrderStatus::Pending, string $destination = 'Sagay City'): Order
 {
-    $order = Order::factory()->cashOnDelivery()->create(['status' => $status]);
+    $order = Order::factory()->cashOnDelivery($destination)->create(['status' => $status]);
     Shipment::factory()->for($order)->withHandoffDetails($order->total_amount)->create([
         'status' => $milestone,
         'actual_carrier_cost' => $order->delivery_fee,
@@ -166,9 +166,9 @@ test('the shared service refuses unquoted COD placement even with otherwise vali
     expect(Inventory::sole()->quantity)->toBe(5);
 });
 
-test('COD progresses through shipment milestones and separates collection from remittance', function () {
+test('COD progresses through shipment milestones and separates collection from remittance', function (string $destination, string $total) {
     $this->travelTo('2026-10-12 09:00:00');
-    $order = codWorkflowOrder();
+    $order = codWorkflowOrder(destination: $destination);
     $administrator = User::factory()->administrator()->create();
     $order->assigned_handler_id = $administrator->id;
     $order->save();
@@ -215,7 +215,7 @@ test('COD progresses through shipment milestones and separates collection from r
         ->assertSessionHasNoErrors()->assertInertiaFlash('toast.message', 'LBC COD collection recorded. The order remains unpaid until remittance is reconciled.');
 
     expect($order->refresh())->status->toBe(OrderStatus::Processing)->payment_status->toBe(PaymentStatus::Pending);
-    expect($order->shipment)->carrier_cod_collected_amount->toBe('250.00')->carrier_cod_collected_at->not->toBeNull();
+    expect($order->shipment)->carrier_cod_collected_amount->toBe($total)->carrier_cod_collected_at->not->toBeNull();
     expect($order->sale)->toBeNull();
     $this->assertDatabaseCount('sales', 0);
     $this->get(route('administration.orders.show', $order))->assertInertia(fn (Assert $page) => $page
@@ -228,7 +228,7 @@ test('COD progresses through shipment milestones and separates collection from r
 
     expect($order->refresh())->status->toBe(OrderStatus::Completed)->payment_status->toBe(PaymentStatus::Verified);
     expect($order->sale)->amount->toBe('100.00')->sale_date->toDateString()->toBe('2026-10-12');
-    expect($order->total_amount)->toBe('250.00');
+    expect($order->total_amount)->toBe($total);
     expect($order->shipment->delivered_at->toDateTimeString())->toBe($deliveredSnapshot['delivered_at']);
     expect(Inventory::sole()->quantity)->toBe(8);
     expect($order->user->notifications()->pluck('data')->pluck('event')->sort()->values()->all())->toBe([
@@ -238,7 +238,7 @@ test('COD progresses through shipment milestones and separates collection from r
     $this->post(route('administration.orders.cod-collection.store', $order), ['cod_collection_confirmed' => true])->assertSessionHasErrors('cod_collection_confirmed');
     $this->assertDatabaseCount('sales', 1);
     $this->assertDatabaseCount('notifications', 7);
-});
+})->with(['Negros' => ['Sagay City', '250.00'], 'NCR' => ['1380300000', '300.00'], 'Mindanao' => ['1130700000', '350.00']]);
 
 test('COD collection is rejected before delivery or after cancellation with no payment sales or notification changes', function (ShipmentStatus $milestone, OrderStatus $status) {
     $order = codWorkflowOrder($milestone, $status);

@@ -204,16 +204,16 @@ function findButton(node, label, matches = () => true) {
     return findButton(node.children, label, matches);
 }
 
-function findElement(node, type) {
+function findElement(node, type, matches = () => true) {
     if (Array.isArray(node)) {
-        return node.map((child) => findElement(child, type)).find(Boolean);
+        return node.map((child) => findElement(child, type, matches)).find(Boolean);
     }
     if (!node || typeof node !== 'object') return null;
-    if (node.type === type) return node;
-    return findElement(node.children?.default?.() ?? node.children, type);
+    if (node.type === type && matches(node)) return node;
+    return findElement(node.children?.default?.() ?? node.children, type, matches);
 }
 
-test('saved shipment records are read-only until explicitly edited', async (t) => {
+test('saved shipment records remain read-only outside the handoff form', async (t) => {
     const view = orderHarness(t, {
         can_process: true,
         assigned_handler_id: 1,
@@ -235,28 +235,10 @@ test('saved shipment records are read-only until explicitly edited', async (t) =
         },
     });
 
-    await view.html();
-    assert.ok(findButton(view.tree(), 'Edit package details'));
-    assert.equal(
-        Boolean(findButton(view.tree(), 'Save package details')),
-        false,
-    );
-    assert.equal(findElement(view.tree(), 'fieldset').props.disabled, true);
-
-    findButton(view.tree(), 'Edit package details').props.onClick();
-    await view.html();
-    assert.ok(findButton(view.tree(), 'Save package details'));
-    assert.equal(findElement(view.tree(), 'fieldset').props.disabled, false);
-
-    findButton(view.tree(), 'Save package details').props.onClick();
-    view.submissions.at(-1)[1].onSuccess();
-
-    await view.html();
-    assert.ok(findButton(view.tree(), 'Edit package details'));
-    assert.equal(
-        Boolean(findButton(view.tree(), 'Save package details')),
-        false,
-    );
+    const html = await view.html();
+    assert.match(html, /Packed weight/);
+    assert.match(html, /1\.000/);
+    assert.doesNotMatch(html, /Edit package details|Save package details|Save carrier cost|handoff-package_count/);
 });
 
 test('delivery arrangement confirmation keeps optional details blank and requires actual arrangement', async (t) => {
@@ -595,7 +577,7 @@ test('cancellation review retains its processing hold notice without ownership i
 });
 
 
-test('handoff stays disabled until matching confirmed cost and tracking are available', async (t) => {
+test('handoff opens one form and submits package receipt and tracking together', async (t) => {
     const view = orderHarness(t, {
         can_process: true,
         assigned_handler_id: 1,
@@ -607,8 +589,32 @@ test('handoff stays disabled until matching confirmed cost and tracking are avai
         },
         shipment_actions: { next_status: { value: 'handed_to_lbc', label: 'Handed to LBC' } },
     });
-    await view.html();
-    assert.equal(Boolean(findButton(view.tree(), 'Mark Handed to LBC').props.disabled), true);
+    let html = await view.html();
+    assert.doesNotMatch(html, /id="handoff-package_count"/);
+    assert.equal(Boolean(findButton(view.tree(), 'Hand over to LBC').props.disabled), false);
+    findButton(view.tree(), 'Hand over to LBC').props.onClick();
+    html = await view.html();
+    assert.match(html, /id="handoff-package_count"/);
+    assert.match(html, /id="handoff-receipt"/);
+    assert.match(html, /id="handoff-reference"/);
+    const form = view.forms.find((candidate) => Object.hasOwn(candidate, 'handoff'));
+    assert.equal(form.status, 'handed_to_lbc');
+    Object.assign(form.handoff, {
+        package_count: 1, package_weight_kg: '1.250', package_length_cm: '30',
+        package_width_cm: '20', package_height_cm: '10', handoff_mode: 'branch_dropoff',
+        carrier_cost_reference: 'RECEIPT', carrier_cost_confirmed: true,
+    });
+    form.tracking_reference = 'LBC-123';
+    findElement(view.tree(), 'form', (node) => node.props['aria-label'] === 'LBC handoff').props.onSubmit({ preventDefault() {} });
+    assert.equal(view.submissions.length, 1);
+    form.errors = { 'handoff.package_weight_kg': 'Check packed weight.' };
+    view.submissions[0][1].onError();
+    html = await view.html();
+    assert.match(html, /id="handoff-receipt"/);
+    view.props.order.can_process = false;
+    await Vue.nextTick();
+    html = await view.html();
+    assert.doesNotMatch(html, /id="handoff-receipt"/);
 });
 
 test('shipment amounts remain read-only while preparing package and receipt records', async (t) => {

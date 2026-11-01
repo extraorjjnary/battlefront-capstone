@@ -22,3 +22,6 @@ Before Handed to LBC, require confirmed actual carrier cost equal to the saved c
 
 ## Derive locked shipment amounts from saved order charges
 Declared value uses saved product_subtotal (legacy fallback: total_amount minus delivery_fee); carrier cost uses saved delivery_fee. Both are always read-only and HTTP writes reject supplied amounts. Staff must still enter receipt evidence and explicitly confirm a match; prefill does not reconcile or establish payment. Preserve immutable historical shipment values and show discrepancies separately.
+
+## Save package and reconciliation records only in atomic LBC handoff
+The approved consolidated handoff supersedes separate package/carrier-cost editing: only the assigned handler at ReadyForDispatch may submit these records through the shipment status action with nested handoff data, atomically with tracking, handoff timestamp, and HandedToLbc. Standalone operations accept shipping issues only. Derive declared value and carrier cost from saved order amounts; preserve confirmed receipt/tracking evidence, reject mismatches and later edits. Keep historical records, payment/COD, cancellation locks, and after-commit notifications unchanged.
