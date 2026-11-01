@@ -12,6 +12,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | routes/api.php,app/Http/Controllers/Api/**,config/sanctum.php | .ai/rules/api.md |
 | app/**,database/**,resources/js/** | .ai/rules/app-js.md |
 | app/Models/** | .ai/rules/app-models.md |
+| app/Repositories/Catalog/** | .ai/rules/app-repositories-catalog.md |
 | app/Http/Controllers/**,app/Actions/**,app/Services/**,app/Repositories/** | .ai/rules/application-architecture.md |
 | app/Models/User.php,config/fortify.php,routes/**,app/Providers/FortifyServiceProvider.php,resources/js/pages/{auth,settings,Administration/Customers}/**,tests/Feature/{Auth,Settings,Administration}/** | .ai/rules/auth-settings-administration.md |
 | app/Models/Branch.php,app/Services/BranchDirectory.php,app/Http/Requests/Administration/*Branch*,database/seeders/BranchSeeder.php,config/battlefront.php,resources/js/pages/**/Branches/** | .ai/rules/branches.md |
@@ -32,6 +33,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | app/Actions/Chatbot/**,app/Services/Chatbot/**,resources/js/components/chatbot/** | .ai/rules/components-chatbot.md |
 | database/seeders/**,app/Http/Controllers/BranchController.php,resources/js/components/BranchMap.vue | .ai/rules/components.md |
 | resources/js/composables/useNotificationPolling* | .ai/rules/composables.md |
+| app/Models/{Category,Product}.php,app/Repositories/Catalog/**,app/Jobs/SyncCatalogSearch.php,app/Console/Commands/ReconcileCatalogSearch.php | .ai/rules/console-commands.md |
 | app/Services/AdministrationEvidenceService.php,app/Http/Controllers/Administration/CustomerReturnController.php | .ai/rules/controllers-administration.md |
 | app/Services/Order/**,app/Http/Controllers/**/*Order*,resources/js/pages/**/Orders/** | .ai/rules/controllers-js-pages-orders.md |
 | routes/**,app/Http/Controllers/** | .ai/rules/controllers.md |
@@ -45,6 +47,7 @@ Before planning or editing, find the row whose globs match the file's path and r
 | database/seeders/DevelopmentSupplierSeeder.php,app/Actions/Inventory/HandleSupplierReturn.php,app/Repositories/Inventory/**,resources/js/pages/Administration/SupplierReturns.vue | .ai/rules/inventory-js-pages-administration.md |
 | app/Actions/Inventory/HandleCustomerReturn*.php,app/Services/CustomerReturn*.php, app/Actions/Inventory/HandleCustomerReturn.php,app/Services/CustomerReturnRequestPresenter.php | .ai/rules/inventory-services.md |
 | app/Services/Dashboard/**,app/Repositories/Inventory/** | .ai/rules/inventory.md |
+| app/Repositories/Catalog/**,app/Models/{Category,Product}.php,app/Jobs/SyncCatalogSearch.php | .ai/rules/jobs.md |
 | app/Http/Controllers/BranchController.php,resources/js/pages/Branches/**,resources/js/components/BranchMap.vue | .ai/rules/js-components.md |
 | app/Actions/Order/**,app/Services/Order/**,app/Http/Controllers/Administration/Order*,resources/js/pages/Administration/Orders/** | .ai/rules/js-pages-administration-orders.md |
 | app/Actions/Inventory/HandleCustomerReturn.php,app/Services/CustomerReturnRequestPresenter.php,app/Http/Controllers/Administration/CustomerReturnController.php,resources/js/components/{OrderReturnRequests,RefundAmountFields}.vue,resources/js/pages/Administration/CustomerReturns.vue | .ai/rules/js-pages-administration.md |

@@ -45,12 +45,16 @@ class ProductCatalogRepository
      */
     public function paginate(array $filters): LengthAwarePaginator
     {
-        $query = $this->catalogQuery($filters)->customerAvailable();
+        $intent = isset($filters['q']) ? app(CatalogSearchIntent::class)->resolve($filters['q']) : null;
+        $query = $this->catalogQuery($filters, $intent)->customerAvailable();
         $sort = $filters['sort'] ?? 'featured';
 
         if ($sort === 'price_asc' || $sort === 'price_desc') {
             $query->orderByRaw('CAST(COALESCE(discount_price, price) AS DECIMAL(12, 2)) '.($sort === 'price_asc' ? 'asc' : 'desc'));
         } else {
+            if ($intent !== null) {
+                $this->prioritizePrimaryProducts($query, $intent);
+            }
             $query->orderByDesc('is_featured');
         }
 
@@ -69,6 +73,66 @@ class ProductCatalogRepository
     public function findEligibleOrFail(int $productId): Product
     {
         return $this->catalogQuery()->findOrFail($productId);
+    }
+
+    /**
+     * @param  Builder<Product>  $query
+     * @param  array{category: string, query: string}  $intent
+     */
+    private function prioritizePrimaryProducts(Builder $query, array $intent): void
+    {
+        if (preg_match('/\b(ink|toner|cartridge|cable|balun|adapter|adaptor|battery|bracket|mount|mousepad|enclosure|reader|paste|grease)\b/u', $intent['query'])) {
+            return;
+        }
+
+        $exclusions = match ($intent['category']) {
+            'Printer' => ['printer cable%'],
+            'Storage' => ['%enclosure%', '%external case%', '%card reader%', '%adapter%', '%cable%'],
+            'CCTV & Security' => ['%cable%', '%balun%', '%power supply%', '%hdd%', '%sd card%', '%otg%', '%nap box%'],
+            'Networking' => ['%adapter%', '%adaptor%', '%cable%', '%connector%', '%coupler%'],
+            'Peripherals' => ['%mousepad%', '%mouse pad%', '%keycap%', '%keyboard cover%'],
+            'Monitor' => ['%bracket%', '%wall mount%'],
+            'Cooling Components' => ['%thermal paste%', '%thermal grease%'],
+            'Power Accessories' => preg_match('/\b(ups|avr)\b/u', $intent['query']) ? ['%battery%', '%cable%', '%adapter%', '%adaptor%'] : [],
+            default => [],
+        };
+        if ($exclusions === []) {
+            return;
+        }
+
+        $conditions = [];
+        $bindings = [];
+        if ($intent['category'] === 'Printer') {
+            $conditions[] = 'LOWER(products.name) LIKE ?';
+            $bindings[] = 'printer %';
+        }
+        if ($intent['category'] === 'Monitor' && ! preg_match('/\b(tv|television)\b/u', $intent['query'])) {
+            $conditions[] = 'LOWER(products.name) LIKE ?';
+            $bindings[] = '%monitor%';
+        }
+        foreach ($exclusions as $pattern) {
+            $conditions[] = 'LOWER(products.name) NOT LIKE ?';
+            $bindings[] = $pattern;
+        }
+        $query->orderByRaw('CASE WHEN '.implode(' AND ', $conditions).' THEN 0 ELSE 1 END', $bindings);
+    }
+
+    /** @param Builder<Product> $query */
+    private function whereSearchCategory(Builder $query, string $categoryName): void
+    {
+        $query->where(function (Builder $match) use ($categoryName): void {
+            $match->whereHas('category', fn (Builder $category): Builder => $category->whereRaw('LOWER(name) = ?', [mb_strtolower($categoryName)]));
+            if ($categoryName === 'Storage') {
+                $match->orWhere(function (Builder $surveillance): void {
+                    $surveillance->whereHas('category', fn (Builder $category): Builder => $category->whereRaw('LOWER(name) = ?', ['cctv & security']))
+                        ->where(function (Builder $names): void {
+                            foreach (['hdd %', 'surveillance hdd %', 'sd card %', 'hiksemi otg %'] as $pattern) {
+                                $names->orWhereRaw('LOWER(products.name) LIKE ?', [$pattern]);
+                            }
+                        });
+                });
+            }
+        });
     }
 
     public function findAvailableOrFail(int $productId): Product
@@ -301,9 +365,10 @@ class ProductCatalogRepository
 
     /**
      * @param  array{q?: string|null, category_id?: int|null, brand?: string|null, tag_id?: int|null, category_ids?: list<int>, min_price?: string, max_price?: string, sort?: string}  $filters
+     * @param  array{category: string, query: string}|null  $intent
      * @return Builder<Product>
      */
-    private function catalogQuery(array $filters = []): Builder
+    private function catalogQuery(array $filters = [], ?array $intent = null): Builder
     {
         return Product::query()
             ->customerEligible()
@@ -317,13 +382,37 @@ class ProductCatalogRepository
                 'tags:id,name',
             ])
             ->withExists('lowStockInventory as is_low_stock')
-            ->when($filters['q'] ?? null, function (Builder $query, string $search): void {
-                $query->where(function (Builder $query) use ($search): void {
-                    $query
-                        ->whereLike('name', "%{$search}%")
-                        ->orWhereLike('brand', "%{$search}%")
-                        ->orWhereLike('description', "%{$search}%");
-                });
+            ->when($filters['q'] ?? null, function (Builder $query, string $search) use ($intent): void {
+                $quoted = app(CatalogSearchIntent::class)->quotedSearch($search);
+                $search = $quoted['query'] ?? app(CatalogSearchIntent::class)->normalizeQuery($search);
+                if ($intent !== null) {
+                    $this->whereSearchCategory($query, $intent['category']);
+                    $search = $intent['query'];
+                    if ($search === '') {
+                        return;
+                    }
+                }
+
+                $ids = trim($search) === '' ? null : app(CatalogSearch::class)->matchingIds($search);
+
+                if ($ids !== null) {
+                    $query->whereKey($ids);
+                }
+
+                $terms = $quoted['phrases'] ?? [];
+                if ($ids === null) {
+                    $terms = $quoted !== null
+                        ? [...$terms, ...$quoted['terms']]
+                        : (preg_split('/\s+/u', $search, -1, PREG_SPLIT_NO_EMPTY) ?: []);
+                }
+                foreach ($terms as $term) {
+                    $query->where(function (Builder $query) use ($term): void {
+                        $pattern = '%'.strtr($term, ['!' => '!!', '%' => '!%', '_' => '!_']).'%';
+                        foreach (['product_code', 'name', 'brand', 'description'] as $column) {
+                            $query->orWhereRaw("LOWER({$column}) LIKE LOWER(?) ESCAPE '!'", [$pattern]);
+                        }
+                    });
+                }
             })
             ->when(
                 $filters['category_id'] ?? null,

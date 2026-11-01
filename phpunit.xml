@@ -18,6 +18,9 @@
         </include>
     </source>
     <php>
+        <server name="SCOUT_DRIVER" value="null" force="true"/>
+        <server name="ALGOLIA_APP_ID" value="testing-only" force="true"/>
+        <server name="ALGOLIA_SECRET" value="testing-only" force="true"/>
         <ini name="memory_limit" value="512M"/>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_DEBUG" value="false" force="true"/>
