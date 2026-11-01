@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\AppearancePreference;
+use App\Models\Branch;
 use App\Models\ComponentSpecificationRevision;
 use App\Models\Inventory;
 use App\Models\PcBuildTemplate;
@@ -97,6 +98,20 @@ test('a complete mobile build enters cart atomically and group selection and rem
     $this->assertDatabaseCount('cart_items', 0);
 });
 
+test('mobile customers can cart and review unfinished builds without treating unknown facts as verified', function () {
+    Branch::factory()->create(['city' => 'Sagay City']);
+    $customer = User::factory()->customer()->create();
+    $cpu = mobileBuilderProduct('processor', []);
+    $components = [['key' => 'cpu', 'product_id' => $cpu->id, 'quantity' => 1]];
+    $this->postJson('/api/v1/pc-builder/validate', ['components' => $components])->assertOk()
+        ->assertJsonPath('data.can_purchase', true)->assertJsonPath('data.complete', false);
+    $this->withToken($customer->createToken('phone')->plainTextToken);
+    $uuid = $this->postJson('/api/v1/pc-builds', ['name' => 'CPU upgrade', 'mode' => 'simple', 'components' => $components])->assertCreated()->json('data.uuid');
+    $this->postJson('/api/v1/pc-builds/'.$uuid.'/cart')->assertCreated();
+    $cartId = $this->getJson('/api/v1/cart')->assertOk()->assertJsonPath('data.items.0.pc_build_group.validation.complete', false)->json('data.items.0.id');
+    $this->getJson('/api/v1/checkout?cart_item_ids[]='.$cartId)->assertOk()->assertJsonPath('data.cart.items.0.pc_build_group.validation.can_purchase', true);
+});
+
 test('mobile builder does not publish inactive or unverified templates', function () {
     PcBuildTemplate::factory()->create(['is_active' => false]);
     PcBuildTemplate::factory()->create(['is_active' => true]);
@@ -144,6 +159,12 @@ function mobileCompleteBuild(): array
     ];
 
     return collect($facts)->map(function (array $specifications, string $type): array {
+        if ($type === 'processor') {
+            $specifications['model'] = 'Test CPU';
+        }
+        if ($type === 'motherboard') {
+            $specifications['cpu_support'] = [['model' => 'Test CPU', 'minimum_bios_version' => '1.0']];
+        }
         $product = mobileBuilderProduct($type, $specifications);
 
         return ['key' => $type, 'product_id' => $product->id, 'quantity' => 1];

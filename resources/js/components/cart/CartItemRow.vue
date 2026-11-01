@@ -2,6 +2,7 @@
 import { Form, Link } from '@inertiajs/vue3';
 import { CircleHelp, CircleX, Save, Trash2, TriangleAlert } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import { index as builderIndex } from '@/routes/pc-builder';
 import {
     destroy,
     update,
@@ -126,9 +127,35 @@ const availabilityCopy = computed(() => {
         </div>
 
         <div class="min-w-0">
+            <Link
+                v-if="
+                    item.pc_build_group?.validation &&
+                    !item.pc_build_group.validation.can_purchase
+                "
+                :href="builderIndex.url()"
+                class="text-primary-ink mb-2 block text-sm underline"
+                >Return to PC Builder to change or remove affected parts</Link
+            >
             <Badge v-if="item.pc_build_group" variant="outline" class="mb-2">
                 PC build · {{ item.pc_build_group.name }}
             </Badge>
+            <p
+                v-if="
+                    item.pc_build_group?.validation &&
+                    !item.pc_build_group.validation.complete
+                "
+                class="text-muted-foreground mb-2 text-sm"
+            >
+                Selected parts only ·
+                {{ item.pc_build_group.validation.status }} compatibility.
+                {{
+                    item.pc_build_group.validation.can_purchase
+                        ? 'Missing parts or unverified checks remain; you can purchase these parts.'
+                        : item.pc_build_group.validation.purchase_blockers?.join(
+                              ' ',
+                          )
+                }}
+            </p>
             <div
                 class="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between"
             >

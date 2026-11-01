@@ -26,7 +26,12 @@ class OrderIndexRequest extends FormRequest
      */
     public function rules(): array
     {
+        if ($this->input('view') === 'shipments') {
+            return ['view' => ['required', 'in:shipments'], ...ShipmentIndexRequest::filterRules($this->filled('from'))];
+        }
+
         return [
+            'view' => ['nullable', 'in:orders,shipments'],
             'q' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'string', Rule::in(['active', 'completed', 'cancelled'])],
             'gateway_state' => ['nullable', Rule::in(['awaiting', 'failed', 'expired', 'checking', 'closing', 'needs_attention'])],

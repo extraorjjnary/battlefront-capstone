@@ -6,6 +6,7 @@ defineProps({
     items: Array,
     disabled: Boolean,
     multiple: Boolean,
+    available: { type: Boolean, default: true },
 });
 defineEmits(['select', 'remove']);
 </script>
@@ -30,9 +31,11 @@ defineEmits(['select', 'remove']);
                 </p>
                 <p class="text-muted-foreground mt-1 text-xs">
                     {{
-                        required
-                            ? 'Required for your build'
-                            : 'Add if your setup needs it'
+                        !available
+                            ? 'No eligible parts currently in stock'
+                            : required
+                              ? 'Required for your build'
+                              : 'Add if your setup needs it'
                     }}
                 </p>
             </div>

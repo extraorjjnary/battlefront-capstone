@@ -1,3 +1,5 @@
+import { componentDefinitions } from '../../PcBuilder/builderActions.js';
+
 const text = (key, label) => ({ key, label, kind: 'text' });
 const number = (key, label) => ({ key, label, kind: 'number' });
 const boolean = (key, label) => ({ key, label, kind: 'boolean' });
@@ -10,29 +12,17 @@ const list = (key, label, item = { kind: 'text', label: 'Value' }) => ({
 const counts = (key, label) => ({ key, label, kind: 'counts' });
 const power = number('power_draw_w', 'Component power draw (W)');
 
-export const componentLabels = {
-    processor: 'Processor (CPU)',
-    motherboard: 'Motherboard',
-    memory: 'Memory (RAM)',
-    storage: 'Storage',
-    power_supply: 'Power supply (PSU)',
-    case: 'PC case',
-    graphics_card: 'Graphics card (GPU)',
-    cooler: 'CPU cooler',
-    fan: 'Case fan',
-    network_adapter: 'Network adapter',
-    monitor: 'Monitor',
-    keyboard: 'Keyboard',
-    mouse: 'Mouse',
-    headset: 'Headset',
-    speakers: 'Speakers',
-    webcam: 'Webcam',
-    ups_avr: 'UPS / AVR',
-};
+export const componentLabels = Object.fromEntries(
+    Object.entries(componentDefinitions).map(([type, definition]) => [
+        type,
+        definition.label,
+    ]),
+);
 
 // Presentation metadata only. Compatibility decisions remain server-owned.
 export const specificationFields = {
     processor: [
+        text('model', 'Exact CPU model (matches motherboard support list)'),
         text('socket', 'Socket'),
         text('generation', 'CPU generation'),
         list('supported_chipsets', 'Supported chipsets'),
@@ -43,6 +33,25 @@ export const specificationFields = {
         counts('required_power_connectors', 'Required power connectors'),
     ],
     motherboard: [
+        counts(
+            'required_power_connectors',
+            'Required motherboard power connectors',
+        ),
+        boolean(
+            'cpu_support_complete',
+            'Recorded CPU support list is exhaustive for this board revision',
+        ),
+        list('cpu_support', 'Reviewed CPU support list', {
+            kind: 'object',
+            label: 'Supported CPU',
+            fields: [
+                text('model', 'Exact CPU model'),
+                text(
+                    'minimum_bios_version',
+                    'Minimum BIOS for this CPU on this motherboard',
+                ),
+            ],
+        }),
         text('socket', 'Socket'),
         text('chipset', 'Chipset'),
         list('supported_cpu_generations', 'Supported CPU generations'),
@@ -61,6 +70,10 @@ export const specificationFields = {
         number('pcie_x16_slots', 'PCIe x16 slots'),
         list('display_outputs', 'Display outputs'),
         counts('fan_headers', 'Fan headers by connector type'),
+        counts(
+            'peripheral_ports',
+            'Available external ports by interface (USB, 3.5mm, PS/2)',
+        ),
         list('storage_slots', 'Storage slots', {
             kind: 'object',
             label: 'Storage slot',
@@ -75,6 +88,7 @@ export const specificationFields = {
         power,
     ],
     memory: [
+        number('height_mm', 'Module height (mm)'),
         text('memory_generation', 'Memory generation'),
         number('capacity_gb', 'Capacity (GB)'),
         number('modules_per_package', 'Modules per package'),
@@ -113,6 +127,17 @@ export const specificationFields = {
         }),
         list('fan_mounting_positions', 'Fan mounting positions'),
         counts('fan_mounting_capacity', 'Fan capacity by position'),
+        list('fan_mounts', 'Supported fan sizes by position', {
+            kind: 'object',
+            label: 'Fan mount',
+            fields: [
+                text('position', 'Mounting position'),
+                list('sizes_mm', 'Supported sizes (mm)', {
+                    kind: 'number',
+                    label: 'Size (mm)',
+                }),
+            ],
+        }),
         power,
     ],
     graphics_card: [
@@ -125,6 +150,7 @@ export const specificationFields = {
         list('display_outputs', 'Display outputs'),
     ],
     cooler: [
+        number('ram_clearance_mm', 'RAM clearance under the cooler (mm)'),
         list('mounting_sockets', 'Mounting sockets'),
         number('height_mm', 'Air cooler height (mm)'),
         number('radiator_size_mm', 'Radiator size (mm)'),
@@ -140,6 +166,24 @@ export const specificationFields = {
         text('resolution', 'Resolution'),
         number('refresh_rate_hz', 'Refresh rate (Hz)'),
         power,
+    ],
+    network_adapter: [
+        text('connection_interface', 'Connection interface'),
+        power,
+    ],
+    keyboard: [text('connection_interface', 'Connection interface'), power],
+    mouse: [text('connection_interface', 'Connection interface'), power],
+    headset: [text('connection_interface', 'Connection interface'), power],
+    speakers: [text('connection_interface', 'Connection interface'), power],
+    webcam: [
+        text('connection_interface', 'Connection interface'),
+        text('resolution', 'Resolution'),
+        power,
+    ],
+    ups_avr: [
+        number('rated_output_w', 'Rated output (W)'),
+        text('output_voltage', 'Output voltage'),
+        text('outlet_type', 'Outlet type'),
     ],
 };
 

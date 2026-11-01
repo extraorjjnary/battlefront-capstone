@@ -7,12 +7,15 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
+use App\Enums\ShipmentStatus;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Shipment;
 use App\Models\User;
 use App\Repositories\Order\AdministratorOrderRepository;
 use App\Services\Order\OrderProcessingService;
 use App\Services\PayMongo\PaymentRecoveryPresenter;
+use App\Services\Reporting\ShipmentExportService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
@@ -20,6 +23,42 @@ use Illuminate\Support\Str;
 
 class AdministratorOrderPresenter
 {
+    /** @return array<string, mixed> */
+    public function shipmentRow(Shipment $shipment): array
+    {
+        $order = $shipment->order;
+        $status = $order->status === OrderStatus::Cancelled ? ShipmentStatus::Cancelled : $shipment->status;
+
+        return [
+            'id' => $shipment->id, 'order_id' => $order->id, 'reference' => $order->reference,
+            'recipient' => $order->recipient_name, 'customer' => $order->user->name,
+            'destination' => $order->delivery_destination ?? $order->delivery_address,
+            'status' => ['value' => $status->value, 'label' => $status->label()],
+            'package_count' => $shipment->package_count, 'weight' => $shipment->package_weight_kg,
+            'length' => $shipment->package_length_cm, 'width' => $shipment->package_width_cm, 'height' => $shipment->package_height_cm,
+            'declared_value' => $shipment->declared_value, 'tracking' => $shipment->tracking_reference,
+            'delivery_fee' => $order->delivery_fee, 'carrier_cost' => $shipment->actual_carrier_cost,
+            'reconciliation' => $shipment->carrier_cost_recorded_at === null ? 'Unconfirmed' : 'Confirmed',
+            'receipt' => $shipment->carrier_cost_reference,
+            'handed_at' => $shipment->handed_to_carrier_at?->toIso8601String(),
+        ];
+    }
+
+    /** @param LengthAwarePaginator<int, Shipment> $shipments
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function shipmentDirectory(LengthAwarePaginator $shipments, array $filters, User $actor): array
+    {
+        return [
+            'shipments' => $shipments->through(fn (Shipment $shipment): array => $this->shipmentRow($shipment)),
+            'filters' => $filters,
+            'status_options' => array_map(fn (ShipmentStatus $status): array => ['value' => $status->value, 'label' => $status->label()], ShipmentStatus::cases()),
+            'can_export' => $actor->can('reports.export'),
+            'document_limit' => ShipmentExportService::DOCUMENT_LIMIT,
+        ];
+    }
+
     public function __construct(
         private readonly AdministratorOrderRepository $orderRepository,
         private readonly AdministratorOrderProfitability $profitability,

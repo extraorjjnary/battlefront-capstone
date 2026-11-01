@@ -1,5 +1,6 @@
 <script setup>
 import PageHeader from '@/components/PageHeader.vue';
+import OrdersDirectoryTabs from '@/components/OrdersDirectoryTabs.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
 import {
     ArrowRight,
@@ -207,6 +208,7 @@ defineOptions({
     >
         <Head title="Orders" />
         <PageHeader title="Orders" />
+        <OrdersDirectoryTabs active="orders" />
 
         <nav
             aria-label="Order views"

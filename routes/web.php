@@ -27,6 +27,7 @@ use App\Http\Controllers\Administration\OrderPaymentProofController;
 use App\Http\Controllers\Administration\OrderPaymentReconciliationController;
 use App\Http\Controllers\Administration\OrderPaymentStatusController;
 use App\Http\Controllers\Administration\OrderPickupConfirmationController;
+use App\Http\Controllers\Administration\OrderShipmentExportController;
 use App\Http\Controllers\Administration\OrderShipmentOperationsController;
 use App\Http\Controllers\Administration\OrderShipmentReferenceController;
 use App\Http\Controllers\Administration\OrderShipmentStatusController;
@@ -88,6 +89,7 @@ Route::middleware('guest')->group(function (): void {
 Route::get('branches', [BranchController::class, 'index'])->name('branches.index');
 
 // customer PC Builder
+Route::post('pc-builder/options', [PcBuilderController::class, 'options'])->middleware('throttle:60,1')->name('pc-builder.options');
 Route::get('pc-builder', [PcBuilderController::class, 'index'])->name('pc-builder.index');
 Route::post('pc-builder/validate', [PcBuilderController::class, 'validate'])
     ->middleware('throttle:60,1')
@@ -355,6 +357,9 @@ Route::middleware(['auth', 'can:access-administration'])
             ->only(['index', 'show']);
 
         // handling customer orders
+        Route::get('orders/shipments/export/{format}', OrderShipmentExportController::class)
+            ->whereIn('format', ['csv', 'pdf', 'print'])
+            ->middleware(['can:orders.view', 'can:reports.export'])->name('orders.shipments.export');
         Route::resource('orders', AdministrationOrderController::class)
             ->middleware('can:orders.view')
             ->only(['index', 'show']);

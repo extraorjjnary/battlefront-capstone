@@ -2,10 +2,14 @@
 
 namespace App\Repositories\Order;
 
+use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
+use App\Enums\ShipmentStatus;
 use App\Enums\UserRole;
 use App\Models\Order;
+use App\Models\Shipment;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -14,6 +18,65 @@ use Illuminate\Support\Facades\DB;
 
 class AdministratorOrderRepository
 {
+    /** @param array<string, mixed> $filters
+     * @return Builder<Shipment>
+     */
+    public function shipmentQuery(array $filters): Builder
+    {
+        $query = Shipment::query()
+            ->select(['id', 'order_id', 'status', 'created_at', 'package_count', 'package_weight_kg',
+                'package_length_cm', 'package_width_cm', 'package_height_cm', 'declared_value',
+                'tracking_reference', 'actual_carrier_cost', 'carrier_cost_reference', 'carrier_cost_recorded_at', 'handed_to_carrier_at'])
+            ->whereHas('order', fn (Builder $order) => $order->where('fulfillment_method', FulfillmentMethod::Delivery))
+            ->with(['order:id,user_id,recipient_name,delivery_destination,delivery_address,delivery_fee,status', 'order.user:id,name']);
+        $status = $filters['shipment_status'] ?? 'active';
+        if ($status === 'cancelled') {
+            $query->where(fn (Builder $shipment) => $shipment->where('status', ShipmentStatus::Cancelled)
+                ->orWhereHas('order', fn (Builder $order) => $order->where('status', OrderStatus::Cancelled)));
+        } elseif ($status !== 'all') {
+            $query->whereHas('order', fn (Builder $order) => $order->where('status', '!=', OrderStatus::Cancelled));
+            $status === 'active'
+                ? $query->whereNotIn('status', [ShipmentStatus::Delivered, ShipmentStatus::Cancelled])
+                : $query->where('status', $status);
+        }
+        if (($filters['reconciliation'] ?? 'all') === 'confirmed') {
+            $query->whereNotNull('carrier_cost_recorded_at');
+        } elseif (($filters['reconciliation'] ?? 'all') === 'unconfirmed') {
+            $query->whereNull('carrier_cost_recorded_at');
+        }
+        if (filled($filters['q'] ?? null)) {
+            $search = $filters['q'];
+            $referenceId = $this->referenceIdFromSearch($search);
+            $query->where(function (Builder $shipment) use ($search, $referenceId): void {
+                $shipment->where('tracking_reference', 'like', "%{$search}%")
+                    ->orWhere('carrier_cost_reference', 'like', "%{$search}%")
+                    ->orWhereHas('order', function (Builder $order) use ($search, $referenceId): void {
+                        $order->where('recipient_name', 'like', "%{$search}%")
+                            ->orWhereHas('user', fn (Builder $user) => $user->where('name', 'like', "%{$search}%"));
+                        if ($referenceId !== null) {
+                            $order->orWhereKey($referenceId);
+                        }
+                    });
+            });
+        }
+        if (filled($filters['from'] ?? null)) {
+            $query->where('handed_to_carrier_at', '>=', CarbonImmutable::parse($filters['from'], config('battlefront.timezone'))->startOfDay()->utc());
+        }
+        if (filled($filters['to'] ?? null)) {
+            $query->where('handed_to_carrier_at', '<', CarbonImmutable::parse($filters['to'], config('battlefront.timezone'))->startOfDay()->addDay()->utc());
+        }
+
+        return $query->orderByDesc('created_at')->orderByDesc('id');
+    }
+
+    /** @param array<string, mixed> $filters
+     * @return LengthAwarePaginator<int, Shipment>
+     */
+    public function shipmentDirectory(array $filters): LengthAwarePaginator
+    {
+        return $this->shipmentQuery($filters)->paginate(20)->appends(['view' => 'shipments', ...$filters]);
+    }
+
     /**
      * Return the filtered order directory and counts for each operational view.
      *

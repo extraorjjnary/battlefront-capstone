@@ -7,6 +7,11 @@ use Illuminate\Contracts\Debug\ShouldntReport;
 
 class CheckoutUnavailableException extends DomainException implements ShouldntReport
 {
+    public static function incompatibleBuild(): self
+    {
+        return new self('Resolve confirmed incompatibilities in your PC build before checking out.');
+    }
+
     public static function invalidSelection(): self
     {
         return new self('Your selected cart items changed or are unavailable. Review your cart and select items again.');

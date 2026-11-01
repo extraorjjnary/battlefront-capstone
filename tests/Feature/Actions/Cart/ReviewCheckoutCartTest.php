@@ -23,7 +23,7 @@ test('returns a current checkout summary for only the customer cart', function (
     $item = $cartService->add($customer, $product->id, 2);
     $cartService->add($otherCustomer, $otherProduct->id, 1);
 
-    $summary = (new ReviewCheckoutCart($cartService))->execute($customer, $customer->cart?->items->modelKeys() ?? []);
+    $summary = app(ReviewCheckoutCart::class)->execute($customer, $customer->cart?->items->modelKeys() ?? []);
 
     expect($summary)->toBe([
         'items' => [[
@@ -48,7 +48,7 @@ test('returns a current checkout summary for only the customer cart', function (
 test('rejects an empty customer cart', function () {
     $customer = User::factory()->customer()->create();
 
-    expect(fn () => (new ReviewCheckoutCart(new CartService))->execute($customer, $customer->cart?->items->modelKeys() ?? []))
+    expect(fn () => app(ReviewCheckoutCart::class)->execute($customer, $customer->cart?->items->modelKeys() ?? []))
         ->toThrow(
             CheckoutUnavailableException::class,
             'Your selected cart items changed or are unavailable. Review your cart and select items again.',
@@ -63,7 +63,7 @@ test('rejects cart items that exceed current stock', function () {
     $cartService->add($customer, $product->id, 3);
     $inventory->update(['quantity' => 2]);
 
-    expect(fn () => (new ReviewCheckoutCart($cartService))->execute($customer, $customer->cart?->items->modelKeys() ?? []))
+    expect(fn () => app(ReviewCheckoutCart::class)->execute($customer, $customer->cart?->items->modelKeys() ?? []))
         ->toThrow(
             CheckoutUnavailableException::class,
             'Review unavailable products or quantities in your cart before checking out.',

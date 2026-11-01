@@ -7,9 +7,7 @@ namespace App\Services\PcBuilder;
  */
 class CompatibilityEngine
 {
-    public const RULESET_VERSION = 1;
-
-    private const REQUIRED_TYPES = ['processor', 'motherboard', 'memory', 'storage', 'power_supply', 'case'];
+    public const RULESET_VERSION = 3;
 
     private const POWER_HEADROOM_FACTOR = 1.2;
 
@@ -19,6 +17,9 @@ class CompatibilityEngine
      *     product_id: int,
      *     component_type: string,
      *     quantity: int,
+     *     name?: string,
+     *     evidence?: list<array<string, string>>,
+     *     specifications_reviewed?: bool,
      *     specifications: array<string, mixed>
      * }>  $components
      * @return array{
@@ -27,16 +28,27 @@ class CompatibilityEngine
      *     complete: bool,
      *     required_components: list<string>,
      *     estimated_power_w: int|null,
-     *     findings: list<array{rule: string, status: string, component_keys: list<string>, message: string}>
+     *     can_purchase: bool,
+     *     purchase_blockers: list<string>,
+     *     selection_compatible: bool,
+     *     selection_blockers: list<string>,
+     *     findings: list<array{rule: string, status: string, component_keys: list<string>, message: string, scope: string}>
      * }
      */
-    public function evaluate(array $components): array
+    public function evaluate(array $components, bool $strictSelection = false): array
     {
         $groups = [];
         $findings = [];
 
         foreach ($components as $component) {
             $groups[$component['component_type']][] = $component;
+            if (($component['specifications_reviewed'] ?? true) === false) {
+                $findings[] = $this->unknown('component.specifications', [$component['key']], 'Specifications for this part have not been verified against its exact model.');
+            }
+            if (! (ComponentTypes::definitions()[$component['component_type']]['multiple'] ?? false)
+                && (count($groups[$component['component_type']]) > 1 || $component['quantity'] > 1)) {
+                $findings[] = $this->finding('component.single_slot', 'incompatible', [$component['key']], 'Choose only one part for this component slot.');
+            }
         }
 
         foreach ($components as $component) {
@@ -51,7 +63,7 @@ class CompatibilityEngine
         }
 
         $requiredComponents = [];
-        foreach (self::REQUIRED_TYPES as $type) {
+        foreach (ComponentTypes::required() as $type) {
             if (($groups[$type] ?? []) === []) {
                 $requiredComponents[] = $type;
             }
@@ -142,11 +154,69 @@ class CompatibilityEngine
         $this->checkMotherboardCase($findings, $motherboard, $case);
         $this->checkGraphicsCards($findings, $groups, $motherboard, $case);
         $this->checkStorage($findings, $groups, $motherboard);
-        $estimatedPower = $this->checkPower($findings, $groups, $powerSupply);
+        $estimatedPower = $this->checkPower($findings, $groups, $powerSupply, $strictSelection);
         $this->checkPowerSupplyCase($findings, $powerSupply, $case);
         $this->checkFans($findings, $groups, $motherboard, $case);
+        $this->checkPeripheralConnections($findings, $groups, $motherboard);
+        if ($strictSelection) {
+            foreach ($groups['cooler'] ?? [] as $cooler) {
+                if (($cooler['specifications']['radiator_size_mm'] ?? 0) > 0) {
+                    if ($case !== null && ($groups['graphics_card'] ?? []) !== []) {
+                        $findings[] = $this->unknown('cooling.radiator_gpu_clearance', [$cooler['key'], $case['key'], ...array_column($groups['graphics_card'], 'key')], 'GPU clearance with this radiator installation requires configuration-specific verification.');
+                    }
+
+                    continue;
+                }
+                foreach ($groups['memory'] ?? [] as $memory) {
+                    $clearance = $cooler['specifications']['ram_clearance_mm'] ?? null;
+                    $height = $memory['specifications']['height_mm'] ?? null;
+                    if (is_numeric($clearance) && is_numeric($height)) {
+                        $fits = (float) $height <= (float) $clearance;
+                        $findings[] = $this->finding('cooling.ram_clearance', $fits ? 'compatible' : 'incompatible', [$cooler['key'], $memory['key']], $fits ? 'RAM height is within the reviewed cooler clearance.' : 'The selected RAM exceeds the cooler clearance.');
+                    } else {
+                        $findings[] = $this->unknown('cooling.ram_clearance', [$cooler['key'], $memory['key']], 'RAM height and cooler overhang clearance require verification.');
+                    }
+                }
+            }
+        }
 
         $status = $this->aggregateStatus($findings);
+
+        $findings = array_map(function (array $finding) use ($components, $groups, $processor, $motherboard): array {
+            $affected = array_values(array_filter($components, fn (array $component): bool => in_array($component['key'], $finding['component_keys'], true)));
+            $deferred = match ($finding['rule']) {
+                'build.required_components' => true,
+                'graphics.required' => ($processor['specifications']['integrated_graphics'] ?? null) === false && ($groups['graphics_card'] ?? []) === []
+                    || $motherboard === null,
+                'cooling.cpu_cooler' => ($processor['specifications']['included_cooler'] ?? null) === false && ($groups['cooler'] ?? []) === [],
+                'display.graphics_source' => ($groups['graphics_card'] ?? []) === [] && ($processor === null || $motherboard === null || ($processor['specifications']['integrated_graphics'] ?? null) === false),
+                'cooling.fan_mount' => ($groups['case'] ?? []) === [],
+                'peripheral.connection' => $motherboard === null,
+                default => false,
+            };
+
+            return [
+                ...$finding,
+                'scope' => $deferred ? 'missing_component' : 'selected_parts',
+                'affected_parts' => array_map(fn (array $component): string => $component['name'] ?? $component['key'], $affected),
+                'evidence' => array_values(array_filter(array_merge(...array_map(fn (array $component): array => $component['evidence'] ?? [], $affected)), fn (array $source): bool => isset($source['url']) && preg_match('/^https?:\/\//i', $source['url']) === 1)),
+                'action' => match ($finding['status']) {
+                    'incompatible' => 'Change an affected part or correct its verified configuration before purchasing.',
+                    'unknown' => 'Check the exact stock model and manufacturer documentation; this check has not passed.',
+                    'warning' => 'Review this condition before using the selected parts together.',
+                    default => null,
+                },
+            ];
+        }, $findings);
+        $selectionBlockers = array_values(array_unique(array_column(array_filter($findings,
+            fn (array $finding): bool => $finding['scope'] === 'selected_parts' && $finding['status'] !== 'compatible'), 'message')));
+        $purchaseBlockers = array_values(array_unique(array_column(array_filter($findings, fn (array $finding): bool => $finding['status'] === 'incompatible'), 'message')));
+        if ($strictSelection) {
+            $purchaseBlockers = $selectionBlockers;
+        }
+        if ($components === []) {
+            $purchaseBlockers[] = 'Select at least one part before adding to cart.';
+        }
 
         return [
             'ruleset_version' => self::RULESET_VERSION,
@@ -155,6 +225,10 @@ class CompatibilityEngine
             'required_components' => $requiredComponents,
             'estimated_power_w' => $estimatedPower,
             'findings' => $findings,
+            'can_purchase' => $purchaseBlockers === [],
+            'purchase_blockers' => $purchaseBlockers,
+            'selection_compatible' => $components !== [] && $selectionBlockers === [],
+            'selection_blockers' => $selectionBlockers,
         ];
     }
 
@@ -196,15 +270,23 @@ class CompatibilityEngine
      */
     private function checkBios(array &$findings, array $processor, array $motherboard): void
     {
+        $model = $processor['specifications']['model'] ?? null;
+        $support = $motherboard['specifications']['cpu_support'] ?? null;
+        $pair = is_string($model) && is_array($support)
+            ? collect($support)->first(fn ($entry): bool => is_array($entry) && ($entry['model'] ?? null) === $model)
+            : null;
+        if (! is_string($model) || ! is_array($support)) {
+            $findings[] = $this->unknown('cpu_motherboard.model', [$processor['key'], $motherboard['key']], 'The exact CPU model and motherboard CPU support list require verification.');
+        } else {
+            $status = $pair !== null ? 'compatible' : (($motherboard['specifications']['cpu_support_complete'] ?? false) === true ? 'incompatible' : 'unknown');
+            $findings[] = $this->finding('cpu_motherboard.model', $status, [$processor['key'], $motherboard['key']], $pair === null ? 'This exact CPU is absent from the recorded motherboard CPU support list; verify whether the list is complete.' : 'This exact CPU is listed in the reviewed motherboard CPU support data.');
+        }
         $minimumBios = $processor['specifications']['minimum_bios_version'] ?? null;
+        if ($pair !== null) {
+            $minimumBios = $pair['minimum_bios_version'] ?? null;
+        }
         $boardBios = $motherboard['specifications']['bios_version'] ?? null;
         $updatable = $motherboard['specifications']['bios_update_without_supported_cpu'] ?? null;
-
-        if ($minimumBios === null && is_string($boardBios)) {
-            $findings[] = $this->finding('cpu_motherboard.bios', 'compatible', [$processor['key'], $motherboard['key']], 'No minimum BIOS requirement is recorded for this processor.');
-
-            return;
-        }
 
         if (! is_string($minimumBios) || ! is_string($boardBios)) {
             $findings[] = $this->unknown('cpu_motherboard.bios', [$processor['key'], $motherboard['key']], 'Motherboard BIOS compatibility requires verification.');
@@ -212,6 +294,11 @@ class CompatibilityEngine
             return;
         }
 
+        if ($boardBios !== $minimumBios && (preg_match('/^\d+(\.\d+)*$/', $boardBios) !== 1 || preg_match('/^\d+(\.\d+)*$/', $minimumBios) !== 1)) {
+            $findings[] = $this->unknown('cpu_motherboard.bios', [$processor['key'], $motherboard['key']], 'Manufacturer BIOS release ordering must be verified; these version labels cannot be compared numerically.');
+
+            return;
+        }
         if (version_compare($boardBios, $minimumBios, '>=')) {
             $findings[] = $this->finding('cpu_motherboard.bios', 'compatible', [$processor['key'], $motherboard['key']], 'The recorded motherboard BIOS meets the processor minimum.');
 
@@ -352,7 +439,7 @@ class CompatibilityEngine
 
         $integratedGraphics = $processor['specifications']['integrated_graphics'] ?? null;
         if ($integratedGraphics === false) {
-            $findings[] = $this->finding('graphics.required', 'incompatible', [$processor['key']], 'This processor has no integrated graphics. Add a compatible graphics card.');
+            $findings[] = $this->unknown('graphics.required', [$processor['key']], 'This processor has no integrated graphics. Add a compatible graphics card to complete the PC.');
 
             return;
         }
@@ -387,7 +474,7 @@ class CompatibilityEngine
                 $outputs = $motherboard['specifications']['display_outputs'] ?? null;
                 $sourceKey = $motherboard['key'];
             } elseif (($processor['specifications']['integrated_graphics'] ?? null) === false) {
-                $findings[] = $this->finding('display.graphics_source', 'incompatible', [$monitor['key'], $processor['key']], 'This processor has no integrated graphics and the build has no graphics card.');
+                $findings[] = $this->unknown('display.graphics_source', [$monitor['key'], $processor['key']], 'This processor has no integrated graphics and the build has no graphics card.');
 
                 continue;
             } else {
@@ -417,7 +504,7 @@ class CompatibilityEngine
      */
     private function checkCoolers(array &$findings, array $groups, ?array $processor, ?array $motherboard, ?array $case): void
     {
-        if ($processor === null) {
+        if ($processor === null && ($groups['cooler'] ?? []) === []) {
             return;
         }
 
@@ -429,7 +516,7 @@ class CompatibilityEngine
                     $fits = in_array($socket, $sockets, true);
                     $findings[] = $this->finding('cooling.cpu_socket', $fits ? 'compatible' : 'incompatible', [$processor['key'], $cooler['key']],
                         $fits ? 'The cooler lists mounting support for this processor socket.' : 'The cooler does not list mounting support for this processor socket.');
-                } else {
+                } elseif ($processor !== null) {
                     $findings[] = $this->unknown('cooling.cpu_socket', [$processor['key'], $cooler['key']], 'Cooler mounting support requires verified socket data.');
                 }
 
@@ -454,6 +541,9 @@ class CompatibilityEngine
             return;
         }
 
+        if ($processor === null) {
+            return;
+        }
         if (($processor['specifications']['included_cooler'] ?? null) === true) {
             $findings[] = $this->finding('cooling.cpu_cooler', 'compatible', [$processor['key']], 'The processor listing includes a cooler. Verify its suitability for the intended workload.');
 
@@ -461,7 +551,7 @@ class CompatibilityEngine
         }
 
         if (($processor['specifications']['included_cooler'] ?? null) === false) {
-            $findings[] = $this->finding('cooling.cpu_cooler', 'incompatible', [$processor['key']], 'Add a compatible CPU cooler; the processor listing does not include one.');
+            $findings[] = $this->unknown('cooling.cpu_cooler', [$processor['key']], 'Add a compatible CPU cooler to complete the PC; the processor listing does not include one.');
 
             return;
         }
@@ -504,14 +594,13 @@ class CompatibilityEngine
         foreach ($groups['graphics_card'] ?? [] as $graphicsCard) {
             if ($motherboard !== null) {
                 $availableSlots = $motherboard['specifications']['pcie_x16_slots'] ?? null;
-                $neededSlots = $graphicsCard['specifications']['pcie_slots_required'] ?? null;
-                if (is_int($availableSlots) && is_int($neededSlots)) {
-                    $fits = $neededSlots <= $availableSlots;
+                if (is_int($availableSlots)) {
+                    $fits = $availableSlots >= 1;
                     $findings[] = $this->finding(
                         'graphics.motherboard_slot',
                         $fits ? 'compatible' : 'incompatible',
                         [$graphicsCard['key'], $motherboard['key']],
-                        $fits ? 'The motherboard has enough physical expansion slots for this graphics card.' : 'The graphics card occupies more expansion slots than the motherboard can provide.',
+                        $fits ? 'The motherboard lists a PCIe x16 connector. Card thickness and adjacent-slot clearance are separate checks.' : 'The motherboard does not list a PCIe x16 connector for this graphics card.',
                     );
                 } else {
                     $findings[] = $this->unknown('graphics.motherboard_slot', [$graphicsCard['key'], $motherboard['key']], 'Graphics-card slot and motherboard clearance data is incomplete.');
@@ -713,7 +802,7 @@ class CompatibilityEngine
      * @param  array<string, list<array<string, mixed>>>  $groups
      * @param  array<string, mixed>|null  $powerSupply
      */
-    private function checkPower(array &$findings, array $groups, ?array $powerSupply): ?int
+    private function checkPower(array &$findings, array $groups, ?array $powerSupply, bool $strictSelection = false): ?int
     {
         $load = 0.0;
         $hasUnknownLoad = false;
@@ -793,7 +882,9 @@ class CompatibilityEngine
         }
 
         $requiredConnectors = [];
-        foreach ([...($groups['processor'] ?? []), ...($groups['graphics_card'] ?? [])] as $component) {
+        $connectorKeys = [];
+        foreach ([...($groups['processor'] ?? []), ...($groups['graphics_card'] ?? []), ...($strictSelection ? ($groups['motherboard'] ?? []) : [])] as $component) {
+            $connectorKeys[] = $component['key'];
             $connectors = $component['specifications']['required_power_connectors'] ?? null;
             if (! is_array($connectors)) {
                 $findings[] = $this->unknown('power.connectors', [$component['key'], $powerSupply['key']], 'Power connector requirements are not verified.');
@@ -821,7 +912,7 @@ class CompatibilityEngine
             $findings[] = $this->finding(
                 'power.connectors',
                 $missing === [] ? 'compatible' : 'incompatible',
-                [$powerSupply['key']],
+                [$powerSupply['key'], ...$connectorKeys],
                 $missing === [] ? 'The PSU lists the required CPU and graphics power connectors.' : 'The PSU does not list enough compatible connectors: '.implode(', ', $missing).'.',
             );
         }
@@ -887,6 +978,16 @@ class CompatibilityEngine
                     $supported ? 'The case supports this fan position.' : 'The selected fan position is not supported by the case.',
                 );
                 $positionCounts[$mountingPosition] = ($positionCounts[$mountingPosition] ?? 0) + $fan['quantity'];
+                $mounts = $case['specifications']['fan_mounts'] ?? [];
+                $mount = collect(is_array($mounts) ? $mounts : [])->first(fn ($entry): bool => is_array($entry) && ($entry['position'] ?? null) === $mountingPosition);
+                $sizes = $mount['sizes_mm'] ?? null;
+                $size = $fan['specifications']['size_mm'] ?? null;
+                if (is_array($sizes) && is_numeric($size)) {
+                    $fits = in_array((int) $size, $sizes, true);
+                    $findings[] = $this->finding('cooling.fan_size', $fits ? 'compatible' : 'incompatible', [$fan['key'], $case['key']], $fits ? 'The case mount supports this fan size.' : 'The selected fan size is not supported at this case position.');
+                } else {
+                    $findings[] = $this->unknown('cooling.fan_size', [$fan['key'], $case['key']], 'Supported fan sizes at the selected case position require verification.');
+                }
             }
 
             if ($motherboard !== null) {
@@ -919,6 +1020,40 @@ class CompatibilityEngine
             } else {
                 $findings[] = $this->unknown('cooling.fan_header_quantity', array_column($groups['fan'], 'key'), 'Fan header counts require verification.');
             }
+        }
+    }
+
+    /**
+     * @param  list<array{rule: string, status: string, component_keys: list<string>, message: string}>  $findings
+     * @param  array<string, list<array<string, mixed>>>  $groups
+     * @param  array<string, mixed>|null  $motherboard
+     */
+    private function checkPeripheralConnections(array &$findings, array $groups, ?array $motherboard): void
+    {
+        $portDemand = [];
+        foreach (['network_adapter', 'keyboard', 'mouse', 'headset', 'speakers', 'webcam'] as $type) {
+            foreach ($groups[$type] ?? [] as $part) {
+                $interface = $part['specifications']['connection_interface'] ?? null;
+                $ports = $motherboard['specifications']['peripheral_ports'] ?? null;
+                if (! is_string($interface) || ! is_array($ports) || ! array_key_exists($interface, $ports)
+                    || ! in_array($interface, ['USB', '3.5mm', 'PS/2'], true)) {
+                    $findings[] = $this->unknown('peripheral.connection', [$part['key']], 'The selected peripheral connection, available port, driver support or expansion-slot clearance requires verification.');
+
+                    continue;
+                }
+                $portDemand[$interface] ??= ['quantity' => 0, 'keys' => []];
+                $portDemand[$interface]['quantity'] += $part['quantity'];
+                $portDemand[$interface]['keys'][] = $part['key'];
+                $findings[] = $this->finding('peripheral.connection', 'warning', [$part['key'], $motherboard['key']], 'The recorded connection is available. Confirm the exact connector, operating-system support and any required receiver or cable.');
+            }
+        }
+        foreach ($portDemand as $interface => $demand) {
+            $capacity = $motherboard['specifications']['peripheral_ports'][$interface];
+            $status = is_int($capacity) && $capacity >= 0 ? ($demand['quantity'] <= $capacity ? 'compatible' : 'incompatible') : 'unknown';
+            $findings[] = $this->finding('peripheral.port_capacity', $status, $demand['keys'], $status === 'incompatible' ? 'Selected peripherals require more ports than the recorded available capacity.' : ($status === 'compatible' ? 'Recorded port capacity covers the selected peripherals.' : 'Available peripheral port capacity requires verification.'));
+        }
+        foreach ($groups['ups_avr'] ?? [] as $part) {
+            $findings[] = $this->unknown('peripheral.power_protection', [$part['key']], 'Confirm the UPS/AVR output rating, voltage, outlets, waveform and total connected load. VA alone does not establish capacity.');
         }
     }
 

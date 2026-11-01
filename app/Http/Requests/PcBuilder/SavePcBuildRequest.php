@@ -42,7 +42,7 @@ class SavePcBuildRequest extends FormRequest
             'edit_version' => ['sometimes', 'integer', 'min:1'],
             'components' => ['present', 'array', 'max:32'],
             'components.*.key' => ['required', 'string', 'max:64', 'distinct'],
-            'components.*.product_id' => ['required', 'integer', 'min:1', 'distinct'],
+            'components.*.product_id' => ['required', 'integer', 'min:1'],
             'components.*.quantity' => ['required', 'integer', 'min:1', 'max:99'],
             'components.*.configuration' => ['sometimes', 'array'],
             'components.*.configuration.*' => ['string', 'max:80'],

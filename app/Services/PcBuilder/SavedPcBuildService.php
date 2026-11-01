@@ -166,7 +166,7 @@ class SavedPcBuildService
             ->get()
             ->keyBy('id');
 
-        if ($products->count() !== count($components)) {
+        if ($products->count() !== count(array_unique(array_column($components, 'product_id')))) {
             throw ValidationException::withMessages(['components' => 'A selected catalog product no longer exists.']);
         }
 
