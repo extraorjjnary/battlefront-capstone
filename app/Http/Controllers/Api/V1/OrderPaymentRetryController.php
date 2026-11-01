@@ -2,14 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Actions\PayMongo\RetryPayMongoPayment;
 use App\Http\Controllers\Controller;
-use App\Models\PayMongoFlow;
 use App\Models\User;
 use App\Services\CustomerOrderPresenter;
-use App\Services\PayMongo\RetryDirectOnlineBanking;
-use App\Services\PayMongo\RetryOrderPayment;
-use App\Services\PayMongo\StartDirectQrPh;
-use App\Services\PayMongo\StartHostedCheckout;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
@@ -21,9 +17,7 @@ class OrderPaymentRetryController extends Controller
     public function __invoke(
         Request $request,
         int $order,
-        StartHostedCheckout $retryHostedCheckout,
-        RetryDirectOnlineBanking $retryBank,
-        StartDirectQrPh $retryQrPh,
+        RetryPayMongoPayment $retryPayment,
         CustomerOrderPresenter $presenter,
     ): JsonResponse {
         /** @var User $customer */
@@ -31,10 +25,9 @@ class OrderPaymentRetryController extends Controller
         $persistedOrder = $customer->orders()->whereKey($order)->firstOrFail();
 
         try {
-            $flow = PayMongoFlow::query()->where('order_id', $persistedOrder->id)->latest('id')->firstOrFail();
+            $payment = $retryPayment->execute($persistedOrder);
 
-            if ($flow->channel === 'direct_qrph') {
-                app(RetryOrderPayment::class)->execute($persistedOrder, fn ($currentOrder) => $retryQrPh->execute($currentOrder));
+            if ($payment['channel'] === 'direct_qrph') {
                 $data = $presenter->detail($persistedOrder->fresh());
                 $qrIsReady = data_get($data, 'payment.qr_code_image_url') !== null;
 
@@ -44,16 +37,14 @@ class OrderPaymentRetryController extends Controller
                 ], $qrIsReady ? 200 : 202);
             }
 
-            if ($flow->channel === 'hosted_checkout') {
-                $checkoutUrl = app(RetryOrderPayment::class)->execute($persistedOrder, fn ($currentOrder) => $retryHostedCheckout->execute($currentOrder));
-
+            if ($payment['channel'] === 'hosted_checkout') {
                 return response()->json([
                     'data' => $presenter->detail($persistedOrder->fresh()),
-                    'payment' => ['status' => 'checkout_ready', 'redirect_url' => $checkoutUrl],
+                    'payment' => ['status' => 'checkout_ready', 'redirect_url' => $payment['redirect_url']],
                 ]);
             }
 
-            return response()->json(['payment' => ['redirect_url' => app(RetryOrderPayment::class)->execute($persistedOrder, fn ($currentOrder) => $retryBank->execute($currentOrder))]]);
+            return response()->json(['payment' => ['redirect_url' => $payment['redirect_url']]]);
         } catch (RuntimeException|RequestException|ConnectionException) {
             return response()->json(['message' => 'The online payment is being reconciled. Check this order again shortly.'], 202);
         }
