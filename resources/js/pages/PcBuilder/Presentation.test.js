@@ -45,19 +45,40 @@ async function render(file, props) {
             ].map((name) => [name, element('div')]),
         ),
     };
-    const code = content
-        .replace(
-            /import\s+(\w+)\s+from\s*['"]([^'"]+)['"];?/g,
-            (_, symbol, path) =>
-                `const ${symbol} = modules[${JSON.stringify(path)}].default;`,
-        )
-        .replace(
-            /import\s*\{([^}]+)\}\s*from\s*['"]([^'"]+)['"];?/g,
-            (_, names, path) =>
-                `const { ${names.replace(/\s+as\s+/g, ': ')} } = modules[${JSON.stringify(path)}];`,
-        )
-        .replace('export default', 'return');
-    const component = new Function('modules', code)(modules);
+    const codeFor = (content) =>
+        content
+            .replace(
+                /import\s+(\w+)\s+from\s*['"]([^'"]+)['"];?/g,
+                (_, symbol, path) =>
+                    `const ${symbol} = modules[${JSON.stringify(path)}].default;`,
+            )
+            .replace(
+                /import\s*\{([^}]+)\}\s*from\s*['"]([^'"]+)['"];?/g,
+                (_, names, path) =>
+                    `const { ${names.replace(/\s+as\s+/g, ': ')} } = modules[${JSON.stringify(path)}];`,
+            )
+            .replace('export default', 'return');
+    const { descriptor: choice } = parse(
+        readFileSync(
+            new URL(
+                '../Administration/ComponentSpecifications/SpecificationChoice.vue',
+                import.meta.url,
+            ),
+            'utf8',
+        ),
+    );
+    modules['./SpecificationChoice.vue'] = {
+        default: new Function(
+            'modules',
+            codeFor(
+                compileScript(choice, {
+                    id: 'specification-choice',
+                    inlineTemplate: true,
+                }).content,
+            ),
+        )(modules),
+    };
+    const component = new Function('modules', codeFor(content))(modules);
     return renderToString(Vue.h(component, props));
 }
 

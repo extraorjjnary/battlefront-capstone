@@ -450,7 +450,10 @@ async function reloadRevision() {
                         <p class="text-muted-foreground text-sm">
                             Use exact source names and units. Leave unverified
                             values unknown; use “Confirm none” only when the
-                            source verifies that there are none.
+                            source verifies that there are none. Presets are
+                            entry suggestions, not verified product support.
+                            Choose Custom value for an uncommon saved or sourced
+                            value.
                         </p>
                         <template v-if="!advancedOpen"
                             ><div
