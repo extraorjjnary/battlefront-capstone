@@ -1,4 +1,5 @@
 <script setup>
+import { formatRelativeTime } from '@/lib/dateTime';
 import PageHeader from '@/components/PageHeader.vue';
 import { Form, Head, Link, usePage } from '@inertiajs/vue3';
 import SupplierReturnController from '@/actions/App/Http/Controllers/Administration/SupplierReturnController';
@@ -220,7 +221,7 @@ defineOptions({
                         </p>
                         <p class="mt-1 text-sm">{{ entry.reason }}</p>
                         <p class="text-muted-foreground text-sm">
-                            {{ entry.age_days }} days open
+                            {{ formatRelativeTime(entry.created_at) }}
                         </p>
                         <p
                             v-if="entry.dispatch_reference"
