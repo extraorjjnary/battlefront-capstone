@@ -10,30 +10,26 @@ class ReconcilePayMongoOrders extends Command
 {
     protected $signature = 'paymongo:reconcile-overdue';
 
-    protected $description = 'Reconcile and close overdue PayMongo checkout sessions before releasing order inventory';
+    protected $description = 'Recover due PayMongo payments and safely close overdue unpaid orders';
 
     public function handle(): int
     {
-        PayMongoFlow::query()
+        $flows = PayMongoFlow::query()
             ->whereIn('channel', ['hosted_checkout', 'direct_online_banking', 'direct_qrph'])
-            ->whereIn('status', ['open', 'closing', 'closed', 'awaiting_payment_method', 'failed', 'retrying', 'reconciliation_required'])
-            ->whereHas('order', fn ($query) => $query->where('status', 'pending')->where('payment_status', 'pending'))
+            ->where(fn ($query) => $query->whereNull('next_check_at')->orWhere('next_check_at', '<=', now()))
             ->where(function ($query): void {
-                $query->where('merchant_cutoff_at', '<=', now())
-                    ->orWhere(function ($recovery): void {
-                        $recovery->where('channel', 'hosted_checkout')
-                            ->where('status', 'reconciliation_required')
-                            ->where('merchant_cutoff_at', '>', now())
-                            ->whereHas('operations', fn ($operation) => $operation
-                                ->where('kind', 'create_checkout_session')
-                                ->whereIn('status', ['dispatched', 'unknown'])
-                                ->where(fn ($due) => $due->whereNull('next_check_at')->orWhere('next_check_at', '<=', now())));
+                $query->where('requires_attention', true)
+                    ->orWhere(function ($pending): void {
+                        $pending->where('status', '!=', 'paid')
+                            ->whereHas('order', fn ($order) => $order->where('status', 'pending')->where('payment_status', 'pending'));
                     });
             })
-            ->orderBy('id')
-            ->limit(100)
-            ->pluck('id')
-            ->each(static fn (int $flowId) => ReconcilePayMongoOrder::dispatch($flowId)->onQueue('payments'));
+            ->orderBy('next_check_at')->orderBy('id')->limit(100)->get();
+
+        foreach ($flows as $flow) {
+            $flow->update(['next_check_at' => now()->addMinute()]);
+            ReconcilePayMongoOrder::dispatch($flow->id)->onQueue('payments');
+        }
 
         return self::SUCCESS;
     }

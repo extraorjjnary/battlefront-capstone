@@ -17,6 +17,10 @@ class HandleSupplierReturn
             if (! DB::table('suppliers')->where('id', $supplierId)->where('is_active', true)->exists()) {
                 throw ValidationException::withMessages(['supplier_id' => 'Select an active supplier.']);
             }
+            if (DB::table('product_supplier')->where('supplier_id', $supplierId)->exists()
+                && ! DB::table('product_supplier')->where('supplier_id', $supplierId)->where('product_id', $productId)->exists()) {
+                throw ValidationException::withMessages(['product_id' => 'Select a product linked to this supplier.']);
+            }
             $inventory = Inventory::query()->where('product_id', $productId)->lockForUpdate()->firstOrFail();
             if ($inventory->quantity < $quantity) {
                 throw ValidationException::withMessages(['quantity' => 'Not enough sellable stock remains.']);

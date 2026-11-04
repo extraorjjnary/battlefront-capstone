@@ -19,18 +19,39 @@ const props = defineProps({
     selectedIds: Array,
     canWishlist: Boolean,
     returnFocus: Object,
+    strict: Boolean,
+    loading: Boolean,
+    busy: Boolean,
+    error: String,
+    page: { type: Number, default: 1 },
+    lastPage: { type: Number, default: 1 },
+    availableBrands: { type: Array, default: () => [] },
+    componentType: String,
+    mountingPositions: { type: Array, default: () => [] },
 });
-const emit = defineEmits(['update:open', 'select']);
+const emit = defineEmits([
+    'update:open',
+    'select',
+    'remove',
+    'resolve',
+    'filters',
+    'retry',
+]);
 const search = ref('');
 const brand = ref('');
 const sort = ref('name');
 const showUnavailable = ref(false);
+const fanMount = ref('');
 const brands = computed(() =>
-    [
-        ...new Set(
-            props.products.map((product) => product.brand).filter(Boolean),
-        ),
-    ].sort(),
+    props.availableBrands?.length
+        ? props.availableBrands
+        : [
+              ...new Set(
+                  props.products
+                      .map((product) => product.brand)
+                      .filter(Boolean),
+              ),
+          ].sort(),
 );
 const visible = computed(() =>
     props.products
@@ -40,20 +61,45 @@ const visible = computed(() =>
                     .toLowerCase()
                     .includes(search.value.trim().toLowerCase()) &&
                 (!brand.value || product.brand === brand.value) &&
-                (showUnavailable.value || Number(product.stock_quantity) > 0),
+                (props.strict ||
+                    showUnavailable.value ||
+                    Number(product.stock_quantity) > 0),
         )
-        .sort((a, b) =>
-            sort.value === 'name'
-                ? a.name.localeCompare(b.name)
-                : (Number(a.price) - Number(b.price)) *
-                  (sort.value === 'price_desc' ? -1 : 1),
+        .sort(
+            (a, b) =>
+                (props.strict
+                    ? Number(b.selectable) - Number(a.selectable)
+                    : 0) ||
+                (sort.value === 'name'
+                    ? a.name.localeCompare(b.name)
+                    : (Number(a.price) - Number(b.price)) *
+                      (sort.value === 'price_desc' ? -1 : 1)),
         ),
 );
+watch([search, brand, sort], () => {
+    if (props.strict)
+        emit('filters', {
+            search: search.value,
+            brand: brand.value,
+            sort: sort.value,
+            page: 1,
+        });
+});
+watch(fanMount, (position) => {
+    if (props.strict && props.componentType === 'fan')
+        emit('filters', {
+            candidate_configuration: position
+                ? { mounting_position: position }
+                : null,
+            page: 1,
+        });
+});
 watch(
     () => props.label,
     () => {
         search.value = '';
         brand.value = '';
+        fanMount.value = '';
     },
 );
 function money(value) {
@@ -76,11 +122,35 @@ function restoreFocus(event) {
         >
             <DialogHeader>
                 <DialogTitle>Select {{ label }}</DialogTitle>
-                <DialogDescription
-                    >Choose a catalog part. Compatibility is checked after
-                    selection.</DialogDescription
-                >
+                <DialogDescription>{{
+                    strict
+                        ? 'Only verified parts compatible with your selected build can be added.'
+                        : 'Choose a catalog part. Compatibility is checked after selection.'
+                }}</DialogDescription>
             </DialogHeader>
+            <label
+                v-if="
+                    strict &&
+                    componentType === 'fan' &&
+                    mountingPositions.length
+                "
+                class="text-sm font-medium"
+            >
+                Case mounting position
+                <select
+                    v-model="fanMount"
+                    class="border-input bg-background mt-2 block w-full rounded-md border p-2"
+                >
+                    <option value="">Choose a position to check fan fit</option>
+                    <option
+                        v-for="position in mountingPositions"
+                        :key="position"
+                        :value="position"
+                    >
+                        {{ position }}
+                    </option>
+                </select>
+            </label>
             <div class="grid gap-3 sm:grid-cols-[1fr_auto_auto]">
                 <div>
                     <label for="part-search" class="sr-only"
@@ -111,13 +181,26 @@ function restoreFocus(event) {
                     <option value="price_desc">Price: high to low</option>
                 </select>
             </div>
+            <p
+                v-if="loading"
+                class="text-muted-foreground py-3 text-sm"
+                role="status"
+            >
+                Checking available compatible parts…
+            </p>
+            <p v-if="error" class="text-destructive py-3 text-sm" role="alert">
+                {{ error }}
+                <Button variant="outline" size="sm" @click="emit('retry')"
+                    >Try again</Button
+                >
+            </p>
             <label class="flex items-center gap-2 text-sm"
                 ><input v-model="showUnavailable" type="checkbox" /> Show
                 out-of-stock parts</label
             >
             <div class="min-h-0 overflow-y-auto" aria-live="polite">
                 <p
-                    v-if="!products.length"
+                    v-if="!products.length && !loading && !error"
                     class="text-muted-foreground py-12 text-center"
                 >
                     No parts have been prepared for this category yet.
@@ -158,10 +241,53 @@ function restoreFocus(event) {
                             {{
                                 product.specifications_reviewed
                                     ? 'Reviewed specifications · select to check fit'
-                                    : 'Needs verification · specifications pending review'
+                                    : 'Specifications not verified · pending review'
                             }}
                         </p>
+                        <p
+                            v-if="product.manufacturer_part_number"
+                            class="text-muted-foreground mt-1 text-xs"
+                        >
+                            Model: {{ product.manufacturer_part_number
+                            }}{{
+                                product.hardware_revision
+                                    ? ` · Revision ${product.hardware_revision}`
+                                    : ''
+                            }}
+                        </p>
+                        <details
+                            v-if="product.evidence?.length"
+                            class="mt-2 text-xs"
+                        >
+                            <summary class="cursor-pointer">
+                                Specification sources
+                            </summary>
+                            <a
+                                v-for="source in product.evidence"
+                                :key="source.url"
+                                :href="source.url"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="text-primary-ink mt-2 block underline"
+                                >{{ source.title }} ·
+                                {{ source.verified_at }}</a
+                            >
+                        </details>
                         <div class="mt-3 flex flex-wrap items-center gap-3">
+                            <ul
+                                v-if="strict && !product.selectable"
+                                class="text-muted-foreground w-full space-y-1 text-xs"
+                            >
+                                <li
+                                    v-for="reason in product.selection_reasons.slice(
+                                        0,
+                                        2,
+                                    )"
+                                    :key="reason"
+                                >
+                                    {{ reason }}
+                                </li>
+                            </ul>
                             <strong class="text-primary-ink mr-auto">{{
                                 money(product.price)
                             }}</strong>
@@ -173,7 +299,12 @@ function restoreFocus(event) {
                                 compact
                             />
                             <Button
-                                :disabled="Number(product.stock_quantity) < 1"
+                                :disabled="
+                                    busy ||
+                                    loading ||
+                                    Number(product.stock_quantity) < 1 ||
+                                    (strict && !product.selectable)
+                                "
                                 @click="emit('select', product)"
                                 >{{
                                     selectedIds.includes(product.id)
@@ -185,9 +316,46 @@ function restoreFocus(event) {
                                         : 'Select part'
                                 }}</Button
                             >
+                            <Button
+                                v-if="selectedIds.includes(product.id)"
+                                variant="outline"
+                                :disabled="busy"
+                                :aria-label="`Remove ${product.name}`"
+                                @click="emit('remove', product.id)"
+                                >Remove</Button
+                            >
+                            <Button
+                                v-if="
+                                    strict &&
+                                    product.can_resolve &&
+                                    !product.selectable
+                                "
+                                variant="outline"
+                                :disabled="busy || loading"
+                                @click="emit('resolve', product)"
+                                >Replace and resolve conflicts</Button
+                            >
                         </div>
                     </div>
                 </article>
+            </div>
+            <div
+                v-if="strict && lastPage > 1"
+                class="flex items-center justify-between gap-3 text-sm"
+            >
+                <Button
+                    variant="outline"
+                    :disabled="busy || loading || page <= 1"
+                    @click="emit('filters', { page: page - 1 })"
+                    >Previous</Button
+                >
+                <span>Page {{ page }} of {{ lastPage }}</span>
+                <Button
+                    variant="outline"
+                    :disabled="busy || loading || page >= lastPage"
+                    @click="emit('filters', { page: page + 1 })"
+                    >Next</Button
+                >
             </div>
         </DialogContent>
     </Dialog>

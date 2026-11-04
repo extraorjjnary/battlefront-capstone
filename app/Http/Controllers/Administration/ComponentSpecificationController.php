@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\SaveComponentSpecificationRequest;
 use App\Models\Product;
 use App\Models\ProductComponentProfile;
+use App\Services\PcBuilder\CompatibleComponentOptions;
 use App\Services\PcBuilder\ComponentReadinessService;
 use App\Services\PcBuilder\ComponentSpecificationService;
 use Illuminate\Http\JsonResponse;
@@ -24,6 +25,7 @@ class ComponentSpecificationController extends Controller
             'products' => $products,
             'profiles' => $profiles,
             'candidates' => $readiness->candidates(),
+            'builder_readiness' => app(CompatibleComponentOptions::class)->readiness(),
         ]);
     }
 

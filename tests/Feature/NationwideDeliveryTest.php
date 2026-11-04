@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Product\UpdateProduct;
+use App\Enums\ShipmentStatus;
 use App\Enums\ShippingProfile;
 use App\Models\Category;
 use App\Models\Inventory;
@@ -9,6 +10,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Services\Cart\CartService;
 use App\Services\CatalogShippingClassification;
+use App\Services\DeliveryQuotePresenter;
 use App\Services\Order\DeliveryRules;
 use App\Services\Order\PsgcDeliveryLocations;
 use Database\Seeders\BranchSeeder;
@@ -48,6 +50,103 @@ function nationwidePaymentPayload(array $data, string $method): array
 
     return $data;
 }
+
+dataset('nationwide configured routes', [
+    'NCR HUC' => ['1380300000', '200.00', '310.00', 5, 10],
+    'Manila' => ['1380600000', '200.00', '310.00', 5, 10],
+    'Cebu HUC' => ['0730600000', '150.00', '245.00', 3, 7],
+    'Negros Oriental' => ['1804610000', '150.00', '245.00', 3, 7],
+    'Siquijor' => ['1806106000', '150.00', '245.00', 3, 7],
+    'Davao HUC' => ['1130700000', '250.00', '375.00', 5, 10],
+    'BARMM' => ['1908703000', '250.00', '375.00', 5, 10],
+]);
+
+test('all bundled cities resolve configured delivery coverage without external requests', function () {
+    Http::preventStrayRequests();
+    $locations = app(PsgcDeliveryLocations::class);
+    $rules = app(DeliveryRules::class);
+
+    foreach ($locations->geography()['cities'] as $city) {
+        expect($rules->zone($city['code']))->toMatchArray([
+            'configured' => true,
+            'city_code' => $city['code'],
+            'payment_methods' => ['gcash', 'maya', 'cod'],
+        ]);
+    }
+
+    Http::assertNothingSent();
+});
+
+test('nationwide web and API quotes include the same configured fees and provisional ETA', function (
+    string $cityCode, string $baseFee, string $deliveryFee, int $minimumDays, int $maximumDays,
+) {
+    $this->travelTo('2026-11-01 09:00:00');
+    [$customer, $data] = nationwideCheckout();
+    $query = ['cart_item_ids' => $data['cart_item_ids'], 'delivery_city_code' => $cityCode];
+    $web = $this->actingAs($customer)->getJson(route('checkout.delivery-quote.show', $query))->assertOk();
+    $api = $this->withToken($customer->createToken('Phone')->plainTextToken)
+        ->getJson('/api/v1/checkout/delivery-quote?'.http_build_query($query))->assertOk();
+
+    expect($api->json('data'))->toBe($web->json('data'));
+    $api->assertJsonPath('data.quote.pricing_status', 'configured_estimate')
+        ->assertJsonPath('data.quote.delivery_arrangement_required', false)
+        ->assertJsonPath('data.quote.route_base_fee', $baseFee)
+        ->assertJsonPath('data.quote.delivery_fee', $deliveryFee)
+        ->assertJsonPath('data.quote.carrier', 'lbc')
+        ->assertJsonPath('data.quote.preparation_days', 2)
+        ->assertJsonPath('data.quote.transit_min_days', $minimumDays)
+        ->assertJsonPath('data.quote.transit_max_days', $maximumDays)
+        ->assertJsonPath('data.quote.estimated_delivery_start', now()->addDays($minimumDays + 2)->toDateString())
+        ->assertJsonPath('data.quote.estimated_delivery_end', now()->addDays($maximumDays + 2)->toDateString())
+        ->assertJsonPath('data.quote.zone.rules_version', 'nationwide-demo-v8')
+        ->assertJsonPath('data.quote.payment_methods', ['gcash', 'maya', 'cod'])
+        ->assertJsonPath('data.quote.notice', DeliveryQuotePresenter::ESTIMATE_NOTICE);
+    $this->assertDatabaseCount('shipments', 0);
+})->with('nationwide configured routes');
+
+test('nationwide placement snapshots a configured shipment on web and API', function (
+    string $cityCode, string $baseFee, string $deliveryFee, int $minimumDays, int $maximumDays,
+    string $channel, string $paymentMethod,
+) {
+    [$customer, $data, $inventory] = nationwideCheckout();
+    $locations = app(PsgcDeliveryLocations::class);
+    $city = $locations->city($cityCode);
+    $data = nationwidePaymentPayload([
+        ...$data,
+        'delivery_region_code' => $city['region_code'],
+        'delivery_province_code' => $city['province_code'],
+        'delivery_city_code' => $cityCode,
+        'delivery_barangay_code' => $locations->cityBarangays($cityCode)[0]['code'],
+        'payment_method' => $paymentMethod,
+        'delivery_fee' => '0.00',
+        'total_amount' => '1.00',
+    ], $paymentMethod);
+    $this->actingAs($customer)->withToken($customer->createToken('Phone')->plainTextToken);
+
+    $response = $this->post($channel === 'web' ? route('orders.store') : '/api/v1/orders', $data);
+    $channel === 'web' ? $response->assertSessionHasNoErrors()->assertRedirect() : $response->assertSuccessful();
+
+    $order = Order::sole();
+    expect($order->delivery_quote_metadata)->toMatchArray([
+        'pricing_status' => 'configured_estimate', 'delivery_arrangement_required' => false,
+        'city_code' => $cityCode, 'rules_version' => 'nationwide-demo-v8',
+    ]);
+    expect($order->delivery_fee)->toBe($deliveryFee);
+    expect($order->product_subtotal)->toBe('200.00');
+    expect($order->shipment)->carrier->toBe('lbc')->status->toBe(ShipmentStatus::AwaitingPreparation)
+        ->transit_min_days->toBe($minimumDays)->transit_max_days->toBe($maximumDays)
+        ->eta_min_days->toBe($minimumDays + 2)->eta_max_days->toBe($maximumDays + 2)
+        ->eta_anchor_date->toBeNull()->booking_reference->toBeNull();
+    expect($inventory->refresh()->quantity)->toBe(8);
+    expect($customer->refresh()->cart)->toBeNull();
+    $this->assertDatabaseCount('shipments', 1);
+
+    $snapshot = $order->getAttributes();
+    $shipmentSnapshot = $order->shipment->getAttributes();
+    config(['battlefront.delivery.zones.regions' => [], 'battlefront.delivery.regional_estimates.fees' => []]);
+    expect($order->refresh()->getAttributes())->toBe($snapshot);
+    expect($order->shipment->getAttributes())->toBe($shipmentSnapshot);
+})->with('nationwide configured routes')->with(['web', 'api'])->with(['gcash', 'maya', 'cod']);
 
 test('nationwide geography has complete unique parent chains without external requests', function () {
     Http::preventStrayRequests();
@@ -157,6 +256,7 @@ test('zones choose city then province then region and explicit exclusions fail c
 });
 
 test('quotes share configured and regional estimates without inventing carrier delivery details', function () {
+    config(['battlefront.delivery.zones.regions' => []]);
     [$customer, $data] = nationwideCheckout();
     $query = ['cart_item_ids' => $data['cart_item_ids'], 'delivery_city_code' => '1804523000'];
     $web = $this->actingAs($customer)->getJson(route('checkout.delivery-quote.show', $query))->assertOk();
@@ -198,7 +298,31 @@ test('nationwide checkout rejects tampered parents without reserving inventory',
     'conflicting alias' => [['delivery_destination' => 'Bacolod City'], 'delivery_destination'],
 ]);
 
+test('explicit nationwide exclusions reject placement without consuming stock or cart', function (string $level, string $code) {
+    [$customer, $data, $inventory] = nationwideCheckout();
+    $locations = app(PsgcDeliveryLocations::class);
+    $data = [...$data,
+        'delivery_province_code' => '1804600000',
+        'delivery_city_code' => '1804610000',
+        'delivery_barangay_code' => $locations->cityBarangays('1804610000')[0]['code'],
+    ];
+    config(['battlefront.delivery.zones.'.$level.'.'.$code => ['enabled' => false]]);
+
+    $this->actingAs($customer)->postJson(route('orders.store'), $data)
+        ->assertUnprocessable()->assertJsonValidationErrors('delivery_destination');
+
+    expect($inventory->refresh()->quantity)->toBe(10);
+    $this->assertDatabaseCount('orders', 0);
+    $this->assertDatabaseCount('shipments', 0);
+    $this->assertDatabaseCount('cart_items', 1);
+})->with([
+    'city' => ['cities', '1804610000'],
+    'province' => ['provinces', '1804600000'],
+    'region' => ['regions', '1800000000'],
+]);
+
 test('regional nationwide estimates are saved without automatic shipments', function (string $channel, string $paymentMethod) {
+    config(['battlefront.delivery.zones.regions' => []]);
     Storage::fake('local');
     [$customer, $data, $inventory] = nationwideCheckout();
     $barangay = app(PsgcDeliveryLocations::class)->cityBarangays('1380300000')[0]['code'];

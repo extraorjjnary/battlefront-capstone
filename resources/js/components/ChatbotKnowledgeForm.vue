@@ -135,6 +135,7 @@ async function checkQuestion() {
                 name="response_template"
                 :default-value="knowledge?.response_template"
                 rows="8"
+                class="min-h-48 resize-y"
                 placeholder="Enter the approved response content."
                 :aria-invalid="Boolean(errors.response_template)"
                 required

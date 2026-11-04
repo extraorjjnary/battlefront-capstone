@@ -548,7 +548,8 @@ test('a database failure rolls back imported catalog changes', function () {
 test('the private mapping and manifest agree on approved demo inventory while retaining spreadsheet provenance', function () {
     $path = storage_path('app/imports/product_catalog/verified-product-details.csv');
     $manifestPath = storage_path('app/private/product-catalog-images/manifest.json');
-    if (! is_file($path) || ! is_file($manifestPath)) {
+    $approvalsPath = storage_path('app/private/product-catalog-images/development-value-approvals.json');
+    if (! is_file($path) || ! is_file($manifestPath) || ! is_file($approvalsPath)) {
         $this->markTestSkipped('The private catalog data is unavailable.');
     }
     $handle = fopen($path, 'r');
@@ -559,7 +560,7 @@ test('the private mapping and manifest agree on approved demo inventory while re
     }
     fclose($handle);
     $manifest = json_decode(file_get_contents($manifestPath), true, flags: JSON_THROW_ON_ERROR);
-    $approvals = json_decode(file_get_contents(storage_path('app/private/product-catalog-images/development-value-approvals.json')), true, flags: JSON_THROW_ON_ERROR);
+    $approvals = json_decode(file_get_contents($approvalsPath), true, flags: JSON_THROW_ON_ERROR);
 
     expect($rows)->toHaveCount(654);
     expect($approvals['products'])->toHaveCount(654);

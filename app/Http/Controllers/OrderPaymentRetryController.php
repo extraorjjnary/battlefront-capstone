@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Actions\PayMongo\RetryPayMongoPayment;
 use App\Models\User;
 use App\Services\CustomerOrderPresenter;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use RuntimeException;
@@ -26,7 +28,6 @@ class OrderPaymentRetryController extends Controller
             $payment = $retryPayment->execute($persistedOrder);
 
             if ($payment['channel'] === 'direct_qrph') {
-
                 if ($request->expectsJson()) {
                     $data = $presenter->detail($persistedOrder->fresh());
                     $qrIsReady = data_get($data, 'payment.qr_code_image_url') !== null;
@@ -41,12 +42,10 @@ class OrderPaymentRetryController extends Controller
             }
 
             if ($payment['channel'] === 'hosted_checkout') {
-                $checkoutUrl = $payment['redirect_url'];
-
                 if ($request->expectsJson()) {
                     return response()->json([
                         'data' => $presenter->detail($persistedOrder->fresh()),
-                        'payment' => ['status' => 'checkout_ready', 'checkout_url' => $checkoutUrl],
+                        'payment' => ['status' => 'checkout_ready', 'checkout_url' => $payment['redirect_url']],
                     ]);
                 }
 
@@ -56,7 +55,7 @@ class OrderPaymentRetryController extends Controller
             }
 
             return Inertia::location($payment['redirect_url']);
-        } catch (RuntimeException) {
+        } catch (RuntimeException|RequestException|ConnectionException) {
             if ($request->expectsJson()) {
                 return response()->json(['message' => 'The online payment is being reconciled. Check this order again shortly.'], 202);
             }

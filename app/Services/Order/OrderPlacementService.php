@@ -23,6 +23,7 @@ use App\Models\User;
 use App\Services\Cart\CartService;
 use App\Services\Notifications\OrderNotificationPublisher;
 use App\Services\PcBuilder\CompatibilityEngine;
+use App\Services\PcBuilder\ComponentReadinessService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Config;
@@ -343,7 +344,7 @@ class OrderPlacementService
     }
 
     /**
-     * Revalidate complete PC cart groups against current reviewed specifications and prepare purchase snapshots.
+     * Revalidate all selected PC group lines and prepare purchase snapshots, including unfinished builds.
      *
      * @param  Collection<int, CartItem>  $cartItems
      * @param  Collection<int, PcBuildCartGroup>  $buildGroups
@@ -371,28 +372,38 @@ class OrderPlacementService
             $snapshotParts = [];
 
             foreach ($groupItems as $cartItem) {
-                $stored = $storedComponents->firstWhere('product_id', $cartItem->product_id);
-                if (! is_array($stored) || (int) ($stored['quantity'] ?? 0) !== $cartItem->quantity) {
+                $storedParts = $storedComponents->where('product_id', $cartItem->product_id);
+                if ($storedParts->isEmpty() || (int) $storedParts->sum('quantity') !== $cartItem->quantity) {
                     throw ValidationException::withMessages(['cart_item_ids' => 'A PC configuration changed. Remove it and add the current build again.']);
                 }
 
                 $profile = $profiles->get($cartItem->product_id);
                 $revision = $profile?->revisions->firstWhere('revision', $profile->current_revision);
                 $reviewed = $profile?->review_status === 'approved' && $revision?->review_status === 'approved';
-                $component = [
-                    'key' => (string) $stored['key'],
-                    'product_id' => $cartItem->product_id,
-                    'component_type' => $profile->component_type ?? (string) ($stored['component_type'] ?? 'unknown'),
-                    'quantity' => $cartItem->quantity,
-                    'configuration' => $stored['configuration'] ?? [],
-                    'specifications' => $reviewed ? $revision->specifications : [],
-                ];
-                $components[] = $component;
+                if ($profile === null) {
+                    throw ValidationException::withMessages(['cart_item_ids' => 'A selected part is no longer configured for the PC Builder.']);
+                }
+                $slots = [];
+                foreach ($storedParts as $stored) {
+                    $component = [
+                        'key' => (string) $stored['key'],
+                        'product_id' => $cartItem->product_id,
+                        'component_type' => $profile->component_type ?? (string) ($stored['component_type'] ?? 'unknown'),
+                        'quantity' => (int) $stored['quantity'],
+                        'configuration' => $stored['configuration'] ?? [],
+                        'specifications' => $reviewed ? $revision->specifications : [],
+                        'specifications_reviewed' => $reviewed && (! config('pc-builder.strict_selection_enabled') || app(ComponentReadinessService::class)->selectionIssues($profile) === []),
+                        'evidence' => $revision->evidence ?? [],
+                    ];
+                    $components[] = $component;
+                    $slots[] = $component;
+                }
                 $snapshotParts[$cartItem->id] = [
-                    'component_type' => $component['component_type'],
-                    'configuration' => $component['configuration'],
-                    'specifications' => $component['specifications'],
+                    'component_type' => $profile->component_type,
+                    'configuration' => $storedParts->first()['configuration'] ?? [],
+                    'specifications' => $reviewed ? $revision->specifications : [],
                     'specification_revision' => $reviewed ? $revision->revision : null,
+                    'component_slots' => $slots,
                 ];
             }
 
@@ -400,16 +411,16 @@ class OrderPlacementService
                 throw ValidationException::withMessages(['cart_item_ids' => 'Select the full PC configuration to check out.']);
             }
 
-            $validation = app(CompatibilityEngine::class)->evaluate($components);
-            if (! $validation['complete']) {
-                throw ValidationException::withMessages(['cart_item_ids' => 'A PC configuration is incompatible, incomplete, or requires specification verification.']);
+            $validation = app(CompatibilityEngine::class)->evaluate($components, (bool) config('pc-builder.strict_selection_enabled'));
+            if (! $validation['can_purchase']) {
+                throw ValidationException::withMessages(['cart_item_ids' => implode(' ', $validation['purchase_blockers'])]);
             }
 
             foreach ($groupItems as $cartItem) {
                 $part = $snapshotParts[$cartItem->id];
                 $relatedFindings = array_values(array_filter(
                     $validation['findings'],
-                    fn (array $finding): bool => in_array($storedComponents->firstWhere('product_id', $cartItem->product_id)['key'], $finding['component_keys'], true),
+                    fn (array $finding): bool => array_intersect(array_column($part['component_slots'], 'key'), $finding['component_keys']) !== [],
                 ));
                 $snapshots[$cartItem->id] = [
                     'group_uuid' => $group->uuid,
@@ -419,6 +430,8 @@ class OrderPlacementService
                         'ruleset_version' => $validation['ruleset_version'],
                         'compatibility_status' => $validation['status'],
                         'compatibility_findings' => $relatedFindings,
+                        'build_complete' => $validation['complete'],
+                        'required_components' => $validation['required_components'],
                     ],
                 ];
             }

@@ -142,6 +142,7 @@ test('checkout redirects show the remaining cart quantity after partial or compl
         'payment_method' => 'cash',
     ])->assertInertia(fn (Assert $page) => $page
         ->component('Orders/Show')
+        ->has('order.items', $purchaseAll ? 2 : 1)
         ->where('cartQuantity', $purchaseAll ? 0 : 3));
 
     $this->assertDatabaseCount('orders', 1);

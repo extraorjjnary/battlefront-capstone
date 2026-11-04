@@ -85,8 +85,11 @@ class PcBuildToCartService
                 }
 
                 $profile = $product->componentProfile()->with('revisions')->first();
-                $revision = $profile?->revisions->firstWhere('revision', $profile->current_revision);
-                $reviewed = $profile?->review_status === 'approved' && $revision?->review_status === 'approved';
+                if ($profile === null || ! in_array($profile->component_type, ComponentTypes::all(), true)) {
+                    throw ValidationException::withMessages(['build' => 'A selected product is no longer configured for the PC Builder.']);
+                }
+                $revision = $profile->revisions->firstWhere('revision', $profile->current_revision);
+                $reviewed = $profile->review_status === 'approved' && $revision?->review_status === 'approved';
                 $specifications = $reviewed ? $revision->specifications : [];
                 $components[] = [
                     'key' => $item->slot_key,
@@ -95,6 +98,9 @@ class PcBuildToCartService
                     'quantity' => $item->quantity,
                     'configuration' => $item->configuration ?? [],
                     'specifications' => $specifications,
+                    'specifications_reviewed' => $reviewed && (! config('pc-builder.strict_selection_enabled') || app(ComponentReadinessService::class)->selectionIssues($profile) === []),
+                    'evidence' => $revision->evidence ?? [],
+                    'name' => $product->name,
                 ];
                 $snapshots[] = [
                     'key' => $item->slot_key,
@@ -107,9 +113,9 @@ class PcBuildToCartService
                 ];
             }
 
-            $validation = $this->compatibilityEngine->evaluate($components);
-            if (! $validation['complete']) {
-                throw ValidationException::withMessages(['build' => 'This build is incomplete or needs compatibility verification before it can be added to the cart.']);
+            $validation = $this->compatibilityEngine->evaluate($components, (bool) config('pc-builder.strict_selection_enabled'));
+            if (! $validation['can_purchase']) {
+                throw ValidationException::withMessages(['build' => implode(' ', $validation['purchase_blockers'])]);
             }
 
             $group = PcBuildCartGroup::query()->create([

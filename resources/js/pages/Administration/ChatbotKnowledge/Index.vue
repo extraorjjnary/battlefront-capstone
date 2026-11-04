@@ -92,7 +92,7 @@ defineOptions({
     <Head title="Chatbot FAQs" />
 
     <main
-        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-8 p-6 lg:p-10"
+        class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 sm:p-6 lg:p-8"
     >
         <section
             class="border-border bg-card relative overflow-hidden border p-6"
@@ -137,7 +137,7 @@ defineOptions({
             <SearchField
                 id="knowledge-search"
                 v-model="search"
-                class="mt-5 max-w-xl"
+                class="mx-6 mb-6 max-w-xl"
                 label="Search FAQs"
                 placeholder="Question or response"
                 :is-searching="isSearching"
@@ -293,7 +293,7 @@ defineOptions({
                     />
                     <p class="mt-3 font-medium">No chatbot FAQs available</p>
                     <p class="text-muted-foreground mt-1 text-sm">
-                        Add approved support guidance to begin managing FAQs.
+                        {{ filters.q ? 'Try different wording or clear your search.' : 'Add approved support guidance to begin managing FAQs.' }}
                     </p>
                 </div>
             </div>
@@ -331,11 +331,11 @@ defineOptions({
                         >
                             {{ item.eligibility_reason }}
                         </p>
-                        <h3 class="mt-3 font-semibold">
+                        <h3 class="mt-3 font-semibold break-words">
                             {{ item.question_pattern }}
                         </h3>
                         <p
-                            class="text-muted-foreground mt-2 line-clamp-2 max-w-3xl text-sm leading-6 whitespace-pre-line"
+                            class="text-muted-foreground mt-2 line-clamp-3 max-w-3xl text-sm leading-6 whitespace-pre-line break-words"
                         >
                             {{ item.response_template }}
                         </p>

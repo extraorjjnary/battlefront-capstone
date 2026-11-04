@@ -1175,6 +1175,22 @@ defineOptions({
                                 >
                                     PC build · {{ item.pc_build_group.name }}
                                 </p>
+                                <p
+                                    v-if="
+                                        item.pc_build_group?.validation &&
+                                        !item.pc_build_group.validation.complete
+                                    "
+                                    class="text-muted-foreground mb-2 text-xs"
+                                >
+                                    Selected parts only. This is not a verified
+                                    complete PC. Missing components:
+                                    {{
+                                        item.pc_build_group.validation.required_components.join(
+                                            ', ',
+                                        ) || 'none recorded'
+                                    }}. Compatibility:
+                                    {{ item.pc_build_group.validation.status }}.
+                                </p>
                                 <p class="truncate text-sm font-semibold">
                                     {{ item.product.name }}
                                 </p>

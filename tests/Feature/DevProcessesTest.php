@@ -13,7 +13,7 @@ test('development process previews include shopping workers and recovery without
 
         expect($exitCode)->toBe(0);
         expect($processes->get('queue')['command'])->toBe('php artisan queue:listen --queue=default --tries=1 --timeout=0');
-        expect($processes->get('payments')['command'])->toBe('php artisan queue:listen --queue=payments --sleep=1 --tries=3 --timeout=30');
+        expect($processes->get('payments')['command'])->toBe('php artisan queue:listen --queue=payments --sleep=1 --tries=3 --timeout=70');
         expect($processes->get('scheduler')['command'])->toBe('php artisan schedule:work');
         expect($processes->has('vite'))->toBeTrue();
         expect($processes->has('server'))->toBe(! $herd);

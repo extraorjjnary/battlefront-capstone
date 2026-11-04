@@ -30,7 +30,7 @@ class PayMongoClient
 
     private function authenticatedRequest(string $baseUrl, mixed $apiKey, string $keyPrefix): PendingRequest
     {
-        if (! config('services.paymongo.enabled') || config('services.paymongo.mode') !== 'test'
+        if (config('services.paymongo.mode') !== 'test'
             || ! is_string($apiKey) || ! str_starts_with($apiKey, $keyPrefix)) {
             throw new RuntimeException('PayMongo test checkout is not configured.');
         }

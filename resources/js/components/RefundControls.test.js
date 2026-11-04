@@ -178,6 +178,7 @@ function returnsPage(inlineTemplate = true, submissions = []) {
             default: load('./EvidenceFileInput.vue'),
         },
         '@/components/PageHeader.vue': { default: primitive },
+        '@/components/administration/OperationalExports.vue': { default: primitive },
         '@/components/SearchField.vue': { default: primitive },
         '@/composables/useDebouncedSearch': {
             useDebouncedSearch: () => ({

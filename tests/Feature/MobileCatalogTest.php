@@ -225,7 +225,7 @@ test('mobile categories combine multiple categories with effective price and sea
     }
     Product::factory()->available()->create(['name' => 'Selected GPU Outside category', 'brand' => 'Atlas', 'price' => '100.00']);
 
-    $this->getJson(route('api.v1.products.index', ['category_ids' => $categories->modelKeys(), 'brand' => 'Atlas', 'q' => 'GPU', 'max_price' => '4999.99']))
+    $this->getJson(route('api.v1.products.index', ['category_ids' => $categories->modelKeys(), 'brand' => 'Atlas', 'q' => 'Selected', 'max_price' => '4999.99']))
         ->assertOk()->assertJsonCount(2, 'data')->assertJsonPath('meta.total', 2);
     $this->getJson(route('api.v1.products.index', ['category_ids' => $categories->modelKeys(), 'brand' => 'Atlas', 'min_price' => '5000']))
         ->assertOk()->assertJsonCount(2, 'data');
@@ -285,7 +285,7 @@ test('mobile category lists combine with search brand tag and inclusive effectiv
     $outsideCategory->tags()->attach($tag);
 
     $response = $this->get(route('api.v1.products.index', [
-        'category_ids' => $categories->modelKeys(), 'brand' => 'Atlas', 'q' => 'GPU', 'tag_id' => $tag->id,
+        'category_ids' => $categories->modelKeys(), 'brand' => 'Atlas', 'q' => 'Selected', 'tag_id' => $tag->id,
         'min_price' => '4999.99', 'max_price' => '5000.00',
     ]));
 

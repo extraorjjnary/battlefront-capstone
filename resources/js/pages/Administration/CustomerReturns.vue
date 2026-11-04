@@ -1,4 +1,5 @@
 <script setup>
+import OperationalExports from '@/components/administration/OperationalExports.vue';
 import PageHeader from '@/components/PageHeader.vue';
 import { Form, Head, Link, usePage, useForm } from '@inertiajs/vue3';
 import CustomerReturnController from '@/actions/App/Http/Controllers/Administration/CustomerReturnController';
@@ -167,6 +168,13 @@ defineOptions({
             >
         </p>
         <PageHeader title="Customer returns" />
+        <OperationalExports
+            feature="customer-returns"
+            :filters="filters"
+            :case-id="selected_case"
+            :request-id="selected_request"
+            :payment-id="selected_payment"
+        />
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
             <SearchField
                 id="return-search"

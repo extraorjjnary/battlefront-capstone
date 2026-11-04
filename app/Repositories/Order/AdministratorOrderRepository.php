@@ -2,10 +2,14 @@
 
 namespace App\Repositories\Order;
 
+use App\Enums\FulfillmentMethod;
 use App\Enums\OrderStatus;
+use App\Enums\ShipmentStatus;
 use App\Enums\UserRole;
 use App\Models\Order;
+use App\Models\Shipment;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -14,6 +18,65 @@ use Illuminate\Support\Facades\DB;
 
 class AdministratorOrderRepository
 {
+    /** @param array<string, mixed> $filters
+     * @return Builder<Shipment>
+     */
+    public function shipmentQuery(array $filters): Builder
+    {
+        $query = Shipment::query()
+            ->select(['id', 'order_id', 'status', 'created_at', 'package_count', 'package_weight_kg',
+                'package_length_cm', 'package_width_cm', 'package_height_cm', 'declared_value',
+                'tracking_reference', 'actual_carrier_cost', 'carrier_cost_reference', 'carrier_cost_recorded_at', 'handed_to_carrier_at'])
+            ->whereHas('order', fn (Builder $order) => $order->where('fulfillment_method', FulfillmentMethod::Delivery))
+            ->with(['order:id,user_id,recipient_name,delivery_destination,delivery_address,delivery_fee,status', 'order.user:id,name']);
+        $status = $filters['shipment_status'] ?? 'active';
+        if ($status === 'cancelled') {
+            $query->where(fn (Builder $shipment) => $shipment->where('status', ShipmentStatus::Cancelled)
+                ->orWhereHas('order', fn (Builder $order) => $order->where('status', OrderStatus::Cancelled)));
+        } elseif ($status !== 'all') {
+            $query->whereHas('order', fn (Builder $order) => $order->where('status', '!=', OrderStatus::Cancelled));
+            $status === 'active'
+                ? $query->whereNotIn('status', [ShipmentStatus::Delivered, ShipmentStatus::Cancelled])
+                : $query->where('status', $status);
+        }
+        if (($filters['reconciliation'] ?? 'all') === 'confirmed') {
+            $query->whereNotNull('carrier_cost_recorded_at');
+        } elseif (($filters['reconciliation'] ?? 'all') === 'unconfirmed') {
+            $query->whereNull('carrier_cost_recorded_at');
+        }
+        if (filled($filters['q'] ?? null)) {
+            $search = $filters['q'];
+            $referenceId = $this->referenceIdFromSearch($search);
+            $query->where(function (Builder $shipment) use ($search, $referenceId): void {
+                $shipment->where('tracking_reference', 'like', "%{$search}%")
+                    ->orWhere('carrier_cost_reference', 'like', "%{$search}%")
+                    ->orWhereHas('order', function (Builder $order) use ($search, $referenceId): void {
+                        $order->where('recipient_name', 'like', "%{$search}%")
+                            ->orWhereHas('user', fn (Builder $user) => $user->where('name', 'like', "%{$search}%"));
+                        if ($referenceId !== null) {
+                            $order->orWhereKey($referenceId);
+                        }
+                    });
+            });
+        }
+        if (filled($filters['from'] ?? null)) {
+            $query->where('handed_to_carrier_at', '>=', CarbonImmutable::parse($filters['from'], config('battlefront.timezone'))->startOfDay()->utc());
+        }
+        if (filled($filters['to'] ?? null)) {
+            $query->where('handed_to_carrier_at', '<', CarbonImmutable::parse($filters['to'], config('battlefront.timezone'))->startOfDay()->addDay()->utc());
+        }
+
+        return $query->orderByDesc('created_at')->orderByDesc('id');
+    }
+
+    /** @param array<string, mixed> $filters
+     * @return LengthAwarePaginator<int, Shipment>
+     */
+    public function shipmentDirectory(array $filters): LengthAwarePaginator
+    {
+        return $this->shipmentQuery($filters)->paginate(20)->appends(['view' => 'shipments', ...$filters]);
+    }
+
     /**
      * Return the filtered order directory and counts for each operational view.
      *
@@ -27,12 +90,12 @@ class AdministratorOrderRepository
             ->selectRaw('status, COUNT(*) as aggregate')
             ->groupBy('status')
             ->pluck('aggregate', 'status');
-        $orders = $this->applyStatusFilter($filteredOrders, $statusFilter)
+        $orders = (($filters['gateway_state'] ?? null) === 'needs_attention' ? $filteredOrders : $this->applyStatusFilter($filteredOrders, $statusFilter))
             ->select([
                 'id', 'user_id', 'recipient_name', 'fulfillment_method',
-                'total_amount', 'status', 'payment_status', 'payment_method', 'created_at',
+                'total_amount', 'status', 'payment_status', 'payment_method', 'created_at', 'payment_origin', 'payment_closure_requested_at',
             ])
-            ->with(['user:id,name,email', 'shipment:id,order_id,status', 'cancellationRequest.refund'])
+            ->with(['paymongoFlows', 'user:id,name,email', 'shipment:id,order_id,status', 'cancellationRequest.refund'])
             ->withCount('items')
             ->withSum('items as total_quantity', 'quantity')
             ->orderByDesc('created_at')
@@ -46,6 +109,7 @@ class AdministratorOrderRepository
     public function loadDetails(Order $order): Order
     {
         return $order->load([
+            'paymongoFlows',
             'cancellationRequest.refund',
             'shipment',
             'user:id,name,email',
@@ -102,6 +166,24 @@ class AdministratorOrderRepository
     private function applyIndexFilters(Builder $query, array $filters): Builder
     {
         return $query
+            ->when($filters['gateway_state'] ?? null, function (Builder $query, string $state): void {
+                $query->where('payment_origin', 'paymongo');
+                if ($state === 'needs_attention') {
+                    $query->where(fn ($exceptions) => $exceptions->whereDoesntHave('paymongoFlows')->orWhereHas('paymongoFlows', fn ($flows) => $flows->where('requires_attention', true)));
+
+                    return;
+                }
+                $query->where('payment_status', 'pending')->whereDoesntHave('paymongoFlows', fn ($flows) => $flows->where('requires_attention', true));
+                if ($state === 'closing') {
+                    $query->whereNotNull('payment_closure_requested_at');
+
+                    return;
+                }
+                $query->whereNull('payment_closure_requested_at')->whereHas('paymongoFlows', function ($flows) use ($state): void {
+                    $flows->whereRaw('paymongo_flows.id = (select coalesce(max(case when selected.active_slot = ? then selected.id end), max(selected.id)) from paymongo_flows selected where selected.order_id = orders.id)', ['active'])
+                        ->whereRaw("CASE WHEN status IN ('reconciliation_required', 'creating', 'retrying') THEN 'checking' WHEN status = 'closed' THEN 'expired' WHEN status = 'failed' THEN 'failed' WHEN recovery_outcome IN ('failed', 'expired') THEN recovery_outcome ELSE 'awaiting' END = ?", [$state]);
+                });
+            })
             ->when($filters['q'] ?? null, function (Builder $query, string $search): void {
                 $referenceId = $this->referenceIdFromSearch($search);
 

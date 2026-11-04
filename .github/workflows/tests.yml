@@ -76,7 +76,7 @@ jobs:
         uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
         with:
           php-version: '8.4'
-          extensions: bcmath, gd, pdo_mysql
+          extensions: bcmath, gd, pdo_mysql, pcntl, posix
           tools: composer:v2
           coverage: none
 
@@ -92,4 +92,4 @@ jobs:
           php artisan key:generate --force
 
       - name: Run MySQL concurrency and migration tests
-        run: BATTLEFRONT_COD_MYSQL_TESTS=1 php artisan test --compact tests/Feature/CodOrderConcurrencyTest.php
+        run: BATTLEFRONT_COD_MYSQL_TESTS=1 BATTLEFRONT_PAYMONGO_MYSQL_TESTS=1 php artisan test --compact tests/Feature/CodOrderConcurrencyTest.php tests/Feature/PayMongoRecoveryConcurrencyTest.php tests/Feature/CommerceRecoveryUpgradeTest.php

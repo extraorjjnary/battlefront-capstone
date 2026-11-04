@@ -6,7 +6,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 test('expanded labels preserve existing snapshots and delivery constraints', function () {
-    $historical = Order::factory()->withDeliverySnapshot()->create()->refresh();
+    $historical = Order::factory()->withDeliverySnapshot()->create([
+        'delivery_assumption_label' => 'Historical delivery estimate retained for rollback coverage.',
+    ])->refresh();
     $pickup = Order::factory()->create()->refresh();
     $historicalBefore = $historical->getAttributes();
     $pickupBefore = $pickup->getAttributes();

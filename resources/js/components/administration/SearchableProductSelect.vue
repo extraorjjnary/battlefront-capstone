@@ -6,6 +6,8 @@ const props = defineProps({
     products: { type: Array, required: true },
     id: { type: String, required: true },
     name: { type: String, default: 'product_id' },
+    disabled: { type: Boolean, default: false },
+    emptyMessage: { type: String, default: 'No products match this search.' },
 });
 
 const search = ref('');
@@ -37,6 +39,7 @@ const filteredProducts = computed(() => {
     <div class="grid gap-2">
         <Input
             v-model="search"
+            :disabled="disabled"
             type="search"
             aria-label="Search products"
             placeholder="Search product name or code"
@@ -46,6 +49,7 @@ const filteredProducts = computed(() => {
             :id="id"
             v-model="selectedId"
             :name="name"
+            :disabled="disabled"
             required
             class="border-input bg-background focus-visible:ring-ring min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
         >
@@ -64,7 +68,7 @@ const filteredProducts = computed(() => {
             class="text-muted-foreground text-xs"
             role="status"
         >
-            No products match this search.
+            {{ search.trim() ? 'No products match this search.' : emptyMessage }}
         </p>
     </div>
 </template>
