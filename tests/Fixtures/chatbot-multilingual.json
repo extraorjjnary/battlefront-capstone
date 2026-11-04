@@ -1,0 +1,2054 @@
+{
+    "metadata": {
+        "purpose": "Offline recognition and handling evaluation; never a source of business facts.",
+        "verification_date": "2026-11-04",
+        "review_note": "Technical review is distinct from native-speaker validation. Regional sentences require native review for naturalness and Negros Occidental usage.",
+        "sources": [
+            {
+                "language": "hil",
+                "url": "https://kaikki.org/dictionary/Hiligaynon/words/sapa--suyak.html",
+                "attribution": "Kaikki.org, extracted from English Wiktionary contributors using Wiktextract.",
+                "upstream_license": "Wiktionary text: CC BY-SA 4.0 / GFDL; no example sentences or substantial definitions copied.",
+                "license_url": "https://en.wiktionary.org/wiki/Wiktionary:Copyrights"
+            },
+            {
+                "language": "ceb",
+                "url": "https://kaikki.org/dictionary/Cebuano/meaning/k/ka/karon.html",
+                "attribution": "Kaikki.org, extracted from English Wiktionary contributors using Wiktextract.",
+                "upstream_license": "Wiktionary text: CC BY-SA 4.0 / GFDL; no example sentences or substantial definitions copied.",
+                "license_url": "https://en.wiktionary.org/wiki/Wiktionary:Copyrights"
+            },
+            {
+                "language": "tl",
+                "url": "https://kaikki.org/dictionary/Tagalog/meaning/n/ng/ngayon.html",
+                "attribution": "Kaikki.org, extracted from English Wiktionary contributors using Wiktextract.",
+                "upstream_license": "Wiktionary text: CC BY-SA 4.0 / GFDL; no example sentences or substantial definitions copied.",
+                "license_url": "https://en.wiktionary.org/wiki/Wiktionary:Copyrights"
+            }
+        ],
+        "academic_citation": "Tatu Ylonen. Wiktextract: Wiktionary as Machine-Readable Structured Data. LREC 2022, pp. 1317–1325.",
+        "geography": {
+            "url": "https://kaikki.org/dictionary/Hiligaynon/categories-place/Tf/Cities%20in%20Negros%20Occidental%2C%20Philippines/index.html",
+            "status": "inaccessible_during_verification",
+            "usage": "No content extracted. Branch facts come only from application records."
+        },
+        "english": "Manually authored regression cases; no additional English dataset."
+    },
+    "cases": [
+        {
+            "id": "en-01",
+            "language": "en",
+            "question": "What are the specs of NVIDIA GeForce RTX 4060?",
+            "expected_category": "product",
+            "expected_intent": "product_details",
+            "vocabulary": [],
+            "expected_handling": "live_product_details",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-02",
+            "language": "en",
+            "question": "Show product details for NVIDIA GeForce RTX 4060.",
+            "expected_category": "product",
+            "expected_intent": "product_details",
+            "vocabulary": [],
+            "expected_handling": "live_product_details",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-03",
+            "language": "en",
+            "question": "What are the product specifications of NVIDIA GeForce RTX 4060?",
+            "expected_category": "product",
+            "expected_intent": "product_details",
+            "vocabulary": [],
+            "expected_handling": "live_product_details",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-04",
+            "language": "en",
+            "question": "How much is RTX 4060?",
+            "expected_category": "product",
+            "expected_intent": "product_price",
+            "vocabulary": [],
+            "expected_handling": "live_product_price",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-05",
+            "language": "en",
+            "question": "Price of NVIDIA GeForce RTX 4060?",
+            "expected_category": "product",
+            "expected_intent": "product_price",
+            "vocabulary": [],
+            "expected_handling": "live_product_price",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-06",
+            "language": "en",
+            "question": "What does RTX 4060 cost?",
+            "expected_category": "product",
+            "expected_intent": "product_price",
+            "vocabulary": [],
+            "expected_handling": "live_product_price",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-07",
+            "language": "en",
+            "question": "Is RTX 4060 available currently?",
+            "expected_category": "product",
+            "expected_intent": "product_stock",
+            "vocabulary": [],
+            "expected_handling": "live_product_stock",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-08",
+            "language": "en",
+            "question": "Do you have RTX 4060 in stock?",
+            "expected_category": "product",
+            "expected_intent": "product_stock",
+            "vocabulary": [],
+            "expected_handling": "live_product_stock",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-09",
+            "language": "en",
+            "question": "Stock of NVIDIA GeForce RTX 4060?",
+            "expected_category": "product",
+            "expected_intent": "product_stock",
+            "vocabulary": [],
+            "expected_handling": "live_product_stock",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-10",
+            "language": "en",
+            "question": "Is there stock currently?",
+            "expected_category": "product",
+            "expected_intent": "product_stock",
+            "vocabulary": [],
+            "expected_handling": "ask_product",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-11",
+            "language": "en",
+            "question": "Where is my order BF-000042?",
+            "expected_category": "order",
+            "expected_intent": "order_status",
+            "vocabulary": [],
+            "expected_handling": "owned_live_order",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-12",
+            "language": "en",
+            "question": "Order status BF-000042?",
+            "expected_category": "order",
+            "expected_intent": "order_status",
+            "vocabulary": [],
+            "expected_handling": "owned_live_order",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-13",
+            "language": "en",
+            "question": "Track my order BF-000042.",
+            "expected_category": "order",
+            "expected_intent": "order_status",
+            "vocabulary": [],
+            "expected_handling": "owned_live_order",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-14",
+            "language": "en",
+            "question": "Where is the Sagay store?",
+            "expected_category": "store",
+            "expected_intent": "store_location",
+            "vocabulary": [],
+            "expected_handling": "live_store_location",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-15",
+            "language": "en",
+            "question": "What are the Sagay branch opening hours?",
+            "expected_category": "store",
+            "expected_intent": "store_hours",
+            "vocabulary": [],
+            "expected_handling": "live_store_hours",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-16",
+            "language": "en",
+            "question": "What is the Sagay branch contact number?",
+            "expected_category": "store",
+            "expected_intent": "store_contact",
+            "vocabulary": [],
+            "expected_handling": "live_store_contact",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-17",
+            "language": "en",
+            "question": "How do I pay?",
+            "expected_category": "faq",
+            "expected_intent": "payment_methods",
+            "vocabulary": [],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-18",
+            "language": "en",
+            "question": "What payment methods can I use?",
+            "expected_category": "faq",
+            "expected_intent": "payment_methods",
+            "vocabulary": [],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-19",
+            "language": "en",
+            "question": "How much is the delivery fee?",
+            "expected_category": "faq",
+            "expected_intent": "delivery_quote",
+            "vocabulary": [],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-20",
+            "language": "en",
+            "question": "Do you offer pickup or delivery?",
+            "expected_category": "faq",
+            "expected_intent": "fulfillment",
+            "vocabulary": [],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-21",
+            "language": "en",
+            "question": "How do I return an item?",
+            "expected_category": "faq",
+            "expected_intent": "returns",
+            "vocabulary": [],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-22",
+            "language": "en",
+            "question": "How does refund processing work?",
+            "expected_category": "faq",
+            "expected_intent": "refunds",
+            "vocabulary": [],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-23",
+            "language": "en",
+            "question": "How do I cancel an order?",
+            "expected_category": "faq",
+            "expected_intent": "cancellation",
+            "vocabulary": [],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-24",
+            "language": "en",
+            "question": "What about it?",
+            "expected_category": "unsupported",
+            "expected_intent": "uncertain",
+            "vocabulary": [],
+            "expected_handling": "ask_details",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "en-25",
+            "language": "en",
+            "question": "Price of RTX 4060 and where is the Sagay store?",
+            "expected_category": "unsupported",
+            "expected_intent": "clarification",
+            "vocabulary": [],
+            "expected_handling": "ask_topic",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "not_applicable"
+            }
+        },
+        {
+            "id": "hil-01",
+            "language": "hil",
+            "question": "Specs sang NVIDIA GeForce RTX 4060?",
+            "expected_category": "product",
+            "expected_intent": "product_details",
+            "vocabulary": [],
+            "expected_handling": "live_product_details",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-02",
+            "language": "hil",
+            "question": "Product details sang NVIDIA GeForce RTX 4060?",
+            "expected_category": "product",
+            "expected_intent": "product_details",
+            "vocabulary": [],
+            "expected_handling": "live_product_details",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-03",
+            "language": "hil",
+            "question": "Product specs sang NVIDIA GeForce RTX 4060?",
+            "expected_category": "product",
+            "expected_intent": "product_details",
+            "vocabulary": [],
+            "expected_handling": "live_product_details",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-04",
+            "language": "hil",
+            "question": "Pila ang RTX 4060 subong?",
+            "expected_category": "product",
+            "expected_intent": "product_price",
+            "vocabulary": [
+                {
+                    "term": "subong",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Hiligaynon/words/sapa--suyak.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_price",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-05",
+            "language": "hil",
+            "question": "Pila sang NVIDIA GeForce RTX 4060?",
+            "expected_category": "product",
+            "expected_intent": "product_price",
+            "vocabulary": [],
+            "expected_handling": "live_product_price",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-06",
+            "language": "hil",
+            "question": "Price sang RTX 4060 subong?",
+            "expected_category": "product",
+            "expected_intent": "product_price",
+            "vocabulary": [
+                {
+                    "term": "subong",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Hiligaynon/words/sapa--suyak.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_price",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-07",
+            "language": "hil",
+            "question": "May stock kamo sang RTX 4060 subong?",
+            "expected_category": "product",
+            "expected_intent": "product_stock",
+            "vocabulary": [
+                {
+                    "term": "subong",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Hiligaynon/words/sapa--suyak.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_stock",
+            "source": {
+                "designation": "task_supplied",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-08",
+            "language": "hil",
+            "question": "May ara kamo RTX 4060 subong?",
+            "expected_category": "product",
+            "expected_intent": "product_stock",
+            "vocabulary": [
+                {
+                    "term": "subong",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Hiligaynon/words/sapa--suyak.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_stock",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-09",
+            "language": "hil",
+            "question": "Available ang NVIDIA GeForce RTX 4060 subong?",
+            "expected_category": "product",
+            "expected_intent": "product_stock",
+            "vocabulary": [
+                {
+                    "term": "subong",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Hiligaynon/words/sapa--suyak.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_stock",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-10",
+            "language": "hil",
+            "question": "May stock kamo subong?",
+            "expected_category": "product",
+            "expected_intent": "product_stock",
+            "vocabulary": [
+                {
+                    "term": "subong",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Hiligaynon/words/sapa--suyak.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "ask_product",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-11",
+            "language": "hil",
+            "question": "Diin na ang akon order BF-000042?",
+            "expected_category": "order",
+            "expected_intent": "order_status",
+            "vocabulary": [],
+            "expected_handling": "owned_live_order",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-12",
+            "language": "hil",
+            "question": "Status sang order BF-000042 subong?",
+            "expected_category": "order",
+            "expected_intent": "order_status",
+            "vocabulary": [
+                {
+                    "term": "subong",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Hiligaynon/words/sapa--suyak.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "owned_live_order",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-13",
+            "language": "hil",
+            "question": "Order tracking sang BF-000042?",
+            "expected_category": "order",
+            "expected_intent": "order_status",
+            "vocabulary": [],
+            "expected_handling": "owned_live_order",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-14",
+            "language": "hil",
+            "question": "Diin kamo dampi sa Sagay?",
+            "expected_category": "store",
+            "expected_intent": "store_location",
+            "vocabulary": [],
+            "expected_handling": "live_store_location",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-15",
+            "language": "hil",
+            "question": "Opening hours sang Sagay branch?",
+            "expected_category": "store",
+            "expected_intent": "store_hours",
+            "vocabulary": [],
+            "expected_handling": "live_store_hours",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-16",
+            "language": "hil",
+            "question": "Contact number sang Sagay branch?",
+            "expected_category": "store",
+            "expected_intent": "store_contact",
+            "vocabulary": [],
+            "expected_handling": "live_store_contact",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-17",
+            "language": "hil",
+            "question": "Paano bala magbayad?",
+            "expected_category": "faq",
+            "expected_intent": "payment_methods",
+            "vocabulary": [],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-18",
+            "language": "hil",
+            "question": "Payment methods subong?",
+            "expected_category": "faq",
+            "expected_intent": "payment_methods",
+            "vocabulary": [
+                {
+                    "term": "subong",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Hiligaynon/words/sapa--suyak.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-19",
+            "language": "hil",
+            "question": "Pila ang delivery fee subong?",
+            "expected_category": "faq",
+            "expected_intent": "delivery_quote",
+            "vocabulary": [
+                {
+                    "term": "subong",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Hiligaynon/words/sapa--suyak.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-20",
+            "language": "hil",
+            "question": "Pickup or delivery subong?",
+            "expected_category": "faq",
+            "expected_intent": "fulfillment",
+            "vocabulary": [
+                {
+                    "term": "subong",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Hiligaynon/words/sapa--suyak.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-21",
+            "language": "hil",
+            "question": "Mahimo ibalik ang item?",
+            "expected_category": "faq",
+            "expected_intent": "returns",
+            "vocabulary": [],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-22",
+            "language": "hil",
+            "question": "Refund processing subong?",
+            "expected_category": "faq",
+            "expected_intent": "refunds",
+            "vocabulary": [
+                {
+                    "term": "subong",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Hiligaynon/words/sapa--suyak.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-23",
+            "language": "hil",
+            "question": "Mahimo i-cancel ang order?",
+            "expected_category": "faq",
+            "expected_intent": "cancellation",
+            "vocabulary": [],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-24",
+            "language": "hil",
+            "question": "Subong?",
+            "expected_category": "unsupported",
+            "expected_intent": "uncertain",
+            "vocabulary": [
+                {
+                    "term": "subong",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Hiligaynon/words/sapa--suyak.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "ask_details",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "hil-25",
+            "language": "hil",
+            "question": "Pila ang RTX 4060 kag diin kamo dampi sa Sagay?",
+            "expected_category": "unsupported",
+            "expected_intent": "clarification",
+            "vocabulary": [],
+            "expected_handling": "ask_topic",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-01",
+            "language": "ceb",
+            "question": "Specs sa NVIDIA GeForce RTX 4060 karon?",
+            "expected_category": "product",
+            "expected_intent": "product_details",
+            "vocabulary": [
+                {
+                    "term": "karon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Cebuano/meaning/k/ka/karon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_details",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-02",
+            "language": "ceb",
+            "question": "Product details sa NVIDIA GeForce RTX 4060 karon?",
+            "expected_category": "product",
+            "expected_intent": "product_details",
+            "vocabulary": [
+                {
+                    "term": "karon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Cebuano/meaning/k/ka/karon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_details",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-03",
+            "language": "ceb",
+            "question": "Product specs sa NVIDIA GeForce RTX 4060 karon?",
+            "expected_category": "product",
+            "expected_intent": "product_details",
+            "vocabulary": [
+                {
+                    "term": "karon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Cebuano/meaning/k/ka/karon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_details",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-04",
+            "language": "ceb",
+            "question": "Tagpila ang RTX 4060 karon?",
+            "expected_category": "product",
+            "expected_intent": "product_price",
+            "vocabulary": [
+                {
+                    "term": "karon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Cebuano/meaning/k/ka/karon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_price",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-05",
+            "language": "ceb",
+            "question": "Pila ang NVIDIA GeForce RTX 4060 karon?",
+            "expected_category": "product",
+            "expected_intent": "product_price",
+            "vocabulary": [
+                {
+                    "term": "karon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Cebuano/meaning/k/ka/karon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_price",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-06",
+            "language": "ceb",
+            "question": "Price sa RTX 4060 karon?",
+            "expected_category": "product",
+            "expected_intent": "product_price",
+            "vocabulary": [
+                {
+                    "term": "karon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Cebuano/meaning/k/ka/karon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_price",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-07",
+            "language": "ceb",
+            "question": "Naa pa moy RTX 4060 karon?",
+            "expected_category": "product",
+            "expected_intent": "product_stock",
+            "vocabulary": [
+                {
+                    "term": "karon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Cebuano/meaning/k/ka/karon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_stock",
+            "source": {
+                "designation": "task_supplied",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-08",
+            "language": "ceb",
+            "question": "Naa moy RTX 4060?",
+            "expected_category": "product",
+            "expected_intent": "product_stock",
+            "vocabulary": [],
+            "expected_handling": "live_product_stock",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-09",
+            "language": "ceb",
+            "question": "Available ang NVIDIA GeForce RTX 4060 karon?",
+            "expected_category": "product",
+            "expected_intent": "product_stock",
+            "vocabulary": [
+                {
+                    "term": "karon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Cebuano/meaning/k/ka/karon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_stock",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-10",
+            "language": "ceb",
+            "question": "Naa pa ba karon?",
+            "expected_category": "product",
+            "expected_intent": "product_stock",
+            "vocabulary": [
+                {
+                    "term": "karon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Cebuano/meaning/k/ka/karon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "ask_product",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-11",
+            "language": "ceb",
+            "question": "Asa na ang akong order BF-000042?",
+            "expected_category": "order",
+            "expected_intent": "order_status",
+            "vocabulary": [],
+            "expected_handling": "owned_live_order",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-12",
+            "language": "ceb",
+            "question": "Order status BF-000042 karon?",
+            "expected_category": "order",
+            "expected_intent": "order_status",
+            "vocabulary": [
+                {
+                    "term": "karon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Cebuano/meaning/k/ka/karon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "owned_live_order",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-13",
+            "language": "ceb",
+            "question": "Track ang akong order BF-000042.",
+            "expected_category": "order",
+            "expected_intent": "order_status",
+            "vocabulary": [],
+            "expected_handling": "owned_live_order",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-14",
+            "language": "ceb",
+            "question": "Asa inyong tindahan sa Sagay?",
+            "expected_category": "store",
+            "expected_intent": "store_location",
+            "vocabulary": [],
+            "expected_handling": "live_store_location",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-15",
+            "language": "ceb",
+            "question": "Opening hours sa Sagay branch karon?",
+            "expected_category": "store",
+            "expected_intent": "store_hours",
+            "vocabulary": [
+                {
+                    "term": "karon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Cebuano/meaning/k/ka/karon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_store_hours",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-16",
+            "language": "ceb",
+            "question": "Unsa inyong contact number sa Sagay branch?",
+            "expected_category": "store",
+            "expected_intent": "store_contact",
+            "vocabulary": [],
+            "expected_handling": "live_store_contact",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-17",
+            "language": "ceb",
+            "question": "Unsaon pagbayad?",
+            "expected_category": "faq",
+            "expected_intent": "payment_methods",
+            "vocabulary": [],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-18",
+            "language": "ceb",
+            "question": "Payment methods karon?",
+            "expected_category": "faq",
+            "expected_intent": "payment_methods",
+            "vocabulary": [
+                {
+                    "term": "karon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Cebuano/meaning/k/ka/karon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-19",
+            "language": "ceb",
+            "question": "Tagpila ang delivery fee karon?",
+            "expected_category": "faq",
+            "expected_intent": "delivery_quote",
+            "vocabulary": [
+                {
+                    "term": "karon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Cebuano/meaning/k/ka/karon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-20",
+            "language": "ceb",
+            "question": "Pickup or delivery karon?",
+            "expected_category": "faq",
+            "expected_intent": "fulfillment",
+            "vocabulary": [
+                {
+                    "term": "karon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Cebuano/meaning/k/ka/karon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-21",
+            "language": "ceb",
+            "question": "Pwede ibalik ang item?",
+            "expected_category": "faq",
+            "expected_intent": "returns",
+            "vocabulary": [],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-22",
+            "language": "ceb",
+            "question": "Refund processing karon?",
+            "expected_category": "faq",
+            "expected_intent": "refunds",
+            "vocabulary": [
+                {
+                    "term": "karon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Cebuano/meaning/k/ka/karon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-23",
+            "language": "ceb",
+            "question": "Unsaon i cancel ang order?",
+            "expected_category": "faq",
+            "expected_intent": "cancellation",
+            "vocabulary": [],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-24",
+            "language": "ceb",
+            "question": "Karon?",
+            "expected_category": "unsupported",
+            "expected_intent": "uncertain",
+            "vocabulary": [
+                {
+                    "term": "karon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Cebuano/meaning/k/ka/karon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "ask_details",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "ceb-25",
+            "language": "ceb",
+            "question": "Tagpila ang RTX 4060 ug asa inyong tindahan sa Sagay?",
+            "expected_category": "unsupported",
+            "expected_intent": "clarification",
+            "vocabulary": [],
+            "expected_handling": "ask_topic",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-01",
+            "language": "tl",
+            "question": "Specs ng NVIDIA GeForce RTX 4060 ngayon?",
+            "expected_category": "product",
+            "expected_intent": "product_details",
+            "vocabulary": [
+                {
+                    "term": "ngayon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Tagalog/meaning/n/ng/ngayon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_details",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-02",
+            "language": "tl",
+            "question": "Product details ng NVIDIA GeForce RTX 4060 ngayon?",
+            "expected_category": "product",
+            "expected_intent": "product_details",
+            "vocabulary": [
+                {
+                    "term": "ngayon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Tagalog/meaning/n/ng/ngayon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_details",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-03",
+            "language": "tl",
+            "question": "Product specs ng NVIDIA GeForce RTX 4060 ngayon?",
+            "expected_category": "product",
+            "expected_intent": "product_details",
+            "vocabulary": [
+                {
+                    "term": "ngayon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Tagalog/meaning/n/ng/ngayon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_details",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-04",
+            "language": "tl",
+            "question": "Magkano ang RTX 4060 ngayon?",
+            "expected_category": "product",
+            "expected_intent": "product_price",
+            "vocabulary": [
+                {
+                    "term": "ngayon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Tagalog/meaning/n/ng/ngayon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_price",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-05",
+            "language": "tl",
+            "question": "Magkano po ang NVIDIA GeForce RTX 4060?",
+            "expected_category": "product",
+            "expected_intent": "product_price",
+            "vocabulary": [],
+            "expected_handling": "live_product_price",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-06",
+            "language": "tl",
+            "question": "Price ng RTX 4060 ngayon?",
+            "expected_category": "product",
+            "expected_intent": "product_price",
+            "vocabulary": [
+                {
+                    "term": "ngayon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Tagalog/meaning/n/ng/ngayon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_price",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-07",
+            "language": "tl",
+            "question": "Available pa ba ang RTX 4060 ngayon?",
+            "expected_category": "product",
+            "expected_intent": "product_stock",
+            "vocabulary": [
+                {
+                    "term": "ngayon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Tagalog/meaning/n/ng/ngayon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_stock",
+            "source": {
+                "designation": "task_supplied",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-08",
+            "language": "tl",
+            "question": "Meron ba kayong RTX 4060 ngayon?",
+            "expected_category": "product",
+            "expected_intent": "product_stock",
+            "vocabulary": [
+                {
+                    "term": "ngayon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Tagalog/meaning/n/ng/ngayon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_stock",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-09",
+            "language": "tl",
+            "question": "May stock ba ng NVIDIA GeForce RTX 4060 ngayon?",
+            "expected_category": "product",
+            "expected_intent": "product_stock",
+            "vocabulary": [
+                {
+                    "term": "ngayon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Tagalog/meaning/n/ng/ngayon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_product_stock",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-10",
+            "language": "tl",
+            "question": "May stock ba ngayon?",
+            "expected_category": "product",
+            "expected_intent": "product_stock",
+            "vocabulary": [
+                {
+                    "term": "ngayon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Tagalog/meaning/n/ng/ngayon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "ask_product",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-11",
+            "language": "tl",
+            "question": "Nasaan na ang order ko BF-000042?",
+            "expected_category": "order",
+            "expected_intent": "order_status",
+            "vocabulary": [],
+            "expected_handling": "owned_live_order",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-12",
+            "language": "tl",
+            "question": "Order status BF-000042 ngayon?",
+            "expected_category": "order",
+            "expected_intent": "order_status",
+            "vocabulary": [
+                {
+                    "term": "ngayon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Tagalog/meaning/n/ng/ngayon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "owned_live_order",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-13",
+            "language": "tl",
+            "question": "Track ang order ko BF-000042.",
+            "expected_category": "order",
+            "expected_intent": "order_status",
+            "vocabulary": [],
+            "expected_handling": "owned_live_order",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-14",
+            "language": "tl",
+            "question": "Saan kayo located sa Sagay?",
+            "expected_category": "store",
+            "expected_intent": "store_location",
+            "vocabulary": [],
+            "expected_handling": "live_store_location",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-15",
+            "language": "tl",
+            "question": "Opening hours ng Sagay branch ngayon?",
+            "expected_category": "store",
+            "expected_intent": "store_hours",
+            "vocabulary": [
+                {
+                    "term": "ngayon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Tagalog/meaning/n/ng/ngayon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_store_hours",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-16",
+            "language": "tl",
+            "question": "Contact number ng Sagay branch ngayon?",
+            "expected_category": "store",
+            "expected_intent": "store_contact",
+            "vocabulary": [
+                {
+                    "term": "ngayon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Tagalog/meaning/n/ng/ngayon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "live_store_contact",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-17",
+            "language": "tl",
+            "question": "Paano magbayad?",
+            "expected_category": "faq",
+            "expected_intent": "payment_methods",
+            "vocabulary": [],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-18",
+            "language": "tl",
+            "question": "Payment methods ngayon?",
+            "expected_category": "faq",
+            "expected_intent": "payment_methods",
+            "vocabulary": [
+                {
+                    "term": "ngayon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Tagalog/meaning/n/ng/ngayon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-19",
+            "language": "tl",
+            "question": "Magkano ang delivery fee ngayon?",
+            "expected_category": "faq",
+            "expected_intent": "delivery_quote",
+            "vocabulary": [
+                {
+                    "term": "ngayon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Tagalog/meaning/n/ng/ngayon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-20",
+            "language": "tl",
+            "question": "Pickup or delivery ngayon?",
+            "expected_category": "faq",
+            "expected_intent": "fulfillment",
+            "vocabulary": [
+                {
+                    "term": "ngayon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Tagalog/meaning/n/ng/ngayon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-21",
+            "language": "tl",
+            "question": "Pwede bang ibalik ang item?",
+            "expected_category": "faq",
+            "expected_intent": "returns",
+            "vocabulary": [],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-22",
+            "language": "tl",
+            "question": "Refund processing ngayon?",
+            "expected_category": "faq",
+            "expected_intent": "refunds",
+            "vocabulary": [
+                {
+                    "term": "ngayon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Tagalog/meaning/n/ng/ngayon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-23",
+            "language": "tl",
+            "question": "Paano i-cancel ang order?",
+            "expected_category": "faq",
+            "expected_intent": "cancellation",
+            "vocabulary": [],
+            "expected_handling": "authoritative_guidance",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-24",
+            "language": "tl",
+            "question": "Ngayon?",
+            "expected_category": "unsupported",
+            "expected_intent": "uncertain",
+            "vocabulary": [
+                {
+                    "term": "ngayon",
+                    "meaning": "current time",
+                    "source": "https://kaikki.org/dictionary/Tagalog/meaning/n/ng/ngayon.html",
+                    "verification": "dictionary_verified"
+                }
+            ],
+            "expected_handling": "ask_details",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        },
+        {
+            "id": "tl-25",
+            "language": "tl",
+            "question": "Magkano ang RTX 4060 at saka saan kayo located sa Sagay?",
+            "expected_category": "unsupported",
+            "expected_intent": "clarification",
+            "vocabulary": [],
+            "expected_handling": "ask_topic",
+            "source": {
+                "designation": "manually_authored",
+                "note": "Customer sentence is not a dictionary quotation."
+            },
+            "review_status": {
+                "technical": "reviewed",
+                "native_speaker": "pending"
+            }
+        }
+    ]
+}

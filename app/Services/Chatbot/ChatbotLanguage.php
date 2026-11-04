@@ -10,6 +10,7 @@ class ChatbotLanguage
 
     /** Phrase aliases affect matching only; original messages remain available to entity resolvers. */
     private const ALIASES = [
+        '(?<![\p{L}\p{N}_-])(?:subong|karon|ngayon)(?![\p{L}\p{N}_-])' => 'currently',
         '\b(?:what would (?:that|this|it) set me back|what does (?:it|that) cost|how much is (?:it|that))\b' => 'price it',
         '\b(?:paano (?:ko )?(?:makikita|tingnan|i check)|diin (?:ko )?makita|asa (?:nako )?makita) (?:ang )?(?:akon |akong |aking |my )?order (?:history|status)\b' => 'how can i check my order status',
         '\b(?:paano|unsaon) (?:mag search|maghanap|mangita) (?:ng |ug |sang )?(?:products|produkto)\b' => 'how do i search for products',
@@ -69,6 +70,11 @@ class ChatbotLanguage
         return Str::of($this->canonical($message))->lower()->replaceMatches('/[^\p{L}\p{N}\s]+/u', ' ')->squish()->toString();
     }
 
+    public function isTemporalOnly(string $message): bool
+    {
+        return preg_match('/^(?:subong|karon|ngayon)[.!?]*$/iu', trim($this->withoutLanguageRequest($message))) === 1;
+    }
+
     public function explicit(string $message): ?string
     {
         if (preg_match('/\b(?:answer|reply|respond|speak|use|in|sabat|tubag|sagot|sumagot)(?:\s+(?:in|sa|lang|using))?\s+(english|hiligaynon|ilonggo|bisaya|cebuano|tagalog|filipino)\b/iu', $message, $matches) !== 1) {
@@ -91,8 +97,9 @@ class ChatbotLanguage
     public function detect(string $message): ?string
     {
         $matches = [];
-        foreach (['hil' => 'may ara|diin|kag|sang|akon|sini', 'ceb' => 'naa|moy|asa|unsa|unsaon|akong|nako|inyong|kana', 'tl' => 'magkano|paano|nasaan|meron|mayroon|aking|kayong|niyan|po'] as $language => $words) {
-            if (preg_match('/\b(?:'.$words.')\b/iu', $message) === 1) {
+        foreach (['hil' => ['may ara|diin|kag|sang|akon|sini', 'subong'], 'ceb' => ['naa|moy|asa|unsa|unsaon|akong|nako|inyong|kana', 'karon'], 'tl' => ['magkano|paano|nasaan|meron|mayroon|aking|kayong|niyan|po', 'ngayon']] as $language => [$words, $temporal]) {
+            if (preg_match('/\b(?:'.$words.')\b/iu', $message) === 1
+                || preg_match('/(?<![\p{L}\p{N}_-])'.$temporal.'(?![\p{L}\p{N}_-])/iu', $message) === 1) {
                 $matches[] = $language;
             }
         }

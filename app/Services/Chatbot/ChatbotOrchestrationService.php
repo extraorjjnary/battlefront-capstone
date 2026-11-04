@@ -85,6 +85,9 @@ class ChatbotOrchestrationService
         }
 
         if ($category === ChatbotQueryCategory::Unsupported) {
+            if ($this->language->isTemporalOnly($message)) {
+                return $this->fallback($category, 'Please tell me which product, branch, order or support question you would like help with.');
+            }
             if ((new CategorizeChatbotQuery)->isBlocked($message) || ! $this->language->classifierCandidate($message)) {
                 return $this->fallback($category, self::UNSUPPORTED_INQUIRY);
             }

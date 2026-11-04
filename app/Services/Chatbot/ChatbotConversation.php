@@ -124,6 +124,7 @@ class ChatbotConversation
         }
 
         $matchingMessage = $this->language->canonical($message);
+        $matchingMessage = Str::squish(preg_replace('/\s+currently(?=[?!.]*$)/iu', '', $matchingMessage) ?? $matchingMessage);
         $isFollowUp = preg_match('/\b(?:it|its|that|this|there|earlier|previous)\b|^(?:how much|and the)\b|^(?:price|available)\s*[?!.]*$/iu', $matchingMessage) === 1;
         $shortTopic = match (true) {
             preg_match('/^(?:stock|availability|specs|specifications|details|description)[?!.]*$/iu', $matchingMessage) === 1 => 'product',
