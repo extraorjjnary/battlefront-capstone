@@ -181,27 +181,34 @@ test('seeded monthly coverage matches selected imported product quantities', fun
     ['10468', 175], ['10121', 155], ['10986', 108], ['10214', 64], ['10350', 80], ['10463', 175], ['28909657', 164],
 ]);
 
-test('only explicit reseeding advances the development coverage at quarter rollover', function () {
+test('only explicit reseeding advances the development coverage at month rollover', function (string $reference, string $nextReference, string $previousEnd, string $start, string $end) {
+    $this->travelTo(CarbonImmutable::parse($reference, 'UTC'));
     HistoricalSalesCatalogFixtures::createProducts();
     $disk = Storage::fake('local');
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
     $path = config('forecasting.development_manifest');
     $before = $disk->get($path);
+    $salesBefore = Sale::count();
     $repository = app(SalesHistoryCoverageRepository::class);
-    $this->travelTo(CarbonImmutable::parse('2026-12-15'));
-    $this->seed(DevelopmentHistoricalSalesSeeder::class);
-    expect($disk->get($path))->toBe($before);
 
-    $this->travelTo(CarbonImmutable::parse('2027-01-15'));
-    expect($repository->forProductCode('10003')['end_exclusive'])->toBe('2026-10-01');
+    $this->travelTo(CarbonImmutable::parse($nextReference, 'UTC'));
+
+    expect($repository->forProductCode('10003')['end_exclusive'])->toBe($previousEnd);
     expect($disk->get($path))->toBe($before);
+    expect(Sale::count())->toBe($salesBefore);
+
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
+
     $entry = $repository->forProductCode('10003');
-    expect($entry['start'])->toBe('2023-01-01');
-    expect($entry['end_exclusive'])->toBe('2027-01-01');
-    expect(Sale::count())->toBeBetween(150, 300);
+    expect($entry['start'])->toBe($start);
+    expect($entry['end_exclusive'])->toBe($end);
+    expect(Sale::count())->toBeGreaterThan($salesBefore);
     expect(config('forecasting.operational_coverage'))->toBe([]);
-});
+})->with([
+    'October to November' => ['2026-10-15', '2026-11-04', '2026-10-01', '2022-11-01', '2026-11-01'],
+    'November to December' => ['2026-11-15', '2026-12-01', '2026-11-01', '2022-12-01', '2026-12-01'],
+    'December to January' => ['2026-12-15', '2027-01-01', '2026-12-01', '2023-01-01', '2027-01-01'],
+]);
 
 test('failed fixture preparation invalidates old coverage and rolls back record changes', function () {
     HistoricalSalesCatalogFixtures::createProducts();

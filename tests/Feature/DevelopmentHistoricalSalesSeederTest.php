@@ -10,12 +10,14 @@ use App\Enums\ShipmentStatus;
 use App\Enums\ShippingProfile;
 use App\Enums\UserRole;
 use App\Models\CartItem;
+use App\Models\Forecast;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\Sale;
 use App\Models\User;
 use App\Repositories\Catalog\ProductCatalogRepository;
+use App\Repositories\Reporting\SalesHistoryCoverageRepository;
 use App\Services\Cart\CartService;
 use App\Services\Order\DeliveryRules;
 use App\Services\Order\OrderPlacementService;
@@ -291,7 +293,7 @@ test('repeated seeding preserves snapshots and unrelated transactions even on se
     $products['10003']->inventory->update(['quantity' => 1, 'reorder_level' => 2]);
     $before = historicalSalesDatabaseSnapshot();
     $coverageBefore = Storage::disk('local')->get(config('forecasting.development_manifest'));
-    $this->travelTo(CarbonImmutable::parse('2026-12-15 12:00:00', 'UTC'));
+    $this->travelTo(CarbonImmutable::parse('2026-10-25 12:00:00', 'UTC'));
 
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
 
@@ -504,7 +506,7 @@ test('historical seeding is available in local and snapshots existing effective 
     'zero price' => ['0.00', null, '0.00'],
 ]);
 
-test('history includes only completed months before the quarter in the application timezone', function (string $reference, string $timezone, string $start, string $end) {
+test('history includes only completed months before the current month in the application timezone', function (string $reference, string $timezone, string $start, string $end) {
     HistoricalSalesCatalogFixtures::createProducts();
     config(['app.timezone' => $timezone]);
     $this->travelTo(CarbonImmutable::parse($reference, 'UTC'));
@@ -516,18 +518,31 @@ test('history includes only completed months before the quarter in the applicati
     expect($dates->last()->format('Y-m'))->toBe($end);
     expect($dates->map(fn ($date) => $date->format('Y-m'))->unique())->toHaveCount(48);
     expect($dates->count())->toBeBetween(150, 300);
-    expect(Sale::whereDate('sale_date', '>=', now($timezone)->startOfQuarter()->toDateString())->exists())->toBeFalse();
+    expect(Sale::whereDate('sale_date', '>=', now($timezone)->startOfMonth()->toDateString())->exists())->toBeFalse();
+    $coverage = app(SalesHistoryCoverageRepository::class)->forProductCode('10003');
+    expect($coverage['start'])->toBe($start.'-01');
+    expect($coverage['end_exclusive'])->toBe(CarbonImmutable::parse($end.'-01', $timezone)->addMonth()->toDateString());
 })->with([
-    'before quarter closes' => ['2026-09-30 23:59:59', 'UTC', '2022-07', '2026-06'],
-    'quarter closes' => ['2026-10-01 00:00:00', 'UTC', '2022-10', '2026-09'],
+    'before October' => ['2026-09-30 23:59:59', 'UTC', '2022-09', '2026-08'],
+    'October begins' => ['2026-10-01 00:00:00', 'UTC', '2022-10', '2026-09'],
+    'before November' => ['2026-10-31 23:59:59', 'UTC', '2022-10', '2026-09'],
+    'November begins' => ['2026-11-01 00:00:00', 'UTC', '2022-11', '2026-10'],
+    'before December' => ['2026-11-30 23:59:59', 'UTC', '2022-11', '2026-10'],
+    'December begins' => ['2026-12-01 00:00:00', 'UTC', '2022-12', '2026-11'],
     'new year' => ['2027-01-01 00:00:00', 'UTC', '2023-01', '2026-12'],
-    'leap quarter' => ['2024-04-01 00:00:00', 'UTC', '2020-04', '2024-03'],
+    'during leap February' => ['2024-02-29 12:00:00', 'UTC', '2020-02', '2024-01'],
+    'after leap February' => ['2024-03-01 00:00:00', 'UTC', '2020-03', '2024-02'],
     'application ahead of UTC' => ['2026-09-30 16:00:00', 'Asia/Shanghai', '2022-10', '2026-09'],
+    'before local November' => ['2026-10-31 15:59:59', 'Asia/Manila', '2022-10', '2026-09'],
+    'local November begins' => ['2026-10-31 16:00:00', 'Asia/Manila', '2022-11', '2026-10'],
 ]);
 
-test('quarter rollover retains every existing record while preparing only the requested history window', function (string $nextReference, string $expectedStart, string $expectedEnd) {
+test('month rollover retains every existing record while preparing only the requested history window', function (string $reference, string $nextReference, string $expectedStart, string $expectedEnd) {
+    $this->travelTo(CarbonImmutable::parse($reference, 'UTC'));
     $products = HistoricalSalesCatalogFixtures::createProducts();
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $forecast = Forecast::factory()->for($products['10003'])->create();
+    $forecastBefore = $forecast->refresh()->getAttributes();
     $customer = User::where('email', 'demo.customer01@example.test')->sole();
     $unrelatedSale = Sale::factory()->for(Order::factory()->for($customer)->state(['recipient_name' => 'Unrelated customer order', 'created_at' => '2025-02-10 12:30:00']))->create();
     OrderItem::factory()->for($unrelatedSale->order)->for($products['10003'])->create();
@@ -535,7 +550,8 @@ test('quarter rollover retains every existing record while preparing only the re
     $originals = Order::with(['items', 'sale', 'shipment'])->whereNotNull('development_fixture_key')->get()->keyBy('development_fixture_key');
     $inventoryBefore = DB::table('inventories')->orderBy('id')->get()->all();
     $catalogBefore = DB::table('products')->orderBy('id')->get()->all();
-    $this->travelTo(CarbonImmutable::parse($nextReference));
+    $customersBefore = DB::table('users')->orderBy('id')->get()->all();
+    $this->travelTo(CarbonImmutable::parse($nextReference, 'UTC'));
 
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
 
@@ -546,6 +562,7 @@ test('quarter rollover retains every existing record while preparing only the re
     expect($sales->last()->sale_date->format('Y-m'))->toBe($expectedEnd);
     $orders = Order::with(['items', 'sale', 'shipment'])->whereNotNull('development_fixture_key')->get()->keyBy('development_fixture_key');
     expect($orders->flatMap->items->count())->toBeGreaterThan(720);
+    expect($orders->count())->toBeGreaterThan($originals->count());
     foreach ($originals as $key => $original) {
         expect($orders->has($key))->toBeTrue();
         expect($orders[$key]->toArray())->toBe($original->toArray());
@@ -556,13 +573,18 @@ test('quarter rollover retains every existing record while preparing only the re
     expect($unrelatedSale->fresh()->load('order.items')->toArray())->toBe($unrelated);
     expect(DB::table('inventories')->orderBy('id')->get()->all())->toEqual($inventoryBefore);
     expect(DB::table('products')->orderBy('id')->get()->all())->toEqual($catalogBefore);
+    expect(DB::table('users')->orderBy('id')->get()->all())->toEqual($customersBefore);
+    expect($forecast->refresh()->getAttributes())->toBe($forecastBefore);
     $snapshot = historicalSalesDatabaseSnapshot();
     $this->seed(DevelopmentHistoricalSalesSeeder::class);
     expect(historicalSalesDatabaseSnapshot())->toEqual($snapshot);
 })->with([
-    'next quarter' => ['2027-01-15', '2023-01', '2026-12'],
-    'beyond entire window' => ['2031-04-15', '2027-04', '2031-03'],
-    'backward reference' => ['2025-04-15', '2021-04', '2025-03'],
+    'October to November' => ['2026-10-15', '2026-11-04', '2022-11', '2026-10'],
+    'November to December' => ['2026-11-15', '2026-12-01', '2022-12', '2026-11'],
+    'December to January' => ['2026-12-15', '2027-01-01', '2023-01', '2026-12'],
+    'next quarter' => ['2026-10-15', '2027-01-15', '2023-01', '2026-12'],
+    'beyond entire window' => ['2026-10-15', '2031-04-15', '2027-04', '2031-03'],
+    'backward reference' => ['2026-10-15', '2025-04-15', '2021-04', '2025-03'],
 ]);
 
 test('customer assignment follows calendar identities rather than database creation order', function () {

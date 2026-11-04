@@ -438,6 +438,54 @@ test('imported products with development history show synthetic scope and target
     $this->assertDatabaseHas('forecasts', ['product_id' => $product->id, 'method' => 'additive_holt_winters', 'predicted_demand' => '7.10']);
 });
 
+test('monthly development preparation restores forecast discovery and generation after rollover', function (string $reference, string $nextReference, string $sourceStart, string $targetStart, string $targetEnd, array $targetMonths, string $period) {
+    $this->travelTo(CarbonImmutable::parse($reference, 'UTC'));
+    $products = HistoricalSalesCatalogFixtures::createProducts();
+    Product::factory()->create();
+    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+    $product = $products['10003'];
+    $expectedIds = collect($products)->pluck('id')->sort()->values()->all();
+    $this->actingAs(User::factory()->administrator()->create())
+        ->get(route('administration.forecasting.index'))
+        ->assertInertia(fn (Assert $page) => $page->where('products.total', 15));
+    $this->travelTo(CarbonImmutable::parse($nextReference, 'UTC'));
+
+    $this->get(route('administration.forecasting.index', ['product_id' => $product->id]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('products.total', 0)
+            ->where('readiness.status', 'history_unavailable'));
+    $this->post(route('administration.forecasting.store'), forecastingInput($product))
+        ->assertInertiaFlash('forecast_result.status', 'history_unavailable');
+    $this->assertDatabaseCount('forecasts', 0);
+
+    $this->seed(DevelopmentHistoricalSalesSeeder::class);
+
+    $this->get(route('administration.forecasting.index', ['product_id' => $product->id]))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('products.total', 15)
+            ->where('products.data', fn ($rows): bool => collect($rows)->pluck('id')->sort()->values()->all() === $expectedIds)
+            ->where('readiness.status', 'ready')
+            ->where('readiness.covered_months', 36)
+            ->where('readiness.source_period', ['start' => $sourceStart, 'end_exclusive' => $targetStart])
+            ->where('readiness.target_period', ['start' => $targetStart, 'end_exclusive' => $targetEnd])
+            ->where('readiness.is_synthetic', true)
+            ->where('readiness.sales_scope', 'development_fixture_transactions'));
+    $this->post(route('administration.forecasting.store'), forecastingInput($product))
+        ->assertInertiaFlash('forecast_result.status', 'ready')
+        ->assertInertiaFlash('forecast_result.method', 'additive_holt_winters')
+        ->assertInertiaFlash('forecast_result.monthly_forecasts.0.start', $targetMonths[0])
+        ->assertInertiaFlash('forecast_result.monthly_forecasts.1.start', $targetMonths[1])
+        ->assertInertiaFlash('forecast_result.monthly_forecasts.2.start', $targetMonths[2]);
+    $this->assertDatabaseCount('forecasts', 1);
+    $this->assertDatabaseHas('forecasts', [
+        'product_id' => $product->id, 'method' => 'additive_holt_winters', 'forecast_quarter' => $period,
+    ]);
+})->with([
+    'October to November' => ['2026-10-15', '2026-11-04', '2023-11-01', '2026-11-01', '2027-02-01', ['2026-11-01', '2026-12-01', '2027-01-01'], '2026-11/2027-01'],
+    'November to December' => ['2026-11-15', '2026-12-01', '2023-12-01', '2026-12-01', '2027-03-01', ['2026-12-01', '2027-01-01', '2027-02-01'], '2026-12/2027-02'],
+    'December to January' => ['2026-12-15', '2027-01-01', '2024-01-01', '2027-01-01', '2027-04-01', ['2027-01-01', '2027-02-01', '2027-03-01'], '2027-01/2027-03'],
+]);
+
 test('monthly display rounding never replaces the finalized quarterly total', function () {
     $product = Product::factory()->create();
     forecastingCoverage($product);
