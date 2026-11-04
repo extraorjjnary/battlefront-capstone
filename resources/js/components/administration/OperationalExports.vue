@@ -47,7 +47,12 @@ const url = (format) =>
                 </select>
             </label>
             <Button variant="outline" as-child>
-                <a :href="url('print')" target="_blank" rel="noopener noreferrer">Print</a>
+                <a
+                    :href="url('print')"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    >Print</a
+                >
             </Button>
             <Button variant="outline" as-child
                 ><a :href="url('csv')">Export CSV</a></Button
@@ -70,7 +75,9 @@ const url = (format) =>
             }}
         </p>
         <p class="text-muted-foreground text-sm">
-            CSV includes all matching records across pages. PDF and print support up to 500 records; narrow your filters for larger selections.
+            CSV includes all matching records across pages. PDF and print
+            support up to 500 records; narrow your filters for larger
+            selections.
         </p>
         <InputError :message="page.props.errors?.export" />
         <p

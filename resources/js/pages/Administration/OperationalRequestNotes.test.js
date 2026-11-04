@@ -403,48 +403,88 @@ for (const [pageName, controller, method, id] of [
 
 test('supplier selection narrows available products to saved links and resets the product picker', async (t) => {
     const products = [
-        { id: 10, product_code: '10035', name: 'Memory', available_quantity: 5 },
-        { id: 20, product_code: '40705128', name: 'Keyboard', available_quantity: 4 },
+        {
+            id: 10,
+            product_code: '10035',
+            name: 'Memory',
+            available_quantity: 5,
+        },
+        {
+            id: 20,
+            product_code: '40705128',
+            name: 'Keyboard',
+            available_quantity: 4,
+        },
     ];
     const app = harness(t, 'SupplierReturns', {
         products,
-        suppliers: [{ id: 1, name: 'Components' }, { id: 2, name: 'Peripherals' }],
-        supplier_product_links: [{ supplier_id: 1, product_id: 10 }, { supplier_id: 2, product_id: 20 }],
+        suppliers: [
+            { id: 1, name: 'Components' },
+            { id: 2, name: 'Peripherals' },
+        ],
+        supplier_product_links: [
+            { supplier_id: 1, product_id: 10 },
+            { supplier_id: 2, product_id: 20 },
+        ],
     });
     await app.html();
     const form = () => app.form('SupplierReturn', 'store');
-    const picker = () => findNode(form(), (node) => node.props?.id === 'return-product');
+    const picker = () =>
+        findNode(form(), (node) => node.props?.id === 'return-product');
     assert.equal(picker().props.disabled, true);
     assert.deepEqual(picker().props.products, []);
 
     field(form(), 'supplier_id').props['onUpdate:modelValue']('1');
     await app.html();
     assert.equal(picker().props.disabled, false);
-    assert.deepEqual(picker().props.products.map((product) => product.id), [10]);
+    assert.deepEqual(
+        picker().props.products.map((product) => product.id),
+        [10],
+    );
     const oldPickerKey = picker().key;
 
     field(form(), 'supplier_id').props['onUpdate:modelValue']('2');
     await app.html();
-    assert.deepEqual(picker().props.products.map((product) => product.id), [20]);
+    assert.deepEqual(
+        picker().props.products.map((product) => product.id),
+        [20],
+    );
     assert.notEqual(picker().key, oldPickerKey);
 });
 
 test('supplier picker keeps zero-stock assignments empty and preserves manual selection for unassigned suppliers', async (t) => {
     const app = harness(t, 'SupplierReturns', {
-        products: [{ id: 20, name: 'Available unrelated product', product_code: 'OTHER', available_quantity: 4 }],
-        suppliers: [{ id: 1, name: 'Out of stock' }, { id: 2, name: 'Manual' }],
+        products: [
+            {
+                id: 20,
+                name: 'Available unrelated product',
+                product_code: 'OTHER',
+                available_quantity: 4,
+            },
+        ],
+        suppliers: [
+            { id: 1, name: 'Out of stock' },
+            { id: 2, name: 'Manual' },
+        ],
         supplier_product_links: [{ supplier_id: 1, product_id: 10 }],
     });
     await app.html();
     const form = () => app.form('SupplierReturn', 'store');
-    const picker = () => findNode(form(), (node) => node.props?.id === 'return-product');
+    const picker = () =>
+        findNode(form(), (node) => node.props?.id === 'return-product');
 
     field(form(), 'supplier_id').props['onUpdate:modelValue']('1');
     await app.html();
     assert.deepEqual(picker().props.products, []);
-    assert.equal(picker().props['empty-message'], 'No linked products have available stock.');
+    assert.equal(
+        picker().props['empty-message'],
+        'No linked products have available stock.',
+    );
 
     field(form(), 'supplier_id').props['onUpdate:modelValue']('2');
     await app.html();
-    assert.deepEqual(picker().props.products.map((product) => product.id), [20]);
+    assert.deepEqual(
+        picker().props.products.map((product) => product.id),
+        [20],
+    );
 });

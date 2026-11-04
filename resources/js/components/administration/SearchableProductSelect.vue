@@ -68,7 +68,9 @@ const filteredProducts = computed(() => {
             class="text-muted-foreground text-xs"
             role="status"
         >
-            {{ search.trim() ? 'No products match this search.' : emptyMessage }}
+            {{
+                search.trim() ? 'No products match this search.' : emptyMessage
+            }}
         </p>
     </div>
 </template>

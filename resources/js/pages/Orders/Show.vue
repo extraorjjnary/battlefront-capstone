@@ -156,9 +156,20 @@ function submitReplacementProof() {
 }
 
 function retryOnlinePayment() {
-    if (!(props.order.payment.can_retry || (props.order.payment.action === 'retry' && props.order.payment.can_retry_hosted) || props.order.payment.qr_can_retry) || paymentRetryForm.processing) return;
+    if (
+        !(
+            props.order.payment.can_retry ||
+            (props.order.payment.action === 'retry' &&
+                props.order.payment.can_retry_hosted) ||
+            props.order.payment.qr_can_retry
+        ) ||
+        paymentRetryForm.processing
+    )
+        return;
     if (props.order.payment.qr_can_retry) {
-        paymentRetryForm.submit(retryPayMongo(props.order.id), { preserveScroll: true });
+        paymentRetryForm.submit(retryPayMongo(props.order.id), {
+            preserveScroll: true,
+        });
         return;
     }
     paymentWindow = window.open('about:blank', '_blank');
@@ -740,7 +751,14 @@ function finishPaymentWindow(page) {
                                     >
                                         {{ order.payment.notice }}
                                     </dd>
-                                    <dd v-if="order.payment.action === 'continue' && order.payment.checkout_url" class="mt-3">
+                                    <dd
+                                        v-if="
+                                            order.payment.action ===
+                                                'continue' &&
+                                            order.payment.checkout_url
+                                        "
+                                        class="mt-3"
+                                    >
                                         <Button as-child>
                                             <a
                                                 :href="
@@ -854,10 +872,33 @@ function finishPaymentWindow(page) {
                                             "
                                         />
                                     </dd>
-                                    <dd v-if="order.payment.action === 'retry' && order.payment.can_retry_hosted" class="mt-3 grid gap-2">
-                                        <p class="text-muted-foreground text-xs leading-5">Your previous payment failed or expired. You can try paying this order again.</p>
-                                        <Button type="button" size="sm" :disabled="paymentRetryForm.processing" @click="retryOnlinePayment">
-                                            <Spinner v-if="paymentRetryForm.processing" />
+                                    <dd
+                                        v-if="
+                                            order.payment.action === 'retry' &&
+                                            order.payment.can_retry_hosted
+                                        "
+                                        class="mt-3 grid gap-2"
+                                    >
+                                        <p
+                                            class="text-muted-foreground text-xs leading-5"
+                                        >
+                                            Your previous payment failed or
+                                            expired. You can try paying this
+                                            order again.
+                                        </p>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            :disabled="
+                                                paymentRetryForm.processing
+                                            "
+                                            @click="retryOnlinePayment"
+                                        >
+                                            <Spinner
+                                                v-if="
+                                                    paymentRetryForm.processing
+                                                "
+                                            />
                                             Try payment again
                                         </Button>
                                         <InputError

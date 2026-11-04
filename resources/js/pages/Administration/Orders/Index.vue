@@ -92,9 +92,12 @@ const viewCopy = computed(() => {
 
 const hasSearchInput = computed(() => Boolean(search.value.trim()));
 const hasAppliedFilters = computed(() =>
-    ['gateway_state', 'payment_status', 'payment_method', 'fulfillment_method'].some(
-        (filter) => props.filters[filter] !== null,
-    ),
+    [
+        'gateway_state',
+        'payment_status',
+        'payment_method',
+        'fulfillment_method',
+    ].some((filter) => props.filters[filter] !== null),
 );
 
 function formatDate(value) {
@@ -131,7 +134,12 @@ function filtersAreCurrent() {
     const selected = selectedFilters();
     const applied = appliedFilters();
 
-    return ['gateway_state', 'payment_status', 'payment_method', 'fulfillment_method'].every(
+    return [
+        'gateway_state',
+        'payment_status',
+        'payment_method',
+        'fulfillment_method',
+    ].every(
         (filter) =>
             String(selected[filter] ?? '') === String(applied[filter] ?? ''),
     );
@@ -188,7 +196,10 @@ function orderPage(options) {
     });
 }
 
-watch([gatewayState, paymentStatus, paymentMethod, fulfillmentMethod], updateFilters);
+watch(
+    [gatewayState, paymentStatus, paymentMethod, fulfillmentMethod],
+    updateFilters,
+);
 
 defineOptions({
     layout: {
@@ -241,13 +252,26 @@ defineOptions({
             <div class="mb-4">
                 <Label for="gateway-state">Online payment recovery</Label>
                 <Select v-model="gatewayState">
-                    <SelectTrigger id="gateway-state"><SelectValue placeholder="All payment states" /></SelectTrigger>
+                    <SelectTrigger id="gateway-state"
+                        ><SelectValue placeholder="All payment states"
+                    /></SelectTrigger>
                     <SelectContent>
                         <SelectItem value="all">All payment states</SelectItem>
-                        <SelectItem v-for="option in filter_options.gateway_states" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
+                        <SelectItem
+                            v-for="option in filter_options.gateway_states"
+                            :key="option.value"
+                            :value="option.value"
+                            >{{ option.label }}</SelectItem
+                        >
                     </SelectContent>
                 </Select>
-                <p v-if="gatewayState === 'needs_attention'" class="text-muted-foreground mt-2 text-sm">Includes payment exceptions on completed and cancelled orders.</p>
+                <p
+                    v-if="gatewayState === 'needs_attention'"
+                    class="text-muted-foreground mt-2 text-sm"
+                >
+                    Includes payment exceptions on completed and cancelled
+                    orders.
+                </p>
             </div>
             <h2 id="order-query-heading" class="sr-only">Search and filters</h2>
 
@@ -453,7 +477,12 @@ defineOptions({
                             <p class="text-muted-foreground">Payment</p>
                             <div class="mt-1 flex flex-wrap items-center gap-2">
                                 <span class="font-medium">
-                                    {{ order.payment.method.label }}<span v-if="order.payment.gateway" class="text-muted-foreground block text-xs">{{ order.payment.gateway.label }}</span>
+                                    {{ order.payment.method.label
+                                    }}<span
+                                        v-if="order.payment.gateway"
+                                        class="text-muted-foreground block text-xs"
+                                        >{{ order.payment.gateway.label }}</span
+                                    >
                                 </span>
                                 <Badge
                                     variant="outline"

@@ -206,11 +206,17 @@ function findButton(node, label, matches = () => true) {
 
 function findElement(node, type, matches = () => true) {
     if (Array.isArray(node)) {
-        return node.map((child) => findElement(child, type, matches)).find(Boolean);
+        return node
+            .map((child) => findElement(child, type, matches))
+            .find(Boolean);
     }
     if (!node || typeof node !== 'object') return null;
     if (node.type === type && matches(node)) return node;
-    return findElement(node.children?.default?.() ?? node.children, type, matches);
+    return findElement(
+        node.children?.default?.() ?? node.children,
+        type,
+        matches,
+    );
 }
 
 test('saved shipment records remain read-only outside the handoff form', async (t) => {
@@ -238,7 +244,10 @@ test('saved shipment records remain read-only outside the handoff form', async (
     const html = await view.html();
     assert.match(html, /Packed weight/);
     assert.match(html, /1\.000/);
-    assert.doesNotMatch(html, /Edit package details|Save package details|Save carrier cost|handoff-package_count/);
+    assert.doesNotMatch(
+        html,
+        /Edit package details|Save package details|Save carrier cost|handoff-package_count/,
+    );
 });
 
 test('delivery arrangement confirmation keeps optional details blank and requires actual arrangement', async (t) => {
@@ -576,22 +585,32 @@ test('cancellation review retains its processing hold notice without ownership i
     );
 });
 
-
 test('handoff opens one form and submits package receipt and tracking together', async (t) => {
     const view = orderHarness(t, {
         can_process: true,
         assigned_handler_id: 1,
         delivery_fee: '250.00',
         shipment: {
-            status: { value: 'ready_for_dispatch', label: 'Ready for dispatch' },
+            status: {
+                value: 'ready_for_dispatch',
+                label: 'Ready for dispatch',
+            },
             tracking_reference: null,
-            operations: { actual_carrier_cost: null, carrier_cost_recorded_at: null },
+            operations: {
+                actual_carrier_cost: null,
+                carrier_cost_recorded_at: null,
+            },
         },
-        shipment_actions: { next_status: { value: 'handed_to_lbc', label: 'Handed to LBC' } },
+        shipment_actions: {
+            next_status: { value: 'handed_to_lbc', label: 'Handed to LBC' },
+        },
     });
     let html = await view.html();
     assert.doesNotMatch(html, /id="handoff-package_count"/);
-    assert.equal(Boolean(findButton(view.tree(), 'Hand over to LBC').props.disabled), false);
+    assert.equal(
+        Boolean(findButton(view.tree(), 'Hand over to LBC').props.disabled),
+        false,
+    );
     findButton(view.tree(), 'Hand over to LBC').props.onClick();
     html = await view.html();
     assert.match(html, /id="handoff-package_count"/);
@@ -599,15 +618,27 @@ test('handoff opens one form and submits package receipt and tracking together',
     assert.match(html, /id="handoff-reference"/);
     assert.match(html, /id="handoff-carrier-cost"/);
     assert.match(html, /Battlefront absorbs any difference/);
-    const form = view.forms.find((candidate) => Object.hasOwn(candidate, 'handoff'));
+    const form = view.forms.find((candidate) =>
+        Object.hasOwn(candidate, 'handoff'),
+    );
     assert.equal(form.status, 'handed_to_lbc');
     Object.assign(form.handoff, {
-        package_count: 1, package_weight_kg: '1.250', package_length_cm: '30',
-        package_width_cm: '20', package_height_cm: '10', handoff_mode: 'branch_dropoff',
-        actual_carrier_cost: '300.00', carrier_cost_reference: 'RECEIPT', carrier_cost_confirmed: true,
+        package_count: 1,
+        package_weight_kg: '1.250',
+        package_length_cm: '30',
+        package_width_cm: '20',
+        package_height_cm: '10',
+        handoff_mode: 'branch_dropoff',
+        actual_carrier_cost: '300.00',
+        carrier_cost_reference: 'RECEIPT',
+        carrier_cost_confirmed: true,
     });
     form.tracking_reference = 'LBC-123';
-    findElement(view.tree(), 'form', (node) => node.props['aria-label'] === 'LBC handoff').props.onSubmit({ preventDefault() {} });
+    findElement(
+        view.tree(),
+        'form',
+        (node) => node.props['aria-label'] === 'LBC handoff',
+    ).props.onSubmit({ preventDefault() {} });
     assert.equal(view.submissions.length, 1);
     assert.equal(form.handoff.actual_carrier_cost, '300.00');
     form.errors = { 'handoff.package_weight_kg': 'Check packed weight.' };
@@ -622,12 +653,27 @@ test('handoff opens one form and submits package receipt and tracking together',
 
 test('shipment amounts remain read-only while preparing package and receipt records', async (t) => {
     const view = orderHarness(t, {
-        can_process: true, assigned_handler_id: 1, product_subtotal: '1200.50', delivery_fee: '250.25',
-        shipment: { status: { value: 'preparing', label: 'Preparing' }, operations: {} },
-        shipment_actions: { can_update_package_details: true, can_record_carrier_cost: true },
+        can_process: true,
+        assigned_handler_id: 1,
+        product_subtotal: '1200.50',
+        delivery_fee: '250.25',
+        shipment: {
+            status: { value: 'preparing', label: 'Preparing' },
+            operations: {},
+        },
+        shipment_actions: {
+            can_update_package_details: true,
+            can_record_carrier_cost: true,
+        },
     });
     const html = await view.html();
     assert.match(html, /Saved merchandise amount, excluding delivery/);
-    assert.match(html, /Actual carrier expense is separate from the saved customer delivery fee/);
-    assert.doesNotMatch(html, /<input[^>]*id="shipment-(declared-value|carrier-cost)"/);
+    assert.match(
+        html,
+        /Actual carrier expense is separate from the saved customer delivery fee/,
+    );
+    assert.doesNotMatch(
+        html,
+        /<input[^>]*id="shipment-(declared-value|carrier-cost)"/,
+    );
 });

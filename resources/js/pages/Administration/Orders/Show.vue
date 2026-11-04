@@ -111,13 +111,10 @@ const handlerNotice = computed(() => {
     return '';
 });
 
-watch(
-    [() => props.order.id, () => props.order.assigned_handler_id],
-    () => {
-        handlerForm.reset();
-        handlerForm.clearErrors();
-    },
-);
+watch([() => props.order.id, () => props.order.assigned_handler_id], () => {
+    handlerForm.reset();
+    handlerForm.clearErrors();
+});
 
 function submitHandler() {
     if (
@@ -173,25 +170,66 @@ const manualShipmentForm = useForm({
 });
 const shipmentConfirmationOpen = ref(false);
 const handoffDialogOpen = ref(false);
-const shipmentStatusForm = useForm({ status: '', tracking_reference: null, handoff: {} });
+const shipmentStatusForm = useForm({
+    status: '',
+    tracking_reference: null,
+    handoff: {},
+});
 const handoffMeasurements = [
     { field: 'package_count', label: 'Parcel count', min: 1, max: 99, step: 1 },
-    { field: 'package_weight_kg', label: 'Packed weight (kg)', min: 0.001, max: 99999.999, step: 0.001 },
-    { field: 'package_length_cm', label: 'Length (cm)', min: 0.01, max: 99999.99, step: 0.01 },
-    { field: 'package_width_cm', label: 'Width (cm)', min: 0.01, max: 99999.99, step: 0.01 },
-    { field: 'package_height_cm', label: 'Height (cm)', min: 0.01, max: 99999.99, step: 0.01 },
+    {
+        field: 'package_weight_kg',
+        label: 'Packed weight (kg)',
+        min: 0.001,
+        max: 99999.999,
+        step: 0.001,
+    },
+    {
+        field: 'package_length_cm',
+        label: 'Length (cm)',
+        min: 0.01,
+        max: 99999.99,
+        step: 0.01,
+    },
+    {
+        field: 'package_width_cm',
+        label: 'Width (cm)',
+        min: 0.01,
+        max: 99999.99,
+        step: 0.01,
+    },
+    {
+        field: 'package_height_cm',
+        label: 'Height (cm)',
+        min: 0.01,
+        max: 99999.99,
+        step: 0.01,
+    },
 ];
-watch([() => props.order.id, () => props.order.shipment?.status.value, canProcess], () => {
-    handoffDialogOpen.value = false;
-    shipmentStatusForm.reset();
-    shipmentStatusForm.clearErrors();
-});
+watch(
+    [
+        () => props.order.id,
+        () => props.order.shipment?.status.value,
+        canProcess,
+    ],
+    () => {
+        handoffDialogOpen.value = false;
+        shipmentStatusForm.reset();
+        shipmentStatusForm.clearErrors();
+    },
+);
 const shipmentReferenceForm = useForm({
     tracking_reference: props.order.shipment?.tracking_reference ?? '',
 });
-const orderDeclaredValue = computed(() => props.order.product_subtotal ?? (Number(props.order.total) - Number(props.order.delivery_fee)));
+const orderDeclaredValue = computed(
+    () =>
+        props.order.product_subtotal ??
+        Number(props.order.total) - Number(props.order.delivery_fee),
+);
 const shipmentOperations = props.order.shipment?.operations ?? {};
-const shipmentCostRecorded = computed(() => Boolean(props.order.shipment?.operations?.carrier_cost_recorded_at));
+const shipmentCostRecorded = computed(() =>
+    Boolean(props.order.shipment?.operations?.carrier_cost_recorded_at),
+);
 const shipmentExceptionEditing = ref(
     Boolean(
         shipmentOperations.exception_reported_at &&
@@ -351,9 +389,11 @@ function submitShipmentOperations(group) {
     }
 
     const fields = {
-
-
-        exception: ['shipment_exception_code', 'shipment_exception_note', 'shipment_exception_resolved'],
+        exception: [
+            'shipment_exception_code',
+            'shipment_exception_note',
+            'shipment_exception_resolved',
+        ],
     }[group];
 
     if (!fields) {
@@ -366,7 +406,8 @@ function submitShipmentOperations(group) {
     shipmentOperationsForm.patch(updateShipmentOperations(props.order.id), {
         preserveScroll: true,
         onSuccess: () => {
-            shipmentExceptionActive.value = !shipmentOperationsForm.shipment_exception_resolved;
+            shipmentExceptionActive.value =
+                !shipmentOperationsForm.shipment_exception_resolved;
             shipmentExceptionEditing.value = shipmentExceptionActive.value;
         },
         onFinish: () => {
@@ -482,7 +523,14 @@ function requestShipmentUpdate() {
     if (next.value === 'handed_to_lbc') {
         const operations = props.order.shipment?.operations ?? {};
         shipmentStatusForm.handoff = Object.fromEntries(
-            ['package_count', 'package_weight_kg', 'package_length_cm', 'package_width_cm', 'package_height_cm', 'handoff_mode'].map((field) => [field, operations[field] ?? '']),
+            [
+                'package_count',
+                'package_weight_kg',
+                'package_length_cm',
+                'package_width_cm',
+                'package_height_cm',
+                'handoff_mode',
+            ].map((field) => [field, operations[field] ?? '']),
         );
         if (!operations.carrier_cost_recorded_at) {
             shipmentStatusForm.handoff.actual_carrier_cost = '';
@@ -501,10 +549,22 @@ function requestShipmentUpdate() {
 }
 
 function submitShipmentStatus() {
-    if (!canProcess.value || shipmentStatusForm.processing || props.order.shipment_actions?.next_status?.value !== shipmentStatusForm.status) {
+    if (
+        !canProcess.value ||
+        shipmentStatusForm.processing ||
+        props.order.shipment_actions?.next_status?.value !==
+            shipmentStatusForm.status
+    ) {
         return;
     }
-    shipmentStatusForm.transform((data) => data.status === 'handed_to_lbc' ? data : { status: data.status, tracking_reference: data.tracking_reference });
+    shipmentStatusForm.transform((data) =>
+        data.status === 'handed_to_lbc'
+            ? data
+            : {
+                  status: data.status,
+                  tracking_reference: data.tracking_reference,
+              },
+    );
     shipmentStatusForm.submit(
         OrderShipmentStatusController.update(props.order.id),
         {
@@ -849,16 +909,125 @@ defineOptions({
                         </p>
                     </div>
                     <p class="text-muted-foreground text-sm">
-                        Package details, receipt confirmation, and tracking are recorded together through Hand over to LBC at Ready for Dispatch. Saved records are locked after handoff.
+                        Package details, receipt confirmation, and tracking are
+                        recorded together through Hand over to LBC at Ready for
+                        Dispatch. Saved records are locked after handoff.
                     </p>
                     <dl class="grid gap-3 text-sm sm:grid-cols-2">
-                        <div><dt class="text-muted-foreground">Parcel count</dt><dd>{{ order.shipment.operations?.package_count ?? 'Not recorded' }}</dd></div>
-                        <div><dt class="text-muted-foreground">Packed weight (kg)</dt><dd>{{ order.shipment.operations?.package_weight_kg ?? 'Not recorded' }}</dd></div>
-                        <div><dt class="text-muted-foreground">Dimensions (cm)</dt><dd>{{ order.shipment.operations?.package_length_cm ?? '—' }} × {{ order.shipment.operations?.package_width_cm ?? '—' }} × {{ order.shipment.operations?.package_height_cm ?? '—' }}</dd></div>
-                        <div><dt class="text-muted-foreground">Handoff arrangement</dt><dd>{{ order.shipment.operations?.handoff_mode === 'branch_dropoff' ? 'Branch drop-off' : order.shipment.operations?.handoff_mode === 'rider_pickup' ? 'Rider pickup' : 'Not recorded' }}</dd></div>
-                        <div><dt class="text-muted-foreground">Declared value</dt><dd>{{ formatCurrency(order.shipment.operations?.declared_value ?? orderDeclaredValue) }}</dd><p class="text-muted-foreground text-sm">Saved merchandise amount, excluding delivery. This amount is locked.</p></div>
-                        <div><dt class="text-muted-foreground">Carrier cost reconciliation</dt><dd>{{ shipmentCostRecorded ? 'Confirmed' : 'Not confirmed' }} · {{ shipmentCostRecorded ? formatCurrency(order.shipment.operations.actual_carrier_cost) : 'Not recorded' }}</dd><p class="text-muted-foreground text-sm">Actual carrier expense is separate from the saved customer delivery fee. Battlefront absorbs any difference.</p></div>
-                        <div><dt class="text-muted-foreground">Receipt or carrier reference</dt><dd>{{ order.shipment.operations?.carrier_cost_reference ?? 'Not recorded' }}</dd></div>
+                        <div>
+                            <dt class="text-muted-foreground">Parcel count</dt>
+                            <dd>
+                                {{
+                                    order.shipment.operations?.package_count ??
+                                    'Not recorded'
+                                }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-muted-foreground">
+                                Packed weight (kg)
+                            </dt>
+                            <dd>
+                                {{
+                                    order.shipment.operations
+                                        ?.package_weight_kg ?? 'Not recorded'
+                                }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-muted-foreground">
+                                Dimensions (cm)
+                            </dt>
+                            <dd>
+                                {{
+                                    order.shipment.operations
+                                        ?.package_length_cm ?? '—'
+                                }}
+                                ×
+                                {{
+                                    order.shipment.operations
+                                        ?.package_width_cm ?? '—'
+                                }}
+                                ×
+                                {{
+                                    order.shipment.operations
+                                        ?.package_height_cm ?? '—'
+                                }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-muted-foreground">
+                                Handoff arrangement
+                            </dt>
+                            <dd>
+                                {{
+                                    order.shipment.operations?.handoff_mode ===
+                                    'branch_dropoff'
+                                        ? 'Branch drop-off'
+                                        : order.shipment.operations
+                                                ?.handoff_mode ===
+                                            'rider_pickup'
+                                          ? 'Rider pickup'
+                                          : 'Not recorded'
+                                }}
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-muted-foreground">
+                                Declared value
+                            </dt>
+                            <dd>
+                                {{
+                                    formatCurrency(
+                                        order.shipment.operations
+                                            ?.declared_value ??
+                                            orderDeclaredValue,
+                                    )
+                                }}
+                            </dd>
+                            <p class="text-muted-foreground text-sm">
+                                Saved merchandise amount, excluding delivery.
+                                This amount is locked.
+                            </p>
+                        </div>
+                        <div>
+                            <dt class="text-muted-foreground">
+                                Carrier cost reconciliation
+                            </dt>
+                            <dd>
+                                {{
+                                    shipmentCostRecorded
+                                        ? 'Confirmed'
+                                        : 'Not confirmed'
+                                }}
+                                ·
+                                {{
+                                    shipmentCostRecorded
+                                        ? formatCurrency(
+                                              order.shipment.operations
+                                                  .actual_carrier_cost,
+                                          )
+                                        : 'Not recorded'
+                                }}
+                            </dd>
+                            <p class="text-muted-foreground text-sm">
+                                Actual carrier expense is separate from the
+                                saved customer delivery fee. Battlefront absorbs
+                                any difference.
+                            </p>
+                        </div>
+                        <div>
+                            <dt class="text-muted-foreground">
+                                Receipt or carrier reference
+                            </dt>
+                            <dd>
+                                {{
+                                    order.shipment.operations
+                                        ?.carrier_cost_reference ??
+                                    'Not recorded'
+                                }}
+                            </dd>
+                        </div>
                     </dl>
                     <div class="border-border grid gap-3 border-t pt-4">
                         <div>
@@ -1490,8 +1659,13 @@ defineOptions({
                     >
                         <div>
                             <p class="text-muted-foreground text-sm">
-                                {{ order.total_quantity }} {{ order.total_quantity === 1 ? 'unit' : 'units' }} across
-                                {{ order.item_count }} lines
+                                {{ order.total_quantity }}
+                                {{
+                                    order.total_quantity === 1
+                                        ? 'unit'
+                                        : 'units'
+                                }}
+                                across {{ order.item_count }} lines
                             </p>
                             <h2
                                 id="order-items-heading"
@@ -1533,7 +1707,8 @@ defineOptions({
                                         Route
                                         {{
                                             formatCurrency(
-                                                order.delivery_quote.route_base_fee,
+                                                order.delivery_quote
+                                                    .route_base_fee,
                                             )
                                         }}
                                         + weight
@@ -1706,7 +1881,13 @@ defineOptions({
                             @click="requestShipmentUpdate"
                         >
                             <Spinner v-if="shipmentStatusForm.processing" />
-                            {{ order.shipment_actions.next_status.value === 'handed_to_lbc' ? 'Hand over to LBC' : 'Mark ' + order.shipment_actions.next_status.label }}
+                            {{
+                                order.shipment_actions.next_status.value ===
+                                'handed_to_lbc'
+                                    ? 'Hand over to LBC'
+                                    : 'Mark ' +
+                                      order.shipment_actions.next_status.label
+                            }}
                         </Button>
                     </template>
                     <p
@@ -1774,77 +1955,323 @@ defineOptions({
                     </form>
 
                     <Dialog v-model:open="handoffDialogOpen">
-                        <DialogContent class="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+                        <DialogContent
+                            class="max-h-[90dvh] overflow-y-auto sm:max-w-2xl"
+                        >
                             <DialogHeader>
-                                <DialogTitle>Hand over {{ order.reference }} to LBC</DialogTitle>
+                                <DialogTitle
+                                    >Hand over {{ order.reference }} to
+                                    LBC</DialogTitle
+                                >
                                 <DialogDescription>
-                                    Record the final packed parcel and check the LBC receipt. Confirm only after physical handoff. These records and the handoff status are saved together and locked afterward.
+                                    Record the final packed parcel and check the
+                                    LBC receipt. Confirm only after physical
+                                    handoff. These records and the handoff
+                                    status are saved together and locked
+                                    afterward.
                                 </DialogDescription>
                             </DialogHeader>
-                            <form class="grid gap-5" aria-label="LBC handoff" @submit.prevent="submitShipmentStatus">
-                                <fieldset class="grid gap-4" :disabled="shipmentStatusForm.processing">
-                                    <legend class="mb-3 text-sm font-medium">Packed shipment</legend>
+                            <form
+                                class="grid gap-5"
+                                aria-label="LBC handoff"
+                                @submit.prevent="submitShipmentStatus"
+                            >
+                                <fieldset
+                                    class="grid gap-4"
+                                    :disabled="shipmentStatusForm.processing"
+                                >
+                                    <legend class="mb-3 text-sm font-medium">
+                                        Packed shipment
+                                    </legend>
                                     <div class="grid gap-4 sm:grid-cols-2">
-                                        <div v-for="measurement in handoffMeasurements" :key="measurement.field" class="grid gap-2">
-                                            <Label :for="'handoff-' + measurement.field">{{ measurement.label }}</Label>
-                                            <Input :id="'handoff-' + measurement.field" v-model="shipmentStatusForm.handoff[measurement.field]" type="number" :min="measurement.min" :max="measurement.max" :step="measurement.step" required />
-                                            <InputError :message="shipmentStatusForm.errors['handoff.' + measurement.field]" />
+                                        <div
+                                            v-for="measurement in handoffMeasurements"
+                                            :key="measurement.field"
+                                            class="grid gap-2"
+                                        >
+                                            <Label
+                                                :for="
+                                                    'handoff-' +
+                                                    measurement.field
+                                                "
+                                                >{{ measurement.label }}</Label
+                                            >
+                                            <Input
+                                                :id="
+                                                    'handoff-' +
+                                                    measurement.field
+                                                "
+                                                v-model="
+                                                    shipmentStatusForm.handoff[
+                                                        measurement.field
+                                                    ]
+                                                "
+                                                type="number"
+                                                :min="measurement.min"
+                                                :max="measurement.max"
+                                                :step="measurement.step"
+                                                required
+                                            />
+                                            <InputError
+                                                :message="
+                                                    shipmentStatusForm.errors[
+                                                        'handoff.' +
+                                                            measurement.field
+                                                    ]
+                                                "
+                                            />
                                         </div>
                                         <div class="grid gap-2">
-                                            <Label for="handoff-mode">Handoff arrangement</Label>
-                                            <Select v-model="shipmentStatusForm.handoff.handoff_mode" :disabled="shipmentStatusForm.processing">
-                                                <SelectTrigger id="handoff-mode" class="w-full"><SelectValue placeholder="Select arrangement" /></SelectTrigger>
+                                            <Label for="handoff-mode"
+                                                >Handoff arrangement</Label
+                                            >
+                                            <Select
+                                                v-model="
+                                                    shipmentStatusForm.handoff
+                                                        .handoff_mode
+                                                "
+                                                :disabled="
+                                                    shipmentStatusForm.processing
+                                                "
+                                            >
+                                                <SelectTrigger
+                                                    id="handoff-mode"
+                                                    class="w-full"
+                                                    ><SelectValue
+                                                        placeholder="Select arrangement"
+                                                /></SelectTrigger>
                                                 <SelectContent>
-                                                    <SelectItem value="branch_dropoff">Branch drop-off</SelectItem>
-                                                    <SelectItem value="rider_pickup">Rider pickup</SelectItem>
+                                                    <SelectItem
+                                                        value="branch_dropoff"
+                                                        >Branch
+                                                        drop-off</SelectItem
+                                                    >
+                                                    <SelectItem
+                                                        value="rider_pickup"
+                                                        >Rider
+                                                        pickup</SelectItem
+                                                    >
                                                 </SelectContent>
                                             </Select>
-                                            <InputError :message="shipmentStatusForm.errors['handoff.handoff_mode']" />
+                                            <InputError
+                                                :message="
+                                                    shipmentStatusForm.errors[
+                                                        'handoff.handoff_mode'
+                                                    ]
+                                                "
+                                            />
                                         </div>
                                     </div>
-                                    <div class="border-border grid gap-3 border-t pt-4 text-sm sm:grid-cols-2">
-                                        <div><p class="text-muted-foreground">Declared value · locked</p><p>{{ formatCurrency(orderDeclaredValue) }}</p></div>
-                                        <div><p class="text-muted-foreground">Customer delivery fee · locked</p><p>{{ formatCurrency(order.delivery_fee) }}</p></div>
+                                    <div
+                                        class="border-border grid gap-3 border-t pt-4 text-sm sm:grid-cols-2"
+                                    >
+                                        <div>
+                                            <p class="text-muted-foreground">
+                                                Declared value · locked
+                                            </p>
+                                            <p>
+                                                {{
+                                                    formatCurrency(
+                                                        orderDeclaredValue,
+                                                    )
+                                                }}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p class="text-muted-foreground">
+                                                Customer delivery fee · locked
+                                            </p>
+                                            <p>
+                                                {{
+                                                    formatCurrency(
+                                                        order.delivery_fee,
+                                                    )
+                                                }}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <InputError :message="shipmentStatusForm.errors['handoff.declared_value'] || shipmentStatusForm.errors['handoff.actual_carrier_cost']" />
-                                    <div v-if="shipmentCostRecorded" class="text-sm">
-                                        <p>Carrier receipt already confirmed: {{ order.shipment.operations.carrier_cost_reference }}</p>
-                                        <p>Recorded cost: {{ formatCurrency(order.shipment.operations.actual_carrier_cost) }}. This record cannot be changed.</p>
+                                    <InputError
+                                        :message="
+                                            shipmentStatusForm.errors[
+                                                'handoff.declared_value'
+                                            ] ||
+                                            shipmentStatusForm.errors[
+                                                'handoff.actual_carrier_cost'
+                                            ]
+                                        "
+                                    />
+                                    <div
+                                        v-if="shipmentCostRecorded"
+                                        class="text-sm"
+                                    >
+                                        <p>
+                                            Carrier receipt already confirmed:
+                                            {{
+                                                order.shipment.operations
+                                                    .carrier_cost_reference
+                                            }}
+                                        </p>
+                                        <p>
+                                            Recorded cost:
+                                            {{
+                                                formatCurrency(
+                                                    order.shipment.operations
+                                                        .actual_carrier_cost,
+                                                )
+                                            }}. This record cannot be changed.
+                                        </p>
                                     </div>
                                     <template v-else>
                                         <div class="grid gap-2">
-                                            <Label for="handoff-carrier-cost">Actual carrier cost (PHP)</Label>
-                                            <Input id="handoff-carrier-cost" v-model="shipmentStatusForm.handoff.actual_carrier_cost" type="number" min="0" max="9999999999.99" step="0.01" required />
-                                            <p class="text-muted-foreground text-sm">Enter the amount on the carrier receipt. The customer's saved charges will not change.</p>
-                                            <InputError :message="shipmentStatusForm.errors['handoff.actual_carrier_cost']" />
+                                            <Label for="handoff-carrier-cost"
+                                                >Actual carrier cost
+                                                (PHP)</Label
+                                            >
+                                            <Input
+                                                id="handoff-carrier-cost"
+                                                v-model="
+                                                    shipmentStatusForm.handoff
+                                                        .actual_carrier_cost
+                                                "
+                                                type="number"
+                                                min="0"
+                                                max="9999999999.99"
+                                                step="0.01"
+                                                required
+                                            />
+                                            <p
+                                                class="text-muted-foreground text-sm"
+                                            >
+                                                Enter the amount on the carrier
+                                                receipt. The customer's saved
+                                                charges will not change.
+                                            </p>
+                                            <InputError
+                                                :message="
+                                                    shipmentStatusForm.errors[
+                                                        'handoff.actual_carrier_cost'
+                                                    ]
+                                                "
+                                            />
                                         </div>
                                         <div class="grid gap-2">
-                                            <Label for="handoff-receipt">Carrier receipt or reference</Label>
-                                            <Input id="handoff-receipt" v-model="shipmentStatusForm.handoff.carrier_cost_reference" maxlength="100" required />
-                                            <InputError :message="shipmentStatusForm.errors['handoff.carrier_cost_reference']" />
+                                            <Label for="handoff-receipt"
+                                                >Carrier receipt or
+                                                reference</Label
+                                            >
+                                            <Input
+                                                id="handoff-receipt"
+                                                v-model="
+                                                    shipmentStatusForm.handoff
+                                                        .carrier_cost_reference
+                                                "
+                                                maxlength="100"
+                                                required
+                                            />
+                                            <InputError
+                                                :message="
+                                                    shipmentStatusForm.errors[
+                                                        'handoff.carrier_cost_reference'
+                                                    ]
+                                                "
+                                            />
                                         </div>
                                         <div class="flex items-start gap-3">
-                                            <Checkbox id="handoff-cost-confirmed" v-model="shipmentStatusForm.handoff.carrier_cost_confirmed" />
-                                            <Label for="handoff-cost-confirmed" class="text-sm leading-5 font-normal">I checked the actual carrier cost against its receipt. Battlefront absorbs any difference from the customer's saved delivery fee.</Label>
+                                            <Checkbox
+                                                id="handoff-cost-confirmed"
+                                                v-model="
+                                                    shipmentStatusForm.handoff
+                                                        .carrier_cost_confirmed
+                                                "
+                                            />
+                                            <Label
+                                                for="handoff-cost-confirmed"
+                                                class="text-sm leading-5 font-normal"
+                                                >I checked the actual carrier
+                                                cost against its receipt.
+                                                Battlefront absorbs any
+                                                difference from the customer's
+                                                saved delivery fee.</Label
+                                            >
                                         </div>
-                                        <InputError :message="shipmentStatusForm.errors['handoff.carrier_cost_confirmed']" />
+                                        <InputError
+                                            :message="
+                                                shipmentStatusForm.errors[
+                                                    'handoff.carrier_cost_confirmed'
+                                                ]
+                                            "
+                                        />
                                     </template>
-                                    <div v-if="order.shipment?.tracking_reference" class="text-sm">
-                                        <p>Saved LBC tracking number: {{ order.shipment.tracking_reference }}</p>
+                                    <div
+                                        v-if="
+                                            order.shipment?.tracking_reference
+                                        "
+                                        class="text-sm"
+                                    >
+                                        <p>
+                                            Saved LBC tracking number:
+                                            {{
+                                                order.shipment
+                                                    .tracking_reference
+                                            }}
+                                        </p>
                                         <p>This reference cannot be changed.</p>
                                     </div>
                                     <div v-else class="grid gap-2">
-                                        <Label for="handoff-reference">Real LBC tracking number</Label>
-                                        <Input id="handoff-reference" v-model="shipmentStatusForm.tracking_reference" maxlength="255" required />
-                                        <p class="text-muted-foreground text-sm">Shared with the customer after handoff.</p>
+                                        <Label for="handoff-reference"
+                                            >Real LBC tracking number</Label
+                                        >
+                                        <Input
+                                            id="handoff-reference"
+                                            v-model="
+                                                shipmentStatusForm.tracking_reference
+                                            "
+                                            maxlength="255"
+                                            required
+                                        />
+                                        <p
+                                            class="text-muted-foreground text-sm"
+                                        >
+                                            Shared with the customer after
+                                            handoff.
+                                        </p>
                                     </div>
-                                    <InputError :message="shipmentStatusForm.errors.tracking_reference" />
-                                    <InputError :message="shipmentStatusForm.errors.handoff || shipmentStatusForm.errors.status" />
+                                    <InputError
+                                        :message="
+                                            shipmentStatusForm.errors
+                                                .tracking_reference
+                                        "
+                                    />
+                                    <InputError
+                                        :message="
+                                            shipmentStatusForm.errors.handoff ||
+                                            shipmentStatusForm.errors.status
+                                        "
+                                    />
                                 </fieldset>
                                 <DialogFooter>
-                                    <DialogClose as-child><Button type="button" variant="outline" :disabled="shipmentStatusForm.processing">Keep ready for dispatch</Button></DialogClose>
-                                    <Button type="submit" :disabled="shipmentStatusForm.processing || (!shipmentCostRecorded && !shipmentStatusForm.handoff.carrier_cost_confirmed)">
-                                        <Spinner v-if="shipmentStatusForm.processing" />Confirm handoff to LBC
+                                    <DialogClose as-child
+                                        ><Button
+                                            type="button"
+                                            variant="outline"
+                                            :disabled="
+                                                shipmentStatusForm.processing
+                                            "
+                                            >Keep ready for dispatch</Button
+                                        ></DialogClose
+                                    >
+                                    <Button
+                                        type="submit"
+                                        :disabled="
+                                            shipmentStatusForm.processing ||
+                                            (!shipmentCostRecorded &&
+                                                !shipmentStatusForm.handoff
+                                                    .carrier_cost_confirmed)
+                                        "
+                                    >
+                                        <Spinner
+                                            v-if="shipmentStatusForm.processing"
+                                        />Confirm handoff to LBC
                                     </Button>
                                 </DialogFooter>
                             </form>
@@ -2148,24 +2575,42 @@ defineOptions({
                     </div>
 
                     <div v-if="order.payment.gateway">
-                        <dl class="text-muted-foreground mt-3 grid gap-2 text-sm">
+                        <dl
+                            class="text-muted-foreground mt-3 grid gap-2 text-sm"
+                        >
                             <div class="flex justify-between gap-4">
                                 <dt>Provider flow</dt>
                                 <dd class="text-foreground text-right">
-                                    {{ order.payment.gateway.channel === 'hosted_checkout'
-                                        ? 'Hosted Checkout'
-                                        : order.payment.gateway.channel === 'direct_qrph'
-                                          ? 'Direct QR Ph'
-                                          : 'Direct Online Banking' }}
+                                    {{
+                                        order.payment.gateway.channel ===
+                                        'hosted_checkout'
+                                            ? 'Hosted Checkout'
+                                            : order.payment.gateway.channel ===
+                                                'direct_qrph'
+                                              ? 'Direct QR Ph'
+                                              : 'Direct Online Banking'
+                                    }}
                                 </dd>
                             </div>
-                            <div v-if="order.payment.gateway.bank" class="flex justify-between gap-4">
+                            <div
+                                v-if="order.payment.gateway.bank"
+                                class="flex justify-between gap-4"
+                            >
                                 <dt>Bank</dt>
-                                <dd class="text-foreground uppercase">{{ order.payment.gateway.bank }}</dd>
+                                <dd class="text-foreground uppercase">
+                                    {{ order.payment.gateway.bank }}
+                                </dd>
                             </div>
                             <div class="flex justify-between gap-4">
                                 <dt>Provider status</dt>
-                                <dd class="text-foreground">{{ order.payment.gateway.status.replaceAll('_', ' ') }}</dd>
+                                <dd class="text-foreground">
+                                    {{
+                                        order.payment.gateway.status.replaceAll(
+                                            '_',
+                                            ' ',
+                                        )
+                                    }}
+                                </dd>
                             </div>
                         </dl>
                         <OrderPaymentRecovery
@@ -2175,7 +2620,10 @@ defineOptions({
                     </div>
 
                     <div
-                        v-if="!order.payment.gateway && order.payment.method.requires_proof"
+                        v-if="
+                            !order.payment.gateway &&
+                            order.payment.method.requires_proof
+                        "
                         class="border-border mt-5 border-t pt-5"
                     >
                         <p class="text-sm font-medium">Submitted evidence</p>
@@ -2660,7 +3108,12 @@ defineOptions({
                         class="border-border mt-5 grid gap-4 border-t pt-5"
                     >
                         <div class="text-muted-foreground text-sm leading-6">
-                            <p v-if="!order.payment.gateway && order.payment.method.requires_proof">
+                            <p
+                                v-if="
+                                    !order.payment.gateway &&
+                                    order.payment.method.requires_proof
+                                "
+                            >
                                 Proof is evidence only. Cross-check the
                                 transaction in the selected
                                 {{ order.payment.method.label }} platform and

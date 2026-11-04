@@ -10,26 +10,56 @@ function harness(t, overrides = {}) {
     const props = Vue.reactive({
         orderId: 12,
         payment: {
-            state: 'checking', label: 'Checking payment', guidance: 'Stock remains reserved.',
-            stock_disposition: 'Reserved ? not released', merchant_cutoff_at: '2026-11-01',
-            last_checked_at: null, next_check_at: '2026-10-31', can_reconcile: true, history: [],
+            state: 'checking',
+            label: 'Checking payment',
+            guidance: 'Stock remains reserved.',
+            stock_disposition: 'Reserved ? not released',
+            merchant_cutoff_at: '2026-11-01',
+            last_checked_at: null,
+            next_check_at: '2026-10-31',
+            can_reconcile: true,
+            history: [],
             ...overrides,
         },
     });
-    const form = Vue.reactive({ processing: false, errors: {}, submit: (...args) => calls.push(args) });
+    const form = Vue.reactive({
+        processing: false,
+        errors: {},
+        submit: (...args) => calls.push(args),
+    });
     const polling = [];
     const component = compileSkeletonTestComponent(
-        readFileSync(new URL('./OrderPaymentRecovery.vue', import.meta.url), 'utf8'),
+        readFileSync(
+            new URL('./OrderPaymentRecovery.vue', import.meta.url),
+            'utf8',
+        ),
         {
             vue: Vue,
             '@inertiajs/vue3': {
                 useForm: () => form,
-                usePoll: () => ({ start: () => polling.push('start'), stop: () => polling.push('stop') }),
+                usePoll: () => ({
+                    start: () => polling.push('start'),
+                    stop: () => polling.push('stop'),
+                }),
             },
-            '@/actions/App/Http/Controllers/Administration/OrderPaymentReconciliationController': {
-                default: (id) => ({ url: '/orders/' + id + '/payment-reconciliation', method: 'post' }),
+            '@/actions/App/Http/Controllers/Administration/OrderPaymentReconciliationController':
+                {
+                    default: (id) => ({
+                        url: '/orders/' + id + '/payment-reconciliation',
+                        method: 'post',
+                    }),
+                },
+            '@/components/ui/button': {
+                Button: {
+                    render() {
+                        return Vue.h(
+                            'button',
+                            this.$attrs,
+                            this.$slots.default?.(),
+                        );
+                    },
+                },
             },
-            '@/components/ui/button': { Button: { render() { return Vue.h('button', this.$attrs, this.$slots.default?.()); } } },
             '@/components/InputError.vue': { default: { render: () => null } },
             '@/lib/dateTime': { formatDateTime: String },
         },
@@ -38,7 +68,15 @@ function harness(t, overrides = {}) {
     t.after(() => scope.stop());
     const render = scope.run(() => component.setup(props, { expose() {} }));
     let tree;
-    return { props, form, calls, polling, tree: () => tree, html: () => renderToString(Vue.h({ render: () => (tree = render({}, [])) })) };
+    return {
+        props,
+        form,
+        calls,
+        polling,
+        tree: () => tree,
+        html: () =>
+            renderToString(Vue.h({ render: () => (tree = render({}, [])) })),
+    };
 }
 
 function action(node) {
@@ -81,7 +119,16 @@ test('terminal recovery stops polling and read-only users have no action', async
 });
 
 test('provider references are escaped and history does not expose payment links', async (t) => {
-    const view = harness(t, { history: [{ id: 1, outcome: 'Failed attempt', created_at: '2026-10-31', provider_reference: '<script>unsafe</script>' }] });
+    const view = harness(t, {
+        history: [
+            {
+                id: 1,
+                outcome: 'Failed attempt',
+                created_at: '2026-10-31',
+                provider_reference: '<script>unsafe</script>',
+            },
+        ],
+    });
     const html = await view.html();
     assert.doesNotMatch(html, /<script>/);
     assert.match(html, /&lt;script&gt;/);

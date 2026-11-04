@@ -293,7 +293,11 @@ defineOptions({
                     />
                     <p class="mt-3 font-medium">No chatbot FAQs available</p>
                     <p class="text-muted-foreground mt-1 text-sm">
-                        {{ filters.q ? 'Try different wording or clear your search.' : 'Add approved support guidance to begin managing FAQs.' }}
+                        {{
+                            filters.q
+                                ? 'Try different wording or clear your search.'
+                                : 'Add approved support guidance to begin managing FAQs.'
+                        }}
                     </p>
                 </div>
             </div>
@@ -335,7 +339,7 @@ defineOptions({
                             {{ item.question_pattern }}
                         </h3>
                         <p
-                            class="text-muted-foreground mt-2 line-clamp-3 max-w-3xl text-sm leading-6 whitespace-pre-line break-words"
+                            class="text-muted-foreground mt-2 line-clamp-3 max-w-3xl text-sm leading-6 break-words whitespace-pre-line"
                         >
                             {{ item.response_template }}
                         </p>

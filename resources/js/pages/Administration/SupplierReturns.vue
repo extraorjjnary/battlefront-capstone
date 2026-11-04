@@ -34,7 +34,9 @@ const supplierProducts = computed(() => {
     if (links.length === 0) return props.products;
 
     const productIds = new Set(links.map((link) => String(link.product_id)));
-    return props.products.filter((product) => productIds.has(String(product.id)));
+    return props.products.filter((product) =>
+        productIds.has(String(product.id)),
+    );
 });
 const page = usePage();
 const returnLabels = {
@@ -143,7 +145,11 @@ defineOptions({
                     id="return-product"
                     :products="supplierProducts"
                     :disabled="!selectedSupplierId"
-                    :empty-message="selectedSupplierId ? 'No linked products have available stock.' : 'Select a supplier first.'"
+                    :empty-message="
+                        selectedSupplierId
+                            ? 'No linked products have available stock.'
+                            : 'Select a supplier first.'
+                    "
                 /><InputError :message="errors.product_id" />
             </div>
             <div class="space-y-2">
