@@ -5,17 +5,12 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\ShipmentStatus;
 use App\Enums\ShippingProfile;
-use App\Jobs\CheckExpoReceipt;
-use App\Jobs\SendExpoNotification;
 use App\Models\Inventory;
-use App\Models\NotificationPushDelivery;
 use App\Models\Order;
 use App\Models\Product;
-use App\Models\PushDevice;
 use App\Models\User;
 use App\Services\Order\OrderProcessingService;
 use Database\Seeders\BranchSeeder;
-use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
@@ -144,24 +139,18 @@ test('pickup consumer journey uses cart mutations and buys only the selected lin
     $this->assertDatabaseCount('shipments', 0);
 })->with(['cash', 'card_at_store']);
 
-test('placed delivery milestones share read state and owned deep links while logout suppresses queued push only for its session', function () {
+test('placed delivery milestones share read state and owned deep links while logout revokes only its session', function () {
     Storage::fake('local');
     Http::preventStrayRequests();
-    Http::fake(['exp.host/--/api/v2/push/send' => Http::response(['data' => ['status' => 'ok', 'id' => 'consumer-ticket']])]);
-    Bus::fake([SendExpoNotification::class, CheckExpoReceipt::class]);
-    config(['services.expo.enabled' => true]);
+    Bus::fake();
     $this->travelTo('2026-10-08 09:00:00');
     $customer = User::factory()->customer()->create();
     $tokens = [];
-    $deviceIds = [(string) Str::uuid(), (string) Str::uuid()];
-    foreach ($deviceIds as $index => $deviceId) {
+    foreach (range(0, 1) as $index) {
         Auth::forgetGuards();
         $tokens[] = $this->postJson('/api/v1/auth/login', [
             'email' => $customer->email, 'password' => 'password', 'device_name' => 'Phone '.$index,
         ])->assertOk()->json('data.token');
-        $this->withToken($tokens[$index])->putJson('/api/v1/push-devices/'.$deviceId, [
-            'expo_push_token' => 'ExpoPushToken[consumer_'.$index.']', 'platform' => 'android',
-        ])->assertOk()->assertJsonMissingPath('data.expo_push_token');
     }
     Auth::forgetGuards();
     $this->withToken($tokens[0]);
@@ -224,25 +213,14 @@ test('placed delivery milestones share read state and owned deep links while log
     Auth::forgetGuards();
     $this->withToken($tokens[0])->getJson('/api/v1/notifications/unread-count')->assertExactJson(['data' => ['unread_count' => 0]]);
 
-    Bus::assertDispatchedTimes(SendExpoNotification::class, 14);
+    Bus::assertNothingDispatched();
+    $this->assertDatabaseCount('notification_push_deliveries', 0);
     $this->postJson('/api/v1/auth/logout')->assertNoContent();
     Auth::forgetGuards();
     $this->getJson('/api/v1/orders/'.$order->id)->assertUnauthorized();
-    $devices = PushDevice::query()->whereBelongsTo($customer)->get()->keyBy('device_id');
-    expect($devices[$deviceIds[0]])->is_active->toBeFalse()->expo_push_token->toBeNull();
-    expect($devices[$deviceIds[1]]->is_active)->toBeTrue();
-    foreach (NotificationPushDelivery::all() as $delivery) {
-        app()->call([new SendExpoNotification($delivery->id), 'handle']);
-        expect($delivery->refresh()->status)->toBe($delivery->push_device_id === $devices[$deviceIds[0]]->id ? 'skipped' : 'accepted');
-    }
-    Http::assertSentCount(7);
-    Http::assertSent(fn (Request $request): bool => $request['to'] === 'ExpoPushToken[consumer_1]'
-        && $request['data']['deep_link'] === ['screen' => 'order_detail', 'order_id' => $order->id]
-        && array_keys($request['data']) === ['notification_id', 'order_id', 'deep_link']
-        && ! str_contains($request->body(), 'Synthetic address') && ! str_contains($request->body(), 'payment-proofs/'));
-    Bus::assertDispatchedTimes(CheckExpoReceipt::class, 7);
+    Http::assertNothingSent();
     Auth::forgetGuards();
     $this->withToken($tokens[1])->getJson('/api/v1/orders/'.$order->id)->assertOk();
-    $this->deleteJson('/api/v1/push-devices/'.$deviceIds[1])->assertNoContent();
-    expect($devices[$deviceIds[1]]->refresh()->is_active)->toBeFalse();
+    $this->getJson('/api/v1/notifications')->assertOk()->assertJsonCount(7, 'data')
+        ->assertJsonPath('meta.unread_count', 0);
 });

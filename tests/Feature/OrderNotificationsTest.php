@@ -23,6 +23,7 @@ use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -355,7 +356,85 @@ test('persistence failure queues a retry without failing committed checkout or d
     expect(Inventory::sole()->quantity)->toBe(2);
     Bus::assertDispatchedTimes(RetryOrderNotifications::class, 2);
     foreach (Bus::dispatched(RetryOrderNotifications::class) as $job) {
+        expect($job->connection)->toBe('database');
+        expect($job->queue)->toBe('default');
         app()->call([$job, 'handle']);
     }
     $this->assertDatabaseCount('notifications', 2);
+});
+
+test('the default database worker recovers partial persistence without duplicating history or resetting read state', function () {
+    $order = Order::factory()->create();
+    $firstAdmin = User::factory()->administrator()->create();
+    $secondAdmin = User::factory()->administrator()->create();
+    Event::listen('eloquent.creating: '.DatabaseNotification::class, function (DatabaseNotification $notification) use ($secondAdmin): void {
+        if ((int) $notification->notifiable_id === $secondAdmin->id) {
+            throw new RuntimeException('Administrator notification unavailable.');
+        }
+    });
+
+    try {
+        app(OrderProcessingService::class)->cancelForCustomer($order->user, $order->id);
+    } finally {
+        Event::forget('eloquent.creating: '.DatabaseNotification::class);
+    }
+
+    $order->user->notifications()->sole()->markAsRead();
+    $firstAdmin->notifications()->sole()->markAsRead();
+    $this->assertDatabaseHas('jobs', ['queue' => 'default', 'attempts' => 0]);
+    $this->assertDatabaseMissing('jobs', ['queue' => 'notifications']);
+
+    $this->artisan('queue:work', ['connection' => 'database', '--queue' => 'default', '--once' => true])->assertSuccessful();
+
+    expect($order->refresh()->status)->toBe(OrderStatus::Cancelled);
+    $this->assertDatabaseCount('notifications', 3);
+    $this->assertDatabaseCount('jobs', 0);
+    expect($order->user->notifications()->sole()->read_at)->not->toBeNull();
+    expect($firstAdmin->notifications()->sole()->read_at)->not->toBeNull();
+    expect($secondAdmin->notifications()->sole()->data['cancellation_initiator'])->toBe('customer');
+});
+
+test('notification persistence and enqueue failures do not escape a committed cancellation', function () {
+    $order = Order::factory()->create();
+    $stock = Inventory::factory()->create(['quantity' => 3]);
+    OrderItem::factory()->for($order)->for($stock->product)->create(['quantity' => 2]);
+    Event::listen('eloquent.creating: '.DatabaseNotification::class, fn (): never => throw new RuntimeException('Persistence unavailable.'));
+    Bus::shouldReceive('dispatch')->once()->with(Mockery::type(RetryOrderNotifications::class))
+        ->andThrow(new RuntimeException('Queue unavailable.'));
+    Log::shouldReceive('warning')->once()->with('Notification delivery failed.', Mockery::on(
+        fn (array $context): bool => $context['stage'] === 'persistence' && Str::isUuid($context['notification_event_id']),
+    ));
+    Log::shouldReceive('warning')->once()->with('Notification delivery failed.', Mockery::on(
+        fn (array $context): bool => $context['stage'] === 'persistence_enqueue' && Str::isUuid($context['notification_event_id']),
+    ));
+
+    try {
+        app(OrderProcessingService::class)->cancelForCustomer($order->user, $order->id);
+    } finally {
+        Event::forget('eloquent.creating: '.DatabaseNotification::class);
+    }
+
+    expect($order->refresh()->status)->toBe(OrderStatus::Cancelled);
+    expect($stock->refresh()->quantity)->toBe(5);
+    $this->assertDatabaseCount('notifications', 0);
+    $this->assertDatabaseCount('jobs', 0);
+});
+
+test('exhausted default queue persistence retries retain failed work and sanitized diagnostics', function () {
+    $order = Order::factory()->create();
+    $event = new OrderNotificationOccurred((string) Str::uuid(), 'payment.verified', $order->id, $order->user_id, $order->reference, now()->toIso8601String());
+    $job = new RetryOrderNotifications($event);
+    Bus::dispatch($job);
+    DB::table('jobs')->where('queue', 'default')->update(['attempts' => 3]);
+    Log::spy();
+
+    $this->artisan('queue:work', ['connection' => 'database', '--queue' => 'default', '--once' => true])->assertSuccessful();
+
+    expect($job->backoff())->toBe([30, 120]);
+    $this->assertDatabaseCount('notifications', 0);
+    $this->assertDatabaseCount('jobs', 0);
+    $this->assertDatabaseHas('failed_jobs', ['connection' => 'database', 'queue' => 'default']);
+    Log::shouldHaveReceived('warning')->once()->with('Notification delivery failed.', [
+        'stage' => 'persistence_exhausted', 'notification_event_id' => $event->id,
+    ]);
 });

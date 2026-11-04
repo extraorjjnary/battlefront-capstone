@@ -19,7 +19,7 @@ class RetryOrderNotifications implements ShouldQueue
 
     public function __construct(public readonly OrderNotificationOccurred $event)
     {
-        $this->onConnection('database')->onQueue('notifications');
+        $this->onConnection('database')->onQueue('default');
     }
 
     /** @return list<int> */

@@ -11,12 +11,10 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Events\OrderNotificationOccurred;
 use App\Jobs\RetryOrderNotifications;
-use App\Jobs\SendExpoNotification;
 use App\Listeners\PersistOrderNotifications;
 use App\Models\Inventory;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\PushDevice;
 use App\Models\User;
 use App\Services\Notifications\NotificationHistory;
 use App\Services\Notifications\OrderNotificationPublisher;
@@ -385,11 +383,9 @@ test('explicit self assignment still notifies its new handler while self claims 
     expect($manager->notifications()->sole()->data['title'])->toBe('Order assigned to you');
 });
 
-test('new return events preserve customer push and deep links without administrator push', function () {
-    config(['services.expo.enabled' => true]);
-    Bus::fake([SendExpoNotification::class]);
+test('new return events persist both audiences and owned deep links without queued delivery', function () {
+    Bus::fake();
     $order = Order::factory()->create();
-    PushDevice::factory()->for($order->user)->create();
     $manager = workflowEmployee();
     $event = new OrderNotificationOccurred((string) Str::uuid(), 'customer_return.received', $order->id, $order->user_id, $order->reference, now()->toIso8601String());
 
@@ -398,7 +394,7 @@ test('new return events preserve customer push and deep links without administra
 
     expect($order->user->notifications()->count())->toBe(1);
     expect($manager->notifications()->count())->toBe(1);
-    $this->assertDatabaseCount('notification_push_deliveries', 1);
+    $this->assertDatabaseCount('notification_push_deliveries', 0);
     expect(app(NotificationHistory::class)->summary($order->user)['recent'][0]['order']['deep_link'])->toBe(['screen' => 'order_detail', 'order_id' => $order->id]);
-    Bus::assertDispatched(SendExpoNotification::class);
+    Bus::assertNothingDispatched();
 });

@@ -20,7 +20,6 @@ use App\Http\Controllers\Api\V1\PcBuilderController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\ProductDwellController;
 use App\Http\Controllers\Api\V1\ProfileController;
-use App\Http\Controllers\Api\V1\PushDeviceController;
 use App\Http\Controllers\Api\V1\RecommendationController;
 use App\Http\Controllers\Api\V1\WishlistController;
 use App\Http\Controllers\CustomerRefundProofController;
@@ -117,14 +116,11 @@ Route::prefix('v1')
             Route::get('recommendations/personalized', [RecommendationController::class, 'personalized'])
                 ->name('recommendations.personalized');
 
-            // notifications and push devices
+            // notifications
             Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
             Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount'])->name('notifications.unread-count');
             Route::patch('notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
             Route::patch('notifications/{notification}/read', [NotificationController::class, 'update'])->whereUuid('notification')->name('notifications.update');
-            Route::get('push-devices/{device}', [PushDeviceController::class, 'show'])->whereUuid('device')->name('push-devices.show');
-            Route::put('push-devices/{device}', [PushDeviceController::class, 'update'])->whereUuid('device')->name('push-devices.update');
-            Route::delete('push-devices/{device}', [PushDeviceController::class, 'destroy'])->whereUuid('device')->name('push-devices.destroy');
 
             // profile
             Route::get('profile', [ProfileController::class, 'show'])->name('profile.show');

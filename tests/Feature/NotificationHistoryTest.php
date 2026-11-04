@@ -77,7 +77,7 @@ test('notification API returns 401 for missing invalid expired and revoked sessi
     $this->patchJson('/api/v1/notifications/read-all')->assertUnauthorized();
 })->with(['missing', 'invalid', 'expired', 'revoked']);
 
-test('administrators cannot use customer notification or device API endpoints', function (string $endpoint, string $method) {
+test('administrators cannot use customer notification API endpoints', function (string $endpoint, string $method) {
     $administrator = User::factory()->administrator()->create();
     $this->withToken($administrator->createToken('Admin test')->plainTextToken);
 
@@ -85,7 +85,6 @@ test('administrators cannot use customer notification or device API endpoints', 
 })->with([
     ['notifications', 'getJson'], ['notifications/unread-count', 'getJson'],
     ['notifications/read-all', 'patchJson'], ['notifications/'.Str::uuid().'/read', 'patchJson'],
-    ['push-devices/'.Str::uuid(), 'putJson'], ['push-devices/'.Str::uuid(), 'deleteJson'],
 ]);
 
 test('web notifications enforce both role boundaries', function (string $role, string $area) {

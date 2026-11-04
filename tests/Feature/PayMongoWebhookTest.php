@@ -73,6 +73,7 @@ test('a valid test webhook is durably recorded and queued once', function () {
     ], $payload)->assertOk()->assertExactJson(['received' => true]);
     $this->assertDatabaseCount('paymongo_webhook_inbox', 1);
     Bus::assertDispatchedTimes(ProcessPayMongoWebhook::class, 1);
+    Bus::assertDispatched(ProcessPayMongoWebhook::class, fn (ProcessPayMongoWebhook $job): bool => $job->queue === 'payments');
 });
 
 test('webhook recording propagates unrelated persistence failures without queuing work', function () {
@@ -360,7 +361,7 @@ test('overdue reconciliation dispatches QR Ph and excludes cancelled historical 
     $this->artisan('paymongo:reconcile-overdue')->assertSuccessful();
 
     Bus::assertDispatchedTimes(ReconcilePayMongoOrder::class, 1);
-    Bus::assertDispatched(ReconcilePayMongoOrder::class, fn (ReconcilePayMongoOrder $job): bool => $job->flowId === $qrFlow->id);
+    Bus::assertDispatched(ReconcilePayMongoOrder::class, fn (ReconcilePayMongoOrder $job): bool => $job->flowId === $qrFlow->id && $job->queue === 'payments');
 });
 
 test('cancelled PayMongo orders show review guidance instead of saying stock remains reserved', function () {

@@ -43,7 +43,7 @@ have no new automatic retry policy; after an uncertain response, read saved buil
 and cart/order state before an explicit retry.
 
 Automated contract and bundle checks do not close the physical-device integration
-gate. Actual uploads, payment return, push delivery, and iOS behavior remain subject
+gate. Actual uploads, payment return, and iOS behavior remain subject
 to the existing native validation procedure.
 
 Companion files:
@@ -165,8 +165,6 @@ All paths below are relative to `base_url`. GET routes also support HEAD through
 | GET    | /notifications/unread-count                              | Customer        | 200     |
 | PATCH  | /notifications/{notification}/read                       | Customer        | 200     |
 | PATCH  | /notifications/read-all                                  | Customer        | 200     |
-| PUT    | /push-devices/{device}                                   | Customer        | 200     |
-| DELETE | /push-devices/{device}                                   | Customer        | 204     |
 | POST   | /chatbot                                                 | Guest/customer  | 200     |
 | GET    | /recommendations                                         | Guest/customer  | 200     |
 | GET    | /recommendations/personalized                            | Customer        | 200     |
@@ -893,11 +891,11 @@ Multipart with one required `payment_proof` file; same image/extension/size rule
 
 There is no separate initial-proof upload endpoint: initial wallet proof belongs to POST /orders.
 
-## Shared notifications and Expo push — EXT-90
+## Shared notifications — EXT-90
 
-Notification history/read state belongs to the authenticated account and is shared by web and mobile. All endpoints below require a valid customer bearer token. Missing/invalid/expired/revoked tokens return 401; administrator tokens return 403. Foreign notification/device IDs return 404. Browser sessions never authenticate these API endpoints.
+Notification history/read state belongs to the authenticated account and is shared by web and mobile. All endpoints below require a valid customer bearer token. Missing/invalid/expired/revoked tokens return 401; administrator tokens return 403. Foreign notification IDs return 404. Browser sessions never authenticate these API endpoints.
 
-The web bell separately refreshes its summary every 30 seconds while its tab is visible using session-only web routes; hidden tabs pause and requests cannot overlap. It updates only the notification summary prop without visiting/reloading the current page or refreshing order/form data. The mobile endpoints below are unchanged: mobile should fetch its own history/count when appropriate for its screen lifecycle and Expo events.
+The web bell separately refreshes its summary every 30 seconds while its tab is visible using session-only web routes; hidden tabs pause and requests cannot overlap. It updates only the notification summary prop without visiting/reloading the current page or refreshing order/form data. The mobile endpoints below are unchanged: mobile should fetch its own history/count when appropriate for its screen lifecycle and read actions.
 
 ### History, unread count and read actions
 
@@ -931,46 +929,23 @@ The web bell separately refreshes its summary every 30 seconds while its tab is 
 
 Customer events: `payment.verified`, `payment.rejected`, `order.cancelled`, and `shipment.preparing/ready_for_dispatch/handed_to_lbc/in_transit/out_for_delivery/delivered`. Proof paths, payment rejection notes and personal addresses are absent; read the authorized order detail for available feedback. Initial shipment creation and reference corrections generate no notice, and current ETA cannot be revised. Administrator operational notifications remain web-only.
 
-### Device registration and revocation
+### Persistence, recovery and retired push
 
-Generate and retain a device-installation UUID in the mobile app; use it as `{device}`. `PUT /push-devices/{device}` accepts:
-
-```json
-{
-    "expo_push_token": "ExpoPushToken[client_obtained_token]",
-    "platform": "android",
-    "notification_channel": "order-updates-v2"
-}
-```
-
-`platform` is required and is `android` or `ios`. `notification_channel` is optional; updated Android clients send `order-updates-v2` after creating that channel. Older clients omit it and continue using the default channel. Tokens must use a nonempty `ExpoPushToken[...]` or `ExponentPushToken[...]` format and be at most 255 characters. Use Expo's actual project/device token; do not substitute an FCM/APNs token or bearer token. No provider credentials are passed by the client. Invalid fields return 422; malformed device UUID routes return 404.
-
-Registration returns `{"data":{"id":1,"device_id":"<installation-uuid>","platform":"android","is_active":true,"updated_at":"<ISO timestamp>"}}`. Account/session ownership comes from bearer authentication, never submitted IDs. Raw push tokens and session identifiers are not returned. Repeated identical registration is idempotent; changed token/session creates a new registration version.
-
-Multiple devices are supported. An active token already registered to a different account/device returns 422; do not silently transfer it. Revoke the previous registration or sign out before switching accounts. Ineligible expired/revoked registrations can be deactivated by server cleanup when encountered, permitting a fresh authenticated registration.
-
-`DELETE /push-devices/{device}` deactivates the caller's registration and clears its stored token; repeated revocation returns 204 without a body. Unknown/foreign registrations return 404. Mobile logout disables registrations belonging to the presented session and revokes that session only. Other valid device sessions remain eligible. Expiry/revocation is also rechecked before queued sending. Sign in and PUT the device registration again to resume push; tokens never authenticate API requests.
-
-### Push behavior, backend setup and limitations
-
-Set `EXPO_PUSH_ENABLED=true` only after the separate Expo project has working platform credentials and physical-device push setup. `EXPO_PUSH_ACCESS_TOKEN` is optional server-side configuration for Expo enhanced push security; keep it outside source control and client responses. Run:
+Customer web/mobile and administrator web notifications are persisted synchronously after business commit. Normal notification creation needs no worker. If persistence fails, `RetryOrderNotifications` retains three attempts with 30/120-second backoff on the `database` connection's `default` queue:
 
 ```shell
-php artisan migrate --no-interaction
-php artisan queue:work database --queue=notifications,default --timeout=30 --tries=3
+php artisan queue:work database --queue=default --timeout=30 --tries=3
 ```
 
-The migrations add Laravel history, device registrations and delivery records; there is no historical backfill. Database history persists immediately after business commit without waiting for the worker. Push and persistence retries explicitly use the asynchronous database connection even when the application's default queue is sync. Workers must process delayed jobs. Rebuild deployment event caches and restart workers after deploying notification classes.
+The general development worker processes `default`; the separate PayMongo `payments` worker and reconciliation schedules remain unchanged. Failed persistence/enqueue/exhausted-retry diagnostics require operator review. The existing no-outbox limitation remains: a crash between commit and history persistence, simultaneous persistence/enqueue failure, or exhausted retries can leave history missing without undoing the committed business action.
 
-Push text is generic: “An update is available. Open Battlefront to view your order.” Its `data` contains `notification_id`, `order_id` and `deep_link`; it contains no proof URLs, addresses, amounts or personal/payment details. Expo's `channelId` is sent only to Android registrations that advertised the new channel. Client receipt/tapping a push must not mutate order/payment/shipment business state. Refresh history/count when opening the app and after read actions; push availability does not establish read state.
+Mobile Expo push delivery, receipt processing and GET/PUT/DELETE `/push-devices/{device}` are retired. Remove device-registration calls from the separate mobile consumer. Mobile history, unread count, read actions, owned-order metadata and account-bound state are unchanged. Logout still revokes only the presented bearer session; another valid session can continue reading the same history. Refresh history/count on screen activation and after read actions.
 
-The adapter checks send tickets and receipts about 15 minutes later; absent receipts are rechecked within 24 hours of acceptance. Confirmed `DeviceNotRegistered` deactivates the matching registration; old feedback cannot disable a refreshed device. Connection/429/5xx/malformed-response failures use bounded retries. Other provider errors retain tokens unless confirmed unusable. Inspect sanitized notification diagnostics and failed queue jobs for recovery; do not log raw credentials or provider bodies.
+Historical migrations, notification records and legacy push tables/data are retained. No history is deleted or reconstructed. No browser Web Push, email/SMS or replacement push provider is added.
 
-Push is best effort: provider acceptance is not device delivery, and uncertain network/process failures can cause missing/duplicate push. An in-flight push cannot be recalled by logout. Enqueue failure can leave delivery/receipt work pending. After-commit persistence retries have no outbox: a crash between commit/history persistence, or simultaneous persistence/queue failure, can leave a history entry missing. These failures never roll back or fail successful business actions.
+Before updating a running installation, disable Expo using the old release's configuration and restart its notification workers so the disabled setting takes effect. Using that old release, drain the `database/notifications` queue, including delayed send/receipt jobs and persistence retries, and resolve failed persistence retries before retiring its worker and deleting Expo job classes. Keep failed-job records; do not bulk purge queues, retry retired Expo failures, or touch `payments`. Then deploy the removal and keep the `database/default` recovery worker running. Existing environment Expo variables are no longer consumed.
 
-No browser Web Push, email/SMS, live LBC API, direct Firebase server integration or React Native UI is included. Real Expo/native-client validation remains pending.
-
-Postman acceptance: list/count, mark one/all read and compare web state; verify foreign IDs and invalid/admin sessions; register two devices, revoke one, and verify session-specific logout. Trigger payment/shipment changes through web administration and refresh customer history. Provider errors/receipt timing require the focused automated fakes or a separately configured real Expo device, not synthetic Postman token examples.
+Postman acceptance: list/count, mark one/all read and compare web state; verify foreign IDs and invalid/admin sessions; verify logout affects only its bearer session. Trigger payment/shipment changes through web administration and refresh customer history. Push registration/delivery checks no longer apply.
 
 ## 7. Chatbot (guest and customer)
 
@@ -1129,7 +1104,7 @@ The developer subsequently reported completing manual tests in Postman Desktop w
 
 Known implementation details are documented, not changed: registration's validated-but-unsaved address; different page validation between products/orders; stateless guest context is not per-device identity; private proof has no mobile download endpoint.
 
-The behavior-driven recommendation update adds the public recommendation feed and anonymous aggregate interaction endpoint and retires the superseded input/options endpoints after developer-confirmed mobile migration. EXT-89 exposes manual shipment facts through existing order detail endpoints; EXT-90 adds notification history/read-state and Expo device registration/revocation endpoints. No mobile password reset/change, token refresh, admin operations, payment gateways, live courier/GPS tracking, or compatibility checking are introduced.
+The behavior-driven recommendation update adds the public recommendation feed and anonymous aggregate interaction endpoint and retires the superseded input/options endpoints after developer-confirmed mobile migration. EXT-89 exposes manual shipment facts through existing order detail endpoints; EXT-90 adds shared notification history/read-state endpoints; mobile Expo push and device registration have since been retired. No mobile password reset/change, token refresh, admin operations, payment gateways, live courier/GPS tracking, or compatibility checking are introduced.
 
 ## 11. Customer return/refund requests
 

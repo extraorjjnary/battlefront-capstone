@@ -11,11 +11,6 @@ return [
         'direct_banking_enabled' => env('PAYMONGO_DIRECT_BANKING_ENABLED', false),
         'direct_banking_banks' => ['bpi' => 'BPI', 'ubp' => 'UnionBank', 'landbank' => 'LandBank'],
     ],
-    'expo' => [
-        'enabled' => env('EXPO_PUSH_ENABLED', false),
-        'access_token' => env('EXPO_PUSH_ACCESS_TOKEN'),
-        'ca_bundle' => env('EXPO_PUSH_CA_BUNDLE'),
-    ],
 
     /*
     |--------------------------------------------------------------------------
