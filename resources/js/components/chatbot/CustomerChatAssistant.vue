@@ -5,6 +5,7 @@ import { nextTick, onMounted, ref, watch } from 'vue';
 import ChatbotController from '@/actions/App/Http/Controllers/ChatbotController';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import ChatbotMessage from './ChatbotMessage.vue';
 import { quickQuestions } from './quickQuestions';
 
 const inquiry = useHttp({ message: '', context_token: null });
@@ -159,6 +160,7 @@ async function submitMessage(quickQuestion = null) {
                 role: 'assistant',
                 content: response.message,
                 source: response.source,
+                productLinks: response.product_links ?? [],
             },
         );
         inquiry.message = quickQuestion !== null ? draft : '';
@@ -312,19 +314,14 @@ async function submitMessage(quickQuestion = null) {
                                             : 'Battlefront assistant'
                                     }}
                                 </p>
-                                <div
-                                    class="mt-1 space-y-3 text-sm leading-6 [overflow-wrap:anywhere]"
-                                >
-                                    <p
-                                        v-for="(
-                                            paragraph, index
-                                        ) in message.content.split(/\n\s*\n/)"
-                                        :key="index"
-                                        class="whitespace-pre-wrap"
-                                    >
-                                        {{ paragraph }}
-                                    </p>
-                                </div>
+                                <ChatbotMessage
+                                    :content="message.content"
+                                    :products="
+                                        message.role === 'assistant'
+                                            ? message.productLinks
+                                            : []
+                                    "
+                                />
                             </article>
                         </li>
                         <li v-if="inquiry.processing" class="flex justify-end">

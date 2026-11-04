@@ -21,6 +21,7 @@ class ChatbotController extends Controller
             'message' => $result['message'],
             'source' => $result['source'],
             'context_token' => $result['context_token'],
+            ...isset($result['product_links']) ? ['product_links' => $result['product_links']] : [],
         ]);
     }
 }

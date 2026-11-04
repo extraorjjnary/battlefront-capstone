@@ -24,7 +24,7 @@ class ChatbotConversation
         private ChatbotLanguage $language = new ChatbotLanguage,
     ) {}
 
-    /** @return array{message: string, source: string, context_token: string|null} */
+    /** @return array{message: string, source: string, context_token: string|null, product_links?: list<array{id: int, name: string}>} */
     public function respond(string $message, ?User $customer, ?string $token, string $contextScope): array
     {
         $subject = $contextScope.':'.($customer?->getKey() ?? 'guest');
@@ -90,7 +90,10 @@ class ChatbotConversation
                     return $this->fallback('Those products are no longer available in the current catalog. Please enter another product name or model.', $state, $subject);
                 }
 
-                return $this->fallback($this->fallbackRenderer->productClarification(array_column($choices, 'name')), $state, $subject);
+                return $this->withProductLinks(
+                    $this->fallback($this->fallbackRenderer->productClarification(array_column($choices, 'name')), $state, $subject),
+                    array_column($choices, 'id'),
+                );
             }
         }
 
@@ -195,11 +198,38 @@ class ChatbotConversation
             $result['message'] .= ' Live inventory information covers the Sagay branch only.';
         }
 
-        return [
+        return $this->withProductLinks([
             'message' => $result['message'],
             'source' => $result['source'],
             'context_token' => $this->tokens->encode($state, $subject),
-        ];
+        ], $resolved && $state['active'] === 'product' ? $state['references']['product'] : []);
+    }
+
+    /**
+     * @param  array{message: string, source: string, context_token: string|null}  $response
+     * @param  list<int>  $productIds
+     * @return array{message: string, source: string, context_token: string|null, product_links?: list<array{id: int, name: string}>}
+     */
+    private function withProductLinks(array $response, array $productIds): array
+    {
+        if ($productIds === []) {
+            return $response;
+        }
+
+        $links = Product::query()->customerAvailable()->whereIn('id', $productIds)
+            ->orderBy('name')->orderBy('id')->get(['id', 'name'])
+            ->filter(fn (Product $product): bool => preg_match(
+                '/(?<![\p{L}\p{N}_])'.preg_quote($product->name, '/').'(?![\p{L}\p{N}_])/iu',
+                $response['message'],
+            ) === 1)
+            ->map(fn (Product $product): array => ['id' => $product->id, 'name' => $product->name])
+            ->all();
+
+        if ($links !== []) {
+            $response['product_links'] = array_values($links);
+        }
+
+        return $response;
     }
 
     private function selectedTopic(string $message): ?string

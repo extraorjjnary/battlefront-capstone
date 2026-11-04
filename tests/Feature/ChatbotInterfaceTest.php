@@ -105,8 +105,9 @@ test('guests can ask about catalog products', function () {
 
     $this->postJson(route('chatbot.store'), ['message' => 'Is the Aurelius Link Station available?'])
         ->assertOk()
-        ->assertJsonCount(3)
-        ->assertJsonStructure(['message', 'source', 'context_token'])
+        ->assertJsonCount(4)
+        ->assertJsonStructure(['message', 'source', 'context_token', 'product_links'])
+        ->assertJsonPath('product_links', [['id' => $product->id, 'name' => 'Aurelius Link Station']])
         ->assertJson([
             'message' => 'The Aurelius Link Station is available. Live inventory information covers the Sagay branch only.',
             'source' => 'gemini',

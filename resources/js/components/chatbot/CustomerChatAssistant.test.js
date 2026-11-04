@@ -151,6 +151,7 @@ for (const succeeds of [true, false]) {
                         message: 'Approved guidance.',
                         source: 'fallback',
                         context_token: 'new-token',
+                        product_links: [{ id: 17, name: 'Atlas Monitor X240' }],
                     };
                 },
             },
@@ -172,6 +173,14 @@ for (const succeeds of [true, false]) {
             succeeds ? 'new-token' : 'old-token',
         );
         assert.equal(context.messages.value.length, succeeds ? 2 : 0);
+        if (succeeds) {
+            assert.equal(context.messages.value[0].productLinks, undefined);
+            assert.equal(context.messages.value[1].productLinks[0].id, 17);
+            assert.equal(
+                context.messages.value[1].productLinks[0].name,
+                'Atlas Monitor X240',
+            );
+        }
         assert.equal(context.showQuickQuestions.value, !succeeds);
     });
 }

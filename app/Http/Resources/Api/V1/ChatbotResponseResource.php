@@ -18,6 +18,7 @@ class ChatbotResponseResource extends JsonResource
             'message' => $this->resource['message'],
             'source' => $this->resource['source'],
             'context_token' => $this->resource['context_token'],
+            'product_links' => $this->when(isset($this->resource['product_links']), fn (): array => $this->resource['product_links']),
         ];
     }
 }
