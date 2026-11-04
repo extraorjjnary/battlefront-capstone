@@ -171,6 +171,14 @@ class ChatbotAiAdapter
 
         $this->ensureScalarContext($context);
 
+        if (is_array($context['products'] ?? null)) {
+            foreach ($context['products'] as $index => $product) {
+                if (is_array($product) && ($product['is_demo'] ?? null) === false) {
+                    unset($context['products'][$index]['is_demo']);
+                }
+            }
+        }
+
         try {
             $encodedPrompt = json_encode(
                 $prompt,

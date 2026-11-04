@@ -17,6 +17,7 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DevelopmentCustomerSeeder;
 use Database\Seeders\DevelopmentHistoricalSalesSeeder;
+use Database\Seeders\DevelopmentSupplierSeeder;
 use Database\Seeders\PcBuilderCatalogDraftSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Artisan;
@@ -33,7 +34,7 @@ test('development reset rejects unsafe environments even with force', function (
     $sentinel = User::factory()->create();
     $this->app->instance('env', $environment);
 
-    $this->artisan('battlefront:reset-dev', ['--force' => $force, '--with-sales-history' => true])
+    $this->artisan('battlefront:reset-dev', ['--force' => $force, '--with-sales-history' => true, '--with-suppliers' => true])
         ->expectsOutputToContain('only allowed in local and testing')
         ->assertFailed();
 
@@ -126,12 +127,13 @@ test('invalid restore inputs preserve the existing database', function (string $
 test('reset stops when an orchestration stage fails', function (string $stage) {
     $sentinel = User::factory()->create();
     $this->mock(RealCatalogImportService::class, function ($mock) use ($stage) {
-        $mock->shouldReceive('inspectFiles')->once()->andReturn(array_fill(0, 654, []));
+        $supplierCodes = array_merge(...array_map(fn (array $supplier): array => array_keys($supplier['products']), DevelopmentSupplierSeeder::catalog()));
+        $mock->shouldReceive('inspectFiles')->once()->andReturn(array_pad(array_map(fn (int|string $code): array => ['product_code' => $code], $supplierCodes), 654, []));
         if ($stage === 'import') {
             $mock->shouldReceive('execute')->once()->andThrow(new RuntimeException('Import failed.'));
         } elseif ($stage === 'count') {
             $mock->shouldReceive('execute')->once()->andReturn(['created' => 653, 'updated' => 0]);
-        } elseif ($stage === 'pc-builder') {
+        } elseif (in_array($stage, ['pc-builder', 'suppliers'], true)) {
             $mock->shouldReceive('execute')->once()->andReturn(['created' => 654, 'updated' => 0]);
         } else {
             $mock->shouldNotReceive('execute');
@@ -152,21 +154,32 @@ test('reset stops when an orchestration stage fails', function (string $stage) {
     } else {
         $command->shouldNotReceive('call')->with('db:seed', ['--class' => PcBuilderCatalogDraftSeeder::class, '--force' => true, '--no-interaction' => true]);
     }
+    if ($stage === 'suppliers') {
+        $command->shouldReceive('call')->with('db:seed', ['--class' => DevelopmentSupplierSeeder::class, '--force' => true, '--no-interaction' => true])->once()->andReturn(1);
+    } else {
+        $command->shouldNotReceive('call')->with('db:seed', ['--class' => DevelopmentSupplierSeeder::class, '--force' => true, '--no-interaction' => true]);
+    }
     $command->shouldNotReceive('call')->with('db:seed', ['--class' => DevelopmentHistoricalSalesSeeder::class, '--force' => true, '--no-interaction' => true]);
     Artisan::registerCommand($command);
 
-    $this->artisan('battlefront:reset-dev', ['--force' => true])
-        ->expectsOutputToContain($stage === 'pc-builder' ? 'PC Builder draft seeding failed' : 'failed:')
+    $this->artisan('battlefront:reset-dev', ['--force' => true, '--with-suppliers' => $stage === 'suppliers'])
+        ->expectsOutputToContain(match ($stage) {
+            'pc-builder' => 'PC Builder draft seeding failed',
+            'suppliers' => 'Supplier demonstration seeding failed',
+            default => 'failed:',
+        })
         ->expectsOutputToContain('Reset incomplete')
         ->doesntExpectOutput('Development reset completed.')
         ->assertFailed();
 
     $this->assertModelExists($sentinel);
-})->with(['migration', 'seeding', 'customers', 'import', 'count', 'pc-builder']);
+})->with(['migration', 'seeding', 'customers', 'import', 'count', 'pc-builder', 'suppliers']);
 
-test('reset prepares component drafts after catalog import and before optional history', function (bool $withHistory) {
+test('reset prepares component drafts after catalog import and optional suppliers and before optional history', function (bool $withHistory, bool $withSuppliers) {
     $this->mock(RealCatalogImportService::class, function ($mock) {
-        $mock->shouldReceive('inspectFiles')->once()->andReturn(array_pad(array_map(fn (string $code): array => ['product_code' => $code], DevelopmentHistoricalSalesSeeder::PRODUCT_CODES), 654, []));
+        $supplierCodes = array_merge(...array_map(fn (array $supplier): array => array_keys($supplier['products']), DevelopmentSupplierSeeder::catalog()));
+        $codes = array_merge(DevelopmentHistoricalSalesSeeder::PRODUCT_CODES, $supplierCodes);
+        $mock->shouldReceive('inspectFiles')->once()->andReturn(array_pad(array_map(fn (int|string $code): array => ['product_code' => $code], $codes), 654, []));
         $mock->shouldReceive('execute')->once()->andReturnUsing(function (): array {
             expect(ProductComponentProfile::query()->count())->toBe(0);
             Product::factory()->available()->for(Category::factory()->create(['name' => 'Motherboard']))->create([
@@ -183,6 +196,16 @@ test('reset prepares component drafts after catalog import and before optional h
     foreach ([DatabaseSeeder::class, DevelopmentCustomerSeeder::class] as $seeder) {
         $command->shouldReceive('call')->with('db:seed', ['--class' => $seeder, '--force' => true, '--no-interaction' => true])->once()->andReturn(0);
     }
+    if ($withSuppliers) {
+        $command->shouldReceive('call')->with('db:seed', ['--class' => DevelopmentSupplierSeeder::class, '--force' => true, '--no-interaction' => true])->once()->andReturnUsing(function (): int {
+            expect(Product::query()->sole()->product_code)->toBe('62504865');
+            expect(ProductComponentProfile::query()->count())->toBe(0);
+
+            return 0;
+        });
+    } else {
+        $command->shouldNotReceive('call')->with('db:seed', ['--class' => DevelopmentSupplierSeeder::class, '--force' => true, '--no-interaction' => true]);
+    }
     if ($withHistory) {
         $command->shouldReceive('call')->with('db:seed', ['--class' => DevelopmentHistoricalSalesSeeder::class, '--force' => true, '--no-interaction' => true])->once()->andReturnUsing(function (): int {
             expect(ProductComponentProfile::query()->sole()->review_status)->toBe('draft');
@@ -194,7 +217,7 @@ test('reset prepares component drafts after catalog import and before optional h
     }
     Artisan::registerCommand($command);
 
-    $this->artisan('battlefront:reset-dev', ['--force' => true, '--with-sales-history' => $withHistory])
+    $this->artisan('battlefront:reset-dev', ['--force' => true, '--with-sales-history' => $withHistory, '--with-suppliers' => $withSuppliers])
         ->expectsOutput('PC Builder catalog drafts seeded. Review specifications before publishing predefined builds.')
         ->assertSuccessful();
 
@@ -206,7 +229,22 @@ test('reset prepares component drafts after catalog import and before optional h
         ->where('components.motherboard.0.specifications_reviewed', false)
         ->where('components.motherboard.0.specifications', [])
         ->has('templates', 0));
-})->with([false, true]);
+})->with([false, true])->with([false, true]);
+
+test('supplier product selection is validated before database recreation', function () {
+    $sentinel = User::factory()->create();
+    $this->mock(RealCatalogImportService::class, function ($mock) {
+        $mock->shouldReceive('inspectFiles')->once()->andReturn(array_fill(0, 654, ['product_code' => 'UNSELECTED']));
+        $mock->shouldNotReceive('execute');
+    });
+
+    $this->artisan('battlefront:reset-dev', ['--force' => true, '--with-suppliers' => true])
+        ->expectsOutputToContain('Supplier demonstrations require selected catalog product codes')
+        ->expectsOutputToContain('No database records were changed')
+        ->assertFailed();
+
+    $this->assertModelExists($sentinel);
+});
 
 test('reset restores the complete real catalog with historical sales only when requested', function (bool $withHistory) {
     $this->travelTo(CarbonImmutable::parse('2026-10-15 12:00:00'));

@@ -7,6 +7,7 @@ use App\Services\RealCatalogImportService;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\DevelopmentCustomerSeeder;
 use Database\Seeders\DevelopmentHistoricalSalesSeeder;
+use Database\Seeders\DevelopmentSupplierSeeder;
 use Database\Seeders\PcBuilderCatalogDraftSeeder;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -18,6 +19,7 @@ use Throwable;
 #[Signature('battlefront:reset-dev
     {--force : Skip confirmation in local/testing environments}
     {--with-sales-history : Load synthetic historical sales for forecasting development}
+    {--with-suppliers : Link demonstration suppliers to existing catalog products}
     {--manifest= : Path to the audited catalog image manifest}
     {--mapping= : Path to the verified product details CSV}')]
 #[Description('Recreate the local development database and restore the verified 654-product catalog')]
@@ -48,6 +50,13 @@ class ResetDevCommand extends Command
                 $missingCodes = array_diff(DevelopmentHistoricalSalesSeeder::PRODUCT_CODES, array_column($rows, 'product_code'));
                 if ($missingCodes !== []) {
                     throw new RuntimeException('Historical sales requires selected catalog product codes: '.implode(', ', $missingCodes).'.');
+                }
+            }
+            if ($this->option('with-suppliers')) {
+                $supplierCodes = array_merge(...array_map(fn (array $supplier): array => array_keys($supplier['products']), DevelopmentSupplierSeeder::catalog()));
+                $missingCodes = array_diff($supplierCodes, array_column($rows, 'product_code'));
+                if ($missingCodes !== []) {
+                    throw new RuntimeException('Supplier demonstrations require selected catalog product codes: '.implode(', ', $missingCodes).'.');
                 }
             }
             $this->info('Catalog audit passed: 654 products and image paths validated.');
@@ -87,6 +96,14 @@ class ResetDevCommand extends Command
                 throw new RuntimeException('Expected 654 newly imported products and no updates.');
             }
             $this->info("{$result['created']} products imported.");
+
+            if ($this->option('with-suppliers')) {
+                $stage = 'Supplier demonstration seeding';
+                if ($this->call('db:seed', ['--class' => DevelopmentSupplierSeeder::class, '--force' => true, '--no-interaction' => true]) !== self::SUCCESS) {
+                    throw new RuntimeException('Supplier demonstration seeding failed.');
+                }
+                $this->info('Demonstration suppliers linked to existing catalog products.');
+            }
 
             $stage = 'PC Builder draft seeding';
             if ($this->call('db:seed', ['--class' => PcBuilderCatalogDraftSeeder::class, '--force' => true, '--no-interaction' => true]) !== self::SUCCESS) {

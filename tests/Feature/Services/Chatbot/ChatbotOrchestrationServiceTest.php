@@ -153,12 +153,12 @@ test('sends only matched catalog and Sagay inventory facts for a product inquiry
             'tags' => ['Field Ready'],
             'price' => '12999.00',
             'discount_price' => null,
-            'is_demo' => false,
             'inventory' => ['quantity' => 7, 'status' => 'in_stock'],
         ]],
     ];
     ChatbotResponseAgent::assertPrompted(function (AgentPrompt $prompt) use ($expectedContext): bool {
         return str_contains($prompt->prompt, json_encode($expectedContext, JSON_THROW_ON_ERROR))
+            && ! str_contains($prompt->prompt, '"is_demo"')
             && ! str_contains($prompt->prompt, 'images/private-catalog-path.jpg')
             && ! str_contains($prompt->prompt, 'Unrelated private product detail.');
     });

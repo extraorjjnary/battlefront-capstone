@@ -20,3 +20,7 @@ The developer-approved direct-answer refinement supersedes the prior provider-by
 ## Bound multilingual intent classification to one provider call per turn
 
 The approved multilingual refinement permits Gemini intent classification before fact retrieval only for screened, uncertain Battlefront inquiries, through ChatbotAiAdapter with validated allowlisted output. Never use it for FAQ approval/preview or authorization. Allow at most one Gemini call per turn: classification consumes the call and the response uses deterministic resolver wording. Keep approved FAQ/rule and fallback text in English until localized wording is reviewed; live-data generation may use en/hil/ceb/tl without claiming verified fluency. No live Gemini calls are authorized for automated tests or implementation verification.
+
+## Hide negative demo flags in product replies
+
+Ordinary catalog products must not be labeled Demonstration product: No. Omit false product is_demo flags from provider prompts and keep internal flags out of customer wording. Preserve actual demo identification/notices, unconfirmed demo stock and deterministic fallback safeguards.

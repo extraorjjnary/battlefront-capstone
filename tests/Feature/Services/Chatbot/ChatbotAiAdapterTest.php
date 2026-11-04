@@ -38,7 +38,7 @@ test('returns generated wording from minimized authoritative context', function 
 
     $result = app(ChatbotAiAdapter::class)->generate(
         'Is the Aurelius Link Station available?',
-        $context,
+        ['products' => [[...$context['products'][0], 'is_demo' => false]]],
     );
 
     expect($result)->toBe([
@@ -56,6 +56,7 @@ test('returns generated wording from minimized authoritative context', function 
             && $prompt->timeout === 20
             && str_contains($prompt->prompt, '"Is the Aurelius Link Station available?"')
             && str_contains($prompt->prompt, $encodedContext)
+            && ! str_contains($prompt->prompt, '"is_demo"')
             && ! str_contains($prompt->prompt, 'test-secret-that-must-not-be-forwarded');
     });
     Http::assertNothingSent();
