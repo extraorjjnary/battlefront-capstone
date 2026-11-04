@@ -32,7 +32,13 @@ class ChatbotConversation
         $message = Str::squish($message);
 
         if (! $this->chatbot->containsSensitiveInput($message)) {
-            $state['language'] = $this->language->select($message, $state['language'] ?? null);
+            $explicitLanguage = $this->language->explicit($message);
+            if ($explicitLanguage !== null) {
+                $state['language'] = $explicitLanguage;
+                $state['language_explicit'] = true;
+            } elseif (! ($state['language_explicit'] ?? false)) {
+                $state['language'] = $this->language->select($message, $state['language'] ?? null);
+            }
             if ($this->language->explicit($message) !== null && trim($this->language->withoutLanguageRequest($message), ' .?!') === '') {
                 return $this->fallback('I will use your selected language when I can express the current facts reliably. Approved guidance and fallback messages remain in English.', $state, $subject);
             }
@@ -67,12 +73,28 @@ class ChatbotConversation
 
         $productId = null;
         $category = $routing['category'];
+        if (($state['active'] ?? null) === 'product' && isset($state['product_clarification'])
+            && preg_match('/^(?:the )?(first|second|third|fourth|\d+(?:st|nd|rd|th)?)(?: one| product)?[.!?]*$/iu', $this->language->canonical($message), $ordinal) === 1) {
+            $position = match (Str::lower($ordinal[1])) {
+                'first', '1', '1st' => 0,
+                'second', '2', '2nd' => 1,
+                'third', '3', '3rd' => 2,
+                default => null,
+            };
+            $shown = array_slice($state['references']['product'] ?? [], 0, 3);
+            if ($position === null || ! isset($shown[$position])) {
+                return $this->fallback('Please choose one of the displayed products by name or position.', $state, $subject);
+            }
+            $productId = $shown[$position];
+            $message = 'Product inquiry: '.$state['product_clarification'];
+            $category = ChatbotQueryCategory::Product;
+        }
         if (isset($state['product_clarification']) && $category === ChatbotQueryCategory::Product
             && $this->products->matchesCatalogTerms($message)
             && $this->products->clarificationChoices($state['references']['product'] ?? [], $message) === []) {
             unset($state['product_clarification']);
         }
-        if (($state['active'] ?? null) === 'product' && isset($state['product_clarification'])
+        if ($productId === null && ($state['active'] ?? null) === 'product' && isset($state['product_clarification'])
             && in_array($category, [ChatbotQueryCategory::Product, ChatbotQueryCategory::Unsupported], true)
             && ! $this->categorizer->requiresLiveFacts($message)) {
             $references = $state['references']['product'] ?? [];
@@ -103,8 +125,19 @@ class ChatbotConversation
 
         $matchingMessage = $this->language->canonical($message);
         $isFollowUp = preg_match('/\b(?:it|its|that|this|there|earlier|previous)\b|^(?:how much|and the)\b|^(?:price|available)\s*[?!.]*$/iu', $matchingMessage) === 1;
+        $shortTopic = match (true) {
+            preg_match('/^(?:stock|availability|specs|specifications|details|description)[?!.]*$/iu', $matchingMessage) === 1 => 'product',
+            preg_match('/^(?:hours|opening hours|contact|contact information)[?!.]*$/iu', $matchingMessage) === 1 => 'store',
+            preg_match('/^status[?!.]*$/iu', $matchingMessage) === 1 => 'order',
+            default => null,
+        };
+        if ($shortTopic !== null && $shortTopic === ($state['active'] ?? null)) {
+            $isFollowUp = true;
+        }
 
-        if ($isFollowUp && $this->hasExplicitEntity($message, $category)) {
+        if ($isFollowUp && ($shortTopic === 'product'
+            ? $this->products->namesProduct($message)
+            : $this->hasExplicitEntity($message, $category))) {
             $isFollowUp = false;
         }
 
@@ -265,7 +298,9 @@ class ChatbotConversation
         }
 
         if ($category === ChatbotQueryCategory::Product) {
-            return $this->products->namesProduct($message) || $this->products->hasSearchTerms($message);
+            $referenceMessage = preg_replace('/^(?:what|how) about\s+/iu', '', $this->language->canonical($message)) ?? $message;
+
+            return $this->products->namesProduct($message) || $this->products->hasSearchTerms($referenceMessage);
         }
 
         return $category === ChatbotQueryCategory::Faq

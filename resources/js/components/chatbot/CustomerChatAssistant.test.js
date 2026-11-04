@@ -165,7 +165,7 @@ for (const succeeds of [true, false]) {
         )('What payment methods can I use?');
         assert.deepEqual(sent, {
             message: 'What payment methods can I use?',
-            token: null,
+            token: 'old-token',
         });
         assert.equal(context.inquiry.message, 'Unfinished question');
         assert.equal(

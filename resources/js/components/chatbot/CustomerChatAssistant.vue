@@ -131,7 +131,6 @@ async function submitMessage(quickQuestion = null) {
     let receivedReply = false;
     if (quickQuestion !== null) {
         inquiry.message = message;
-        inquiry.context_token = null;
     }
     void scrollToLatest();
 

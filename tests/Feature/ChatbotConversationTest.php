@@ -3,6 +3,7 @@
 use App\Ai\Agents\ChatbotIntentAgent;
 use App\Ai\Agents\ChatbotResponseAgent;
 use App\Enums\ChatbotCategory;
+use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Branch;
 use App\Models\ChatbotKnowledge;
@@ -11,9 +12,147 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\Chatbot\ChatbotConversation;
+use App\Services\Chatbot\ChatbotConversationToken;
 use Illuminate\Support\Facades\Http;
 use Laravel\Ai\Exceptions\AiException;
 use Laravel\Ai\Prompts\AgentPrompt;
+
+test('conversational and short product follow ups retain fresh facts', function (string $followUp) {
+    $product = Product::factory()->available()->create(['name' => 'Atlas Monitor X240', 'price' => '4200.00', 'discount_price' => null, 'description' => 'Current monitor details']);
+    ChatbotResponseAgent::fake(fn () => throw new AiException)->preventStrayPrompts();
+    $chat = app(ChatbotConversation::class);
+    $first = $chat->respond('Price of Atlas Monitor X240?', null, null, 'phrases');
+    $product->update(['price' => '3900.00']);
+    $product->inventory->update(['quantity' => 3]);
+
+    $next = $chat->respond($followUp, null, $first['context_token'], 'phrases');
+
+    expect($next['message'])->toContain('Atlas Monitor X240');
+    ChatbotResponseAgent::assertPromptedTimes(2);
+    ChatbotResponseAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, '3900.00') && str_contains($prompt->prompt, '"quantity":3'));
+})->with(['What about its price?', 'Tell me more about it', 'Stock?', 'Specs?', 'Description?']);
+
+test('ordinals select only the displayed product position without substituting inactive choices', function (string $selection, bool $inactive, ?string $expected) {
+    $products = collect(['A100', 'B100', 'C100', 'D100'])->map(fn (string $model) => Product::factory()->available()->create(['name' => 'Atlas Monitor '.$model]));
+    ChatbotResponseAgent::fake(fn () => throw new AiException)->preventStrayPrompts();
+    $chat = app(ChatbotConversation::class);
+    $first = $chat->respond('monitor price', null, null, 'ordinal');
+    if ($inactive) {
+        $products[1]->update(['is_active' => false]);
+    }
+
+    $next = $chat->respond($selection, null, $first['context_token'], 'ordinal');
+
+    if ($expected !== null) {
+        expect($next['message'])->toContain($expected)->not->toContain('D100');
+        ChatbotResponseAgent::assertPromptedTimes(1);
+    } else {
+        expect($next['message'])->not->toContain('Listed price');
+        ChatbotResponseAgent::assertNeverPrompted();
+    }
+})->with([
+    ['the first one', false, 'A100'],
+    ['the second one', false, 'B100'],
+    ['the third one', false, 'C100'],
+    ['2', false, 'B100'],
+    ['1st', false, 'A100'],
+    ['the fourth one', false, null],
+    ['the second one', true, null],
+]);
+
+test('explicit language survives shortcuts and resets with a missing or expired token', function (string $reset) {
+    $this->freezeSecond();
+    Product::factory()->available()->create(['name' => 'Atlas Monitor X240']);
+    ChatbotResponseAgent::fake(['Product.', 'Product again.'])->preventStrayPrompts();
+    $chat = app(ChatbotConversation::class);
+    $first = $chat->respond('Price of Atlas Monitor X240? Reply in Hiligaynon.', null, null, 'language');
+    $shortcut = $chat->respond('What payment methods can I use?', null, $first['context_token'], 'language');
+    $follow = $chat->respond('Stock?', null, $shortcut['context_token'], 'language');
+    $state = app(ChatbotConversationToken::class)->decode($follow['context_token'], 'language:guest');
+    expect($state['language'])->toBe('hil');
+    $earlier = $chat->respond('Price of the earlier product?', null, $follow['context_token'], 'language');
+    ChatbotResponseAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->agent->instructions(), 'Reply in Hiligaynon'));
+    $token = $earlier['context_token'];
+    if ($reset === 'expired') {
+        $this->travel(15)->minutes();
+    } else {
+        $token = null;
+    }
+
+    $next = $chat->respond('Price?', null, $token, 'language');
+
+    expect($next['message'])->toContain('Which product');
+    expect(app(ChatbotConversationToken::class)->decode($next['context_token'], 'language:guest')['language'])->toBe('en');
+})->with(['expired', 'new chat']);
+
+test('token references remain usable just before expiration', function () {
+    $this->freezeSecond();
+    Product::factory()->available()->create(['name' => 'Atlas Monitor X240']);
+    ChatbotResponseAgent::fake(['Product.', 'Current stock.'])->preventStrayPrompts();
+    $chat = app(ChatbotConversation::class);
+    $first = $chat->respond('Price of Atlas Monitor X240?', null, null, 'expiry');
+    $this->travel(899)->seconds();
+
+    $next = $chat->respond('Is it available?', null, $first['context_token'], 'expiry');
+
+    expect($next['source'])->toBe('gemini');
+    ChatbotResponseAgent::assertPromptedTimes(2);
+});
+
+test('short branch and order follow ups requery their active references', function () {
+    $branch = Branch::factory()->create(['city' => 'Sagay City', 'operating_hours' => '8 AM to 6 PM']);
+    $customer = User::factory()->customer()->create();
+    $order = Order::factory()->for($customer)->create();
+    ChatbotResponseAgent::fake(fn () => throw new AiException)->preventStrayPrompts();
+    $chat = app(ChatbotConversation::class);
+    $store = $chat->respond('Where is Sagay branch?', $customer, null, 'short');
+    $branch->update(['operating_hours' => '9 AM to 5 PM']);
+
+    $hours = $chat->respond('Hours?', $customer, $store['context_token'], 'short');
+    $firstOrder = $chat->respond('Status of '.$order->reference, $customer, $hours['context_token'], 'short');
+    $order->update(['status' => OrderStatus::Completed]);
+    $status = $chat->respond('Status?', $customer, $firstOrder['context_token'], 'short');
+
+    expect($hours['message'])->toContain('9 AM to 5 PM');
+    expect($status['message'])->toContain($order->reference);
+    ChatbotResponseAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->prompt, '"value":"completed"'));
+    ChatbotResponseAgent::assertPromptedTimes(4);
+});
+
+test('support shortcuts retain earlier references but do not apply ambiguous pronouns across topics', function () {
+    Product::factory()->available()->create(['name' => 'Atlas Monitor X240']);
+    $customer = User::factory()->customer()->create();
+    $order = Order::factory()->for($customer)->create();
+    ChatbotResponseAgent::fake(fn () => throw new AiException)->preventStrayPrompts();
+    $chat = app(ChatbotConversation::class);
+    $product = $chat->respond('Price of Atlas Monitor X240?', $customer, null, 'quick');
+    $owned = $chat->respond('Status of '.$order->reference, $customer, $product['context_token'], 'quick');
+
+    $support = $chat->respond('My refund status', $customer, $owned['context_token'], 'quick');
+    $faq = $chat->respond('What payment methods can I use?', $customer, $support['context_token'], 'quick');
+    $ambiguous = $chat->respond('Is it available?', $customer, $faq['context_token'], 'quick');
+    $earlier = $chat->respond('What about the earlier product price?', $customer, $ambiguous['context_token'], 'quick');
+
+    expect($support['message'])->toContain($order->reference);
+    expect($faq['message'])->toContain('PayMongo Hosted Checkout')->not->toContain($order->reference);
+    expect($ambiguous['message'])->toContain('Which product');
+    expect($earlier['message'])->toContain('Atlas Monitor X240');
+    ChatbotResponseAgent::assertPromptedTimes(4);
+});
+
+test('an explicit language replacement changes subsequent English follow ups', function () {
+    Product::factory()->available()->create(['name' => 'Atlas Monitor X240']);
+    ChatbotResponseAgent::fake(['Product.', 'Stock.'])->preventStrayPrompts();
+    $chat = app(ChatbotConversation::class);
+    $first = $chat->respond('Price of Atlas Monitor X240? Reply in Hiligaynon.', null, null, 'switch-language');
+    $switch = $chat->respond('Reply in English.', null, $first['context_token'], 'switch-language');
+
+    $next = $chat->respond('Stock?', null, $switch['context_token'], 'switch-language');
+
+    expect(app(ChatbotConversationToken::class)->decode($next['context_token'], 'switch-language:guest')['language'])->toBe('en');
+    ChatbotResponseAgent::assertPrompted(fn (AgentPrompt $prompt): bool => str_contains($prompt->agent->instructions(), 'Reply in English') && str_contains($prompt->prompt, 'Stock?'));
+    ChatbotResponseAgent::assertPromptedTimes(2);
+});
 
 test('short catalog queries resolve without intent classification', function (string $query) {
     Product::factory()->available()->create(['name' => 'Atlas Monitor X240', 'brand' => 'Atlas']);
