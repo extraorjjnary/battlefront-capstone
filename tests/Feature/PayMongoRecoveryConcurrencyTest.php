@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use Laravel\SerializableClosure\SerializableClosure;
+use Symfony\Component\Process\Exception\ProcessSignaledException;
 use Symfony\Component\Process\Process;
 
 beforeEach(function () {
@@ -239,7 +240,7 @@ test('Linux payment worker timeout retains reserved stock and recovery processes
         ReconcilePayMongoOrder::dispatch($flow->id)->onQueue('payments');
         expect(DB::table('jobs')->where('queue', 'payments')->count())->toBe(1);
         $started = microtime(true);
-        $worker->wait();
+        expect(fn () => $worker->wait())->toThrow(ProcessSignaledException::class);
         expect($worker->isSuccessful())->toBeFalse();
         expect($worker->getTermSignal())->toBe(SIGKILL);
         expect(microtime(true) - $started)->toBeLessThan(70);
