@@ -8,6 +8,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
+ * @property CarbonImmutable|null $last_checked_at
+ * @property CarbonImmutable|null $next_check_at
+ * @property CarbonImmutable|null $exception_since
+ * @property bool $requires_attention
+ * @property int $recovery_failures
+ * @property string|null $recovery_outcome
+ * @property string|null $recovery_reason
  * @property CarbonImmutable $merchant_cutoff_at
  * @property CarbonImmutable|null $paid_at
  * @property CarbonImmutable|null $closed_at
@@ -44,6 +51,11 @@ class PayMongoFlow extends Model
     protected function casts(): array
     {
         return [
+            'last_checked_at' => 'immutable_datetime',
+            'next_check_at' => 'immutable_datetime',
+            'exception_since' => 'immutable_datetime',
+            'requires_attention' => 'boolean',
+            'recovery_failures' => 'integer',
             'merchant_cutoff_at' => 'immutable_datetime',
             'paid_at' => 'immutable_datetime',
             'closed_at' => 'immutable_datetime',

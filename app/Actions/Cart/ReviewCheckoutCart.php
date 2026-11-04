@@ -6,18 +6,20 @@ use App\Enums\CartAvailability;
 use App\Models\CartItem;
 use App\Models\User;
 use App\Services\Cart\CartService;
+use App\Services\PcBuilder\PcBuilderService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ReviewCheckoutCart
 {
-    public function __construct(private readonly CartService $cartService) {}
+    public function __construct(private readonly CartService $cartService, private readonly PcBuilderService $builder) {}
 
     /**
      * Build a checkout-ready snapshot from current cart state.
      *
      * @param  list<int>  $cartItemIds
      * @return array{
-     *     items: list<array{id: int, quantity: int, pc_build_group: array{uuid: string, name: string}|null, product: array{id: int, name: string, brand: string|null, image_url: string|null}, unit_price: string, line_total: string}>,
+     *     items: list<array{id: int, quantity: int, pc_build_group: array{uuid: string, name: string, validation: array<string, mixed>}|null, product: array{id: int, name: string, brand: string|null, image_url: string|null}, unit_price: string, line_total: string}>,
      *     item_count: int,
      *     total_quantity: int,
      *     total: string
@@ -56,10 +58,22 @@ class ReviewCheckoutCart
                         ->whereKey($cartItemIds)
                         ->orderBy('id'),
                     'items.product:id,name,brand,image_path',
-                    'items.pcBuildGroup:id,uuid,name',
+                    'items.pcBuildGroup:id,uuid,name,configuration_snapshot',
                 ])
                 ->first();
             $items = [];
+            $buildValidations = [];
+            foreach ($cart->items->pluck('pcBuildGroup')->filter()->unique('id') as $group) {
+                try {
+                    $validation = $this->builder->validateSelection($group->configuration_snapshot['components'] ?? []);
+                } catch (ValidationException) {
+                    throw CheckoutUnavailableException::unavailableItems();
+                }
+                if (! $validation['can_purchase']) {
+                    throw CheckoutUnavailableException::incompatibleBuild();
+                }
+                $buildValidations[$group->id] = $validation;
+            }
 
             foreach ($cart->items as $item) {
                 /** @var CartItem $item */
@@ -71,6 +85,7 @@ class ReviewCheckoutCart
                     'pc_build_group' => $item->pcBuildGroup === null ? null : [
                         'uuid' => $item->pcBuildGroup->uuid,
                         'name' => $item->pcBuildGroup->name,
+                        'validation' => $buildValidations[$item->pcBuildGroup->id],
                     ],
                     'product' => [
                         'id' => $item->product->id,

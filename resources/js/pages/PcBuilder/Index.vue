@@ -3,7 +3,11 @@ import StorefrontHeader from '@/components/StorefrontHeader.vue';
 import ConfirmActionDialog from '@/components/ConfirmActionDialog.vue';
 import { useActionConfirmation } from '@/composables/useActionConfirmation';
 import { login } from '@/routes';
-import { cartBlocker, allowsMultipleComponents } from './builderActions';
+import {
+    cartBlocker,
+    allowsMultipleComponents,
+    componentDefinitions,
+} from './builderActions';
 import { Button } from '@/components/ui/button';
 import BuildSummary from './BuildSummary.vue';
 import SavedBuilds from './SavedBuilds.vue';
@@ -19,7 +23,11 @@ import {
     ref,
     watch,
 } from 'vue';
-import { validate as validateBuild } from '@/actions/App/Http/Controllers/PcBuilderController';
+import {
+    validate as validateBuild,
+    options as componentOptions,
+} from '@/actions/App/Http/Controllers/PcBuilderController';
+import ReplacementDialog from './ReplacementDialog.vue';
 import pcBuildRoutes, {
     store as storeBuild,
     update as updateBuild,
@@ -34,36 +42,25 @@ const props = defineProps({
     templates: { type: Array, default: () => [] },
     ruleset_version: { type: Number, required: true },
     saved_builds: { type: Array, default: () => [] },
+    strict_selection_enabled: { type: Boolean, default: false },
 });
 
-const essentialTypes = [
-    'processor',
-    'motherboard',
-    'memory',
-    'storage',
-    'power_supply',
-    'case',
-];
-const componentLabels = {
-    processor: 'Processor (CPU)',
-    motherboard: 'Motherboard',
-    memory: 'Memory (RAM)',
-    storage: 'Storage',
-    power_supply: 'Power Supply (PSU)',
-    case: 'PC Case',
-    graphics_card: 'Graphics Card (GPU)',
-    cooler: 'CPU Cooler',
-    fan: 'Case Fans',
-    network_adapter: 'Wi-Fi / Network Adapter',
-    monitor: 'Monitor',
-    keyboard: 'Keyboard',
-    mouse: 'Mouse',
-    headset: 'Headset',
-    speakers: 'Speakers',
-    webcam: 'Webcam',
-    ups_avr: 'UPS / AVR',
-};
-const simpleOrder = [...essentialTypes, 'graphics_card', 'cooler', 'fan'];
+const essentialTypes = Object.keys(componentDefinitions).filter(
+    (type) => componentDefinitions[type].required,
+);
+const componentLabels = Object.fromEntries(
+    Object.entries(componentDefinitions).map(([type, definition]) => [
+        type,
+        definition.label,
+    ]),
+);
+const simpleOrder = Object.keys(componentDefinitions).filter(
+    (type) => componentDefinitions[type].simple,
+);
+const optionalTypes = Object.keys(componentDefinitions).filter(
+    (type) => !componentDefinitions[type].simple,
+);
+const optionalOpen = ref(false);
 const mode = ref('simple');
 const activeType = ref('processor');
 const pickerOpen = ref(false);
@@ -72,6 +69,21 @@ const savedOpen = ref(false);
 const mobileSummaryOpen = ref(false);
 const transferring = ref(false);
 const checking = ref(false);
+const selecting = ref(false);
+const pickerProducts = ref([]);
+const optionsLoading = ref(false);
+const optionsError = ref('');
+const optionsPage = ref(1);
+const optionsLastPage = ref(1);
+let optionsRequest = 0;
+let optionsTimer;
+const pickerFilters = ref({ search: '', brand: '', sort: 'name', page: 1 });
+const replacement = ref(null);
+const replacementKeys = ref([]);
+const replacementPreview = ref(null);
+const replacementLoading = ref(false);
+const replacementError = ref('');
+let replacementRequest = 0;
 let selectionVersion = 0;
 const budget = ref('');
 const selections = ref([]);
@@ -83,6 +95,27 @@ const buildName = ref('My PC Build');
 const editingUuid = ref(null);
 const shareMessage = ref('');
 const http = useHttp({ components: [] });
+const selectionHttp = useHttp({ components: [] });
+const optionsHttp = useHttp({
+    components: [],
+    component_type: 'processor',
+    selection_version: 0,
+    search: '',
+    brand: '',
+    sort: 'name',
+    page: 1,
+    candidate_id: null,
+    quantity: null,
+    candidate_configuration: null,
+    remove_keys: [],
+});
+const replacementHttp = useHttp({
+    components: [],
+    component_type: 'processor',
+    selection_version: 0,
+    candidate_id: null,
+    remove_keys: [],
+});
 const saveHttp = useHttp({
     name: 'My PC Build',
     mode: 'simple',
@@ -105,6 +138,17 @@ let validationTimer;
 const componentTypes = computed(() =>
     mode.value === 'simple' ? simpleOrder : Object.keys(componentLabels),
 );
+const componentSections = computed(() => {
+    const types = componentTypes.value;
+    return [
+        ...new Set(types.map((type) => componentDefinitions[type].group)),
+    ].map((group) => ({
+        label: group,
+        types: types.filter(
+            (type) => componentDefinitions[type].group === group,
+        ),
+    }));
+});
 const selectedTotal = computed(() =>
     selections.value.reduce((total, item) => {
         const product = findProduct(item.product_id);
@@ -208,6 +252,13 @@ watch(
         validationError.value = '';
         checking.value = true;
         http.cancel();
+        optionsHttp.cancel();
+        optionsRequest += 1;
+        pickerProducts.value = [];
+        if (props.strict_selection_enabled && pickerOpen.value) loadOptions();
+        replacementRequest += 1;
+        replacementHttp.cancel();
+        replacement.value = null;
         clearTimeout(validationTimer);
         validationTimer = setTimeout(runValidation, 250);
     },
@@ -218,6 +269,12 @@ onBeforeUnmount(() => {
     selectionVersion += 1;
     clearTimeout(validationTimer);
     http.cancel();
+    optionsHttp.cancel();
+    selectionHttp.cancel();
+    replacementHttp.cancel();
+    optionsRequest += 1;
+    replacementRequest += 1;
+    clearTimeout(optionsTimer);
 });
 
 function findProduct(productId) {
@@ -233,7 +290,16 @@ function findProduct(productId) {
 }
 
 function addProduct(product) {
-    if (transferring.value || Number(product.stock_quantity) < 1) return;
+    if (
+        transferring.value ||
+        selecting.value ||
+        Number(product.stock_quantity) < 1
+    )
+        return;
+    if (props.strict_selection_enabled) {
+        if (!product.selectable || optionsLoading.value) return;
+        return commitSelection(product.proposed_components);
+    }
     pickerOpen.value = false;
     const existing = selections.value.find(
         (item) => item.product_id === product.id,
@@ -277,11 +343,18 @@ function changeQuantity(productId, quantity) {
         removeProduct(productId);
         return;
     }
+    if (props.strict_selection_enabled) {
+        return commitSelection(
+            requestComponents().map((part) =>
+                part.product_id === productId ? { ...part, quantity } : part,
+            ),
+        );
+    }
     item.quantity = Math.min(quantity, Number(product.stock_quantity ?? 99));
 }
 
 function removeProduct(productId) {
-    if (!transferring.value)
+    if (!transferring.value && !selecting.value)
         selections.value = selections.value.filter(
             (item) => item.product_id !== productId,
         );
@@ -308,9 +381,167 @@ async function runValidation() {
 }
 
 function openPicker(type, event) {
+    if (selecting.value || transferring.value) return;
+    clearTimeout(optionsTimer);
     activeType.value = type;
     pickerTrigger.value = event?.currentTarget ?? null;
     pickerOpen.value = true;
+    validationError.value = '';
+    pickerFilters.value = { search: '', brand: '', sort: 'name', page: 1 };
+    optionsHttp.candidate_configuration = null;
+    if (props.strict_selection_enabled) loadOptions();
+}
+
+function queueOptions(filters = {}) {
+    pickerFilters.value = { ...pickerFilters.value, ...filters };
+    clearTimeout(optionsTimer);
+    optionsHttp.cancel();
+    optionsRequest += 1;
+    optionsLoading.value = true;
+    optionsTimer = setTimeout(() => loadOptions(), 200);
+}
+
+async function loadOptions(filters = {}) {
+    if (!props.strict_selection_enabled || !pickerOpen.value) return;
+    pickerFilters.value = { ...pickerFilters.value, ...filters };
+    const request = ++optionsRequest;
+    const version = selectionVersion;
+    const type = activeType.value;
+    optionsHttp.cancel();
+    optionsLoading.value = true;
+    optionsError.value = '';
+    pickerProducts.value = [];
+    Object.assign(optionsHttp, pickerFilters.value, {
+        components: requestComponents(),
+        component_type: type,
+        selection_version: version,
+    });
+    try {
+        const result = await optionsHttp.post(componentOptions.url());
+        if (
+            request !== optionsRequest ||
+            version !== selectionVersion ||
+            type !== activeType.value ||
+            !pickerOpen.value
+        )
+            return;
+        if (result.selection_version !== version) return;
+        pickerProducts.value = result.products;
+        optionsPage.value = result.page;
+        optionsLastPage.value = result.last_page;
+    } catch {
+        if (request === optionsRequest)
+            optionsError.value =
+                'Compatible parts could not be loaded. Try again.';
+    } finally {
+        if (request === optionsRequest) optionsLoading.value = false;
+    }
+}
+
+async function commitSelection(parts) {
+    if (selecting.value || transferring.value) return false;
+    const version = selectionVersion;
+    selecting.value = true;
+    validationError.value = '';
+    try {
+        selectionHttp.components = parts;
+        const result = await selectionHttp.post(validateBuild.url());
+        if (version !== selectionVersion) return false;
+        if (!result.can_purchase || !result.selection_compatible) {
+            validationError.value =
+                result.selection_blockers?.join(' ') ||
+                'These parts cannot be used together. Choose another part.';
+            if (pickerOpen.value) loadOptions();
+            return false;
+        }
+        pickerOpen.value = false;
+        selections.value = parts.map((part) => ({
+            ...part,
+            component_type: findProduct(part.product_id)?.component_type,
+            configuration: part.configuration ?? {},
+        }));
+        validation.value = result;
+        return true;
+    } catch (error) {
+        validationError.value =
+            error?.response?.data?.message ??
+            'The selection could not be verified. Refresh the choices and try again.';
+        if (pickerOpen.value) loadOptions();
+        return false;
+    } finally {
+        selecting.value = false;
+    }
+}
+
+function resolveReplacement(product) {
+    if (selecting.value || transferring.value || !product.can_resolve) return;
+    pickerOpen.value = false;
+    replacement.value = product;
+    replacementKeys.value = [];
+    replacementPreview.value = null;
+    replacementError.value = '';
+    previewReplacement();
+}
+
+async function previewReplacement() {
+    if (!replacement.value) return;
+    const request = ++replacementRequest;
+    const version = selectionVersion;
+    const product = replacement.value;
+    replacementHttp.cancel();
+    replacementLoading.value = true;
+    replacementPreview.value = null;
+    replacementError.value = '';
+    Object.assign(replacementHttp, {
+        components: requestComponents(),
+        component_type: product.component_type,
+        selection_version: version,
+        candidate_id: product.id,
+        remove_keys: [...replacementKeys.value],
+    });
+    try {
+        const result = await replacementHttp.post(componentOptions.url());
+        if (
+            request !== replacementRequest ||
+            version !== selectionVersion ||
+            replacement.value?.id !== product.id ||
+            result.selection_version !== version
+        )
+            return;
+        replacementPreview.value = result.products[0] ?? null;
+        if (!replacementPreview.value)
+            replacementError.value = 'This replacement is no longer available.';
+    } catch {
+        if (request === replacementRequest)
+            replacementError.value =
+                'The replacement could not be verified. Try again.';
+    } finally {
+        if (request === replacementRequest) replacementLoading.value = false;
+    }
+}
+
+function toggleReplacementKey(key) {
+    replacementKeys.value = replacementKeys.value.includes(key)
+        ? replacementKeys.value.filter((value) => value !== key)
+        : [...replacementKeys.value, key];
+    previewReplacement();
+}
+
+function cancelReplacement() {
+    if (selecting.value) return;
+    replacementRequest += 1;
+    replacementHttp.cancel();
+    replacement.value = null;
+    replacementPreview.value = null;
+    replacementKeys.value = [];
+}
+
+async function confirmReplacement() {
+    if (replacementLoading.value || !replacementPreview.value?.selectable)
+        return;
+    if (await commitSelection(replacementPreview.value.proposed_components))
+        cancelReplacement();
+    else if (replacement.value) previewReplacement();
 }
 
 function rowItems(type) {
@@ -339,7 +570,8 @@ async function addCurrentBuildToCart() {
         transferring.value ||
         saveHttp.processing ||
         checking.value ||
-        !validation.value?.complete
+        !validation.value?.can_purchase ||
+        selections.value.length === 0
     )
         return;
     transferring.value = true;
@@ -650,6 +882,21 @@ function fanMountingPositions() {
 
 function setFanMount(item, position) {
     if (transferring.value) return;
+    if (props.strict_selection_enabled) {
+        return commitSelection(
+            requestComponents().map((part) =>
+                part.key === item.key
+                    ? {
+                          ...part,
+                          configuration: {
+                              ...part.configuration,
+                              mounting_position: position,
+                          },
+                      }
+                    : part,
+            ),
+        );
+    }
     item.configuration = { ...item.configuration, mounting_position: position };
 }
 </script>
@@ -818,17 +1065,65 @@ function setFanMount(item, position) {
                             build. * Required part
                         </p>
                     </div>
-                    <ComponentRow
-                        v-for="type in componentTypes"
-                        :key="type"
-                        :label="componentLabels[type]"
-                        :required="requiredTypes.includes(type)"
-                        :multiple="allowsMultipleComponents(type)"
-                        :items="rowItems(type)"
-                        :disabled="transferring"
-                        @select="openPicker(type, $event)"
-                        @remove="removeProduct"
-                    />
+                    <div
+                        v-for="section in componentSections"
+                        :key="section.label"
+                    >
+                        <h3
+                            v-if="mode === 'advanced'"
+                            class="text-muted-foreground mt-5 text-xs font-semibold uppercase"
+                        >
+                            {{ section.label }}
+                        </h3>
+                        <ComponentRow
+                            v-for="type in section.types"
+                            :key="type"
+                            :label="componentLabels[type]"
+                            :required="requiredTypes.includes(type)"
+                            :multiple="allowsMultipleComponents(type)"
+                            :items="rowItems(type)"
+                            :disabled="transferring"
+                            :available="
+                                (components[type] ?? []).some(
+                                    (product) =>
+                                        Number(product.stock_quantity) > 0,
+                                )
+                            "
+                            @select="openPicker(type, $event)"
+                            @remove="removeProduct"
+                        />
+                    </div>
+                    <div v-if="mode === 'simple'" class="mt-5">
+                        <Button
+                            variant="outline"
+                            :aria-expanded="optionalOpen"
+                            aria-controls="optional-builder-parts"
+                            @click="optionalOpen = !optionalOpen"
+                            >{{
+                                optionalOpen
+                                    ? 'Hide optional extras'
+                                    : 'Add optional extras'
+                            }}</Button
+                        >
+                        <div v-if="optionalOpen" id="optional-builder-parts">
+                            <ComponentRow
+                                v-for="type in optionalTypes"
+                                :key="type"
+                                :label="componentLabels[type]"
+                                :items="rowItems(type)"
+                                :multiple="allowsMultipleComponents(type)"
+                                :disabled="transferring"
+                                :available="
+                                    (components[type] ?? []).some(
+                                        (product) =>
+                                            Number(product.stock_quantity) > 0,
+                                    )
+                                "
+                                @select="openPicker(type, $event)"
+                                @remove="removeProduct"
+                            />
+                        </div>
+                    </div>
                 </section>
                 <aside
                     id="build-summary"
@@ -907,7 +1202,10 @@ function setFanMount(item, position) {
                                         }}
                                     </p>
                                     <div
-                                        v-if="item.component_type === 'fan'"
+                                        v-if="
+                                            mode === 'advanced' &&
+                                            item.component_type === 'fan'
+                                        "
                                         class="mt-2 grid gap-1"
                                     >
                                         <label
@@ -1016,7 +1314,9 @@ function setFanMount(item, position) {
                                 saveHttp.processing ||
                                 transferring ||
                                 (Boolean(page.props.auth?.user) &&
-                                    (checking || !validation?.complete))
+                                    (checking ||
+                                        !validation?.can_purchase ||
+                                        selections.length === 0))
                             "
                             @click="addCurrentBuildToCart"
                         >
@@ -1025,7 +1325,9 @@ function setFanMount(item, position) {
                                     ? 'Saving and adding...'
                                     : !page.props.auth?.user
                                       ? 'Sign in to add to cart'
-                                      : 'Add build to cart'
+                                      : validation?.complete
+                                        ? 'Add build to cart'
+                                        : 'Add selected parts to cart'
                             }}
                         </Button>
                         <p
@@ -1040,9 +1342,29 @@ function setFanMount(item, position) {
             </div>
             <ComponentPicker
                 v-model:open="pickerOpen"
+                :strict="strict_selection_enabled"
+                :component-type="activeType"
+                :mounting-positions="fanMountingPositions()"
+                :loading="optionsLoading"
+                :busy="selecting || transferring"
+                :error="optionsError || validationError"
+                :page="optionsPage"
+                :last-page="optionsLastPage"
+                :available-brands="
+                    [
+                        ...new Set(
+                            (components[activeType] ?? [])
+                                .map((product) => product.brand)
+                                .filter(Boolean),
+                        ),
+                    ].sort()
+                "
                 :label="componentLabels[activeType]"
                 :products="
-                    (components[activeType] ?? []).map((product) => ({
+                    (strict_selection_enabled
+                        ? pickerProducts
+                        : (components[activeType] ?? [])
+                    ).map((product) => ({
                         ...product,
                         summary: specificationSummary(product),
                     }))
@@ -1051,6 +1373,36 @@ function setFanMount(item, position) {
                 :can-wishlist="Boolean(page.props.auth?.can?.useCustomerCart)"
                 :return-focus="pickerTrigger"
                 @select="addProduct"
+                @remove="removeProduct"
+                @resolve="resolveReplacement"
+                @filters="queueOptions"
+                @retry="loadOptions"
+            />
+            <ReplacementDialog
+                :product="replacement"
+                :items="
+                    selections
+                        .filter(
+                            (item) =>
+                                item.component_type !==
+                                replacement?.component_type,
+                        )
+                        .map((item) => ({
+                            ...item,
+                            name:
+                                findProduct(item.product_id)?.name ??
+                                'Unavailable product',
+                        }))
+                "
+                :selected-keys="replacementKeys"
+                :preview="replacementPreview"
+                :loading="replacementLoading"
+                :busy="selecting"
+                :error="replacementError"
+                @cancel="cancelReplacement"
+                @toggle="toggleReplacementKey"
+                @confirm="confirmReplacement"
+                @retry="previewReplacement"
             />
             <div
                 class="border-border bg-card fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t p-4 lg:hidden"

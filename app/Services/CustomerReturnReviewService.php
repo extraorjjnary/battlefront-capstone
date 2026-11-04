@@ -37,10 +37,10 @@ class CustomerReturnReviewService
      * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
-    public function page(User $actor, array $filters, int|string|null $case, int|string|null $requestId, int|string|null $paymentId, ?string $orderLookup, bool $overdue, bool $canReceive): array
+    public function page(User $actor, array $filters, int|string|null $case, int|string|null $requestId, int|string|null $paymentId, ?string $orderLookup, bool $overdue, bool $canReceive, ?int $page = null): array
     {
         $overdueCutoff = now()->startOfDay()->subDays(3);
-        $customerRequests = $this->returns->requests($requestId)
+        $customerRequests = $this->returns->requests($requestId, $page)
             ->through(fn (CustomerReturnRequest $entry): array => [
                 'id' => $entry->id, 'customer_name' => $entry->customer->name,
                 'order_id' => $entry->order_id, 'order_reference' => $entry->order->reference,
@@ -67,7 +67,7 @@ class CustomerReturnReviewService
                 'price_at_time' => $item->price_at_time,
             ];
         })->all();
-        $returns = $this->returns->paginateReturns($filters, $case, $overdue, $overdueCutoff);
+        $returns = $this->returns->paginateReturns($filters, $case, $overdue, $overdueCutoff, $page);
         $heldReturnIds = $this->returns->heldReturnIds($returns->getCollection()->pluck('id'));
         $payments = $this->returns->payments($returns->getCollection()->pluck('refund_id')->filter());
         $reviews = $this->returns->reviews($payments->pluck('id'));

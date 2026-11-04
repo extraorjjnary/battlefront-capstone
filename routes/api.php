@@ -67,6 +67,7 @@ Route::prefix('v1')
         // branch
         Route::middleware(AuthorizeApiCustomerOrGuest::class)->group(function (): void {
             Route::get('pc-builder', [PcBuilderController::class, 'index'])->name('pc-builder.index');
+            Route::post('pc-builder/options', [PcBuilderController::class, 'options'])->middleware('throttle:30,1')->name('pc-builder.options');
             Route::post('pc-builder/validate', [PcBuilderController::class, 'validate'])->middleware('throttle:30,1')->name('pc-builder.validate');
             Route::get('pc-builds/shared/{token}', [PcBuildController::class, 'showShared'])->whereUuid('token')->name('pc-builds.shared.show');
         });

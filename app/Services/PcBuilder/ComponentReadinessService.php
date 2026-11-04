@@ -76,11 +76,11 @@ class ComponentReadinessService
     /** @param array<string, mixed> $specifications
      * @return list<string>
      */
-    private function incompleteAttributes(string $componentType, array $specifications): array
+    public function incompleteAttributes(string $componentType, array $specifications): array
     {
         $requiredByType = [
-            'processor' => ['socket', 'generation', 'supported_chipsets', 'maximum_power_w', 'integrated_graphics', 'included_cooler', 'required_power_connectors'],
-            'motherboard' => ['socket', 'chipset', 'supported_cpu_generations', 'bios_version', 'memory_generations', 'dimm_slots', 'maximum_memory_gb', 'maximum_memory_speed_mts', 'ecc_supported', 'registered_memory_supported', 'form_factor', 'pcie_x16_slots', 'display_outputs', 'storage_slots', 'fan_headers'],
+            'processor' => ['model', 'socket', 'generation', 'supported_chipsets', 'maximum_power_w', 'integrated_graphics', 'included_cooler', 'required_power_connectors'],
+            'motherboard' => ['cpu_support', 'socket', 'chipset', 'supported_cpu_generations', 'bios_version', 'memory_generations', 'dimm_slots', 'maximum_memory_gb', 'maximum_memory_speed_mts', 'ecc_supported', 'registered_memory_supported', 'form_factor', 'pcie_x16_slots', 'display_outputs', 'storage_slots', 'fan_headers'],
             'memory' => ['memory_generation', 'capacity_gb', 'modules_per_package', 'speed_mts', 'ecc', 'registered'],
             'storage' => ['interface', 'form_factor'],
             'power_supply' => ['continuous_power_w', 'connectors', 'form_factor', 'length_mm'],
@@ -89,11 +89,42 @@ class ComponentReadinessService
             'cooler' => ['mounting_sockets', 'height_mm', 'radiator_size_mm'],
             'fan' => ['size_mm', 'power_draw_w', 'header_type'],
             'monitor' => ['input_ports', 'resolution', 'refresh_rate_hz'],
+            'network_adapter' => ['connection_interface'],
+            'keyboard' => ['connection_interface'],
+            'mouse' => ['connection_interface'],
+            'headset' => ['connection_interface'],
+            'speakers' => ['connection_interface'],
+            'webcam' => ['connection_interface', 'resolution'],
+            'ups_avr' => ['rated_output_w', 'output_voltage', 'outlet_type'],
         ];
 
         return array_values(array_filter(
             $requiredByType[$componentType] ?? [],
             fn (string $attribute): bool => ! array_key_exists($attribute, $specifications) || $specifications[$attribute] === null || $specifications[$attribute] === '',
         ));
+    }
+
+    /** @return list<string> */
+    public function selectionIssues(ProductComponentProfile $profile): array
+    {
+        $revision = $profile->revisions->firstWhere('revision', $profile->current_revision);
+        if ($profile->review_status !== 'approved' || $revision?->review_status !== 'approved') {
+            return ['Compatibility not verified: this product specification is awaiting approval.'];
+        }
+        $partNumber = trim((string) $profile->manufacturer_part_number);
+        $evidenceMatches = collect($revision->evidence ?? [])->contains(fn (array $source): bool => $partNumber !== ''
+            && mb_strtolower(trim($source['variant'] ?? '')) === mb_strtolower($partNumber)
+            && isset($source['url'], $source['section'], $source['verified_at'])
+            && preg_match('/^https?:\/\//i', $source['url']) === 1);
+        $issues = $evidenceMatches ? [] : ['Exact-model evidence is missing.'];
+        $missing = $this->incompleteAttributes($profile->component_type, $revision->specifications);
+        if ($profile->component_type === 'motherboard' && ! is_array($revision->specifications['required_power_connectors'] ?? null)) {
+            $missing[] = 'required_power_connectors';
+        }
+        if ($missing !== []) {
+            $issues[] = 'Required specifications are missing: '.implode(', ', $missing).'.';
+        }
+
+        return $issues;
     }
 }

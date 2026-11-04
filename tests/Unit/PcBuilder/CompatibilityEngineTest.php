@@ -46,7 +46,7 @@ test('it requires a dedicated graphics card when the processor has no integrated
         component('cpu', 'processor', ['integrated_graphics' => false]),
     ]);
 
-    expect($result['status'])->toBe('incompatible')
+    expect($result['status'])->toBe('unknown')
         ->and($result['required_components'])->toContain('graphics_card')
         ->and(collect($result['findings'])->firstWhere('rule', 'graphics.required')['message'])
         ->toContain('no integrated graphics');
@@ -121,7 +121,8 @@ test('it requires a separate CPU cooler when the processor does not include one'
     ]);
 
     expect($result['required_components'])->toContain('cooler')
-        ->and(collect($result['findings'])->firstWhere('rule', 'cooling.cpu_cooler')['status'])->toBe('incompatible');
+        ->and(collect($result['findings'])->firstWhere('rule', 'cooling.cpu_cooler')['status'])->toBe('unknown')
+        ->and($result['can_purchase'])->toBeTrue();
 });
 
 test('it treats graphics card transient power as a separate guidance check', function () {
@@ -142,7 +143,7 @@ test('it checks graphics card length, thickness, and motherboard slot clearance'
         component('case', 'case', ['maximum_gpu_length_mm' => 300, 'maximum_gpu_thickness_mm' => 55]),
     ]);
 
-    expect(collect($result['findings'])->firstWhere('rule', 'graphics.motherboard_slot')['status'])->toBe('incompatible')
+    expect(collect($result['findings'])->firstWhere('rule', 'graphics.motherboard_slot')['status'])->toBe('compatible')
         ->and(collect($result['findings'])->firstWhere('rule', 'graphics.case_length')['status'])->toBe('incompatible')
         ->and(collect($result['findings'])->firstWhere('rule', 'graphics.case_thickness')['status'])->toBe('incompatible');
 });
@@ -162,6 +163,43 @@ test('it rejects missing PSU connectors and reports excess fan quantities', func
     expect(collect($connectorResult['findings'])->firstWhere('rule', 'power.connectors')['status'])->toBe('incompatible')
         ->and(collect($fanResult['findings'])->firstWhere('rule', 'cooling.fan_quantity')['status'])->toBe('incompatible')
         ->and(collect($fanResult['findings'])->firstWhere('rule', 'cooling.fan_header_quantity')['status'])->toBe('warning');
+});
+
+test('missing BIOS evidence and incomplete CPU support lists cannot establish a pass', function () {
+    $result = app(CompatibilityEngine::class)->evaluate([
+        component('cpu', 'processor', ['model' => 'CPU A']),
+        component('board', 'motherboard', ['bios_version' => '1.0', 'cpu_support' => [['model' => 'CPU B', 'minimum_bios_version' => '1.0'], 'unverified entry']]),
+    ]);
+    expect(collect($result['findings'])->firstWhere('rule', 'cpu_motherboard.bios')['status'])->toBe('unknown')
+        ->and(collect($result['findings'])->firstWhere('rule', 'cpu_motherboard.model')['status'])->toBe('unknown');
+});
+
+test('CPU BIOS requirements belong to the exact motherboard and vendor labels stay unknown', function () {
+    $result = app(CompatibilityEngine::class)->evaluate([
+        component('cpu', 'processor', ['model' => 'CPU A', 'minimum_bios_version' => '1.0']),
+        component('board', 'motherboard', ['bios_version' => 'F10', 'cpu_support' => [['model' => 'CPU A', 'minimum_bios_version' => 'F9']]]),
+    ]);
+    expect(collect($result['findings'])->firstWhere('rule', 'cpu_motherboard.model')['status'])->toBe('compatible')
+        ->and(collect($result['findings'])->firstWhere('rule', 'cpu_motherboard.bios')['status'])->toBe('unknown');
+});
+
+test('empty builds cannot be purchased and duplicate singleton parts are rejected', function () {
+    expect(app(CompatibilityEngine::class)->evaluate([])['can_purchase'])->toBeFalse();
+    $result = app(CompatibilityEngine::class)->evaluate([component('cpu', 'processor', [], 2)]);
+    expect($result['can_purchase'])->toBeFalse()
+        ->and(collect($result['findings'])->firstWhere('rule', 'component.single_slot')['status'])->toBe('incompatible');
+});
+
+test('peripheral port demand is aggregated and unsupported connections remain unknown', function () {
+    $result = app(CompatibilityEngine::class)->evaluate([
+        component('keyboard', 'keyboard', ['connection_interface' => 'USB']),
+        component('mouse', 'mouse', ['connection_interface' => 'USB']),
+        component('webcam', 'webcam', []),
+        component('board', 'motherboard', ['peripheral_ports' => ['USB' => 1]]),
+    ]);
+    expect($result['can_purchase'])->toBeFalse()
+        ->and(collect($result['findings'])->firstWhere('rule', 'peripheral.port_capacity')['status'])->toBe('incompatible')
+        ->and(collect($result['findings'])->firstWhere('component_keys', ['webcam'])['status'])->toBe('unknown');
 });
 
 /** @param array<string, mixed> $specifications

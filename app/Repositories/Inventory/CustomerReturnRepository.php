@@ -13,12 +13,12 @@ use Illuminate\Support\Facades\DB;
 class CustomerReturnRepository
 {
     /** @return LengthAwarePaginator<int, CustomerReturnRequest> */
-    public function requests(int|string|null $requestId): LengthAwarePaginator
+    public function requests(int|string|null $requestId, ?int $page = null): LengthAwarePaginator
     {
         return CustomerReturnRequest::query()->with(['customer:id,name', 'order', 'item.product'])
             ->when($requestId !== null, fn ($query) => $query->whereKey($requestId),
                 fn ($query) => $query->whereNull('customer_return_id')->whereNull('withdrawn_at'))
-            ->orderBy('created_at')->orderBy('id')->paginate(10, ['*'], 'requests_page')->withQueryString();
+            ->orderBy('created_at')->orderBy('id')->paginate(10, ['*'], 'requests_page', $page)->withQueryString();
     }
 
     public function paymentReturnId(int|string $paymentId): int|string|null
@@ -38,7 +38,7 @@ class CustomerReturnRepository
      * @param  array<string, mixed>  $filters
      * @return LengthAwarePaginator<int, \stdClass>
      */
-    public function paginateReturns(array $filters, int|string|null $case, bool $overdue, CarbonInterface $overdueCutoff): LengthAwarePaginator
+    public function paginateReturns(array $filters, int|string|null $case, bool $overdue, CarbonInterface $overdueCutoff, ?int $page = null): LengthAwarePaginator
     {
         return DB::table('customer_returns as returns')
             ->join('orders', 'orders.id', '=', 'returns.order_id')
@@ -74,7 +74,7 @@ class CustomerReturnRepository
             }))
             ->when($overdue, fn ($query) => $query->whereIn('returns.status', ['pending', 'rejected_pending_handover'])
                 ->where('returns.created_at', '<', $overdueCutoff))
-            ->orderByDesc('returns.created_at')->paginate(20)->withQueryString();
+            ->orderByDesc('returns.created_at')->orderByDesc('returns.id')->paginate(20, ['*'], 'page', $page)->withQueryString();
     }
 
     /**

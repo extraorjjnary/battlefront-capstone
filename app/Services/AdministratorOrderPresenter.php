@@ -7,12 +7,15 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentRejectionReason;
 use App\Enums\PaymentStatus;
+use App\Enums\ShipmentStatus;
 use App\Models\Order;
 use App\Models\OrderItem;
-use App\Models\PayMongoFlow;
+use App\Models\Shipment;
 use App\Models\User;
 use App\Repositories\Order\AdministratorOrderRepository;
 use App\Services\Order\OrderProcessingService;
+use App\Services\PayMongo\PaymentRecoveryPresenter;
+use App\Services\Reporting\ShipmentExportService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
@@ -20,6 +23,42 @@ use Illuminate\Support\Str;
 
 class AdministratorOrderPresenter
 {
+    /** @return array<string, mixed> */
+    public function shipmentRow(Shipment $shipment): array
+    {
+        $order = $shipment->order;
+        $status = $order->status === OrderStatus::Cancelled ? ShipmentStatus::Cancelled : $shipment->status;
+
+        return [
+            'id' => $shipment->id, 'order_id' => $order->id, 'reference' => $order->reference,
+            'recipient' => $order->recipient_name, 'customer' => $order->user->name,
+            'destination' => $order->delivery_destination ?? $order->delivery_address,
+            'status' => ['value' => $status->value, 'label' => $status->label()],
+            'package_count' => $shipment->package_count, 'weight' => $shipment->package_weight_kg,
+            'length' => $shipment->package_length_cm, 'width' => $shipment->package_width_cm, 'height' => $shipment->package_height_cm,
+            'declared_value' => $shipment->declared_value, 'tracking' => $shipment->tracking_reference,
+            'delivery_fee' => $order->delivery_fee, 'carrier_cost' => $shipment->actual_carrier_cost,
+            'reconciliation' => $shipment->carrier_cost_recorded_at === null ? 'Unconfirmed' : 'Confirmed',
+            'receipt' => $shipment->carrier_cost_reference,
+            'handed_at' => $shipment->handed_to_carrier_at?->toIso8601String(),
+        ];
+    }
+
+    /** @param LengthAwarePaginator<int, Shipment> $shipments
+     * @param  array<string, mixed>  $filters
+     * @return array<string, mixed>
+     */
+    public function shipmentDirectory(LengthAwarePaginator $shipments, array $filters, User $actor): array
+    {
+        return [
+            'shipments' => $shipments->through(fn (Shipment $shipment): array => $this->shipmentRow($shipment)),
+            'filters' => $filters,
+            'status_options' => array_map(fn (ShipmentStatus $status): array => ['value' => $status->value, 'label' => $status->label()], ShipmentStatus::cases()),
+            'can_export' => $actor->can('reports.export'),
+            'document_limit' => ShipmentExportService::DOCUMENT_LIMIT,
+        ];
+    }
+
     public function __construct(
         private readonly AdministratorOrderRepository $orderRepository,
         private readonly AdministratorOrderProfitability $profitability,
@@ -27,6 +66,7 @@ class AdministratorOrderPresenter
         private readonly ShipmentPresenter $shipments,
         private readonly DeliveryQuotePresenter $quotes,
         private readonly OrderCancellationPresenter $cancellations,
+        private readonly PaymentRecoveryPresenter $paymentRecovery,
     ) {}
 
     /**
@@ -56,6 +96,7 @@ class AdministratorOrderPresenter
                 'status' => $this->statusData($order->status),
                 'cancellation' => $this->cancellations->summary($order),
                 'payment' => [
+                    'gateway' => $this->paymentRecovery->detail($order, history: false),
                     'method' => [
                         'value' => $order->payment_method->value,
                         'label' => $order->payment_method->label(),
@@ -76,11 +117,13 @@ class AdministratorOrderPresenter
             'filters' => [
                 'q' => $filters['q'] ?? null,
                 'status' => $statusFilter,
+                'gateway_state' => $filters['gateway_state'] ?? null,
                 'payment_status' => $filters['payment_status'] ?? null,
                 'payment_method' => $filters['payment_method'] ?? null,
                 'fulfillment_method' => $filters['fulfillment_method'] ?? null,
             ],
             'filter_options' => [
+                'gateway_states' => collect(PaymentRecoveryPresenter::labels())->except(['paid', 'closed'])->map(fn ($label, $value): array => compact('value', 'label'))->values()->all(),
                 'payment_statuses' => collect(PaymentStatus::cases())
                     ->map(fn (PaymentStatus $status): array => [
                         'value' => $status->value,
@@ -132,7 +175,6 @@ class AdministratorOrderPresenter
     {
         $canProcess = $this->processing->canProcess($order, $actor);
         $nextShipmentStatus = $canProcess ? $this->processing->nextShipmentStatus($order) : null;
-        $payMongoFlow = PayMongoFlow::query()->where('order_id', $order->id)->first();
         $canViewProfitability = $actor->can('reports.profit');
         $profitability = $this->profitability->calculate($order, $this->orderRepository->profitabilityInputs($order));
 
@@ -179,7 +221,8 @@ class AdministratorOrderPresenter
                     'can_update_shipment_exception' => $canProcess && $this->processing->canUpdateShipmentOperations($order, 'exception'),
                 ],
                 'allowed_status_transitions' => collect($canProcess ? $this->processing->allowedOrderTransitions($order) : [])
-                    ->map(fn (OrderStatus $status): array => $this->statusData($status))
+                    ->map(fn (OrderStatus $status): array => $status === OrderStatus::Cancelled && $order->payment_origin === 'paymongo'
+                        ? ['value' => $status->value, 'label' => 'Cancel unpaid order'] : $this->statusData($status))
                     ->all(),
                 'cancellation_blocked_reason' => $this->processing->shipmentCancellationBlockedReason($order->shipment),
                 'payment' => [
@@ -187,18 +230,13 @@ class AdministratorOrderPresenter
                         'value' => $order->payment_method->value,
                         'label' => $order->payment_method->label(),
                         ...($order->payment_method->isPayAtPickup() ? ['description' => $order->payment_method->description()] : []),
-                        'requires_proof' => $order->payment_method->requiresPaymentProof(),
+                        'requires_proof' => $order->payment_origin !== 'paymongo' && $order->payment_method->requiresPaymentProof(),
                     ],
                     'status' => [
                         'value' => $order->payment_status->value,
                         'label' => $order->paymentStatusLabel(),
                     ],
-                    'gateway' => $payMongoFlow === null ? null : [
-                        'channel' => $payMongoFlow->channel,
-                        'bank' => $payMongoFlow->bank_code,
-                        'status' => $payMongoFlow->status,
-                        'merchant_cutoff_at' => $payMongoFlow->merchant_cutoff_at->toIso8601String(),
-                    ],
+                    'gateway' => $this->paymentRecovery->detail($order, $actor),
                     'can_confirm_cod_collection' => $canProcess && $this->processing->canConfirmCodCollection($order),
                     'can_confirm_cod_remittance' => $canProcess && $this->processing->canConfirmCodRemittance($order),
                     'pay_at_pickup' => $order->payment_method->isPayAtPickup(),

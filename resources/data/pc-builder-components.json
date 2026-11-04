@@ -1,0 +1,121 @@
+{
+    "processor": {
+        "label": "Processor (CPU)",
+        "group": "Core parts",
+        "required": true,
+        "multiple": false,
+        "simple": true
+    },
+    "motherboard": {
+        "label": "Motherboard",
+        "group": "Core parts",
+        "required": true,
+        "multiple": false,
+        "simple": true
+    },
+    "memory": {
+        "label": "Memory (RAM)",
+        "group": "Core parts",
+        "required": true,
+        "multiple": true,
+        "simple": true
+    },
+    "storage": {
+        "label": "Storage",
+        "group": "Core parts",
+        "required": true,
+        "multiple": true,
+        "simple": true
+    },
+    "power_supply": {
+        "label": "Power Supply (PSU)",
+        "group": "Core parts",
+        "required": true,
+        "multiple": false,
+        "simple": true
+    },
+    "case": {
+        "label": "PC Case",
+        "group": "Core parts",
+        "required": true,
+        "multiple": false,
+        "simple": true
+    },
+    "graphics_card": {
+        "label": "Graphics Card (GPU)",
+        "group": "Core parts",
+        "required": false,
+        "multiple": false,
+        "simple": true
+    },
+    "cooler": {
+        "label": "CPU Cooler",
+        "group": "Cooling",
+        "required": false,
+        "multiple": false,
+        "simple": true
+    },
+    "fan": {
+        "label": "Case Fans",
+        "group": "Cooling",
+        "required": false,
+        "multiple": true,
+        "simple": true
+    },
+    "network_adapter": {
+        "label": "Wi-Fi / Network Adapter",
+        "group": "Connectivity",
+        "required": false,
+        "multiple": true,
+        "simple": false
+    },
+    "monitor": {
+        "label": "Monitor",
+        "group": "Peripherals",
+        "required": false,
+        "multiple": false,
+        "simple": false
+    },
+    "keyboard": {
+        "label": "Keyboard",
+        "group": "Peripherals",
+        "required": false,
+        "multiple": false,
+        "simple": false
+    },
+    "mouse": {
+        "label": "Mouse",
+        "group": "Peripherals",
+        "required": false,
+        "multiple": false,
+        "simple": false
+    },
+    "headset": {
+        "label": "Headset",
+        "group": "Peripherals",
+        "required": false,
+        "multiple": false,
+        "simple": false
+    },
+    "speakers": {
+        "label": "Speakers",
+        "group": "Peripherals",
+        "required": false,
+        "multiple": false,
+        "simple": false
+    },
+    "webcam": {
+        "label": "Webcam",
+        "group": "Peripherals",
+        "required": false,
+        "multiple": false,
+        "simple": false
+    },
+    "ups_avr": {
+        "label": "UPS / AVR",
+        "group": "Peripherals",
+        "required": false,
+        "multiple": false,
+        "simple": false
+    }
+}

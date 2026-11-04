@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Actions\Product\QueueCatalogSearchSync;
 use App\Concerns\HasCatalogNameKey;
 use Database\Factories\CategoryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -35,6 +37,22 @@ class Category extends Model
      * @var bool
      */
     public $timestamps = false;
+
+    protected static function booted(): void
+    {
+        static::saved(function (Category $category): void {
+            if (! $category->wasChanged('name') || config('scout.driver') !== 'algolia') {
+                return;
+            }
+
+            $category->products()
+                ->select('products.id')
+                ->orderBy('products.id')
+                ->chunkById(100, function (Collection $products): void {
+                    app(QueueCatalogSearchSync::class)->execute(array_values(array_map('intval', $products->modelKeys())));
+                });
+        });
+    }
 
     /**
      * The model's default values for attributes.

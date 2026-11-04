@@ -15,6 +15,7 @@ function setup(file = 'Index.vue', overrides = {}) {
     const requests = [];
     const visits = [];
     const confirmations = [];
+    const emits = [];
     const route = (name) => ({ url: () => name });
     const routes = {
         store: route('save'),
@@ -126,6 +127,7 @@ function setup(file = 'Index.vue', overrides = {}) {
             '@/routes/cart': { index: route('cart-page') },
             '@/actions/App/Http/Controllers/PcBuilderController': {
                 validate: route('validate'),
+                options: route('options'),
             },
         },
         {
@@ -180,10 +182,20 @@ function setup(file = 'Index.vue', overrides = {}) {
                 candidates: [],
                 ...overrides,
             },
-            { expose() {}, emit() {} },
+            {
+                expose() {},
+                emit: (name, payload) => emits.push({ name, payload }),
+            },
         ),
     );
-    return { state, requests, confirmations, visits, stop: () => scope.stop() };
+    return {
+        state,
+        requests,
+        confirmations,
+        visits,
+        emits,
+        stop: () => scope.stop(),
+    };
 }
 
 test('new selections immediately invalidate compatibility and ignore delayed responses', async () => {
@@ -207,7 +219,7 @@ test('cart handoff saves the latest edits before transferring the saved build', 
     state.selections.value = [
         { key: 'new', product_id: 22, quantity: 2, configuration: {} },
     ];
-    state.validation.value = { complete: true };
+    state.validation.value = { complete: true, can_purchase: true };
     state.checking.value = false;
     const transfer = state.addCurrentBuildToCart();
     assert.equal(requests[0].url, 'update');
@@ -223,11 +235,13 @@ test('cart handoff saves the latest edits before transferring the saved build', 
     stop();
 });
 
-test('failed saves and incomplete builds never reach cart transfer', async () => {
+test('failed saves and empty builds never reach cart transfer', async () => {
     const { state, requests, stop } = setup();
     await state.addCurrentBuildToCart();
     assert.equal(requests.length, 0);
-    state.validation.value = { complete: true };
+    state.selections.value = [{ key: 'cpu', product_id: 1, quantity: 1 }];
+    state.checking.value = false;
+    state.validation.value = { complete: false, can_purchase: true };
     const transfer = state.addCurrentBuildToCart();
     requests[0].reject(new Error('conflicting edit'));
     await transfer;
@@ -551,7 +565,7 @@ test('guided values distinguish unknown from false and zero and reject non-objec
     assert.throws(() => specificationFields.parseSpecifications('null'));
 });
 
-test('cart blockers describe missing parts, pending checks and unresolved compatibility', () => {
+test('cart blockers allow missing parts but explain pending checks and confirmed conflicts', () => {
     assert.match(
         builderActions.cartBlocker({ checking: true, missing: [] }),
         /Checking compatibility/,
@@ -562,20 +576,220 @@ test('cart blockers describe missing parts, pending checks and unresolved compat
     );
     assert.match(
         builderActions.cartBlocker({ missing: ['Processor'] }),
-        /Processor/,
+        /Check compatibility/,
     );
     assert.match(
         builderActions.cartBlocker({
             missing: [],
-            validation: { complete: false },
+            validation: { complete: false, can_purchase: false },
         }),
-        /compatibility findings/,
+        /confirmed compatibility conflicts/,
     );
     assert.equal(
         builderActions.cartBlocker({
             missing: [],
-            validation: { complete: true },
+            validation: { complete: false, can_purchase: true },
         }),
         '',
     );
+});
+
+test('simple optional extras and advanced sections preserve every selected part', () => {
+    const { state, stop } = setup();
+    state.selections.value = [
+        {
+            key: 'camera',
+            product_id: 128,
+            component_type: 'webcam',
+            quantity: 1,
+        },
+    ];
+    assert.equal(state.componentTypes.value.length, 9);
+    assert.ok(state.optionalTypes.includes('webcam'));
+    state.optionalOpen.value = true;
+    state.mode.value = 'advanced';
+    assert.equal(state.componentTypes.value.length, 17);
+    assert.deepEqual(
+        state.componentSections.value.map((section) => section.label),
+        ['Core parts', 'Cooling', 'Connectivity', 'Peripherals'],
+    );
+    state.mode.value = 'simple';
+    assert.equal(state.selections.value[0].product_id, 128);
+    stop();
+});
+
+test('a purchasable unfinished build saves and transfers while confirmed conflicts do not', async () => {
+    const { state, requests, stop } = setup();
+    state.selections.value = [
+        { key: 'cpu', product_id: 1, component_type: 'processor', quantity: 1 },
+    ];
+    state.checking.value = false;
+    state.validation.value = { complete: false, can_purchase: false };
+    await state.addCurrentBuildToCart();
+    assert.equal(requests.length, 0);
+    state.validation.value = { complete: false, can_purchase: true };
+    const transfer = state.addCurrentBuildToCart();
+    assert.equal(requests[0].url, 'save');
+    requests[0].resolve({
+        uuid: 'partial',
+        name: 'Partial build',
+        edit_version: 1,
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(requests[1].url, 'cart');
+    requests[1].resolve({});
+    await transfer;
+    stop();
+});
+
+test('strict picker ignores results from an older selection and never enables unverified choices', async () => {
+    const { state, requests, stop } = setup('Index.vue', {
+        strict_selection_enabled: true,
+    });
+    state.openPicker('processor');
+    assert.equal(requests[0].url, 'options');
+    state.selections.value = [
+        {
+            key: 'board',
+            product_id: 2,
+            component_type: 'motherboard',
+            quantity: 1,
+        },
+    ];
+    assert.equal(requests.length, 2);
+    requests[0].resolve({
+        selection_version: 0,
+        products: [{ id: 1, selectable: true }],
+        page: 1,
+        last_page: 1,
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(state.pickerProducts.value.length, 0);
+    requests[1].resolve({
+        selection_version: requests[1].payload.selection_version,
+        products: [
+            { id: 1, selectable: false, selection_reasons: ['Not verified'] },
+        ],
+        page: 1,
+        last_page: 1,
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    await state.addProduct(state.pickerProducts.value[0]);
+    assert.equal(requests.length, 2);
+    assert.equal(state.selections.value[0].product_id, 2);
+    stop();
+});
+
+test('the strict fan picker requests verification for the mounting position before adding a fan', async () => {
+    const { state, emits, stop } = setup('ComponentPicker.vue', {
+        strict: true,
+        componentType: 'fan',
+        label: 'Case Fans',
+        products: [],
+        mountingPositions: ['front'],
+    });
+    state.fanMount.value = 'front';
+    await Vue.nextTick();
+    assert.deepEqual(
+        emits.find((event) => event.name === 'filters').payload
+            .candidate_configuration,
+        { mounting_position: 'front' },
+    );
+    stop();
+});
+
+test('strict selection revalidates the proposal before committing and rejects a changed server verdict', async () => {
+    const cpu = { id: 1, component_type: 'processor', stock_quantity: 5 };
+    const { state, requests, stop } = setup('Index.vue', {
+        strict_selection_enabled: true,
+        components: { processor: [cpu] },
+    });
+    const product = {
+        ...cpu,
+        selectable: true,
+        proposed_components: [{ key: 'cpu', product_id: 1, quantity: 1 }],
+    };
+    const failed = state.addProduct(product);
+    requests[0].resolve({
+        can_purchase: false,
+        selection_compatible: false,
+        selection_blockers: ['Facts changed'],
+    });
+    await failed;
+    assert.equal(state.selections.value.length, 0);
+    assert.match(state.validationError.value, /Facts changed/);
+    const accepted = state.addProduct(product);
+    requests[1].resolve({
+        can_purchase: true,
+        selection_compatible: true,
+        complete: false,
+    });
+    await accepted;
+    assert.equal(state.selections.value[0].product_id, 1);
+    assert.equal(state.selections.value[0].component_type, 'processor');
+    state.removeProduct(1);
+    assert.equal(state.selections.value.length, 0);
+    stop();
+});
+
+test('replacement previews and cancellation retain selections until a verified confirmation commits', async () => {
+    const cpu = { id: 1, component_type: 'processor', stock_quantity: 5 };
+    const newCpu = {
+        ...cpu,
+        id: 3,
+        can_resolve: true,
+        affected_keys: ['board'],
+    };
+    const board = { id: 2, component_type: 'motherboard', stock_quantity: 5 };
+    const { state, requests, stop } = setup('Index.vue', {
+        strict_selection_enabled: true,
+        components: { processor: [cpu, newCpu], motherboard: [board] },
+    });
+    state.selections.value = [
+        { key: 'cpu', product_id: 1, component_type: 'processor', quantity: 1 },
+        {
+            key: 'board',
+            product_id: 2,
+            component_type: 'motherboard',
+            quantity: 1,
+        },
+    ];
+    state.resolveReplacement(newCpu);
+    state.cancelReplacement();
+    requests[0].resolve({
+        selection_version: 1,
+        products: [{ selectable: true }],
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(state.selections.value.length, 2);
+    assert.equal(state.replacementPreview.value, null);
+    state.resolveReplacement(newCpu);
+    state.toggleReplacementKey('board');
+    requests[1].resolve({
+        selection_version: 1,
+        products: [{ selectable: false }],
+    });
+    requests[2].resolve({
+        selection_version: 1,
+        products: [
+            {
+                selectable: true,
+                proposed_components: [
+                    { key: 'new-cpu', product_id: 3, quantity: 1 },
+                ],
+            },
+        ],
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    const committing = state.confirmReplacement();
+    assert.equal(state.selections.value.length, 2);
+    requests[3].resolve({
+        can_purchase: true,
+        selection_compatible: true,
+        complete: false,
+    });
+    await committing;
+    assert.equal(state.selections.value.length, 1);
+    assert.equal(state.selections.value[0].product_id, 3);
+    stop();
 });

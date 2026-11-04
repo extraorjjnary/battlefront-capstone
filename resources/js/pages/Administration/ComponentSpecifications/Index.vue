@@ -22,6 +22,7 @@ const props = defineProps({
     products: Array,
     profiles: Array,
     candidates: { type: Array, default: () => [] },
+    builder_readiness: { type: Object, default: () => ({}) },
 });
 const { confirmation, confirm, answer } = useActionConfirmation();
 const search = ref('');
@@ -219,6 +220,40 @@ async function reloadRevision() {
             Select a catalog product, record its verified hardware facts, then
             review its source evidence. Unknown facts remain unverified.
         </p>
+        <section
+            v-if="builder_readiness.eligible_products !== undefined"
+            class="border-border bg-card rounded-lg border p-4 text-sm"
+            aria-label="Builder catalog readiness"
+        >
+            <h2 class="font-semibold">Builder catalog readiness</h2>
+            <p class="mt-2">
+                {{ builder_readiness.verified_products }} of
+                {{ builder_readiness.eligible_products }} catalog products have
+                the required reviewed facts.
+            </p>
+            <p
+                v-if="!builder_readiness.ready"
+                class="text-muted-foreground mt-2"
+            >
+                Strict selection is staged until at least one complete in-stock
+                build template passes every applicable check. Product names
+                alone do not establish compatibility.
+            </p>
+            <p v-else class="mt-2">
+                A complete verified build is available for release review.
+            </p>
+            <p
+                v-if="builder_readiness.missing_types?.length"
+                class="text-muted-foreground mt-2"
+            >
+                Types still awaiting verified coverage:
+                {{
+                    builder_readiness.missing_types
+                        .map((type) => componentLabels[type])
+                        .join(', ')
+                }}.
+            </p>
+        </section>
         <div class="grid items-start gap-6 xl:grid-cols-[22rem_minmax(0,1fr)]">
             <section
                 class="border-border bg-card rounded-lg border p-4"
@@ -415,7 +450,10 @@ async function reloadRevision() {
                         <p class="text-muted-foreground text-sm">
                             Use exact source names and units. Leave unverified
                             values unknown; use “Confirm none” only when the
-                            source verifies that there are none.
+                            source verifies that there are none. Presets are
+                            entry suggestions, not verified product support.
+                            Choose Custom value for an uncommon saved or sourced
+                            value.
                         </p>
                         <template v-if="!advancedOpen"
                             ><div

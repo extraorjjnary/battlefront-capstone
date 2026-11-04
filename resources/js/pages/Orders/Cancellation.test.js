@@ -114,6 +114,9 @@ function loadPage(path, inlineTemplate = false) {
                     method: 'post',
                 }),
             },
+            '@/routes/orders/paymongo': {
+                retry: (id) => ({ url: `/orders/${id}/paymongo/retry`, method: 'post' }),
+            },
             '@/actions/App/Http/Controllers/Administration/OrderStatusController':
                 {
                     default: {
@@ -191,6 +194,45 @@ function orderProps(overrides = {}) {
         },
     };
 }
+
+test('hosted payment renders only its server selected action', async () => {
+    for (const action of ['continue', 'retry', null]) {
+        const loaded = loadPage('./Show.vue', true);
+        const props = orderProps();
+        Object.assign(props.order.payment, {
+            action,
+            checkout_url: 'https://checkout.paymongo.com/cs_test',
+            can_retry_hosted: true,
+        });
+        const html = await renderToString(Vue.h(loaded.component, props));
+        assert.equal(html.includes('Continue payment'), action === 'continue');
+        assert.equal(html.includes('Try payment again'), action === 'retry');
+    }
+});
+
+test('payment retry submits once and opens the returned checkout in its payment tab', () => {
+    const previousWindow = globalThis.window;
+    const destinations = [];
+    const paymentTab = { opener: {}, location: { replace: (url) => destinations.push(url) }, close() {} };
+    globalThis.window = { open: () => paymentTab };
+    const scope = Vue.effectScope();
+    try {
+        const loaded = loadPage('./Show.vue');
+        const props = orderProps();
+        Object.assign(props.order.payment, { action: 'retry', can_retry_hosted: true });
+        const page = scope.run(() => loaded.component.setup(props, { expose() {} }));
+        page.retryOnlinePayment();
+        page.retryOnlinePayment();
+        assert.equal(loaded.submissions.length, 1);
+        assert.deepEqual(loaded.submissions[0].target, { url: '/orders/7/paymongo/retry', method: 'post' });
+        assert.equal(paymentTab.opener, null);
+        loaded.submissions[0].options.onSuccess({ props: { order: { payment: { checkout_url: 'https://checkout.paymongo.com/cs_resumed' } } } });
+        assert.deepEqual(destinations, ['https://checkout.paymongo.com/cs_resumed']);
+    } finally {
+        scope.stop();
+        globalThis.window = previousWindow;
+    }
+});
 
 test('wallet cancellation requests use their review endpoint and prevent stale or duplicate submissions', async () => {
     const scope = Vue.effectScope();

@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Actions\Product\QueueCatalogSearchSync;
 use App\Concerns\HasCatalogNameKey;
 use App\Enums\ShippingProfile;
 use Database\Factories\ProductFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Scout\Searchable;
 
 /**
  * @property int $id
@@ -76,12 +79,48 @@ use Illuminate\Support\Facades\Storage;
 class Product extends Model
 {
     use HasCatalogNameKey;
+    use Searchable;
     use SoftDeletes;
+
+    /** @param Collection<int, Product> $models */
+    public function queueMakeSearchable(Collection $models): void
+    {
+        if (config('scout.driver') === 'algolia' && $models->isNotEmpty()) {
+            app(QueueCatalogSearchSync::class)->execute(array_values(array_map('intval', $models->modelKeys())));
+        }
+    }
+
+    /** @param Collection<int, Product> $models */
+    public function queueRemoveFromSearch(Collection $models): void
+    {
+        $this->queueMakeSearchable($models);
+    }
+
+    /** @return array{id: int, product_code: string, name: string, brand: string|null, category: string, description: string} */
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => (int) $this->id,
+            'product_code' => $this->product_code,
+            'name' => $this->name,
+            'brand' => $this->brand,
+            'category' => $this->category->name,
+            'description' => strip_tags($this->description ?? ''),
+        ];
+    }
 
     public const CODE_PATTERN = '/^[A-Za-z0-9]{1,64}$/D';
 
     /** @use HasFactory<ProductFactory> */
     use HasFactory;
+
+    /** @param EloquentBuilder<Product> $query
+     * @return EloquentBuilder<Product>
+     */
+    protected function makeAllSearchableUsing(EloquentBuilder $query): EloquentBuilder
+    {
+        return $query->with('category:id,name');
+    }
 
     /**
      * The name of the "updated at" column.

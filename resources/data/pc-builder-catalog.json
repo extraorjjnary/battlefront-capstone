@@ -1,0 +1,1036 @@
+[
+    {
+        "name": "PROCESSOR AMD A6-SERIES A6-9500E",
+        "category": "Processor",
+        "component_type": "processor"
+    },
+    {
+        "name": "PROCESSOR AMD A8-7680 (CORES 4 THREADS 4)",
+        "category": "Processor",
+        "component_type": "processor"
+    },
+    {
+        "name": "PROCESSOR AMD A8-7680 WITH ORIGINAL HEATSINK FAN",
+        "category": "Processor",
+        "component_type": "processor"
+    },
+    {
+        "name": "PROCESSOR AMD ATHLON 3000G VEGA 3 SOCKET AM4 GRAPHIC",
+        "category": "Processor",
+        "component_type": "processor"
+    },
+    {
+        "name": "PROCESSOR AMD RYZEN 7 5800X 4.7 GHz 8 CORE SOCKET AM4",
+        "category": "Processor",
+        "component_type": "processor"
+    },
+    {
+        "name": "PROCESSOR AMD RYZEN 7 7700 8-CORE, 16-THREAD",
+        "category": "Processor",
+        "component_type": "processor"
+    },
+    {
+        "name": "PROCESSOR AMD RYZEN 9 3900",
+        "category": "Processor",
+        "component_type": "processor"
+    },
+    {
+        "name": "PROCESSOR AMD RYZEN R7 5700X",
+        "category": "Processor",
+        "component_type": "processor"
+    },
+    {
+        "name": "PROCESSOR AMD RYZEN™ 5 4500 (6CORES 12THREADS)",
+        "category": "Processor",
+        "component_type": "processor"
+    },
+    {
+        "name": "PROCESSOR AMD RYZEN™ 5 5600X (6CORES 12THREADS)",
+        "category": "Processor",
+        "component_type": "processor",
+        "manufacturer_part_number": "Ryzen 5 5600X",
+        "specifications": {
+            "model": "Ryzen 5 5600X",
+            "socket": "AM4",
+            "generation": "Ryzen 5000",
+            "integrated_graphics": false,
+            "tdp_w": 65
+        },
+        "evidence": [
+            {
+                "url": "https://www.amd.com/en/products/processors/desktops/ryzen/5000-series/amd-ryzen-5-5600x.html",
+                "title": "AMD Ryzen 5 5600X specifications",
+                "section": "Socket, graphics and default TDP. TDP is not maximum power. Confirm boxed/tray SKU and cooler contents.",
+                "verified_at": "2026-11-01",
+                "variant": "Ryzen 5 5600X"
+            }
+        ]
+    },
+    {
+        "name": "PROCESSOR RYZEN 3 2200G 3.5GHZ",
+        "category": "Processor",
+        "component_type": "processor"
+    },
+    {
+        "name": "PROCESSOR RYZEN R7 5700X3D",
+        "category": "Processor",
+        "component_type": "processor"
+    },
+    {
+        "name": "Biostar EXtreme Gaming GTX 1660 Super",
+        "category": "Graphics Card",
+        "component_type": "graphics_card"
+    },
+    {
+        "name": "Biostar Gaming AMD Radeon RX580 8GB/GDDR5/256BIT",
+        "category": "Graphics Card",
+        "component_type": "graphics_card"
+    },
+    {
+        "name": "Gigabyte GT710",
+        "category": "Graphics Card",
+        "component_type": "graphics_card"
+    },
+    {
+        "name": "Huanazhi GT730 Video Card",
+        "category": "Graphics Card",
+        "component_type": "graphics_card"
+    },
+    {
+        "name": "Ramsta GT730 2GB DDR3",
+        "category": "Graphics Card",
+        "component_type": "graphics_card"
+    },
+    {
+        "name": "Ramsta GTX1050 TI 4G",
+        "category": "Graphics Card",
+        "component_type": "graphics_card"
+    },
+    {
+        "name": "FASPEED RAM DDR3 8G PC1600MHZ",
+        "category": "RAM",
+        "component_type": "memory"
+    },
+    {
+        "name": "FASPEED RAM DDR4 3200MHZ (8GB - ZS4-8G-PAB)",
+        "category": "RAM",
+        "component_type": "memory"
+    },
+    {
+        "name": "RAM ADATA DDR5 32GB 5600MHZ U-DIMM",
+        "category": "RAM",
+        "component_type": "memory"
+    },
+    {
+        "name": "RAM KINGSTON HYPER X FURY BEAST DDR5 16GB 4800MHZ",
+        "category": "RAM",
+        "component_type": "memory"
+    },
+    {
+        "name": "RAM KINGSTON HYPER X FURY BEAST DDR5 8GB 4800MHZ",
+        "category": "RAM",
+        "component_type": "memory"
+    },
+    {
+        "name": "RAM ST MAGIC DDR3 8GB 1600HZ",
+        "category": "RAM",
+        "component_type": "memory"
+    },
+    {
+        "name": "HDD SEAGATE ( 250GB - ST250DM000)",
+        "category": "Storage",
+        "component_type": "storage"
+    },
+    {
+        "name": "HDD SEAGATE BARRACUDA COMPUTE 8TB (ST8000DM004)",
+        "category": "Storage",
+        "component_type": "storage"
+    },
+    {
+        "name": "HDD SEAGATE BARRACUDA GREEN 1TB (ST1000DM010)",
+        "category": "Storage",
+        "component_type": "storage"
+    },
+    {
+        "name": "HDD SEAGATE BARRACUDA GREEN 500GB (ST500DM009)",
+        "category": "Storage",
+        "component_type": "storage"
+    },
+    {
+        "name": "HDD WD 2TB BLUE (PC HARD DRIVE)",
+        "category": "Storage",
+        "component_type": "storage"
+    },
+    {
+        "name": "KINGSTON 2.5 (960GB - SA400S37)",
+        "category": "Storage",
+        "component_type": "storage"
+    },
+    {
+        "name": "RAMSTA NGFF M.2 (R600 M.2 128GB)",
+        "category": "Storage",
+        "component_type": "storage"
+    },
+    {
+        "name": "RAMSTA NGFF M.2 (R600 M.2 256GB)",
+        "category": "Storage",
+        "component_type": "storage"
+    },
+    {
+        "name": "RAMSTA SSD 2.5 (S800 2.5 2TB)",
+        "category": "Storage",
+        "component_type": "storage"
+    },
+    {
+        "name": "SSD DATO DS700 256GB",
+        "category": "Storage",
+        "component_type": "storage"
+    },
+    {
+        "name": "SSD ESGAMING 1TB 2.5 SATA",
+        "category": "Storage",
+        "component_type": "storage"
+    },
+    {
+        "name": "SSD ESGAMING 256GB 2.5 SATA",
+        "category": "Storage",
+        "component_type": "storage"
+    },
+    {
+        "name": "SSD ESGAMING 512GB 2.5 SATA",
+        "category": "Storage",
+        "component_type": "storage"
+    },
+    {
+        "name": "SSD LEXAR NS10 LITE 120GB",
+        "category": "Storage",
+        "component_type": "storage"
+    },
+    {
+        "name": "SURPLUS HDD FOR LAPTOP TOSHIBA 500GB (MQ01ACF050)",
+        "category": "Storage",
+        "component_type": "storage"
+    },
+    {
+        "name": "BIOSTAR H610M Motherboard",
+        "category": "Motherboard",
+        "component_type": "motherboard"
+    },
+    {
+        "name": "Biostar B450M Motherboard AM4",
+        "category": "Motherboard",
+        "component_type": "motherboard"
+    },
+    {
+        "name": "CERRVO MOTHERBOARD INTEL 6TH-9TH GENERATION",
+        "category": "Motherboard",
+        "component_type": "motherboard"
+    },
+    {
+        "name": "GIGABYTE B450M DS3H V2",
+        "category": "Motherboard",
+        "component_type": "motherboard",
+        "manufacturer_part_number": "B450M DS3H V2",
+        "specifications": {
+            "socket": "AM4",
+            "chipset": "B450",
+            "memory_generations": ["DDR4"],
+            "dimm_slots": 4,
+            "maximum_memory_gb": 128,
+            "form_factor": "mATX"
+        },
+        "evidence": [
+            {
+                "url": "https://www.gigabyte.com/Motherboard/B450M-DS3H-V2-rev-1x/sp",
+                "title": "GIGABYTE B450M DS3H V2 revision 1.x specifications",
+                "section": "CPU, chipset, memory, form factor. Confirm stock revision and CPU-specific BIOS support before approval.",
+                "verified_at": "2026-11-01",
+                "variant": "B450M DS3H V2"
+            }
+        ]
+    },
+    {
+        "name": "MOTHERBOARD BIOSTAR A520M",
+        "category": "Motherboard",
+        "component_type": "motherboard"
+    },
+    {
+        "name": "MOTHERBOARD ONDA A68V+ FM2+ VGA/HDMI",
+        "category": "Motherboard",
+        "component_type": "motherboard"
+    },
+    {
+        "name": "MSI B450M-A PRO MAX II",
+        "category": "Motherboard",
+        "component_type": "motherboard",
+        "manufacturer_part_number": "B450M-A PRO MAX II",
+        "specifications": {
+            "socket": "AM4",
+            "chipset": "B450",
+            "memory_generations": ["DDR4"],
+            "dimm_slots": 2,
+            "maximum_memory_gb": 64,
+            "form_factor": "mATX",
+            "pcie_x16_slots": 1,
+            "display_outputs": ["HDMI", "DVI-D"]
+        },
+        "evidence": [
+            {
+                "url": "https://www.msi.com/Motherboard/B450M-A-PRO-MAX-II/Specification",
+                "title": "MSI B450M-A PRO MAX II specifications",
+                "section": "CPU, memory, slots and display outputs. Installed BIOS and exact CPU support require stock review.",
+                "verified_at": "2026-11-01",
+                "variant": "B450M-A PRO MAX II"
+            }
+        ]
+    },
+    {
+        "name": "MSI PRO H610M-E DDR4 Motherboard",
+        "category": "Motherboard",
+        "component_type": "motherboard"
+    },
+    {
+        "name": "ESGAMING PSU ATX 750W",
+        "category": "Power Supply",
+        "component_type": "power_supply"
+    },
+    {
+        "name": "Inplay Ultra Series GS650 PSU 80+ Bronze",
+        "category": "Power Supply",
+        "component_type": "power_supply"
+    },
+    {
+        "name": "KEYTECH PSU GTS-550 80+ GOLD",
+        "category": "Power Supply",
+        "component_type": "power_supply"
+    },
+    {
+        "name": "KEYTECH PSU GTS-650 GOLD BLACK (80 PLUS )",
+        "category": "Power Supply",
+        "component_type": "power_supply"
+    },
+    {
+        "name": "KEYTECH PSU GTS-650 GOLD WHITE (80 PLUS )",
+        "category": "Power Supply",
+        "component_type": "power_supply"
+    },
+    {
+        "name": "KEYTECH PSU GTS-750 GOLD  (80 PLUS )",
+        "category": "Power Supply",
+        "component_type": "power_supply"
+    },
+    {
+        "name": "POWER SUPPLY KEYTECH THUNDERBOLT 800W",
+        "category": "Power Supply",
+        "component_type": "power_supply"
+    },
+    {
+        "name": "POWER SUPPLY PLAYMASTER TECH MATE 700PRO",
+        "category": "Power Supply",
+        "component_type": "power_supply"
+    },
+    {
+        "name": "POWER SUPPLY RAMSTA RW-550 FULL MODULAR 80PLUS",
+        "category": "Power Supply",
+        "component_type": "power_supply"
+    },
+    {
+        "name": "CPU CASE BOSSTON ATX SERIES W/RGB CS06",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE COOLMAN ROBIN 2 (PINK)",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE DAREU WHITE TIGER CS-8856 W/ 5PCS BLOWER/REMOTE CONTROLLER/SIDE LIGHT BOARD",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE ESGAMING CA01G W/ PSU",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE ESGAMING CA02M W/ PSU",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE ESGAMING CA03 W/ PSU",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE ESGAMING MORRIGAN BLACK CASING",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE ESGAMING ROBOT WHITE",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE ESGAMING Y03 ARTIC BLACK",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE GAMEKM S1 BUFFOON (BLACK)",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE GAMEKM S1 BUFFOON (WHITE)",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE HESTAR POSEIDON (BLACK)",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE HESTAR POSEIDON (WHITE)",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE JUNGLE LEOPARD AC-01 (WHITE)",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE JUNGLE LEOPARD AC-02 (BLACK)",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE JUNGLE LEOPARD AC-02 (WHITE)",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE JUNGLE LEOPARD MS-01 (BLACK)",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE JUNGLE LEOPARD MS-01 (WHITE)",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE KEYTECH ROBIN III (PINK)",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE KEYTECH ROBIN LITE W/ ROG LIGHT BOARD (WHITE)",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE KEYTECH ROBIN MINI (BLACK)",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE KEYTECH ROBIN MINI (WHITE)",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE KEYTECH T100 W/PSU @ 2RGB FANS (BLACK)",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE KEYTECH T1000 ROG BLACK",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE KEYTECH T1000 ROG WHITE",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE KEYTECH T5000 (WHITE)",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE KEYTECH T600 WHITE",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE WJ COOLMAN ROBIN CURVED MINI DGT(WHITE)",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE Y60-K (BLACK)",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "CPU CASE Y60-K (WHITE)",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "INPLAY META A200 MICRO ATX PC CASE WITH 3 FANS-WHITE",
+        "category": "PC Case",
+        "component_type": "case"
+    },
+    {
+        "name": "ACER MONITOR 22INCH  (NO POWER CORD NO VGA/HDMI)",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "AOC MONITOR  22INCH  (NO POWER CORD NO VGA/HDMI)",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "LENOVO MONITOR  22INCH  (NO POWER CORD NO VGA/HDMI)",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "MONITOR ASUS TUF VG27AQ5A 210HZ",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "MONITOR DELL 24\\ SE2425HM\"",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "MONITOR GAMING ELSA 23.8 INCH 180HZ (24F8)",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "MONITOR GOMA 17\\ SQUARE\"",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "MONITOR HKC 27\\ IPS FHD@100HZ (MB27V9F )\"",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "MONITOR MSI MAG G244F 200HZ",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "MONITOR NATIONAL STAR PC GAMING  #PC22",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "MONITOR SUPERVISION IPS 23.8INCH 100HZ GV-24HD",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "MONITOR SUPERVISION LED 22\\ SV-22HD\"",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "MONITOR SUPERVISION LED 24INCH  SV-24HD",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "MONITOR SUPERVISION SP-19H",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "MONITOR SUPERVISION SP-20N 20INCH HDMI/VGA",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "MONITOR SURPLUS HP/DELL P2214HB 22\\ WIDE\"",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "MONITOR VIEWPOINT 24INCH K24H24 PRO , SEMI CURVED, 240HZ (BLACK)",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "MONITOR VIEWPOINT 24INCH K24H24 PRO , SEMI CURVED, 240HZ (WHITE)",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "MONITOR VIEWPOINT 24INCH VP24P1S 75HZ FLAT IPS (BLACK)",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "MONITOR VIEWPOINT 24INCH VP24P1S 75HZ FLAT IPS (WHITE)",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "MONITOR VIEWPOINT 34INCH K34WQC PRO 180HZ",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "MONITOR VIEWPOINT K27HQC CURVED 180HZ WHITE",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "PHILIPS MONITOR  22INCH  (NO POWER CORD NO VGA/HDMI)",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "VIEWSONIC MONITOR  22INCH (NO POWER CORD NO VGA/HDMI)",
+        "category": "Monitor",
+        "component_type": "monitor"
+    },
+    {
+        "name": "AOC Gaming Keyboard GK410\"",
+        "category": "Peripherals",
+        "component_type": "keyboard"
+    },
+    {
+        "name": "BOSSTON DRAGAN K820 COOL GAME KEYBOARD",
+        "category": "Peripherals",
+        "component_type": "keyboard"
+    },
+    {
+        "name": "Dareu Gaming mechanical Keyboard Glory-EK1280",
+        "category": "Peripherals",
+        "component_type": "keyboard"
+    },
+    {
+        "name": "Dareu Keyboard Soldier-LK135",
+        "category": "Peripherals",
+        "component_type": "keyboard"
+    },
+    {
+        "name": "Gaming Keyboard HP K300",
+        "category": "Peripherals",
+        "component_type": "keyboard"
+    },
+    {
+        "name": "KEYBOARD DAREU EK815S",
+        "category": "Peripherals",
+        "component_type": "keyboard"
+    },
+    {
+        "name": "KEYBOARD DAREU GLORIOUS QUEEN EK810 PINK",
+        "category": "Peripherals",
+        "component_type": "keyboard"
+    },
+    {
+        "name": "KEYBOARD DAREU RAINBOW LIGHT EK812 BLACK",
+        "category": "Peripherals",
+        "component_type": "keyboard"
+    },
+    {
+        "name": "MECHANICAL KEYBOARD T-WOLF T60",
+        "category": "Peripherals",
+        "component_type": "keyboard"
+    },
+    {
+        "name": "Mechanical Keyboard HP GK100F",
+        "category": "Peripherals",
+        "component_type": "keyboard"
+    },
+    {
+        "name": "Mechanical Keyboard MSI VIGOR GK50Z V2",
+        "category": "Peripherals",
+        "component_type": "keyboard"
+    },
+    {
+        "name": "RAPOO WIRED USB KEYBOARD NK2600",
+        "category": "Peripherals",
+        "component_type": "keyboard"
+    },
+    {
+        "name": "RAPOO WIRERLESS KEYBOARD SPILL PROOF 2.4GHZ E1050",
+        "category": "Peripherals",
+        "component_type": "keyboard"
+    },
+    {
+        "name": "GAMING MOUSE HP M160 LED",
+        "category": "Peripherals",
+        "component_type": "mouse"
+    },
+    {
+        "name": "GAMING MOUSE MSI DS102 V3 RGB MOUSE (WHITE/BLACK)",
+        "category": "Peripherals",
+        "component_type": "mouse"
+    },
+    {
+        "name": "MOUSE AOC MS100",
+        "category": "Peripherals",
+        "component_type": "mouse"
+    },
+    {
+        "name": "MOUSE AOC MS121",
+        "category": "Peripherals",
+        "component_type": "mouse"
+    },
+    {
+        "name": "MOUSE GAMING MAGEGEE G11",
+        "category": "Peripherals",
+        "component_type": "mouse"
+    },
+    {
+        "name": "MOUSE WIRELESS DAREU 2.4G LM106G BLUE",
+        "category": "Peripherals",
+        "component_type": "mouse"
+    },
+    {
+        "name": "MOUSE WIRELESS DAREU RIPPLE LM135D BLUE",
+        "category": "Peripherals",
+        "component_type": "mouse"
+    },
+    {
+        "name": "MOUSE WIRELESS DAREU RIPPLE LM135D PINK",
+        "category": "Peripherals",
+        "component_type": "mouse"
+    },
+    {
+        "name": "MOUSE WIRELESS DAREU RIPPLE LM135D WHITE",
+        "category": "Peripherals",
+        "component_type": "mouse"
+    },
+    {
+        "name": "MOUSE WIRELESS DAREU RIPPLE LM135G BLUE",
+        "category": "Peripherals",
+        "component_type": "mouse"
+    },
+    {
+        "name": "MOUSE WIRELESS DAREU RIPPLE LM135G WHITE",
+        "category": "Peripherals",
+        "component_type": "mouse"
+    },
+    {
+        "name": "RAPOO WIRED OPTICAL USB MOUSE N100",
+        "category": "Peripherals",
+        "component_type": "mouse"
+    },
+    {
+        "name": "WIRELESS GAMING MOUSE DAREU A918",
+        "category": "Peripherals",
+        "component_type": "mouse"
+    },
+    {
+        "name": "WIRELESS MOUSE HP BT52",
+        "category": "Peripherals",
+        "component_type": "mouse"
+    },
+    {
+        "name": "RAPOO WEB CAMERA 1080P FULL HD USB C260",
+        "category": "Peripherals",
+        "component_type": "webcam",
+        "manufacturer_part_number": "C260",
+        "specifications": {
+            "connection_interface": "USB",
+            "resolution": "1920x1080"
+        },
+        "evidence": [
+            {
+                "url": "https://www.rapoo.com/en/product/C260",
+                "title": "Rapoo C260 specifications",
+                "section": "Connection mode USB 2.0; FHD resolution. Confirm stock connector and operating-system support.",
+                "verified_at": "2026-11-01",
+                "variant": "C260"
+            }
+        ]
+    },
+    {
+        "name": "HEADSET ESGAMING ES-15",
+        "category": "Audio Equipment",
+        "component_type": "headset"
+    },
+    {
+        "name": "RAPOO USB STEREO HEADSET H120",
+        "category": "Audio Equipment",
+        "component_type": "headset"
+    },
+    {
+        "name": "RAPOO USB STEREO HEADSET H150S",
+        "category": "Audio Equipment",
+        "component_type": "headset"
+    },
+    {
+        "name": "RAPOO VH160 VIRTUAL 7.1 BACKLIT GAMING HEADSET",
+        "category": "Audio Equipment",
+        "component_type": "headset"
+    },
+    {
+        "name": "RAPOO WIRED 3.5MM STEREO HEADSET H100",
+        "category": "Audio Equipment",
+        "component_type": "headset"
+    },
+    {
+        "name": "RAPOO WIRELESS STEREO HEADSET H200",
+        "category": "Audio Equipment",
+        "component_type": "headset"
+    },
+    {
+        "name": "WIRELESS HEADPHONE Y-680 RGB (ACTIVE NOISE CANCELLING)",
+        "category": "Audio Equipment",
+        "component_type": "headset"
+    },
+    {
+        "name": "WIRELESS HEADSET UID-20",
+        "category": "Audio Equipment",
+        "component_type": "headset"
+    },
+    {
+        "name": "SPEAKER BOSSTON EK-01",
+        "category": "Audio Equipment",
+        "component_type": "speakers"
+    },
+    {
+        "name": "SPEAKER BOSSTON EK-TM6000U",
+        "category": "Audio Equipment",
+        "component_type": "speakers"
+    },
+    {
+        "name": "SPEAKER BOSSTON EK8880",
+        "category": "Audio Equipment",
+        "component_type": "speakers"
+    },
+    {
+        "name": "SPEAKER BOSSTON EK8881",
+        "category": "Audio Equipment",
+        "component_type": "speakers"
+    },
+    {
+        "name": "SPEAKER KEYTECH S10 PRO WHITE (W/ RGB LED LIGHT)",
+        "category": "Audio Equipment",
+        "component_type": "speakers"
+    },
+    {
+        "name": "SPEAKER MICROKINGDOM R19",
+        "category": "Audio Equipment",
+        "component_type": "speakers"
+    },
+    {
+        "name": "Comfast Wifi Dongle CF-WU710N V5 (150MBPS)",
+        "category": "Networking",
+        "component_type": "network_adapter"
+    },
+    {
+        "name": "LB-LINK 2N1 Bluetooth&Wifi Dongle BL-WN300BT (300Mbps)",
+        "category": "Networking",
+        "component_type": "network_adapter"
+    },
+    {
+        "name": "LB-LINK AC1300 HIGH GAIN WIRELESS DUAL BAND USB ADAPTER BL-WDN1300H",
+        "category": "Networking",
+        "component_type": "network_adapter"
+    },
+    {
+        "name": "LB-LINK AC650 BLUETOOTH 4.2 WIRELESS DUAL BAND USB ADAPTER(BL-WN650BT)",
+        "category": "Networking",
+        "component_type": "network_adapter"
+    },
+    {
+        "name": "LB-LINK AC650M HIGH GAIN WIRELESS DUAL BAND USB ADPATER(BL-WDN650A)",
+        "category": "Networking",
+        "component_type": "network_adapter"
+    },
+    {
+        "name": "LB-LINK WIFI DONGLE N300 ( 300MBPS BL-WN351)",
+        "category": "Networking",
+        "component_type": "network_adapter"
+    },
+    {
+        "name": "LB-LINK Wifi Dongle BL-WN151 (150MBPS)",
+        "category": "Networking",
+        "component_type": "network_adapter"
+    },
+    {
+        "name": "MERCUSYS AC1300 HIGH GAIN WIRELESS DUAL BAND ADAPTER MA30H",
+        "category": "Networking",
+        "component_type": "network_adapter"
+    },
+    {
+        "name": "MERCUSYS AC1300 HIGH GAIN WIRELESS DUAL BAND ADAPTER MA32H",
+        "category": "Networking",
+        "component_type": "network_adapter"
+    },
+    {
+        "name": "SURPLUS LAN CARD LOW PROFILE PCI EXPRESS",
+        "category": "Networking",
+        "component_type": "network_adapter"
+    },
+    {
+        "name": "USB TO LAN 3.0 HIGH SPEED ETHERNET ADAPTER",
+        "category": "Networking",
+        "component_type": "network_adapter"
+    },
+    {
+        "name": "USB TO LAN GIGABIT 3.0 (GPT PRO)",
+        "category": "Networking",
+        "component_type": "network_adapter"
+    },
+    {
+        "name": "USB TO LAN GIGABIT JINHUA (JINHUA-IN323)",
+        "category": "Networking",
+        "component_type": "network_adapter"
+    },
+    {
+        "name": "POWERLOGIC AVR 230V 500W AVR500",
+        "category": "Power Accessories",
+        "component_type": "ups_avr"
+    },
+    {
+        "name": "SURPLUS UPS SECURE 3000VA",
+        "category": "Power Accessories",
+        "component_type": "ups_avr"
+    },
+    {
+        "name": "UPS AWP 1000VA 600W AID1000 ECO",
+        "category": "Power Accessories",
+        "component_type": "ups_avr"
+    },
+    {
+        "name": "UPS AWP 1000VA 600W AID1000 PRO LCD",
+        "category": "Power Accessories",
+        "component_type": "ups_avr"
+    },
+    {
+        "name": "UPS AWP 1500VA 900W AID1500",
+        "category": "Power Accessories",
+        "component_type": "ups_avr"
+    },
+    {
+        "name": "UPS SECURE 650VA",
+        "category": "Power Accessories",
+        "component_type": "ups_avr"
+    },
+    {
+        "name": "AMD HEATSINK FAN ORIGINAL",
+        "category": "Cooling Components",
+        "component_type": "cooler"
+    },
+    {
+        "name": "CPU FAN KEYTECH TORNADO SINGLE BLACK",
+        "category": "Cooling Components",
+        "component_type": "cooler"
+    },
+    {
+        "name": "CPU FAN KEYTECH TORNADO SINGLE WHITE",
+        "category": "Cooling Components",
+        "component_type": "cooler"
+    },
+    {
+        "name": "CPU RADIATOR WATER-COOLING ASTROBEAT 360 DIGITAL BLACK",
+        "category": "Cooling Components",
+        "component_type": "cooler"
+    },
+    {
+        "name": "CPU RADIATOR WATER-COOLING LEOPARD 360P TK1 ARGB BLACK",
+        "category": "Cooling Components",
+        "component_type": "cooler"
+    },
+    {
+        "name": "CPU RADIATOR WATER-COOLING LEOPARD 360P TK1 ARGB WHITE",
+        "category": "Cooling Components",
+        "component_type": "cooler"
+    },
+    {
+        "name": "INTEL ORIGINAL HEATSINK FAN",
+        "category": "Cooling Components",
+        "component_type": "cooler"
+    },
+    {
+        "name": "JUNGLE LEOPARD STELLAR REALM RS 240 (BLACK)",
+        "category": "Cooling Components",
+        "component_type": "cooler"
+    },
+    {
+        "name": "JUNGLE LEOPARD STELLAR REALM RS 240 (WHITE)",
+        "category": "Cooling Components",
+        "component_type": "cooler"
+    },
+    {
+        "name": "JUNGLE LEOPARD STELLAR REALM RS 360 (BLACK)",
+        "category": "Cooling Components",
+        "component_type": "cooler"
+    },
+    {
+        "name": "JUNGLE LEOPARD STELLAR REALM RS 360 (WHITE)",
+        "category": "Cooling Components",
+        "component_type": "cooler"
+    },
+    {
+        "name": "Computer Fan Big 120mm (SATA)",
+        "category": "Cooling Components",
+        "component_type": "fan"
+    },
+    {
+        "name": "Computer Fan Small 80mm (SATA)",
+        "category": "Cooling Components",
+        "component_type": "fan"
+    },
+    {
+        "name": "ESGAMING ARGB AURORA ONE 3N1 KIT",
+        "category": "Cooling Components",
+        "component_type": "fan"
+    },
+    {
+        "name": "Inplay Ice tower ARGB Fan 3N1 KIT",
+        "category": "Cooling Components",
+        "component_type": "fan"
+    },
+    {
+        "name": "Inplay Openview ARGB Single (WHITE)",
+        "category": "Cooling Components",
+        "component_type": "fan"
+    },
+    {
+        "name": "Inplay Seaview ARGB Fan 3N1 KIT",
+        "category": "Cooling Components",
+        "component_type": "fan"
+    },
+    {
+        "name": "Keytech Mirage ARGB FAN Single (BLACK)",
+        "category": "Cooling Components",
+        "component_type": "fan"
+    },
+    {
+        "name": "Keytech Mirage ARGB FAN Single (WHITE)",
+        "category": "Cooling Components",
+        "component_type": "fan"
+    },
+    {
+        "name": "Keytech Prism ARGB Fan 3N1 Kit (BLACK)",
+        "category": "Cooling Components",
+        "component_type": "fan"
+    },
+    {
+        "name": "Keytech Prism ARGB Fan 3N1 Kit (WHITE)",
+        "category": "Cooling Components",
+        "component_type": "fan"
+    }
+]

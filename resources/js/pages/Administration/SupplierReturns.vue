@@ -1,5 +1,6 @@
 <script setup>
 import { formatRelativeTime } from '@/lib/dateTime';
+import OperationalExports from '@/components/administration/OperationalExports.vue';
 import PageHeader from '@/components/PageHeader.vue';
 import { Form, Head, Link, usePage } from '@inertiajs/vue3';
 import SupplierReturnController from '@/actions/App/Http/Controllers/Administration/SupplierReturnController';
@@ -11,16 +12,29 @@ import InputError from '@/components/InputError.vue';
 import SearchableProductSelect from '@/components/administration/SearchableProductSelect.vue';
 import { Label } from '@/components/ui/label';
 import { useDebouncedSearch } from '@/composables/useDebouncedSearch';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const requestReasonCode = ref('');
+const selectedSupplierId = ref('');
 
 const props = defineProps({
     returns: Object,
     products: Array,
     suppliers: Array,
+    supplier_product_links: { type: Array, default: () => [] },
     selected_case: { type: Number, default: null },
     filters: Object,
+});
+const supplierProducts = computed(() => {
+    if (!selectedSupplierId.value) return [];
+
+    const links = props.supplier_product_links.filter(
+        (link) => String(link.supplier_id) === String(selectedSupplierId.value),
+    );
+    if (links.length === 0) return props.products;
+
+    const productIds = new Set(links.map((link) => String(link.product_id)));
+    return props.products.filter((product) => productIds.has(String(product.id)));
 });
 const page = usePage();
 const returnLabels = {
@@ -89,6 +103,11 @@ defineOptions({
                 ></template
             >
         </PageHeader>
+        <OperationalExports
+            feature="supplier-returns"
+            :filters="filters"
+            :case-id="selected_case"
+        />
         <Form
             v-if="page.props.auth.can?.requestReturns"
             v-bind="SupplierReturnController.store.form()"
@@ -103,6 +122,7 @@ defineOptions({
                 ><select
                     id="return-supplier"
                     name="supplier_id"
+                    v-model="selectedSupplierId"
                     required
                     class="border-input bg-background focus-visible:ring-ring min-h-11 w-full max-w-full min-w-0 rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none"
                 >
@@ -119,8 +139,11 @@ defineOptions({
             <div class="space-y-2">
                 <Label for="return-product">Product</Label
                 ><SearchableProductSelect
+                    :key="selectedSupplierId"
                     id="return-product"
-                    :products="products"
+                    :products="supplierProducts"
+                    :disabled="!selectedSupplierId"
+                    :empty-message="selectedSupplierId ? 'No linked products have available stock.' : 'Select a supplier first.'"
                 /><InputError :message="errors.product_id" />
             </div>
             <div class="space-y-2">
@@ -244,7 +267,9 @@ defineOptions({
                         </p>
                     </div>
                     <span class="text-sm capitalize">{{
-                        returnLabels[entry.status] ??
+                        (entry.status === 'closed' && !entry.resolution_outcome
+                            ? 'Received by supplier ? outcome pending'
+                            : returnLabels[entry.status]) ??
                         entry.status.replaceAll('_', ' ')
                     }}</span>
                 </div>

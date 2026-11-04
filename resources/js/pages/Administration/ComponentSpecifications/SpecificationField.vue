@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { fieldValue } from './specificationFields';
+import SpecificationChoice from './SpecificationChoice.vue';
 
 const props = defineProps({
     field: Object,
@@ -62,6 +63,15 @@ function removeCount(key) {
             This saved value uses a different format. It is preserved; use
             Advanced attributes to review it.
         </p>
+        <SpecificationChoice
+            v-else-if="field.options && ['text', 'number'].includes(field.kind)"
+            :id="id"
+            :label="field.label"
+            :options="field.options"
+            :kind="field.kind"
+            :model-value="modelValue"
+            @update:model-value="set($event)"
+        />
         <select
             v-else-if="field.kind === 'boolean'"
             :id="id"
@@ -180,7 +190,17 @@ function removeCount(key) {
                 >
             </div>
             <div class="flex gap-2">
+                <SpecificationChoice
+                    v-if="field.options"
+                    :id="id"
+                    label="Connector type or position"
+                    :options="field.options"
+                    :model-value="newKey"
+                    class="min-w-0 flex-1"
+                    @update:model-value="newKey = $event ?? ''"
+                />
                 <Input
+                    v-else
                     :id="id"
                     v-model="newKey"
                     placeholder="Connector type or position"

@@ -56,85 +56,61 @@ defineEmits(['retry']);
                 {{ budgetExceeded ? 'over budget' : 'remaining in budget' }}
             </p>
         </div>
-        <div
-            aria-live="polite"
-            :aria-busy="checking"
-            class="bg-muted/30 mb-5 rounded-lg p-4"
-        >
-            <h3
-                class="text-muted-foreground mb-2 text-xs font-semibold tracking-wide uppercase"
-            >
-                Compatibility review
-            </h3>
-            <p v-if="checking" class="text-muted-foreground text-sm">
-                Checking compatibility…
+        <div aria-live="polite" :aria-busy="checking" class="mb-5 text-sm">
+            <p v-if="checking" class="text-muted-foreground">
+                Checking selected parts…
             </p>
             <div v-else-if="error">
-                <p class="text-destructive text-sm">{{ error }}</p>
+                <p class="text-destructive">{{ error }}</p>
                 <Button
                     size="sm"
                     variant="outline"
                     class="mt-2"
                     @click="$emit('retry')"
-                    >Check again</Button
+                    >Try again</Button
                 >
             </div>
             <template v-else-if="validation">
                 <p class="font-semibold">
-                    {{ statusLabel(validation.status) }}
+                    {{
+                        validation.selection_compatible
+                            ? 'Selected parts compatible'
+                            : 'Selection needs attention'
+                    }}
+                </p>
+                <p
+                    v-if="!validation.complete"
+                    class="text-muted-foreground mt-2"
+                >
+                    Selected parts only. This is not a verified complete PC.
+                </p>
+                <p
+                    v-if="validation.can_purchase && !validation.complete"
+                    class="mt-2"
+                >
+                    You can buy these selected parts.
                 </p>
                 <ul
-                    v-if="
-                        validation.findings.some(
-                            (finding) => finding.status !== 'compatible',
-                        )
-                    "
-                    class="mt-3 space-y-3 text-sm"
-                    aria-label="Compatibility findings to resolve"
+                    v-if="validation.purchase_blockers?.length"
+                    class="mt-2 space-y-1"
                 >
                     <li
-                        v-for="finding in validation.findings.filter(
-                            (item) => item.status !== 'compatible',
-                        )"
-                        :key="`${finding.rule}-${finding.component_keys.join('-')}`"
+                        v-for="reason in validation.purchase_blockers"
+                        :key="reason"
                     >
-                        <strong>{{ statusLabel(finding.status) }}:</strong>
-                        {{ finding.message }}
+                        {{ reason }}
                     </li>
                 </ul>
                 <p
-                    v-if="validation.estimated_power_w !== null"
-                    class="text-muted-foreground mt-1 text-sm"
+                    v-else-if="!validation.selection_compatible"
+                    class="text-muted-foreground mt-2"
                 >
-                    Estimated component draw:
-                    {{ validation.estimated_power_w }} W
+                    Some selected parts still need verification. Open a part's
+                    choices to change or remove it.
                 </p>
-                <details
-                    v-if="
-                        validation.findings.some(
-                            (finding) => finding.status === 'compatible',
-                        )
-                    "
-                    class="mt-3 text-sm"
-                >
-                    <summary class="cursor-pointer font-medium">
-                        View passed checks
-                    </summary>
-                    <ul class="mt-3 space-y-2">
-                        <li
-                            v-for="finding in validation.findings.filter(
-                                (item) => item.status === 'compatible',
-                            )"
-                            :key="`${finding.rule}-${finding.component_keys.join('-')}`"
-                        >
-                            <strong>{{ statusLabel(finding.status) }}:</strong>
-                            {{ finding.message }}
-                        </li>
-                    </ul>
-                </details>
             </template>
-            <p v-else class="text-muted-foreground text-sm">
-                Select components to check compatibility.
+            <p v-else class="text-muted-foreground">
+                Select parts to begin your build.
             </p>
         </div>
         <p class="text-muted-foreground text-xs">

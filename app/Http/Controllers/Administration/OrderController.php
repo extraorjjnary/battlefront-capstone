@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Administration;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\OrderIndexRequest;
+use App\Http\Requests\Administration\ShipmentIndexRequest;
 use App\Models\Order;
 use App\Repositories\Order\AdministratorOrderRepository;
 use App\Services\AdministratorOrderPresenter;
@@ -24,6 +25,13 @@ class OrderController extends Controller
     public function index(OrderIndexRequest $request): Response
     {
         $filters = $request->validated();
+        if (($filters['view'] ?? null) === 'shipments') {
+            $filters = ShipmentIndexRequest::normalizeFilters($filters);
+
+            return Inertia::render('Administration/Orders/Shipments', $this->presenter->shipmentDirectory(
+                $this->orderRepository->shipmentDirectory($filters), $filters, $request->user(),
+            ));
+        }
         $statusFilter = $filters['status'] ?? 'active';
         $filters['status'] = $statusFilter;
         $directory = $this->orderRepository->directory($filters, $statusFilter);

@@ -26,6 +26,11 @@ class CloseHostedCheckout
      */
     public function execute(int $orderId, ?int $flowId = null): bool
     {
+        return PaymentRecovery::locked($orderId, fn (): bool => $this->close($orderId, $flowId));
+    }
+
+    private function close(int $orderId, ?int $flowId): bool
+    {
         $flow = DB::transaction(function () use ($orderId, $flowId): ?PayMongoFlow {
             $order = Order::query()->lockForUpdate()->findOrFail($orderId);
             $flowQuery = PayMongoFlow::query()->where('order_id', $order->id);
@@ -75,7 +80,7 @@ class CloseHostedCheckout
         }
 
         if ($flow->status === 'closed') {
-            return true;
+            return ! Order::query()->whereKey($orderId)->where('payment_status', 'verified')->exists();
         }
 
         if ($flow->channel === 'direct_online_banking') {
@@ -93,7 +98,7 @@ class CloseHostedCheckout
             }
 
             if (! $this->hasOnlySafeToExpireAttempts($session)) {
-                $flow->update(['status' => 'reconciliation_required']);
+                app(PaymentRecovery::class)->uncertain($flow);
 
                 return false;
             }
@@ -124,7 +129,7 @@ class CloseHostedCheckout
             }
 
             if (data_get($session, 'attributes.status') !== 'expired' || ! $this->hasOnlySafeToExpireAttempts($session)) {
-                $flow->update(['status' => 'reconciliation_required']);
+                app(PaymentRecovery::class)->uncertain($flow);
 
                 return false;
             }
@@ -136,11 +141,11 @@ class CloseHostedCheckout
                 ->update(['status' => 'completed', 'provider_reference' => $flow->checkout_session_id, 'completed_at' => now()]);
 
             return DB::transaction(function () use ($flow): bool {
+                $order = Order::query()->lockForUpdate()->findOrFail($flow->order_id);
                 $lockedFlow = PayMongoFlow::query()->lockForUpdate()->findOrFail($flow->id);
-                $order = Order::query()->lockForUpdate()->findOrFail($lockedFlow->order_id);
 
                 if ($order->payment_status->value === 'verified' || $order->status->value !== 'pending') {
-                    $lockedFlow->update(['status' => 'reconciliation_required']);
+                    app(PaymentRecovery::class)->uncertain($lockedFlow);
 
                     return false;
                 }
@@ -150,7 +155,7 @@ class CloseHostedCheckout
                 return true;
             }, attempts: 3);
         } catch (Throwable $exception) {
-            $flow->update(['status' => 'reconciliation_required']);
+            app(PaymentRecovery::class)->uncertain($flow);
 
             return false;
         }
@@ -170,7 +175,7 @@ class CloseHostedCheckout
             }
 
             if (! in_array($status, ['awaiting_payment_method', 'awaiting_next_action'], strict: true)) {
-                $flow->update(['status' => 'reconciliation_required']);
+                app(PaymentRecovery::class)->uncertain($flow);
 
                 return false;
             }
@@ -199,7 +204,7 @@ class CloseHostedCheckout
 
             if (data_get($intent, 'attributes.status') !== 'cancelled') {
                 $operation->update(['status' => 'unknown', 'next_check_at' => now()->addMinute()]);
-                $flow->update(['status' => 'reconciliation_required']);
+                app(PaymentRecovery::class)->uncertain($flow);
 
                 return false;
             }
@@ -212,7 +217,7 @@ class CloseHostedCheckout
 
             return $this->markClosed($flow);
         } catch (Throwable) {
-            $flow->update(['status' => 'reconciliation_required']);
+            app(PaymentRecovery::class)->uncertain($flow);
 
             return false;
         }
@@ -242,7 +247,7 @@ class CloseHostedCheckout
             }
 
             if (! in_array(data_get($intent, 'attributes.status'), ['awaiting_payment_method', 'awaiting_next_action'], strict: true)) {
-                $flow->update(['status' => 'reconciliation_required']);
+                app(PaymentRecovery::class)->uncertain($flow);
 
                 return false;
             }
@@ -273,7 +278,7 @@ class CloseHostedCheckout
             }
             if (data_get($intent, 'attributes.status') !== 'cancelled') {
                 $operation->update(['status' => 'unknown', 'next_check_at' => now()->addMinute()]);
-                $flow->update(['status' => 'reconciliation_required']);
+                app(PaymentRecovery::class)->uncertain($flow);
 
                 return false;
             }
@@ -286,7 +291,7 @@ class CloseHostedCheckout
 
             return $this->markClosed($flow);
         } catch (Throwable) {
-            $flow->update(['status' => 'reconciliation_required']);
+            app(PaymentRecovery::class)->uncertain($flow);
 
             return false;
         }
@@ -295,11 +300,11 @@ class CloseHostedCheckout
     private function markClosed(PayMongoFlow $flow): bool
     {
         return DB::transaction(function () use ($flow): bool {
+            $order = Order::query()->lockForUpdate()->findOrFail($flow->order_id);
             $lockedFlow = PayMongoFlow::query()->lockForUpdate()->findOrFail($flow->id);
-            $order = Order::query()->lockForUpdate()->findOrFail($lockedFlow->order_id);
 
             if ($order->payment_status->value === 'verified' || $order->status->value !== 'pending') {
-                $lockedFlow->update(['status' => 'reconciliation_required']);
+                app(PaymentRecovery::class)->uncertain($lockedFlow);
 
                 return false;
             }
@@ -320,7 +325,7 @@ class CloseHostedCheckout
             ->throw()
             ->json('data');
 
-        if (! is_array($intent) || data_get($intent, 'attributes.livemode') !== false) {
+        if (! is_array($intent) || data_get($intent, 'id') !== $intentId || data_get($intent, 'attributes.livemode') !== false) {
             throw new RuntimeException('PayMongo payment intent could not be verified.');
         }
 
@@ -351,7 +356,7 @@ class CloseHostedCheckout
         ];
 
         if (! is_string($payment['id']) || ! is_int($payment['amount']) || ! is_string($payment['currency'])) {
-            $flow->update(['status' => 'reconciliation_required']);
+            app(PaymentRecovery::class)->uncertain($flow);
 
             return true;
         }
@@ -369,8 +374,27 @@ class CloseHostedCheckout
             ->throw()
             ->json('data');
 
-        if (! is_array($session) || data_get($session, 'attributes.livemode') !== false) {
+        if (! is_array($session) || data_get($session, 'id') !== $sessionId || data_get($session, 'attributes.livemode') !== false) {
             throw new RuntimeException('PayMongo session could not be verified.');
+        }
+
+        $intentId = data_get($session, 'attributes.payment_intent.id');
+        if (is_string($intentId)) {
+            $intent = $this->client->request()->get('/v1/payment_intents/'.$intentId)->throw()->json('data');
+            $flow = PayMongoFlow::query()->where('checkout_session_id', $sessionId)->firstOrFail();
+            if (! is_array($intent) || data_get($intent, 'id') !== $intentId
+                || data_get($intent, 'attributes.livemode') !== false
+                || data_get($intent, 'attributes.amount') !== (int) $flow->amount_minor
+                || data_get($intent, 'attributes.currency') !== $flow->currency
+                || ! is_array(data_get($intent, 'attributes.payments'))) {
+                throw new RuntimeException('PayMongo payment intent could not be verified.');
+            }
+            data_set($session, 'attributes.payment_intent', $intent);
+            $payments = data_get($session, 'attributes.payments');
+            if (! is_array($payments)) {
+                throw new RuntimeException('PayMongo payments could not be verified.');
+            }
+            data_set($session, 'attributes.payments', array_merge($payments, data_get($intent, 'attributes.payments')));
         }
 
         return $session;
@@ -400,7 +424,7 @@ class CloseHostedCheckout
         ];
 
         if (! is_string($payment['id']) || ! is_int($payment['amount']) || ! is_string($payment['currency'])) {
-            $flow->update(['status' => 'reconciliation_required']);
+            app(PaymentRecovery::class)->uncertain($flow);
 
             return true;
         }
@@ -413,10 +437,19 @@ class CloseHostedCheckout
     /** @param array<string, mixed>|null $session */
     private function hasOnlySafeToExpireAttempts(?array $session): bool
     {
-        foreach (data_get($session, 'attributes.payments', []) as $payment) {
+        $payments = data_get($session, 'attributes.payments');
+        if (! is_array($payments)) {
+            return false;
+        }
+        $intent = data_get($session, 'attributes.payment_intent');
+        if ($intent !== null && (! is_array($intent)
+            || ! in_array(data_get($intent, 'attributes.status'), ['awaiting_payment_method', 'awaiting_next_action', 'cancelled'], true))) {
+            return false;
+        }
+        foreach ($payments as $payment) {
             $status = data_get($payment, 'attributes.status');
 
-            if (in_array($status, ['paid', 'pending', 'processing'], strict: true)) {
+            if ($status !== 'failed') {
                 return false;
             }
         }

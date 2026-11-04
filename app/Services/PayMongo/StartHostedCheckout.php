@@ -7,9 +7,10 @@ use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\PayMongoFlow;
-use App\Services\Notifications\OrderNotificationPublisher;
+use App\Services\Order\OrderProcessingService;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -19,18 +20,31 @@ class StartHostedCheckout
 {
     public function __construct(
         private readonly PayMongoClient $client,
-        private readonly RecordPayMongoPayment $recordPayment,
-        private readonly OrderNotificationPublisher $notifications,
     ) {}
 
-    public function execute(Order $order): string
+    public function execute(Order $order, bool $allowReplacement = true): string
+    {
+        $lock = Cache::lock('paymongo-hosted:'.$order->id, 120);
+        if (! $lock->get()) {
+            throw new RuntimeException('Payment reconciliation is already in progress.');
+        }
+
+        try {
+            return PaymentRecovery::locked($order->id, fn (): string => $this->start($order->fresh(), $allowReplacement));
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function start(Order $order, bool $allowReplacement): string
     {
         if ($order->payment_method !== PaymentMethod::Online
             || $order->payment_origin !== 'paymongo'
             || $order->status !== OrderStatus::Pending
             || $order->payment_status !== PaymentStatus::Pending
-            || $order->created_at->copy()->addDay()->isPast()
-            || ! config('services.paymongo.enabled')) {
+            || $order->payment_closure_requested_at !== null
+            || $order->created_at->copy()->addDay()->lessThanOrEqualTo(now())
+            || ($allowReplacement && ! config('services.paymongo.enabled'))) {
             throw new RuntimeException('Online payment is unavailable.');
         }
 
@@ -63,17 +77,46 @@ class StartHostedCheckout
                 || $flow->hosted_payment_method !== $order->hosted_payment_method) {
                 throw new RuntimeException('The payment is already active or requires reconciliation.');
             }
-            if ($flow->checkout_url !== null && $flow->status === 'open') {
-                return $flow->checkout_url;
+            if ($flow->checkout_session_id !== null && in_array($flow->status, ['open', 'reconciliation_required'], true)) {
+                $observation = app(ObserveHostedCheckout::class)->execute($flow, $allowReplacement);
+                if ($observation->checkoutUrl !== null) {
+                    return $observation->checkoutUrl;
+                }
+
+                if (! $allowReplacement) {
+                    throw new RuntimeException('The previous payment expired. A customer retry is required.');
+                }
+
+                if ($observation->requiresFreshTestSession
+                    && ! app(CloseHostedCheckout::class)->execute($order->id, $flow->id)) {
+                    throw new RuntimeException('The previous test checkout must be confirmed closed before retrying.');
+                }
+
+                return $this->start($order->fresh(), $allowReplacement);
             }
-            if ($flow->status === 'reconciliation_required' && $flow->checkout_session_id !== null) {
-                return $this->recoverKnownSession($flow);
+            if ($flow->status === 'failed' && $flow->checkout_session_id === null
+                && $flow->operations()->where('kind', 'create_checkout_session')->where('status', 'failed')->exists()
+                && ! $flow->operations()->whereIn('status', ['pending', 'dispatched', 'unknown'])->exists()) {
+                $flow->update(['status' => 'closed', 'active_slot' => null, 'closed_at' => now()]);
+
+                if (! $allowReplacement) {
+                    throw new RuntimeException('A customer retry is required.');
+                }
+
+                return $this->start($order->fresh(), $allowReplacement);
+            }
+            if ($flow->status === 'creating') {
+                $flow->update(['status' => 'reconciliation_required']);
             }
             if ($flow->status !== 'reconciliation_required') {
                 throw new RuntimeException('The payment is being prepared or requires reconciliation.');
             }
 
             $operation = $flow->operations()->where('kind', 'create_checkout_session')->latest('id')->first();
+            if ($operation !== null && $operation->status === 'pending') {
+                $operation->update(['status' => 'dispatched', 'dispatched_at' => now()]);
+                $operation->refresh();
+            }
             if ($operation === null
                 || ! in_array($operation->status, ['unknown', 'dispatched'], strict: true)
                 || $operation->request_fingerprint !== hash('sha256', json_encode($attributes, JSON_THROW_ON_ERROR))
@@ -82,12 +125,25 @@ class StartHostedCheckout
                 throw new RuntimeException('The checkout session reference is unknown and requires reconciliation.');
             }
         } else {
+            if (! $allowReplacement) {
+                throw new RuntimeException('A customer retry is required.');
+            }
             $operationId = (string) Str::uuid();
             $idempotencyKey = (string) Str::uuid();
             $flow = DB::transaction(function () use ($order, $amountMinor, $attributes, $operationId, $idempotencyKey): PayMongoFlow {
                 $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
+                if ($lockedOrder->status !== OrderStatus::Pending
+                    || $lockedOrder->payment_closure_requested_at !== null
+                    || $lockedOrder->payment_status !== PaymentStatus::Pending
+                    || $lockedOrder->created_at->copy()->addDay()->lessThanOrEqualTo(now())
+                    || app(OrderProcessingService::class)->hasCancellationHold($lockedOrder)) {
+                    throw new RuntimeException('This order cannot accept payment.');
+                }
                 if (PayMongoFlow::query()->where('order_id', $lockedOrder->id)->where('active_slot', 'active')->exists()) {
                     throw new RuntimeException('A payment flow already exists for this order.');
+                }
+                if (PayMongoFlow::query()->where('order_id', $lockedOrder->id)->where(fn ($query) => $query->where('status', '!=', 'closed')->orWhere('requires_attention', true))->exists()) {
+                    throw new RuntimeException('Previous payment history requires reconciliation.');
                 }
                 $flow = PayMongoFlow::query()->create([
                     'order_id' => $lockedOrder->id,
@@ -141,6 +197,8 @@ class StartHostedCheckout
                 $operation->update(['status' => 'completed', 'provider_reference' => $sessionId, 'completed_at' => now()]);
             });
 
+            Cache::put('paymongo-status-refresh:'.$order->id, true, 5);
+
             return $checkoutUrl;
         } catch (Throwable $exception) {
             $definitiveFailure = $this->isDefinitiveClientFailure($exception);
@@ -154,68 +212,11 @@ class StartHostedCheckout
         }
     }
 
-    private function recoverKnownSession(PayMongoFlow $flow): string
-    {
-        $session = $this->client->request()
-            ->get('/v1/checkout_sessions/'.$flow->checkout_session_id)
-            ->throw()
-            ->json('data');
-
-        if (! is_array($session)
-            || data_get($session, 'id') !== $flow->checkout_session_id
-            || data_get($session, 'attributes.livemode') !== false) {
-            throw new RuntimeException('PayMongo checkout state could not be verified.');
-        }
-
-        $payments = data_get($session, 'attributes.payments', []);
-        $payments = is_array($payments) ? $payments : [];
-        $paid = collect($payments)
-            ->first(static fn (mixed $payment): bool => is_array($payment)
-                && data_get($payment, 'attributes.status') === 'paid');
-        if (is_array($paid)) {
-            $attributes = data_get($paid, 'attributes', []);
-            $payment = [
-                'id' => data_get($paid, 'id'),
-                'status' => data_get($attributes, 'status'),
-                'amount' => data_get($attributes, 'amount'),
-                'net_amount' => data_get($attributes, 'net_amount'),
-                'currency' => data_get($attributes, 'currency'),
-                'method' => data_get($attributes, 'source.type'),
-            ];
-            if (is_string($payment['id']) && is_int($payment['amount']) && is_string($payment['currency'])) {
-                $this->recordPayment->execute($flow, $payment, $this->notifications);
-            }
-            throw new RuntimeException('PayMongo confirms payment. Order status is being reconciled.');
-        }
-
-        $sessionStatus = data_get($session, 'attributes.status');
-        if ($sessionStatus === 'active') {
-            $checkoutUrl = data_get($session, 'attributes.checkout_url');
-            if (! is_string($checkoutUrl)
-                || parse_url($checkoutUrl, PHP_URL_SCHEME) !== 'https'
-                || parse_url($checkoutUrl, PHP_URL_HOST) !== 'checkout.paymongo.com'
-                || parse_url($checkoutUrl, PHP_URL_USER) !== null
-                || parse_url($checkoutUrl, PHP_URL_PASS) !== null) {
-                throw new RuntimeException('PayMongo checkout URL could not be recovered.');
-            }
-            $flow->update(['status' => 'open', 'checkout_url' => $checkoutUrl]);
-
-            return $checkoutUrl;
-        }
-
-        if ($sessionStatus === 'expired') {
-            $flow->update(['status' => 'closed', 'active_slot' => null, 'closed_at' => now()]);
-            throw new RuntimeException('This checkout session has expired.');
-        }
-
-        throw new RuntimeException('PayMongo checkout state requires reconciliation.');
-    }
-
     private function isDefinitiveClientFailure(Throwable $exception): bool
     {
         return $exception instanceof RequestException
             && $exception->response->status() >= 400
             && $exception->response->status() < 500
-            && $exception->response->status() !== 409;
+            && ! in_array($exception->response->status(), [408, 409, 429], true);
     }
 }

@@ -2,6 +2,7 @@
 
 use App\Enums\FulfillmentMethod;
 use App\Enums\PaymentMethod;
+use App\Models\Branch;
 use App\Models\CartItem;
 use App\Models\ComponentSpecificationRevision;
 use App\Models\Inventory;
@@ -37,8 +38,8 @@ test('specification index preserves current revision and missing attribute seman
             ->where('profiles.0.specifications', $missingRevision ? [] : $specifications)
             ->where('profiles.0.evidence', [])
             ->where('profiles.0.incomplete_attributes', $missingRevision
-                ? ['socket', 'generation', 'supported_chipsets', 'maximum_power_w', 'integrated_graphics', 'included_cooler', 'required_power_connectors']
-                : ['socket', 'generation', 'required_power_connectors']));
+                ? ['model', 'socket', 'generation', 'supported_chipsets', 'maximum_power_w', 'integrated_graphics', 'included_cooler', 'required_power_connectors']
+                : ['model', 'socket', 'generation', 'required_power_connectors']));
 })->with([false, true]);
 
 test('guests can browse stock status without making unavailable components purchasable', function () {
@@ -376,6 +377,12 @@ test('a complete compatible saved build enters the cart as one grouped configura
     ];
     $items = [];
     foreach ($specifications as $type => $facts) {
+        if ($type === 'processor') {
+            $facts['model'] = 'Test CPU';
+        }
+        if ($type === 'motherboard') {
+            $facts['cpu_support'] = [['model' => 'Test CPU', 'minimum_bios_version' => '1.0']];
+        }
         $product = createBuilderProduct($type, $facts);
         $items[] = ['key' => $type.'-'.$product->id, 'product_id' => $product->id, 'quantity' => 1];
     }
@@ -443,7 +450,7 @@ test('checkout keeps each PC configuration grouped in immutable order snapshots'
         ->and($customer->refresh()->cart)->toBeNull();
 });
 
-test('checkout rejects a partial PC configuration before creating an order or deducting stock', function () {
+test('checkout rejects selecting only some cart lines from a grouped build before deducting stock', function () {
     $customer = User::factory()->customer()->create();
     [, , $cartItems] = createCartReadyBuild($customer);
     $stocksBefore = Inventory::query()->orderBy('product_id')->pluck('quantity')->all();
@@ -512,6 +519,12 @@ function createCartReadyBuild(User $customer): array
     ];
     $components = [];
     foreach ($specifications as $type => $facts) {
+        if ($type === 'processor') {
+            $facts['model'] = 'Test CPU';
+        }
+        if ($type === 'motherboard') {
+            $facts['cpu_support'] = [['model' => 'Test CPU', 'minimum_bios_version' => '1.0']];
+        }
         $product = createBuilderProduct($type, $facts);
         $components[] = ['key' => $type.'-'.$product->id, 'product_id' => $product->id, 'quantity' => 1];
     }
@@ -535,3 +548,98 @@ function addSecondStorageSlot(PcBuild $build): void
         'position' => 6,
     ]);
 }
+
+test('an unfinished build can be purchased with its missing parts and unknown checks preserved', function () {
+    Branch::factory()->create(['city' => 'Sagay City']);
+    $customer = User::factory()->customer()->create();
+    $cpu = createBuilderProduct('processor', ['socket' => 'AM4', 'integrated_graphics' => false, 'included_cooler' => false]);
+    $stock = $cpu->inventory->quantity;
+    $this->actingAs($customer)->postJson(route('pc-builder.validate'), ['components' => [
+        ['key' => 'cpu', 'product_id' => $cpu->id, 'quantity' => 1],
+    ]])->assertOk()->assertJsonPath('complete', false)->assertJsonPath('can_purchase', true);
+    $build = app(SavedPcBuildService::class)->create($customer, ['name' => 'Upgrade parts', 'mode' => 'simple', 'components' => [
+        ['key' => 'cpu', 'product_id' => $cpu->id, 'quantity' => 1],
+    ]]);
+    $this->postJson(route('pc-builds.cart.store', $build->uuid))->assertCreated();
+    $cartItems = $customer->cart()->firstOrFail()->items()->get();
+    $this->get(route('checkout.index', ['cart_item_ids' => $cartItems->modelKeys()]))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('cart.items.0.pc_build_group.validation.complete', false)
+            ->where('cart.items.0.pc_build_group.validation.can_purchase', true));
+
+    $order = app(OrderPlacementService::class)->execute($customer, [
+        'cart_item_ids' => $cartItems->modelKeys(), 'recipient_name' => 'Upgrade Customer', 'contact_number' => '+639171234567',
+        'fulfillment_method' => FulfillmentMethod::Pickup, 'delivery_address' => null, 'payment_method' => PaymentMethod::Cash, 'payment_proof_path' => null,
+    ]);
+
+    expect($order->items)->toHaveCount(1)
+        ->and($order->items->first()->product_id)->toBe($cpu->id)
+        ->and($order->items->first()->pc_build_component_snapshot['build_complete'])->toBeFalse()
+        ->and($order->items->first()->pc_build_component_snapshot['required_components'])->toContain('motherboard', 'graphics_card', 'cooler')
+        ->and($cpu->inventory()->firstOrFail()->quantity)->toBe($stock - 1);
+});
+
+test('draft specifications cannot create false conflicts and confirmed conflicts block cart transfer', function () {
+    $customer = User::factory()->customer()->create();
+    $cpu = createBuilderProduct('processor', ['socket' => 'AM5']);
+    $board = createBuilderProduct('motherboard', ['socket' => 'AM4']);
+    $items = [['key' => 'cpu', 'product_id' => $cpu->id, 'quantity' => 1], ['key' => 'board', 'product_id' => $board->id, 'quantity' => 1]];
+    $build = app(SavedPcBuildService::class)->create($customer, ['name' => 'Conflicting parts', 'mode' => 'advanced', 'components' => $items]);
+    $this->actingAs($customer)->postJson(route('pc-builds.cart.store', $build->uuid))->assertUnprocessable();
+    $this->assertDatabaseCount('pc_build_cart_groups', 0);
+    $board->componentProfile()->update(['review_status' => 'draft']);
+
+    $this->postJson(route('pc-builder.validate'), ['components' => $items])->assertOk()->assertJsonPath('can_purchase', true)->assertJsonPath('complete', false);
+    $this->postJson(route('pc-builds.cart.store', $build->uuid))->assertCreated();
+});
+
+test('fresh confirmed conflicts block checkout preview and placement without changing stock', function () {
+    $customer = User::factory()->customer()->create();
+    [$build, , $cartItems] = createCartReadyBuild($customer);
+    $profile = $build->items()->where('component_type', 'processor')->firstOrFail()->product->componentProfile;
+    $revision = $profile->revisions()->firstOrFail();
+    $new = $profile->revisions()->create(['revision' => 2, 'schema_version' => 1, 'specifications' => [...$revision->specifications, 'socket' => 'AM4'], 'evidence' => [], 'review_status' => 'approved']);
+    $profile->update(['current_revision' => $new->revision]);
+    $stocks = Inventory::query()->pluck('quantity', 'product_id')->all();
+
+    $this->actingAs($customer)->get(route('checkout.index', ['cart_item_ids' => $cartItems->modelKeys()]))->assertRedirectToRoute('cart.index');
+    expect(fn () => app(OrderPlacementService::class)->execute($customer, [
+        'cart_item_ids' => $cartItems->modelKeys(), 'recipient_name' => 'Build Customer', 'contact_number' => '+639171234567',
+        'fulfillment_method' => FulfillmentMethod::Pickup, 'delivery_address' => null, 'payment_method' => PaymentMethod::Cash, 'payment_proof_path' => null,
+    ]))->toThrow(ValidationException::class);
+    $this->assertDatabaseCount('orders', 0);
+    expect(Inventory::query()->pluck('quantity', 'product_id')->all())->toBe($stocks);
+});
+
+test('checkout preserves separate slots when repeated build products share a cart line', function () {
+    $customer = User::factory()->customer()->create();
+    [$build] = createCartReadyBuild($customer);
+    addSecondStorageSlot($build);
+    $build->items()->where('component_type', 'storage')->firstOrFail()->product->inventory()->update(['quantity' => 5]);
+    $group = app(PcBuildToCartService::class)->add($customer, $build->uuid);
+
+    $order = app(OrderPlacementService::class)->execute($customer, [
+        'cart_item_ids' => $group->items->modelKeys(), 'recipient_name' => 'Build Customer', 'contact_number' => '+639171234567',
+        'fulfillment_method' => FulfillmentMethod::Pickup, 'delivery_address' => null, 'payment_method' => PaymentMethod::Cash, 'payment_proof_path' => null,
+    ]);
+    $storage = $order->items->first(fn ($item): bool => $item->pc_build_component_snapshot['component_type'] === 'storage');
+    expect($storage->quantity)->toBe(2)->and($storage->pc_build_component_snapshot['component_slots'])->toHaveCount(2);
+});
+
+test('repeated SKU selections use distinct slots and aggregate stock before validation and saving', function () {
+    $customer = User::factory()->customer()->create();
+    $storage = createBuilderProduct('storage', ['interface' => 'NVMe']);
+    $storage->inventory()->update(['quantity' => 2]);
+    $components = [
+        ['key' => 'storage-first', 'product_id' => $storage->id, 'quantity' => 1],
+        ['key' => 'storage-second', 'product_id' => $storage->id, 'quantity' => 1],
+    ];
+    $this->actingAs($customer)->postJson(route('pc-builder.validate'), ['components' => $components])->assertOk()->assertJsonPath('can_purchase', true);
+    $uuid = $this->postJson(route('pc-builds.store'), ['name' => 'Storage upgrade', 'mode' => 'advanced', 'components' => $components])->assertCreated()->json('uuid');
+    expect(PcBuild::query()->where('uuid', $uuid)->firstOrFail()->items)->toHaveCount(2);
+    $this->postJson(route('pc-builder.validate'), ['components' => [$components[0], $components[0]]])->assertUnprocessable()->assertJsonValidationErrors('components.0.key');
+    $storage->inventory()->update(['quantity' => 1]);
+    $this->postJson(route('pc-builder.validate'), ['components' => $components])->assertUnprocessable()->assertJsonValidationErrors('components');
+    $this->postJson(route('pc-builds.cart.store', $uuid))->assertUnprocessable();
+    $this->assertDatabaseCount('cart_items', 0);
+});

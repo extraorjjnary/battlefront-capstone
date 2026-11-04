@@ -61,7 +61,7 @@ test('delivery placement snapshots each profile and the relative quote in one st
         ->handling_surcharge->toBe($surcharge)->delivery_fee->toBe($fee)
         ->product_subtotal->toBe('18.66')->total_amount->toBe($finalTotal)
         ->delivery_origin_city->toBe('Sagay City')->delivery_is_demo->toBeTrue()
-        ->delivery_assumption_label->toBe('Battlefront demonstration estimates. Regional base fees apply to all destinations. Negros Occidental transit bands use OSM administrative-boundary centroids as straight-line proxies; they are not official LBC rates or verified production shipping charges.')
+        ->delivery_assumption_label->toBe('Battlefront nationwide demonstration estimates from Sagay City. Regional base fees and transit estimates apply, with existing Negros route overrides. Negros Occidental transit bands use OSM administrative-boundary centroids as straight-line proxies. These are not official LBC rates, verified serviceability, or guaranteed delivery dates.')
         ->status->toBe(OrderStatus::Pending)->payment_status->toBe(PaymentStatus::Pending);
     expect($order->shipment)->carrier->toBe('lbc')->status->toBe(ShipmentStatus::AwaitingPreparation)
         ->preparation_days->toBe($preparation)->transit_min_days->toBe(1)->transit_max_days->toBe(2)
@@ -156,7 +156,7 @@ test('stored commercial and fulfillment snapshots survive configuration and prod
     expect($order->shipment->getAttributes())->toBe($fulfillment);
 });
 
-test('a shipment creation failure rolls back the order items stock and cart consumption', function () {
+test('a shipment creation failure rolls back the order items stock and cart consumption', function (string $destination) {
     $customer = User::factory()->customer()->create();
     $product = Product::factory()->bulky()->create(['price' => '100.00']);
     $stock = Inventory::factory()->for($product)->create(['quantity' => 10]);
@@ -164,7 +164,7 @@ test('a shipment creation failure rolls back the order items stock and cart cons
     Shipment::creating(fn (): never => throw new RuntimeException('Shipment persistence failed.'));
 
     try {
-        expect(fn () => app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData($customer->cart->items->modelKeys()), 'Sagay City'))
+        expect(fn () => app(OrderPlacementService::class)->executeWithDeliveryQuote($customer, quotedDeliveryCheckoutData($customer->cart->items->modelKeys()), $destination))
             ->toThrow(RuntimeException::class, 'Shipment persistence failed.');
     } finally {
         Shipment::flushEventListeners();
@@ -176,7 +176,7 @@ test('a shipment creation failure rolls back the order items stock and cart cons
     $this->assertDatabaseCount('shipments', 0);
     $this->assertModelExists($cartItem);
     expect($stock->refresh()->quantity)->toBe(10);
-});
+})->with(['Sagay City', '1380300000', '1130700000']);
 
 test('unsupported destinations fail before consuming any order stock or cart', function () {
     $customer = User::factory()->customer()->create();
@@ -237,17 +237,26 @@ test('verified shipment delivery records the product subtotal while preserving p
 
     $processing->updatePaymentStatus($order, PaymentStatus::Verified);
     $processing->updateStatus($order, OrderStatus::Processing);
-    $processing->updateShipmentOperations($order, [
+    $handoff = [
         'package_count' => '1',
         'package_weight_kg' => '1.000',
         'package_length_cm' => '10.00',
         'package_width_cm' => '10.00',
         'package_height_cm' => '10.00',
-        'declared_value' => $order->total_amount,
         'handoff_mode' => 'branch_dropoff',
-    ], $handler);
+        'carrier_cost_reference' => 'LBC-RECEIPT',
+        'actual_carrier_cost' => $order->delivery_fee,
+        'carrier_cost_confirmed' => true,
+    ];
     foreach ([ShipmentStatus::Preparing, ShipmentStatus::ReadyForDispatch, ShipmentStatus::HandedToLbc, ShipmentStatus::InTransit, ShipmentStatus::OutForDelivery, ShipmentStatus::Delivered] as $status) {
-        $processing->updateShipmentStatus($order, $status);
+        $isHandoff = $status === ShipmentStatus::HandedToLbc;
+        $processing->updateShipmentStatus(
+            $order,
+            $status,
+            $isHandoff ? 'LBC-TRACKING' : null,
+            actor: $handler,
+            handoff: $isHandoff ? $handoff : [],
+        );
     }
 
     expect($order->refresh()->sale->amount)->toBe('200.00');

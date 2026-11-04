@@ -176,19 +176,28 @@ test('placed delivery milestones share read state and owned deep links while log
     $processing = app(OrderProcessingService::class);
     $processing->updatePaymentStatus($order, PaymentStatus::Verified);
     $processing->updateStatus($order, OrderStatus::Processing);
-    $processing->updateShipmentOperations($order, [
+    $handoff = [
         'package_count' => '1',
         'package_weight_kg' => '1.000',
         'package_length_cm' => '10.00',
         'package_width_cm' => '10.00',
         'package_height_cm' => '10.00',
-        'declared_value' => $order->total_amount,
         'handoff_mode' => 'branch_dropoff',
-    ], $handler);
+        'carrier_cost_reference' => 'SYNTHETIC-TEST-RECEIPT',
+        'actual_carrier_cost' => $order->delivery_fee,
+        'carrier_cost_confirmed' => true,
+    ];
     foreach ([ShipmentStatus::Preparing, ShipmentStatus::ReadyForDispatch, ShipmentStatus::HandedToLbc,
         ShipmentStatus::InTransit, ShipmentStatus::OutForDelivery, ShipmentStatus::Delivered] as $status) {
         $this->travel(1)->hours();
-        $processing->updateShipmentStatus($order, $status, $status === ShipmentStatus::HandedToLbc ? 'SYNTHETIC-TEST-REFERENCE' : null);
+        $isHandoff = $status === ShipmentStatus::HandedToLbc;
+        $processing->updateShipmentStatus(
+            $order,
+            $status,
+            $isHandoff ? 'SYNTHETIC-TEST-REFERENCE' : null,
+            actor: $handler,
+            handoff: $isHandoff ? $handoff : [],
+        );
     }
     $this->getJson('/api/v1/orders/'.$order->id)->assertOk()->assertJsonPath('data.status.value', 'completed')
         ->assertJsonPath('data.shipment.status.value', 'delivered')->assertJsonCount(7, 'data.shipment.timeline')

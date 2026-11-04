@@ -50,6 +50,7 @@ class RetryDirectOnlineBanking
                 ->json('data');
 
             if (! is_array($intent)
+                || data_get($intent, 'id') !== $previousAttempt->payment_intent_id
                 || data_get($intent, 'attributes.livemode') !== false
                 || data_get($intent, 'attributes.status') !== 'awaiting_payment_method'
                 || data_get($intent, 'attributes.amount') !== (int) $flow->amount_minor

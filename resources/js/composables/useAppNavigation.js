@@ -12,7 +12,7 @@ import {
     Undo2,
     Handshake,
     Heart,
-    ChartColumn,
+    HeartPulse,
     ChartColumnIncreasing,
     Logs,
     UserRoundCog,
@@ -204,7 +204,7 @@ export function useAppNavigation() {
                 items.push({
                     title: 'Wishlist analytics',
                     href: WishlistReportController.index(),
-                    icon: ChartColumn,
+                    icon: HeartPulse,
                 });
             if (page.props.auth?.can?.viewOrders)
                 items.push({
