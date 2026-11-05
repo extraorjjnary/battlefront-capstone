@@ -12,7 +12,6 @@ use App\Models\Inventory;
 use App\Models\PcBuildCartGroup;
 use App\Models\Product;
 use App\Models\User;
-use App\Services\DemonstrationRehearsal;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -55,14 +54,11 @@ class CartService
             $this->ensureAvailable($product, $category, $inventory, $quantity, $currentQuantity);
 
             if ($cartItem === null) {
-                $created = CartItem::query()->create([
+                return CartItem::query()->create([
                     'cart_id' => $cart->id,
                     'product_id' => $product->id,
                     'quantity' => $quantity,
                 ]);
-                app(DemonstrationRehearsal::class)->record('cart_item', $created);
-
-                return $created;
             }
 
             $cartItem->update(['quantity' => $currentQuantity + $quantity]);

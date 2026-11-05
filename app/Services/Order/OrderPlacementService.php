@@ -21,7 +21,6 @@ use App\Models\Product;
 use App\Models\ProductComponentProfile;
 use App\Models\User;
 use App\Services\Cart\CartService;
-use App\Services\DemonstrationRehearsal;
 use App\Services\Notifications\OrderNotificationPublisher;
 use App\Services\PcBuilder\CompatibilityEngine;
 use App\Services\PcBuilder\ComponentReadinessService;
@@ -335,7 +334,6 @@ class OrderPlacementService
                 $cart->delete();
             }
 
-            app(DemonstrationRehearsal::class)->record('order', $order);
             $this->notifications->afterCommit($order, 'order.placed');
             if ($order->payment_method->requiresPaymentProof() && $order->payment_proof_path !== null) {
                 $this->notifications->afterCommit($order, 'payment.proof_submitted');

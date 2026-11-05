@@ -3,7 +3,6 @@
 namespace App\Repositories\Reporting;
 
 use App\Models\Order;
-use App\Services\DemonstrationRehearsal;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
@@ -81,7 +80,7 @@ class StaffPerformanceRepository
 
     public function unattributedCount(?string $from, ?string $to): int
     {
-        return DB::table('sales')->whereNotIn('sales.order_id', app(DemonstrationRehearsal::class)->archivedOrderIds())->whereNull('handler_id')
+        return DB::table('sales')->whereNull('handler_id')
             ->when($from, fn ($query) => $query->whereDate('sale_date', '>=', $from))
             ->when($to, fn ($query) => $query->whereDate('sale_date', '<=', $to))->count();
     }

@@ -57,7 +57,6 @@ use App\Http\Controllers\CustomerReturnRequestController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryLocationController;
 use App\Http\Controllers\DeliveryQuoteController;
-use App\Http\Controllers\DemonstrationRehearsalController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\NotificationController as CustomerNotificationController;
 use App\Http\Controllers\OrderCancellationController;
@@ -457,9 +456,3 @@ Route::middleware(['auth', 'can:access-administration'])
 
 // profile settings
 require __DIR__.'/settings.php';
-
-Route::prefix('demonstration/rehearsal')->name('demonstration.rehearsal.')->group(function (): void {
-    Route::get('/', [DemonstrationRehearsalController::class, 'show'])->name('show');
-    Route::post('/', [DemonstrationRehearsalController::class, 'store'])->middleware('throttle:5,1')->name('store');
-    Route::delete('/', [DemonstrationRehearsalController::class, 'destroy'])->name('destroy');
-});

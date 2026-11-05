@@ -5,7 +5,6 @@ use App\Http\Middleware\EnforceActiveAccount;
 use App\Http\Middleware\EnforceVerifiedEmail;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
-use App\Http\Middleware\ResolveDemonstrationRehearsal;
 use App\Http\Middleware\ResolveGuestRecommendationProfile;
 use Illuminate\Cookie\Middleware\EncryptCookies as FrameworkEncryptCookies;
 use Illuminate\Foundation\Application;
@@ -28,7 +27,6 @@ return Application::configure(basePath: dirname(__DIR__))
             ],
             append: [
                 ResolveGuestRecommendationProfile::class,
-                ResolveDemonstrationRehearsal::class,
                 EnforceActiveAccount::class,
                 EnforceVerifiedEmail::class,
                 HandleAppearance::class,

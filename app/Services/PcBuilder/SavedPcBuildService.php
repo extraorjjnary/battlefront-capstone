@@ -6,7 +6,6 @@ use App\Models\PcBuild;
 use App\Models\PcBuildEvent;
 use App\Models\Product;
 use App\Models\User;
-use App\Services\DemonstrationRehearsal;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -37,7 +36,6 @@ class SavedPcBuildService
             ]);
             $this->replaceItems($build, $data['components']);
             $this->record($build, $customer, 'saved');
-            app(DemonstrationRehearsal::class)->record('pc_build', $build);
 
             return $build->load(['items.product']);
         }, attempts: 3);
@@ -95,7 +93,6 @@ class SavedPcBuildService
             }
 
             $this->record($duplicate, $customer, 'duplicated');
-            app(DemonstrationRehearsal::class)->record('pc_build', $duplicate);
 
             return $duplicate->load(['items.product']);
         }, attempts: 3);
