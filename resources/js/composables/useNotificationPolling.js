@@ -1,5 +1,9 @@
 import { router, useHttp, usePage } from '@inertiajs/vue3';
-import { useDocumentVisibility, useIntervalFn } from '@vueuse/core';
+import {
+    useDocumentVisibility,
+    useEventListener,
+    useIntervalFn,
+} from '@vueuse/core';
 import { onScopeDispose, ref, watch } from 'vue';
 
 export function useNotificationPolling(navigation) {
@@ -12,18 +16,25 @@ export function useNotificationPolling(navigation) {
     let disposed = false;
     let unauthorized = false;
     let navigating = false;
+    const idleTimeout = 120000;
+    let lastActivity = Date.now();
+    let idleTimer;
+    let refreshAfterNavigation = false;
 
-    async function refresh() {
-        const userId = page.props.auth?.user?.id;
-        if (
-            disposed ||
-            unauthorized ||
-            navigating ||
-            loading.value ||
-            !userId ||
-            visibility.value !== 'visible'
-        )
-            return;
+    function canPoll() {
+        return (
+            !disposed &&
+            !unauthorized &&
+            !navigating &&
+            !!page.props.auth?.user?.id &&
+            visibility.value === 'visible' &&
+            Date.now() - lastActivity < idleTimeout
+        );
+    }
+
+    async function fetchSummary() {
+        if (!canPoll() || loading.value) return;
+        const userId = page.props.auth.user.id;
         const requestGeneration = generation;
         const administrator = navigation.isAdministrator.value;
         loading.value = true;
@@ -37,7 +48,7 @@ export function useNotificationPolling(navigation) {
                         (status === 401 || status === 403)
                     ) {
                         unauthorized = true;
-                        pause();
+                        updatePolling();
                     }
                 },
             });
@@ -48,7 +59,7 @@ export function useNotificationPolling(navigation) {
                     (administrator ? 'administrator' : 'customer')
             ) {
                 unauthorized = true;
-                pause();
+                updatePolling();
                 error.value =
                     'Your session changed. Refresh the page to update notifications.';
                 router.replaceProp('notificationSummary', (current, props) => {
@@ -84,7 +95,7 @@ export function useNotificationPolling(navigation) {
         }
     }
 
-    const { pause, resume } = useIntervalFn(refresh, 30000, {
+    const { pause, resume, isActive } = useIntervalFn(fetchSummary, 30000, {
         immediate: false,
     });
     const removeStartListener = router.on('start', () => {
@@ -92,22 +103,86 @@ export function useNotificationPolling(navigation) {
         generation++;
         http.cancel();
         loading.value = false;
+        updatePolling();
     });
     const removeFinishListener = router.on('finish', () => {
         navigating = false;
+        updatePolling();
+        if (refreshAfterNavigation) {
+            refreshAfterNavigation = false;
+            void fetchSummary();
+        }
     });
 
     function updatePolling() {
-        if (
-            page.props.auth?.user?.id &&
-            visibility.value === 'visible' &&
-            !unauthorized
-        )
-            resume();
-        else pause();
+        if (canPoll()) {
+            if (!isActive.value) resume();
+            if (idleTimer === undefined) {
+                idleTimer = setTimeout(
+                    () => {
+                        idleTimer = undefined;
+                        updatePolling();
+                    },
+                    idleTimeout - (Date.now() - lastActivity),
+                );
+            }
+        } else {
+            pause();
+            clearTimeout(idleTimer);
+            idleTimer = undefined;
+        }
     }
 
-    watch(visibility, updatePolling, { immediate: true });
+    function recordActivity() {
+        if (
+            disposed ||
+            unauthorized ||
+            !page.props.auth?.user?.id ||
+            visibility.value !== 'visible'
+        )
+            return false;
+        const wasIdle = Date.now() - lastActivity >= idleTimeout;
+        lastActivity = Date.now();
+        if (wasIdle) updatePolling();
+        return wasIdle;
+    }
+
+    function refreshOnReturn() {
+        if (navigating) refreshAfterNavigation = true;
+        else void fetchSummary();
+    }
+
+    function refresh() {
+        recordActivity();
+        return fetchSummary();
+    }
+
+    useEventListener(
+        [
+            'pointerdown',
+            'pointermove',
+            'keydown',
+            'touchstart',
+            'wheel',
+            'scroll',
+            'focus',
+        ],
+        () => {
+            if (recordActivity()) refreshOnReturn();
+        },
+        { passive: true },
+    );
+    watch(
+        visibility,
+        (current, previous) => {
+            if (current === 'visible' && previous !== undefined) {
+                lastActivity = Date.now();
+                updatePolling();
+                refreshOnReturn();
+            } else updatePolling();
+        },
+        { immediate: true, flush: 'sync' },
+    );
     watch(
         [
             () => page.props.auth?.user?.id,
@@ -119,11 +194,13 @@ export function useNotificationPolling(navigation) {
             loading.value = false;
             error.value = '';
             unauthorized = false;
+            refreshAfterNavigation = false;
             updatePolling();
         },
     );
     onScopeDispose(() => {
         disposed = true;
+        updatePolling();
         generation++;
         http.cancel();
         removeStartListener();
