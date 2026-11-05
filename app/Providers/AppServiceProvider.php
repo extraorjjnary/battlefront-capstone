@@ -30,6 +30,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Cloud injects named disks before providers register; legacy protected files use "local".
+        if (config('filesystems.default') === 'private') {
+            config()->set('filesystems.disks.local', config('filesystems.disks.private'));
+        }
+
         $this->app->scoped(PsgcDeliveryLocations::class);
     }
 

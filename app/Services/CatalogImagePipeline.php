@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Actions\Product\OptimizeProductImage;
 use App\Models\Product;
+use Illuminate\Filesystem\LocalFilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
 use JsonException;
 use RuntimeException;
@@ -83,6 +84,10 @@ class CatalogImagePipeline
 
     public function ingest(string $productCode, string $sourcePath, ?string $manifestPath = null): string
     {
+        if (! Storage::disk('public') instanceof LocalFilesystemAdapter) {
+            throw new RuntimeException('Catalog image ingestion requires a local public disk. Generate images locally and transfer the verified files separately.');
+        }
+
         $path = $this->manifestPath($manifestPath);
         $lock = fopen($path.'.lock', 'c');
         if ($lock === false || ! flock($lock, LOCK_EX)) {
@@ -310,15 +315,18 @@ class CatalogImagePipeline
             return false;
         }
 
-        $physicalPath = $disk->path($imagePath);
-        $details = @getimagesize($physicalPath);
+        $bytes = $disk->get($imagePath);
+        if ($bytes === null) {
+            return false;
+        }
+        $details = @getimagesizefromstring($bytes);
 
         return $details !== false
             && $details['mime'] === 'image/webp'
             && $details[0] === 1024
             && $details[1] === 1024
-            && filesize($physicalPath) === ($entry['image_bytes'] ?? null)
-            && hash_file('sha256', $physicalPath) === $entry['image_sha256'];
+            && strlen($bytes) === ($entry['image_bytes'] ?? null)
+            && hash('sha256', $bytes) === $entry['image_sha256'];
     }
 
     /**

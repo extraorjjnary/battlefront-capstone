@@ -40,7 +40,7 @@ class StoreProductImage
         }
 
         try {
-            if (! $disk->put($path, $bytes, 'public')) {
+            if (! $disk->put($path, $bytes)) {
                 throw new RuntimeException('The product image could not be stored.');
             }
         } catch (\Throwable $exception) {
