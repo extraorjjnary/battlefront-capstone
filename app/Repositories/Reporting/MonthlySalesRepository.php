@@ -2,6 +2,8 @@
 
 namespace App\Repositories\Reporting;
 
+use App\Services\DemonstrationProvisioning;
+use App\Services\HostedDemoHistory;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use RuntimeException;
@@ -39,9 +41,24 @@ class MonthlySalesRepository
             $cases[] = 'WHEN sales.sale_date >= ? AND sales.sale_date < ? THEN ?';
             array_push($bindings, $month['start'], $month['end_exclusive'], $month['start']);
         }
+        $demo = app(DemonstrationProvisioning::class);
+        $demoProductIds = $demo->enabled()
+            ? DB::table('products')->whereIn('product_code', array_keys($demo->coverage()))->pluck('id')->all() : [];
         $rows = DB::table('sales')
             ->join('orders', 'orders.id', '=', 'sales.order_id')
             ->join('order_items', 'order_items.order_id', '=', 'orders.id')
+            ->when($demo->enabled(), fn ($query) => $query->where(function ($query) use ($demoProductIds): void {
+                $query->where(function ($query) use ($demoProductIds): void {
+                    $query->whereIn('order_items.product_id', $demoProductIds)
+                        ->where('orders.development_fixture_key', 'like', HostedDemoHistory::FIXTURE_PREFIX.'%')
+                        ->whereIn('orders.id', DB::table('audit_logs')->where('action', 'demo.record.created')
+                            ->where('subject_type', 'order')->where('changes->profile', DemonstrationProvisioning::PROFILE)->select('subject_id'));
+                })->orWhere(function ($query) use ($demoProductIds): void {
+                    $query->whereNotIn('order_items.product_id', $demoProductIds)
+                        ->where(fn ($query) => $query->whereNull('orders.development_fixture_key')
+                            ->orWhere('orders.development_fixture_key', 'not like', HostedDemoHistory::FIXTURE_PREFIX.'%'));
+                });
+            }))
             ->whereIn('order_items.product_id', $productIds)
             ->where('sales.sale_date', '>=', $months[0]['start'])
             ->where('sales.sale_date', '<', $months[array_key_last($months)]['end_exclusive'])

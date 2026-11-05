@@ -3,6 +3,7 @@
 namespace App\Repositories\Reporting;
 
 use App\Models\Product;
+use App\Services\DemonstrationProvisioning;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Storage;
@@ -23,6 +24,9 @@ class SalesHistoryCoverageRepository
             throw new RuntimeException('Historical coverage configuration cannot be checked.');
         }
         if (array_key_exists($productCode, $operational)) {
+            return true;
+        }
+        if (array_key_exists($productCode, app(DemonstrationProvisioning::class)->coverage())) {
             return true;
         }
         if (! App::environment(['local', 'testing'])) {
@@ -66,6 +70,10 @@ class SalesHistoryCoverageRepository
     {
         $operational = config('forecasting.operational_coverage');
         $development = is_array($operational) && App::environment(['local', 'testing']) ? $this->readDevelopment() : [];
+        $hosted = app(DemonstrationProvisioning::class)->coverage();
+        foreach ($hosted as $code => $entry) {
+            $development[$code] = array_key_exists($code, $development) ? null : $entry;
+        }
         $results = [];
         foreach ($productCodes as $productCode) {
             if (preg_match(Product::CODE_PATTERN, $productCode) !== 1 || ! is_array($operational)) {

@@ -6,6 +6,7 @@ use App\Actions\Forecasting\CalculateAdditiveHoltWinters;
 use App\Actions\Forecasting\PersistForecast;
 use App\Models\Forecast;
 use App\Models\Product;
+use App\Services\DemonstrationProvisioning;
 use App\Services\Forecasting\ProductForecastPreparationService;
 use ArithmeticError;
 use Carbon\CarbonImmutable;
@@ -146,7 +147,27 @@ class ForecastingService
             ];
         }
         try {
-            $forecast = DB::transaction(fn (): Forecast => $this->persistForecast->execute($result));
+            $forecast = DB::transaction(function () use ($result, $prepared, $product): Forecast {
+                $demo = app(DemonstrationProvisioning::class);
+                $hosted = $demo->enabled() && ($prepared['coverage']['source_kind'] ?? null) === 'synthetic_development';
+                if ($demo->enabled()) {
+                    Product::query()->whereKey($product->id)->lockForUpdate()->firstOrFail();
+                    $period = substr($result['target_period']['start'], 0, 7).'/'.CarbonImmutable::parse($result['target_period']['end_exclusive'])->subMonth()->format('Y-m');
+                    $existing = Forecast::query()->where('product_id', $product->id)->where('method', $result['method'])->where('forecast_quarter', $period)->first();
+                    if ($existing !== null && $hosted !== $demo::owns('forecast', $existing->id)) {
+                        throw new InvalidArgumentException('A preserved forecast occupies this demonstration target.');
+                    }
+                }
+                $forecast = $this->persistForecast->execute($result);
+                if ($hosted) {
+                    if (! $demo::owns('forecast', $forecast->id)) {
+                        $demo::audit('forecast', $forecast->id, ['coverage' => $prepared['coverage']]);
+                    }
+                    $demo::audit('forecast', $forecast->id, ['coverage' => $prepared['coverage'], 'quantity' => $forecast->predicted_demand], 'demo.forecast.generated');
+                }
+
+                return $forecast;
+            });
         } catch (InvalidArgumentException|QueryException $exception) {
             report($exception);
             throw ValidationException::withMessages(['forecast' => 'This forecast could not be saved. Please refresh and try again.']);
@@ -250,7 +271,7 @@ class ForecastingService
             'is_legacy' => $forecast->method !== 'additive_holt_winters',
             'forecast_quantity' => $forecast->predicted_demand,
             'target_label' => $rolling ? $this->monthlyPeriodLabel($target->toDateString(), $target->addMonths(3)->toDateString()) : $this->quarterLabel($target),
-            'source_label' => match ($forecast->method) {
+            'source_label' => (config('catalog-demo.enabled') && DemonstrationProvisioning::owns('forecast', $forecast->id) ? 'Synthetic demonstration transactions — ' : '').match ($forecast->method) {
                 'additive_holt_winters' => $this->monthlyPeriodLabel($target->subMonths(36)->toDateString(), $target->toDateString()).' (inferred from 36-month method)',
                 'moving_average' => $this->periodLabel($target->subQuarters(4)->toDateString(), $target->toDateString()).' (inferred from four-quarter method)',
                 default => 'Not retained with this saved forecast',
