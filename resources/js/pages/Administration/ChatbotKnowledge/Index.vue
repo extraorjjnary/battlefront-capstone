@@ -137,7 +137,7 @@ defineOptions({
             <SearchField
                 id="knowledge-search"
                 v-model="search"
-                class="mx-6 mb-6 max-w-xl"
+                class="mt-6 max-w-xl"
                 label="Search FAQs"
                 placeholder="Question or response"
                 :is-searching="isSearching"

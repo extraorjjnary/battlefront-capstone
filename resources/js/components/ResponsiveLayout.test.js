@@ -9,7 +9,384 @@ import { setTimeout as delay } from 'node:timers/promises';
 // Opt in with built assets, a running local app and an existing Chromium/Edge executable.
 const baseUrl = process.env.BATTLEFRONT_UI_URL;
 const executable = process.env.BATTLEFRONT_UI_BROWSER;
-const widths = [320, 375, 390, 428, 768, 1024, 1440];
+const widths = [320, 360, 375, 390, 428, 768, 1024, 1440];
+
+test(
+    'mobile viewport matrix fits public, customer and administration pages in both themes',
+    { skip: !baseUrl || !executable, timeout: 240000 },
+    async (t) => {
+        const browser = await openBrowser(t);
+        const paginated = (data) => ({
+            data,
+            total: data.length,
+            current_page: 1,
+            last_page: 1,
+            links: [],
+        });
+        const administration = {
+            dashboard: {
+                kpis: {
+                    recorded_revenue: '400',
+                    recorded_sales: 2,
+                    pending_orders: 1,
+                    processing_orders: 1,
+                    low_stock_products: 1,
+                    out_of_stock_products: 0,
+                },
+                needs_attention: {
+                    pending_payment_reviews: 0,
+                    payment_orders: [],
+                    low_stock_products: [
+                        { ...product, quantity: 1, reorder_level: 5 },
+                    ],
+                    out_of_stock_products: [],
+                },
+                recent_orders: [],
+            },
+        };
+        const fixtures = [
+            ['Welcome', {}, false],
+            [
+                'auth/Login',
+                { canResetPassword: true, canRegister: true },
+                false,
+            ],
+            ['auth/Register', { passwordRules: 'min:8' }, false],
+            [
+                'auth/VerifyEmail',
+                {
+                    verification: {
+                        status: 'verification_required',
+                        masked_email: 'c***@example.test',
+                        expires_at: new Date(Date.now() + 300000).toISOString(),
+                        resend_available_at: new Date(
+                            Date.now() - 1000,
+                        ).toISOString(),
+                        attempts_remaining: 5,
+                        delivery_status: 'sent',
+                    },
+                },
+                false,
+            ],
+            ...[false, true].flatMap((account) => [
+                [
+                    'Products/Index',
+                    {
+                        products: paginated([product]),
+                        filters: { sort: 'featured' },
+                        filter_options: {
+                            categories: [],
+                            brands: [],
+                            tags: [],
+                        },
+                        recommendations: [],
+                    },
+                    account,
+                ],
+                [
+                    'Products/Show',
+                    {
+                        product,
+                        can_record_product_dwell: false,
+                        recommendations: [],
+                    },
+                    account,
+                ],
+                [
+                    'PcBuilder/Index',
+                    { components: {}, ruleset_version: 1 },
+                    account,
+                ],
+            ]),
+            ['Cart/Index', { cart }, true],
+            ['Checkout/Index', checkout, true],
+            [
+                'Dashboard/Customer',
+                {
+                    dashboard: {
+                        summary: {
+                            cart_items: 1,
+                            cart_units: 2,
+                            active_orders: 1,
+                            total_orders: 1,
+                        },
+                        latest_order: null,
+                    },
+                    recommendations: [],
+                },
+                true,
+            ],
+            ['Orders/Index', { orders: paginated([order]) }, true],
+            ...['owner', 'manager', 'staff'].map((role) => [
+                'Dashboard/Administration',
+                administration,
+                role,
+            ]),
+            [
+                'Administration/Products/Index',
+                {
+                    products: paginated([
+                        {
+                            ...product,
+                            product_code: 'GPU-007',
+                            is_active: true,
+                        },
+                    ]),
+                    filters: {},
+                    filter_options: { categories: [], brands: [], tags: [] },
+                },
+                'owner',
+            ],
+            ['Administration/Branches/Create', {}, 'owner'],
+            [
+                'Administration/Reports/Sales',
+                {
+                    ...salesPeriodDetails,
+                    filters: {
+                        from: '2026-09-01',
+                        to: '2026-09-30',
+                        period: 'month',
+                    },
+                    active_filters: { product: null, category: null },
+                    kpis: {
+                        total_sales: 2,
+                        total_revenue: '199999.98',
+                        average_order_value: '99999.99',
+                        total_items_sold: 2,
+                    },
+                    timeline: {
+                        labels: ['Sep 2026'],
+                        sales: [2],
+                        revenue: [199999.98],
+                    },
+                    top_products: {
+                        ids: [7],
+                        labels: [longName],
+                        quantities: [2],
+                    },
+                    categories: {
+                        ids: [3],
+                        labels: ['Graphics cards'],
+                        revenue: [199999.98],
+                        rows: [],
+                    },
+                    products: paginated([
+                        {
+                            id: 7,
+                            name: longName,
+                            category: 'Graphics cards',
+                            sales_count: 2,
+                            quantity_sold: 2,
+                            item_revenue: '199999.98',
+                        },
+                    ]),
+                    recommendation_engagement: { summary: {}, placements: [] },
+                },
+                'owner',
+            ],
+            [
+                'Administration/Forecasting',
+                {
+                    products: paginated([]),
+                    filters: {},
+                    timezone: 'Asia/Manila',
+                    forecasts: paginated([]),
+                },
+                'manager',
+            ],
+        ];
+        for (const theme of ['light', 'dark']) {
+            for (const [component, props, account] of fixtures) {
+                await t.test(`${component} ${account} ${theme}`, async () => {
+                    await browser.show(
+                        component,
+                        props,
+                        account,
+                        theme,
+                        {},
+                        {
+                            browseProductCatalog: true,
+                            viewOrders: true,
+                            viewInventory: true,
+                            viewReports: account !== 'staff',
+                            viewProfitReports: account === 'owner',
+                            manageProducts: account === 'owner',
+                            manageBranches: account === 'owner',
+                        },
+                    );
+                    assert.equal(
+                        await browser.evaluate(
+                            `!!document.querySelector('body > aside[role=note]')`,
+                        ),
+                        false,
+                        'The global demo banner is absent',
+                    );
+                    for (const width of widths) {
+                        await browser.resize(width);
+                        await assertFits(
+                            browser,
+                            `${component} ${account} ${theme} ${width}`,
+                        );
+                        assert.equal(
+                            await browser.evaluate(
+                                `document.documentElement.classList.contains('dark')`,
+                            ),
+                            theme === 'dark',
+                        );
+                        if (component === 'PcBuilder/Index' && width < 1024) {
+                            assert.equal(
+                                await browser.evaluate(`(() => {
+                                const chat = document.querySelector('[data-customer-chat] button').getBoundingClientRect();
+                                const summary = document.querySelector('[aria-controls="build-summary"]').getBoundingClientRect();
+                                return summary.bottom <= chat.top;
+                            })()`),
+                                true,
+                                'The build summary stays above support',
+                            );
+                        }
+                        if (component === 'Administration/Reports/Sales') {
+                            assert.equal(
+                                await browser.evaluate(
+                                    `[...document.querySelectorAll('canvas')].every(canvas => canvas.getBoundingClientRect().right <= document.documentElement.clientWidth)`,
+                                ),
+                                true,
+                                'Charts fit their containers',
+                            );
+                            if (width === 320) {
+                                assert.equal(
+                                    await browser.evaluate(`(() => {
+                                    const region = document.querySelector('table').parentElement;
+                                    region.focus();
+                                    region.scrollLeft = region.scrollWidth;
+                                    return region.scrollLeft > 0 && document.activeElement === region;
+                                })()`),
+                                    true,
+                                    'Dense tables retain keyboard-accessible contained scrolling',
+                                );
+                            }
+                        }
+                    }
+                });
+            }
+        }
+        assert.deepEqual(browser.exceptions, []);
+    },
+);
+
+test(
+    'chat composer follows the visual viewport and survives customer navigation',
+    { skip: !baseUrl || !executable, timeout: 60000 },
+    async (t) => {
+        const browser = await openBrowser(t);
+        for (const theme of ['light', 'dark']) {
+            await browser.show('Branches/Index', { branches: [] }, true, theme);
+            await browser.resize(320, 900);
+            await browser.evaluate(
+                `document.querySelector('[aria-controls="battlefront-chat-panel"]').click()`,
+            );
+            for (const width of widths) {
+                await browser.resize(width, 900, width < 640);
+                assert.equal(
+                    await browser.evaluate(`(() => {
+                    const rect = document.getElementById('battlefront-chat-panel').getBoundingClientRect();
+                    return rect.left >= 0 && rect.right <= document.documentElement.clientWidth && rect.top >= 0 && rect.bottom <= innerHeight;
+                })()`),
+                    true,
+                    `Open chat fits ${theme} at ${width}`,
+                );
+                await assertFits(browser, `open chat ${theme} ${width}`);
+            }
+            await browser.resize(320, 900, true);
+            await browser.evaluate(`(() => {
+                const input = document.getElementById('floating-chatbot-message');
+                input.value = 'Keep this draft';
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                Object.defineProperties(window.visualViewport, {
+                    height: { configurable: true, value: 360 },
+                    offsetTop: { configurable: true, value: 40 },
+                });
+                window.visualViewport.dispatchEvent(new Event('resize'));
+                window.visualViewport.dispatchEvent(new Event('scroll'));
+            })()`);
+            await delay(50);
+            const panel = await browser.evaluate(`(() => {
+                const panel = document.getElementById('battlefront-chat-panel');
+                const input = document.getElementById('floating-chatbot-message');
+                const send = panel.querySelector('button[type=submit]');
+                return { bounds: [panel, input, send].map(element => {
+                    const rect = element.getBoundingClientRect();
+                    return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right };
+                }), focused: document.activeElement === input };
+            })()`);
+            assert.ok(
+                panel.bounds.every(
+                    (rect) =>
+                        rect.top >= 40 &&
+                        rect.bottom <= 400 &&
+                        rect.left >= 0 &&
+                        rect.right <= 320,
+                ),
+                JSON.stringify(panel),
+            );
+            assert.equal(panel.focused, true);
+            await assertFits(browser, `keyboard viewport ${theme}`);
+            await browser.evaluate(`(() => {
+                Object.defineProperty(window.visualViewport, 'scale', { configurable: true, value: 2 });
+                window.visualViewport.dispatchEvent(new Event('resize'));
+            })()`);
+            assert.equal(
+                await browser.evaluate(
+                    `document.querySelector('[data-customer-chat]').style.getPropertyValue('--chat-viewport-height')`,
+                ),
+                '360px',
+                'Pinch zoom does not reposition the panel',
+            );
+            browser.registerPage(
+                '/__chat_navigation',
+                'Branches/Index',
+                { branches: [] },
+                theme,
+            );
+            await browser.evaluate(
+                `document.querySelector('#app').__vue_app__.config.globalProperties.$inertia.visit('/__chat_navigation')`,
+            );
+            for (let attempt = 0; attempt < 100; attempt++) {
+                if (
+                    await browser.evaluate(
+                        `location.pathname === '/__chat_navigation'`,
+                    )
+                )
+                    break;
+                await delay(25);
+            }
+            assert.equal(
+                await browser.evaluate(
+                    `document.getElementById('floating-chatbot-message')?.value`,
+                ),
+                'Keep this draft',
+                'Persistent customer support retains the composer on navigation',
+            );
+            await browser.evaluate(`(() => {
+                for (const key of ['height', 'offsetTop', 'scale']) delete window.visualViewport[key];
+                window.visualViewport.dispatchEvent(new Event('resize'));
+                document.querySelector('[aria-label="Close chat"]').click();
+            })()`);
+            assert.equal(
+                await browser.evaluate(
+                    `document.activeElement.getAttribute('aria-controls')`,
+                ),
+                'battlefront-chat-panel',
+            );
+            assert.equal(
+                await browser.evaluate(
+                    `/user-scalable\\s*=\\s*no|maximum-scale\\s*=/.test(document.querySelector('meta[name=viewport]').content)`,
+                ),
+                false,
+            );
+        }
+        assert.deepEqual(browser.exceptions, []);
+    },
+);
 
 test(
     'focused chatbot replies and FAQ search remain readable',
@@ -788,6 +1165,7 @@ const order = {
 };
 const checkout = {
     cart,
+    paymongoHostedMethods: [],
     customer: { name: 'Customer', default_delivery_address: null },
     pickupLocation: {
         name: 'Battlefront Sagay City',
@@ -844,6 +1222,7 @@ const checkout = {
             handling_surcharge: '0.00',
             preparation_days: 1,
             packing_expectation: 'Standard packing',
+            measurement_sources: { measured: 0, estimated: 2 },
             is_demo: true,
             assumption_label:
                 'Battlefront-configured demonstration estimates, not official LBC quotations.',
@@ -864,6 +1243,26 @@ const checkout = {
         delivery_destination: 'Sagay City',
         delivery_barangay_code: '1804523018',
         delivery_address_details: '12 Mabini Street',
+    },
+};
+
+const salesPeriodDetails = {
+    comparison: {
+        from: '2026-08-01',
+        to: '2026-08-31',
+        total_sales: 1,
+        total_revenue: '99999.99',
+    },
+    sale_transactions: { data: [], current_page: 1, last_page: 1 },
+    refund_measures: {
+        cutoff: '2026-09-30',
+        gross_item_sales: '199999.98',
+        refund_payments: '0.00',
+        gross_less_refunds: '199999.98',
+        outstanding_at_cutoff: '0.00',
+        payments: { data: [], last_page: 1 },
+        reversals: { data: [], last_page: 1 },
+        outstanding_refunds: { data: [], last_page: 1 },
     },
 };
 
@@ -946,6 +1345,18 @@ async function openBrowser(t, { built = true } = {}) {
             );
         } else if (message.method === 'Log.entryAdded') {
             diagnostics.push(message.params.entry.text);
+        } else if (
+            message.method === 'Runtime.consoleAPICalled' &&
+            ['warn', 'error'].includes(message.params.type)
+        ) {
+            diagnostics.push(
+                message.params.args
+                    .map(
+                        (argument) =>
+                            argument.description ?? argument.value ?? '',
+                    )
+                    .join(' '),
+            );
         } else if (message.method === 'Network.loadingFailed') {
             diagnostics.push(message.params.errorText);
         }
@@ -977,16 +1388,10 @@ async function openBrowser(t, { built = true } = {}) {
     await command('Runtime.enable');
     await command('Log.enable');
     await command('Network.enable');
-    await command('Page.navigate', { url: baseUrl });
-    for (let attempt = 0; attempt < 100; attempt++) {
-        if (await evaluate(`!!document.querySelector('#app')?.children.length`))
-            break;
-        await delay(100);
-    }
-    const initialPage = await evaluate(
-        `JSON.parse(document.querySelector('script[data-page="app"]').textContent)`,
-    );
     let template = await (await fetch(baseUrl)).text();
+    const initialPage = JSON.parse(
+        template.match(/<script data-page="app"[^>]*>([\s\S]*?)<\/script>/)[1],
+    );
     if (built) {
         const manifest = JSON.parse(
             await readFile(
@@ -1019,6 +1424,25 @@ async function openBrowser(t, { built = true } = {}) {
                     `<script type="module" src="/build/${app.file}"></script></head>`,
             );
     }
+    // Bootstrap with the same built assets as fixtures, even with Vite running.
+    intercept = async ({ requestId }) => {
+        await command('Fetch.fulfillRequest', {
+            requestId,
+            responseCode: 200,
+            responseHeaders: [
+                { name: 'Content-Type', value: 'text/html; charset=utf-8' },
+            ],
+            body: Buffer.from(template).toString('base64'),
+        });
+    };
+    await command('Fetch.enable', { patterns: [{ resourceType: 'Document' }] });
+    await command('Page.navigate', { url: baseUrl });
+    for (let attempt = 0; attempt < 100; attempt++) {
+        if (await evaluate(`!!document.querySelector('#app')?.__vue_app__`))
+            break;
+        await delay(100);
+    }
+    await command('Fetch.disable');
     let fixture;
     let fixtureNumber = 0;
     const navigationFixtures = new Map();
@@ -1319,6 +1743,12 @@ async function openBrowser(t, { built = true } = {}) {
             flash = {},
             capabilities = {},
         ) {
+            const isAdministrator = [
+                'admin',
+                'owner',
+                'manager',
+                'staff',
+            ].includes(customer);
             if (!customer && appearance !== null) {
                 await evaluate(
                     `localStorage.setItem('battlefront_guest_appearance', ${JSON.stringify(appearance)})`,
@@ -1339,12 +1769,14 @@ async function openBrowser(t, { built = true } = {}) {
                               role:
                                   customer === 'admin'
                                       ? 'administrator'
-                                      : 'customer',
+                                      : isAdministrator
+                                        ? customer
+                                        : 'customer',
                               appearance,
                           },
                           can: {
-                              useCustomerCart: customer !== 'admin',
-                              accessAdministration: customer === 'admin',
+                              useCustomerCart: !isAdministrator,
+                              accessAdministration: isAdministrator,
                               ...capabilities,
                           },
                       }
@@ -1371,12 +1803,12 @@ async function openBrowser(t, { built = true } = {}) {
                 `The ${component} fixture did not mount: ${JSON.stringify(state)}; ${exceptions.join('; ')}; ${diagnostics.slice(-8).join('; ')}`,
             );
         },
-        async resize(width, height = 900) {
+        async resize(width, height = 900, mobile = false) {
             await command('Emulation.setDeviceMetricsOverride', {
                 width,
                 height,
                 deviceScaleFactor: 1,
-                mobile: false,
+                mobile,
             });
             await delay(150);
         },
@@ -1384,6 +1816,19 @@ async function openBrowser(t, { built = true } = {}) {
 }
 
 async function assertFits(browser, label) {
+    const documentBounds = await browser.evaluate(`({
+        width: document.documentElement.clientWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        overflow: [...document.querySelectorAll('body *')].filter(element => {
+            const rect = element.getBoundingClientRect();
+            return rect.width && (rect.left < -1 || rect.right > document.documentElement.clientWidth + 1)
+                && !element.closest('[data-slot="table-container"]');
+        }).slice(0, 8).map(element => ({ tag: element.tagName, class: element.className, text: element.textContent.trim().slice(0, 40) }))
+    })`);
+    assert.ok(
+        documentBounds.scrollWidth <= documentBounds.width,
+        `${label}: document overflow ${JSON.stringify(documentBounds)}`,
+    );
     const clipped = await browser.evaluate(`(() => {
         const failures = [];
         for (const element of document.querySelectorAll('main h1, main h2, main h3, main p, main dd, main label, main input:not([type=hidden]), main button, main a, header nav')) {
@@ -3530,7 +3975,7 @@ test(
                         await browser.resize(width);
                         await assertFits(browser, `catalog ${width}`);
                         const result = await browser.evaluate(`(() => {
-                    const cards = [...document.querySelector('#product-list-heading').closest('section').querySelectorAll('a')];
+                    const cards = [...document.querySelector('#product-list-heading').closest('section').querySelectorAll('article')].map(article => article.closest('a'));
                     const price = cards[0].querySelector('article > div:last-child');
                     return { columns: cards.filter(card => Math.abs(card.getBoundingClientRect().top-cards[0].getBoundingClientRect().top)<2).length,
                         showcaseAbsent: !document.querySelector('#featured-products-heading'),
@@ -3541,7 +3986,7 @@ test(
                             const rect = control.getBoundingClientRect();
                             return rect.left >= 0 && rect.right <= innerWidth && control.getAttribute('aria-labelledby')?.includes('catalog-sort-label');
                         })(),
-                        readable: cards.every(card => { const name = card.querySelector('h3'); const price = card.querySelector('article > div:last-child > div > span:last-child'); return parseFloat(getComputedStyle(name).fontSize) >= 14 && name.scrollHeight <= name.clientHeight + 1 && parseFloat(getComputedStyle(price).fontSize) >= 16; }),
+                        readable: cards.every(card => { const name = card.querySelector('h3'); const price = card.querySelector('.tabular-nums'); return parseFloat(getComputedStyle(name).fontSize) >= 14 && name.scrollHeight <= name.clientHeight + 1 && parseFloat(getComputedStyle(price).fontSize) >= 16; }),
                         priceFits: price.scrollWidth <= price.clientWidth + 1, imageFits: getComputedStyle(cards[0].querySelector('img')).objectFit === 'contain',
                         descriptionHidden: getComputedStyle(cards[0].querySelector('h3 + p')).display === 'none' };
                 })()`);
@@ -3703,12 +4148,22 @@ test(
                 await browser.evaluate(
                     `document.querySelector('input[name=fulfillment_method][value=delivery]').click()`,
                 );
-                await delay(300);
+                for (let attempt = 0; attempt < 100; attempt++) {
+                    if (
+                        await browser.evaluate(
+                            `document.querySelector('input[name=delivery_city_code]')?.value === '1804523000'`,
+                        )
+                    )
+                        break;
+                    await delay(50);
+                }
                 assert.equal(
                     await browser.evaluate(
-                        `document.querySelector('input[name=delivery_region_code]').value`,
+                        `document.querySelector('input[name=delivery_region_code]')?.value`,
                     ),
                     '1800000000',
+                    'Delivery fields hydrate: ' +
+                        browser.diagnostics.slice(-8).join('; '),
                 );
                 assert.equal(
                     await browser.evaluate(
@@ -3811,6 +4266,7 @@ test(
                     [
                         'Administration/Reports/Sales',
                         {
+                            ...salesPeriodDetails,
                             filters: {
                                 from: '2026-09-01',
                                 to: '2026-09-30',
@@ -3863,6 +4319,8 @@ test(
                     [
                         'Administration/Customers/Show',
                         {
+                            orders: { data: [], current_page: 1, last_page: 1 },
+                            order_status_filter: 'all',
                             customer: {
                                 id: 9,
                                 name: 'Customer With A Long Name',
@@ -4458,6 +4916,7 @@ test(
             },
         ];
         const sales = {
+            ...salesPeriodDetails,
             filters: { from: '2026-09-01', to: '2026-09-30', period: 'month' },
             active_filters: { product: null, category: null },
             kpis: {

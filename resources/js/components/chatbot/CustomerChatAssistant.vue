@@ -1,7 +1,7 @@
 <script setup>
 import { useHttp, usePage } from '@inertiajs/vue3';
 import { LoaderCircle, MessageSquareText, Send, X } from '@lucide/vue';
-import { nextTick, onMounted, ref, watch } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import ChatbotController from '@/actions/App/Http/Controllers/ChatbotController';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,6 +21,7 @@ const launcher = ref(null);
 const isMounted = ref(false);
 const quickMenu = ref('main');
 const showQuickQuestions = ref(true);
+const viewportStyle = ref({});
 let readerScrolledBack = false;
 let savedScrollTop = 0;
 let nextMessageId = 1;
@@ -28,7 +29,24 @@ let conversationVersion = 0;
 
 onMounted(() => {
     isMounted.value = true;
+    updateViewport();
+    window.visualViewport?.addEventListener('resize', updateViewport);
+    window.visualViewport?.addEventListener('scroll', updateViewport);
 });
+
+onBeforeUnmount(() => {
+    window.visualViewport?.removeEventListener('resize', updateViewport);
+    window.visualViewport?.removeEventListener('scroll', updateViewport);
+});
+
+function updateViewport() {
+    const viewport = window.visualViewport;
+    if (!viewport || viewport.scale !== 1) return;
+    viewportStyle.value = {
+        '--chat-viewport-height': `${viewport.height}px`,
+        '--chat-viewport-bottom': `${Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop)}px`,
+    };
+}
 
 function startNewChat() {
     conversationVersion++;
@@ -188,9 +206,10 @@ async function submitMessage(quickQuestion = null) {
         <div
             data-customer-chat
             class="fixed z-40 sm:right-6 sm:bottom-6"
+            :style="viewportStyle"
             :class="
                 isOpen
-                    ? 'inset-x-3 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] flex justify-end sm:inset-x-auto sm:w-96'
+                    ? 'inset-x-[max(0.75rem,env(safe-area-inset-left),env(safe-area-inset-right))] bottom-[calc(0.75rem+env(safe-area-inset-bottom)+var(--chat-viewport-bottom,0px))] flex justify-end sm:inset-x-auto sm:bottom-[calc(1.5rem+env(safe-area-inset-bottom)+var(--chat-viewport-bottom,0px))] sm:w-96'
                     : 'pointer-events-none inset-x-0 bottom-0 flex h-(--mobile-support-height) items-center justify-end px-4 pb-[env(safe-area-inset-bottom)] sm:inset-x-auto sm:h-auto sm:p-0'
             "
         >
@@ -211,15 +230,15 @@ async function submitMessage(quickQuestion = null) {
             <section
                 v-else
                 id="battlefront-chat-panel"
-                class="border-border bg-card text-card-foreground surface-panel flex h-[min(36rem,calc(100dvh-2rem-env(safe-area-inset-bottom)))] w-full max-w-96 flex-col overflow-hidden border"
+                class="border-border bg-card text-card-foreground surface-panel flex h-[min(36rem,calc(var(--chat-viewport-height,100dvh)-3rem-env(safe-area-inset-top)-env(safe-area-inset-bottom)))] w-full max-w-96 flex-col overflow-y-auto overscroll-contain border"
                 aria-label="Battlefront customer support assistant"
                 @keydown.esc="closePanel"
             >
                 <header
-                    class="border-border flex shrink-0 items-center gap-3 border-b px-4 py-3"
+                    class="border-border flex shrink-0 items-center gap-2 border-b px-3 py-3 sm:gap-3 sm:px-4"
                 >
                     <span
-                        class="bg-secondary text-primary-ink flex size-9 shrink-0 items-center justify-center rounded-md"
+                        class="bg-secondary text-primary-ink hidden size-9 shrink-0 items-center justify-center rounded-md sm:flex"
                     >
                         <MessageSquareText class="size-5" aria-hidden="true" />
                     </span>
@@ -380,22 +399,9 @@ async function submitMessage(quickQuestion = null) {
                     class="border-border bg-card shrink-0 border-t p-3"
                     @submit.prevent="submitMessage()"
                 >
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        :disabled="inquiry.processing"
-                        :aria-expanded="showQuickQuestions"
-                        aria-controls="battlefront-quick-questions"
-                        @click="
-                            showQuickQuestions = !showQuickQuestions;
-                            quickMenu = 'main';
-                        "
-                        >Quick questions</Button
-                    >
                     <label
                         for="floating-chatbot-message"
-                        class="text-sm font-semibold"
+                        class="block text-sm font-semibold"
                         >Your question</label
                     >
                     <Textarea
@@ -427,7 +433,20 @@ async function submitMessage(quickQuestion = null) {
                     >
                         {{ requestError }}
                     </p>
-                    <div class="mt-2 flex items-center justify-end gap-2">
+                    <div class="mt-2 flex items-center justify-between gap-2">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            :disabled="inquiry.processing"
+                            :aria-expanded="showQuickQuestions"
+                            aria-controls="battlefront-quick-questions"
+                            @click="
+                                showQuickQuestions = !showQuickQuestions;
+                                quickMenu = 'main';
+                            "
+                            >Quick questions</Button
+                        >
                         <Button
                             type="submit"
                             size="sm"

@@ -45,19 +45,19 @@ const storefrontLinks = [
         class="border-border bg-card/95 sticky top-0 z-30 border-b backdrop-blur"
     >
         <div
-            class="mx-auto flex h-18 max-w-7xl items-center justify-between gap-2 px-4 sm:gap-6 sm:px-8"
+            class="mx-auto flex h-18 max-w-7xl items-center justify-between gap-1 px-2 md:gap-6 md:px-8"
         >
             <Link
                 :href="home()"
                 aria-label="Battlefront Computer Trading home"
-                class="focus-visible:ring-ring focus-visible:ring-offset-background w-20 rounded-sm focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:outline-none sm:w-52"
+                class="focus-visible:ring-ring focus-visible:ring-offset-background w-10 shrink-0 rounded-sm focus-visible:ring-2 focus-visible:ring-offset-4 focus-visible:outline-none md:w-36 lg:w-52"
             >
-                <AppLogo class="hidden sm:block" />
-                <AppLogoIcon class="mx-auto size-10 sm:hidden" />
+                <AppLogo class="hidden md:block" />
+                <AppLogoIcon class="mx-auto size-10 md:hidden" />
             </Link>
 
             <nav
-                class="flex items-center gap-0 min-[360px]:gap-1 sm:gap-2"
+                class="flex shrink-0 items-center gap-0 md:gap-2"
                 aria-label="Primary"
             >
                 <Button
@@ -65,7 +65,7 @@ const storefrontLinks = [
                     :key="item.section"
                     as-child
                     size="sm"
-                    class="min-w-11 px-2 text-xs min-[360px]:px-3 min-[360px]:text-sm"
+                    class="min-w-11 px-2 text-xs md:px-3 md:text-sm"
                     :variant="
                         props.activeSection === item.section
                             ? 'outline'
@@ -81,8 +81,8 @@ const storefrontLinks = [
                                 : undefined
                         "
                     >
-                        <span class="sm:hidden">{{ item.mobileTitle }}</span>
-                        <span class="hidden sm:inline">{{ item.title }}</span>
+                        <span class="md:hidden">{{ item.mobileTitle }}</span>
+                        <span class="hidden md:inline">{{ item.title }}</span>
                     </Link>
                 </Button>
 
@@ -99,11 +99,11 @@ const storefrontLinks = [
                         as-child
                         size="sm"
                         variant="ghost"
-                        class="min-w-11 px-2 text-xs min-[360px]:px-3 min-[360px]:text-sm"
+                        class="min-w-11 px-2 text-xs md:px-3 md:text-sm"
                     >
                         <Link :href="login()">Log in</Link>
                     </Button>
-                    <Button as-child size="sm" class="hidden sm:inline-flex">
+                    <Button as-child size="sm" class="hidden md:inline-flex">
                         <Link :href="register()">Register</Link>
                     </Button>
                 </template>

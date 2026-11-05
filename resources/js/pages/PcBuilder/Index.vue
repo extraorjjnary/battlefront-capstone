@@ -905,7 +905,9 @@ function setFanMount(item, position) {
     <Head title="Custom PC Builder" />
     <div class="bg-background text-foreground min-h-screen">
         <StorefrontHeader active-section="pc-builder" />
-        <main class="mx-auto max-w-7xl px-4 py-8 pb-28 sm:px-6 lg:px-8 lg:pb-8">
+        <main
+            class="mx-auto max-w-7xl px-4 py-8 pb-28 sm:px-6 sm:pb-[calc(7rem+var(--mobile-support-height))] lg:px-8 lg:pb-8"
+        >
             <div
                 class="mb-8 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"
             >
@@ -1405,7 +1407,7 @@ function setFanMount(item, position) {
                 @retry="previewReplacement"
             />
             <div
-                class="border-border bg-card fixed inset-x-0 bottom-0 z-30 flex items-center justify-between gap-3 border-t p-4 lg:hidden"
+                class="border-border bg-card fixed inset-x-0 bottom-(--mobile-support-height) z-30 flex items-center justify-between gap-3 border-t p-4 lg:hidden"
             >
                 <div>
                     <p class="text-muted-foreground text-xs">Build total</p>
