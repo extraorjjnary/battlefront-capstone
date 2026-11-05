@@ -179,7 +179,8 @@ class ChatbotOrchestrationService
         if ($result['successful']) {
             return [
                 'category' => $category,
-                'message' => $result['text'],
+                'message' => ($category === ChatbotQueryCategory::Product && config('catalog-demo.enabled')
+                    ? config('catalog-demo.notice').' ' : '').$result['text'],
                 'source' => 'gemini',
             ];
         }

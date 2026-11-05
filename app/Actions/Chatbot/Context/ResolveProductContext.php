@@ -274,6 +274,9 @@ class ResolveProductContext
         if ($isDemo) {
             $context['demo_notice'] = 'Demo item only; listed prices are samples and Battlefront stock is unconfirmed.';
         }
+        if (config('catalog-demo.enabled')) {
+            $context['inventory_notice'] = config('catalog-demo.notice');
+        }
 
         return $context;
     }

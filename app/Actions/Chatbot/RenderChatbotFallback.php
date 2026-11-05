@@ -78,6 +78,9 @@ class RenderChatbotFallback
 
         $product = $products[0];
         $parts = [$product['name'].'.'];
+        if (isset($product['inventory_notice'])) {
+            $parts[] = $product['inventory_notice'];
+        }
         if ($product['is_demo']) {
             $parts[] = $product['demo_notice'];
         }
@@ -90,7 +93,7 @@ class RenderChatbotFallback
             }
         }
         if ($stock) {
-            $parts[] = match ($product['inventory']['status']) {
+            $parts[] = isset($product['inventory_notice']) ? 'Simulated inventory: '.($product['inventory']['quantity'] ?? 'unavailable').' units; actual store stock unconfirmed.' : match ($product['inventory']['status']) {
                 'in_stock', 'low_stock' => 'Sagay stock: '.$product['inventory']['quantity'].' available.',
                 'out_of_stock' => 'Currently out of stock at Sagay.',
                 default => 'Sagay stock information is unavailable.',

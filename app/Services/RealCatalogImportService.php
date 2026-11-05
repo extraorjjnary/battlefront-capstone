@@ -63,9 +63,32 @@ class RealCatalogImportService
     {
         $prepared = $this->inspectFiles($mappingPath, $manifestPath);
 
+        return $this->inspectPrepared($prepared);
+    }
+
+    /** @return list<array<string, mixed>> */
+    public function inspectCatalog(string $mappingPath, string $manifestPath): array
+    {
+        return $this->inspectPrepared($this->prepareFiles($mappingPath, $manifestPath, true), true);
+    }
+
+    /** @param list<array<string, mixed>> $prepared
+     * @return list<array<string, mixed>>
+     */
+    private function inspectPrepared(array $prepared, bool $catalogOnly = false): array
+    {
+
         foreach ($prepared as $row) {
+            $category = Category::withTrashed()->where('name_key', CatalogName::key($row['category']))->first();
+            if ($category?->trashed()) {
+                throw new RuntimeException('A source category is deleted. Restore it before importing.');
+            }
             $code = $row['product_code'];
             $existing = Product::withTrashed()->where('product_code', $code)->first();
+            $discount = $existing?->discount_price;
+            if ($catalogOnly && $discount !== null && (! is_numeric($discount) || bccomp($discount, $row['price'], 2) > 0)) {
+                throw new RuntimeException('A source price is below an existing discount price.');
+            }
             if ($existing?->trashed()) {
                 throw new RuntimeException("Product code $code belongs to a deleted product. Restore it before importing. No products were imported.");
             }
@@ -86,6 +109,12 @@ class RealCatalogImportService
      */
     public function inspectFiles(string $mappingPath, ?string $manifestPath = null): array
     {
+        return $this->prepareFiles($mappingPath, $manifestPath, false);
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function prepareFiles(string $mappingPath, ?string $manifestPath, bool $catalogOnly): array
+    {
         $entries = $this->images->importEntries($manifestPath);
         $mapping = $this->readMapping($mappingPath);
         $prepared = [];
@@ -93,7 +122,7 @@ class RealCatalogImportService
 
         foreach ($entries as $entry) {
             $code = $entry['product_code'];
-            if (($entry['quantity_source'] ?? null) === 'development_demo' && ! app()->environment(['local', 'testing'])) {
+            if (! $catalogOnly && ($entry['quantity_source'] ?? null) === 'development_demo' && ! app()->environment(['local', 'testing'])) {
                 throw new RuntimeException('Demo catalog inventory is only allowed in local and testing environments.');
             }
             if (! isset($mapping[$code])) {
@@ -121,20 +150,23 @@ class RealCatalogImportService
             }
             $seenNames[$nameKey] = $code;
 
-            if ($sourceQuantity === null || $sourceQuantity === '') {
-                if ($details['quantity_override'] === '') {
-                    throw new RuntimeException("Verified quantity is required for code $code.");
+            $quantity = null;
+            if (! $catalogOnly) {
+                if ($sourceQuantity === null || $sourceQuantity === '') {
+                    if ($details['quantity_override'] === '') {
+                        throw new RuntimeException("Verified quantity is required for code $code.");
+                    }
+                    $quantity = $details['quantity_override'];
+                } else {
+                    if ($details['quantity_override'] !== '') {
+                        throw new RuntimeException("Quantity override is not allowed for code $code.");
+                    }
+                    $quantity = $sourceQuantity;
                 }
-                $quantity = $details['quantity_override'];
-            } else {
-                if ($details['quantity_override'] !== '') {
-                    throw new RuntimeException("Quantity override is not allowed for code $code.");
-                }
-                $quantity = $sourceQuantity;
-            }
 
-            if (! $this->isUnsignedInventoryValue($quantity)) {
-                throw new RuntimeException("Invalid quantity for code $code.");
+                if (! $this->isUnsignedInventoryValue($quantity)) {
+                    throw new RuntimeException("Invalid quantity for code $code.");
+                }
             }
 
             $tagNames = [];
@@ -161,6 +193,9 @@ class RealCatalogImportService
                 'image_path' => $entry['image_path'],
                 'tags' => $tagNames,
             ];
+            if ($catalogOnly) {
+                unset($prepared[array_key_last($prepared)]['quantity'], $prepared[array_key_last($prepared)]['reorder_level']);
+            }
             unset($mapping[$code]);
         }
 
@@ -178,8 +213,24 @@ class RealCatalogImportService
     {
         $prepared = $this->inspect($mappingPath, $manifestPath);
 
+        return $this->persist($prepared, false);
+    }
+
+    /** @return array{created: int, updated: int} */
+    public function executeCatalog(string $mappingPath, string $manifestPath): array
+    {
+        return $this->persist($this->inspectCatalog($mappingPath, $manifestPath), true);
+    }
+
+    /** @param list<array<string, mixed>> $prepared
+     * @return array{created: int, updated: int}
+     */
+    private function persist(array $prepared, bool $catalogOnly): array
+    {
+
         try {
-            return DB::transaction(function () use ($prepared): array {
+            return DB::transaction(function () use ($prepared, $catalogOnly): array {
+                $this->inspectPrepared($prepared, $catalogOnly);
                 $this->ensureUniqueProductNames($prepared);
                 $created = 0;
                 $updated = 0;
@@ -237,12 +288,14 @@ class RealCatalogImportService
                         app(CatalogShippingClassification::class)->apply($product);
                     }
 
-                    $inventory = Inventory::query()->firstOrCreate(
-                        ['product_id' => $product->id],
-                        ['quantity' => $row['quantity'], 'reorder_level' => $row['reorder_level']],
-                    );
-                    if ($inventory->reorder_level !== $row['reorder_level']) {
-                        $inventory->update(['reorder_level' => $row['reorder_level']]);
+                    if (! $catalogOnly) {
+                        $inventory = Inventory::query()->firstOrCreate(
+                            ['product_id' => $product->id],
+                            ['quantity' => $row['quantity'], 'reorder_level' => $row['reorder_level']],
+                        );
+                        if ($inventory->reorder_level !== $row['reorder_level']) {
+                            $inventory->update(['reorder_level' => $row['reorder_level']]);
+                        }
                     }
 
                     $tagIds = [];

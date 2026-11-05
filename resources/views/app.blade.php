@@ -45,6 +45,11 @@
         </x-inertia::head>
     </head>
     <body class="font-sans antialiased">
+        @if (config('catalog-demo.enabled'))
+            <aside role="note" class="border-b border-border bg-secondary px-4 py-2 text-center text-sm text-foreground">
+                {{ config('catalog-demo.notice') }}
+            </aside>
+        @endif
         <x-inertia::app />
     </body>
 </html>
