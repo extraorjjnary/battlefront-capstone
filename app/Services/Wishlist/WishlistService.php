@@ -9,6 +9,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Models\WishlistActivity;
 use App\Models\WishlistItem;
+use App\Services\DemonstrationRehearsal;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -73,6 +74,8 @@ class WishlistService
                 'event_type' => WishlistActivityType::Added,
                 'occurred_at' => now('UTC'),
             ]);
+
+            app(DemonstrationRehearsal::class)->record('wishlist', $item);
 
             return true;
         }, attempts: 3);

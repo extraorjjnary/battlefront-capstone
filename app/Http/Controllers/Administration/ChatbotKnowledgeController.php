@@ -8,8 +8,10 @@ use App\Enums\ChatbotCategory;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Administration\SaveChatbotKnowledgeRequest;
 use App\Models\ChatbotKnowledge;
+use App\Services\DemonstrationRehearsal;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -53,11 +55,15 @@ class ChatbotKnowledgeController extends Controller
 
     public function store(SaveChatbotKnowledgeRequest $request): RedirectResponse
     {
-        ChatbotKnowledge::query()->create([
-            ...$request->safe()->only(['question_pattern', 'response_template']),
-            'category' => ChatbotCategory::Faq,
-            'priority' => 0,
-        ]);
+        DB::transaction(function () use ($request): void {
+            $knowledge = ChatbotKnowledge::query()->create([
+                ...$request->safe()->only(['question_pattern', 'response_template']),
+                'category' => ChatbotCategory::Faq,
+                'priority' => 0,
+            ]);
+
+            app(DemonstrationRehearsal::class)->record('faq', $knowledge);
+        });
 
         Inertia::flash('toast', [
             'type' => 'success',

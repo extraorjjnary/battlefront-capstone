@@ -167,3 +167,9 @@ test('demo disclosure reaches product context and generated responses', function
     $result = app(ChatbotOrchestrationService::class)->respond('Is the Aurelius Link Station available?');
     expect($result['message'])->toContain(config('catalog-demo.notice'), 'Listed catalog details.');
 });
+
+test('demo disclosure is omitted when demonstration mode is disabled', function () {
+    config()->set('catalog-demo.enabled', false);
+
+    $this->get('/')->assertOk()->assertDontSee(config('catalog-demo.notice'));
+});

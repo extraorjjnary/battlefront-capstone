@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Reporting;
 
+use App\Services\DemonstrationRehearsal;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use RuntimeException;
@@ -40,7 +41,7 @@ class QuarterlySalesRepository
             $cases[] = 'WHEN sales.sale_date >= ? AND sales.sale_date < ? THEN ?';
             array_push($bindings, $quarter['start'], $quarter['end_exclusive'], $quarter['start']);
         }
-        $query = DB::table('sales')
+        $query = DB::table('sales')->whereNotIn('sales.order_id', app(DemonstrationRehearsal::class)->archivedOrderIds())
             ->join('orders', 'orders.id', '=', 'sales.order_id')
             ->join('order_items', 'order_items.order_id', '=', 'orders.id')
             ->join('products', 'products.id', '=', 'order_items.product_id')

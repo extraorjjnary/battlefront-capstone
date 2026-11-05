@@ -3,7 +3,11 @@
 namespace App\Providers;
 
 use App\Enums\UserRole;
+use App\Models\CartItem;
+use App\Models\ChatbotKnowledge;
+use App\Models\PcBuild;
 use App\Models\User;
+use App\Services\DemonstrationRehearsal;
 use App\Services\Order\PsgcDeliveryLocations;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -43,6 +47,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        foreach ([User::class => 'user', ChatbotKnowledge::class => 'faq', CartItem::class => 'cart_item', PcBuild::class => 'pc_build'] as $model => $type) {
+            $model::updating(function (Model $record) use ($type): void {
+                app(DemonstrationRehearsal::class)->detachChangedRecord($type, $record);
+            });
+        }
+
         DevCommands::artisan('queue:listen --queue=default --tries=1 --timeout=0', 'queue');
         DevCommands::artisan('queue:listen --queue=payments --sleep=1 --tries=3 --timeout=70', 'payments');
         DevCommands::artisan('schedule:work', 'scheduler');

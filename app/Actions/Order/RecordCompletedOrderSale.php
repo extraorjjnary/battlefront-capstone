@@ -3,6 +3,7 @@
 namespace App\Actions\Order;
 
 use App\Models\Order;
+use App\Services\DemonstrationRehearsal;
 
 class RecordCompletedOrderSale
 {
@@ -27,5 +28,6 @@ class RecordCompletedOrderSale
             'sale_date' => today(config('battlefront.timezone')),
             'handler_id' => $order->assigned_handler_id,
         ]);
+        app(DemonstrationRehearsal::class)->recordSale($order);
     }
 }

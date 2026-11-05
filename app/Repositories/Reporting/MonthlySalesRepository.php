@@ -3,6 +3,7 @@
 namespace App\Repositories\Reporting;
 
 use App\Services\DemonstrationProvisioning;
+use App\Services\DemonstrationRehearsal;
 use App\Services\HostedDemoHistory;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -44,7 +45,7 @@ class MonthlySalesRepository
         $demo = app(DemonstrationProvisioning::class);
         $demoProductIds = $demo->enabled()
             ? DB::table('products')->whereIn('product_code', array_keys($demo->coverage()))->pluck('id')->all() : [];
-        $rows = DB::table('sales')
+        $rows = DB::table('sales')->whereNotIn('sales.order_id', app(DemonstrationRehearsal::class)->archivedOrderIds())
             ->join('orders', 'orders.id', '=', 'sales.order_id')
             ->join('order_items', 'order_items.order_id', '=', 'orders.id')
             ->when($demo->enabled(), fn ($query) => $query->where(function ($query) use ($demoProductIds): void {

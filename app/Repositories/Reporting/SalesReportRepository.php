@@ -2,6 +2,7 @@
 
 namespace App\Repositories\Reporting;
 
+use App\Services\DemonstrationRehearsal;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -125,7 +126,7 @@ class SalesReportRepository
      */
     private function recordedSaleQuery(?array $dateRange): Builder
     {
-        $query = DB::table('sales')
+        $query = DB::table('sales')->whereNotIn('sales.order_id', app(DemonstrationRehearsal::class)->archivedOrderIds())
             ->join('orders', 'orders.id', '=', 'sales.order_id')
             ->select(['sales.id', 'sales.order_id', 'sales.sale_date'])
             ->selectRaw('COALESCE(orders.product_subtotal,
@@ -320,6 +321,7 @@ class SalesReportRepository
     ): Builder {
         return DB::table('order_items')
             ->join('sales', 'sales.order_id', '=', 'order_items.order_id')
+            ->whereNotIn('sales.order_id', app(DemonstrationRehearsal::class)->archivedOrderIds())
             ->join('products', 'products.id', '=', 'order_items.product_id')
             ->join('categories', 'categories.id', '=', 'products.category_id')
             ->where('sales.sale_date', '>=', $dateRange[0])
