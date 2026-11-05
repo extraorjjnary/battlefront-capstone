@@ -147,9 +147,9 @@ test('demo inventory refuses preexisting stock and rolls back late failures incl
     }
 })->with([true, false]);
 
-test('demo inventory is disclosed without marking catalog prices synthetic', function () {
+test('demo inventory is disclosed in chatbot without a global banner or synthetic catalog prices', function () {
     config()->set('catalog-demo.enabled', true);
-    $this->get('/')->assertOk()->assertSee(config('catalog-demo.notice'));
+    $this->get('/')->assertOk()->assertDontSee(config('catalog-demo.notice'));
     $reply = app(RenderChatbotFallback::class)->execute(ChatbotQueryCategory::Product, 'stock', ['products' => [[
         'name' => 'Real catalog name', 'is_demo' => false, 'inventory_notice' => config('catalog-demo.notice'), 'inventory' => ['quantity' => 5, 'status' => 'in_stock'],
     ]]]);
