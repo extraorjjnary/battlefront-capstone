@@ -19,6 +19,13 @@ use Laravel\Ai\Exceptions\AiException;
 
 use function Pest\Laravel\mock;
 
+test('the web assistant receives a compact inventory disclosure only when enabled', function (bool $enabled) {
+    config(['catalog-demo.enabled' => $enabled]);
+
+    $this->get(route('branches.index'))->assertInertia(fn (Assert $page) => $page
+        ->where('chatbot.inventoryNotice', $enabled ? 'Demo inventory: Stock quantities are simulated.' : null));
+})->with([true, false]);
+
 test('customers can access the floating assistant on their dashboard', function () {
     $customer = User::factory()->customer()->create();
 

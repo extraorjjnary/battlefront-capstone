@@ -410,7 +410,8 @@ test('passes explicitly named demo products to Gemini as unconfirmed samples', f
         'source' => 'gemini',
     ]);
     ChatbotResponseAgent::assertPrompted(function (AgentPrompt $prompt): bool {
-        return str_contains($prompt->prompt, '[DEMO] Samsung Sprint NVMe SSD')
+        return str_contains($prompt->prompt, 'Samsung Sprint NVMe SSD')
+            && ! str_contains($prompt->prompt, '[DEMO]')
             && str_contains($prompt->prompt, '"is_demo":true')
             && str_contains($prompt->prompt, 'Battlefront stock is unconfirmed.')
             && str_contains($prompt->prompt, '"quantity":null')

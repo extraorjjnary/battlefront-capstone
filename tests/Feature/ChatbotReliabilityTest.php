@@ -89,7 +89,7 @@ test('provider outage returns catalog price and preserves demo notice', function
     ChatbotResponseAgent::assertPromptedTimes(1);
 })->with([
     'real' => ['Aurelius Mouse', 'Aurelius Mouse. Listed price: PHP 1,200.00. Discount price: PHP 1,000.00.'],
-    'demo' => ['[DEMO] Aurelius Mouse', '[DEMO] Aurelius Mouse. Demo item only; listed prices are samples and Battlefront stock is unconfirmed. Listed price: PHP 1,200.00. Discount price: PHP 1,000.00.'],
+    'demo' => ['[DEMO] Aurelius Mouse', 'Aurelius Mouse. Demonstration product. Sample price: PHP 1,200.00. Discount price: PHP 1,000.00.'],
 ]);
 
 test('provider outage distinguishes unknown stock from zero stock', function (?int $quantity, string $expected) {

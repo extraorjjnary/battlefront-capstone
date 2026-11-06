@@ -51,6 +51,7 @@ class ChatbotOrchestrationService
         private ClassifyChatbotInquiry $boundary,
         private ResolveChatbotRuleGuidance $ruleGuidance,
         private ChatbotLanguage $language = new ChatbotLanguage,
+        private ChatbotPresentation $presentation = new ChatbotPresentation,
     ) {}
 
     /**
@@ -172,15 +173,17 @@ class ChatbotOrchestrationService
             );
         }
 
+        $presentationContext = $this->presentation->context($context, $intentMessage);
         $result = $language === 'en'
-            ? $this->chatbotAiAdapter->generate($normalizedMessage, $context)
-            : $this->chatbotAiAdapter->generate($normalizedMessage, $context, $language);
+            ? $this->chatbotAiAdapter->generate($normalizedMessage, $presentationContext)
+            : $this->chatbotAiAdapter->generate($normalizedMessage, $presentationContext, $language);
 
         if ($result['successful']) {
             return [
                 'category' => $category,
-                'message' => ($category === ChatbotQueryCategory::Product && config('catalog-demo.enabled')
-                    ? config('catalog-demo.notice').' ' : '').$result['text'],
+                'message' => $this->presentation->generated($result['text'],
+                    $category === ChatbotQueryCategory::Product && isset($context['products'][0]['inventory_notice'])
+                    && $this->presentation->isStockQuestion($intentMessage)),
                 'source' => 'gemini',
             ];
         }

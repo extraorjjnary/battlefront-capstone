@@ -3,6 +3,9 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { runInNewContext } from 'node:vm';
 import { compileScript, parse } from '@vue/compiler-sfc';
+import { compile } from '@vue/compiler-dom';
+import { renderToString } from '@vue/server-renderer';
+import * as Vue from 'vue';
 import { quickQuestions } from './quickQuestions.js';
 
 const source = readFileSync(
@@ -10,6 +13,47 @@ const source = readFileSync(
     'utf8',
 );
 const { descriptor } = parse(source);
+
+test('the conditional inventory note renders once outside the conversation', async () => {
+    const section = descriptor.template.ast.children
+        .find((node) => node.tag === 'Teleport')
+        .children.find((node) => node.tag === 'div')
+        .children.find((node) => node.tag === 'section');
+    const note = section.children.find(
+        (node) =>
+            node.tag === 'p' &&
+            node.props.some(
+                (prop) =>
+                    prop.name === 'role' && prop.value?.content === 'note',
+            ),
+    );
+    assert.ok(note, 'the disclosure is a sibling of the transcript');
+    const render = new Function(
+        'Vue',
+        compile(note.loc.source, {
+            mode: 'function',
+            prefixIdentifiers: true,
+        }).code,
+    )(Vue);
+    for (const inventoryNotice of [
+        null,
+        'Demo inventory: Stock quantities are simulated.',
+    ]) {
+        const html = await renderToString(
+            Vue.h({
+                render,
+                setup: () => ({
+                    page: { props: { chatbot: { inventoryNotice } } },
+                }),
+            }),
+        );
+        assert.equal(
+            (html.match(/Stock quantities are simulated/g) ?? []).length,
+            inventoryNotice ? 1 : 0,
+        );
+        assert.doesNotMatch(html, /role="log"/);
+    }
+});
 const script = compileScript(descriptor, { id: 'chatbot-composer-test' });
 const handler = script.scriptSetupAst.find(
     (node) =>

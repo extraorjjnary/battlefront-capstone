@@ -253,10 +253,10 @@ class ChatbotConversation
         $links = Product::query()->customerAvailable()->whereIn('id', $productIds)
             ->orderBy('name')->orderBy('id')->get(['id', 'name'])
             ->filter(fn (Product $product): bool => preg_match(
-                '/(?<![\p{L}\p{N}_])'.preg_quote($product->name, '/').'(?![\p{L}\p{N}_])/iu',
+                '/(?<![\p{L}\p{N}_])'.preg_quote(ChatbotPresentation::productName($product->name), '/').'(?![\p{L}\p{N}_])/iu',
                 $response['message'],
             ) === 1)
-            ->map(fn (Product $product): array => ['id' => $product->id, 'name' => $product->name])
+            ->map(fn (Product $product): array => ['id' => $product->id, 'name' => ChatbotPresentation::productName($product->name)])
             ->all();
 
         if ($links !== []) {

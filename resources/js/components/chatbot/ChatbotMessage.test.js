@@ -70,6 +70,14 @@ const render = async (content, products = []) =>
         '',
     );
 
+test('a cleaned demo product label links to the original product identifier', async () => {
+    const html = await render('Sample SSD. Demonstration product.', [
+        { id: 17, name: 'Sample SSD' },
+    ]);
+    assert.match(html, /href="\/products\/17"[^>]*>Sample SSD<\/a>/);
+    assert.doesNotMatch(html, /\[DEMO\]/);
+});
+
 test('one product name uses its generated details route and preserves displayed spelling', async () => {
     const html = await render('Ang atlas monitor x240 ay PHP 4,200.00.', [
         { id: 17, name: 'Atlas Monitor X240' },

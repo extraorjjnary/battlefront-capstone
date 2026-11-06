@@ -270,6 +270,14 @@ async function submitMessage(quickQuestion = null) {
                     </Button>
                 </header>
 
+                <p
+                    v-if="page.props.chatbot?.inventoryNotice"
+                    class="text-muted-foreground shrink-0 px-4 py-2 text-xs"
+                    role="note"
+                >
+                    {{ page.props.chatbot.inventoryNotice }}
+                </p>
+
                 <div
                     ref="conversation"
                     class="min-h-0 flex-1 overflow-y-auto px-4 py-4"

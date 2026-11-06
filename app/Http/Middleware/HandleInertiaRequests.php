@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Enums\AppearancePreference;
 use App\Services\AdministrationWorkQueue;
 use App\Services\Cart\CartService;
+use App\Services\Chatbot\ChatbotPresentation;
 use App\Services\Notifications\NotificationHistory;
 use App\Services\Wishlist\WishlistService;
 use Illuminate\Http\Request;
@@ -57,6 +58,9 @@ class HandleInertiaRequests extends Middleware
                 'wishlistCount' => Inertia::always(fn (): int => app(WishlistService::class)->count($customer)),
             ] : []),
             'name' => config('app.name'),
+            'chatbot' => [
+                'inventoryNotice' => config('catalog-demo.enabled') ? ChatbotPresentation::INVENTORY_NOTICE : null,
+            ],
             'workQueueCounts' => fn (): array => $request->user()?->can('access-administration')
                 && $canBrowseProductCatalog
                     ? app(AdministrationWorkQueue::class)->counts($request->user()) : [],

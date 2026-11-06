@@ -4,6 +4,7 @@ namespace App\Actions\Chatbot;
 
 use App\Enums\ChatbotQueryCategory;
 use App\Services\Chatbot\ChatbotLanguage;
+use App\Services\Chatbot\ChatbotPresentation;
 use Illuminate\Support\Str;
 
 class RenderChatbotFallback
@@ -77,27 +78,32 @@ class RenderChatbotFallback
         }
 
         $product = $products[0];
-        $parts = [$product['name'].'.'];
-        if (isset($product['inventory_notice'])) {
-            $parts[] = $product['inventory_notice'];
-        }
+        $parts = [ChatbotPresentation::productName($product['name']).'.'];
         if ($product['is_demo']) {
-            $parts[] = $product['demo_notice'];
+            $parts[] = 'Demonstration product.';
         }
         $price = preg_match('/\b(?:price|prices|pricing|cost|much)\b/iu', $message) === 1;
         $stock = preg_match('/\b(?:stock|stocks|available|availability|have|sell)\b/iu', $message) === 1;
         if ($price) {
-            $parts[] = 'Listed price: PHP '.number_format((float) $product['price'], 2).'.';
+            $parts[] = ($product['is_demo'] ? 'Sample price: PHP ' : 'Listed price: PHP ').number_format((float) $product['price'], 2).'.';
             if ($product['discount_price'] !== null) {
                 $parts[] = 'Discount price: PHP '.number_format((float) $product['discount_price'], 2).'.';
             }
         }
         if ($stock) {
-            $parts[] = isset($product['inventory_notice']) ? 'Simulated inventory: '.($product['inventory']['quantity'] ?? 'unavailable').' units; actual store stock unconfirmed.' : match ($product['inventory']['status']) {
-                'in_stock', 'low_stock' => 'Sagay stock: '.$product['inventory']['quantity'].' available.',
-                'out_of_stock' => 'Currently out of stock at Sagay.',
-                default => 'Sagay stock information is unavailable.',
-            };
+            if ($product['is_demo']) {
+                $parts[] = 'Store stock is unconfirmed.';
+            } elseif (isset($product['inventory_notice'])) {
+                $parts[] = $product['inventory']['quantity'] === null
+                    ? 'Simulated stock quantity is unavailable.'
+                    : 'Simulated stock: '.$product['inventory']['quantity'].' units.';
+            } else {
+                $parts[] = match ($product['inventory']['status']) {
+                    'in_stock', 'low_stock' => 'Sagay stock: '.$product['inventory']['quantity'].' available.',
+                    'out_of_stock' => 'Currently out of stock at Sagay.',
+                    default => 'Sagay stock information is unavailable.',
+                };
+            }
         }
         if (! $price && ! $stock) {
             $parts[] = preg_match('/\b(?:specs|specifications|details|description)\b/iu', $message) === 1
@@ -111,7 +117,7 @@ class RenderChatbotFallback
     /** @param list<string> $names */
     public function productClarification(array $names): string
     {
-        return 'Which product do you mean? Examples: '.implode('; ', array_slice($names, 0, 3)).'. Please reply with one product name or model, or specify a brand.';
+        return 'Which product do you mean? Examples: '.implode('; ', array_map(ChatbotPresentation::productName(...), array_slice($names, 0, 3))).'. Please reply with one product name or model, or specify a brand.';
     }
 
     /** @param list<array<string, mixed>> $orders */
