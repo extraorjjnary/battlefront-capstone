@@ -153,7 +153,7 @@ test('demo inventory is disclosed in chatbot without a global banner or syntheti
     $reply = app(RenderChatbotFallback::class)->execute(ChatbotQueryCategory::Product, 'stock', ['products' => [[
         'name' => 'Real catalog name', 'is_demo' => false, 'inventory_notice' => config('catalog-demo.notice'), 'inventory' => ['quantity' => 5, 'status' => 'in_stock'],
     ]]]);
-    expect($reply)->toContain('simulated', 'actual store stock unconfirmed')->not->toContain('prices are samples', 'Sagay stock:');
+    expect($reply)->toBe('Real catalog name. Simulated stock: 5 units.');
 });
 
 test('demo disclosure reaches product context and generated responses', function () {
@@ -161,9 +161,12 @@ test('demo disclosure reaches product context and generated responses', function
     $product = Product::factory()->available()->create(['name' => 'Aurelius Link Station']);
     $context = app(ResolveProductContext::class)->forProduct($product->id);
     expect($context['products'][0]['inventory_notice'])->toBe(config('catalog-demo.notice'));
-    $this->mock(ChatbotAiAdapter::class)->shouldReceive('generate')->once()->andReturn([
-        'successful' => true, 'text' => 'Listed catalog details.', 'failure' => null,
-    ]);
+    $this->mock(ChatbotAiAdapter::class)->shouldReceive('generate')->once()
+        ->withArgs(fn (string $message, array $context): bool => $message === 'Is the Aurelius Link Station available?'
+            && $context['products'][0]['inventory_notice'] === 'Demo inventory: Stock quantities are simulated.')
+        ->andReturn([
+            'successful' => true, 'text' => 'Listed catalog details.', 'failure' => null,
+        ]);
     $result = app(ChatbotOrchestrationService::class)->respond('Is the Aurelius Link Station available?');
-    expect($result['message'])->toContain(config('catalog-demo.notice'), 'Listed catalog details.');
+    expect($result['message'])->toBe('Listed catalog details. Stock quantities are simulated.');
 });
