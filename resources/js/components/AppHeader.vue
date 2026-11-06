@@ -1,6 +1,6 @@
 <script setup>
 import { Link, router, usePage } from '@inertiajs/vue3';
-import { LogOut, Menu, Undo2 } from '@lucide/vue';
+import { LogOut, Menu } from '@lucide/vue';
 import { computed } from 'vue';
 import AppearanceToggle from '@/components/AppearanceToggle.vue';
 import AppLogo from '@/components/AppLogo.vue';
@@ -54,7 +54,7 @@ const mobileNavItems = computed(() => {
         ['Wishlist', 'My Wishlist'],
         ['Cart', 'My Cart'],
         ['Orders', 'My Orders'],
-        ['Orders', 'Returns & refunds'],
+        ['Returns & Refunds', 'Returns & Refunds'],
         ['Account', 'Profile / Settings'],
     ].flatMap(([sourceTitle, title]) => {
         const item = mainNavItems.value.find(
@@ -65,24 +65,16 @@ const mobileNavItems = computed(() => {
             return [];
         }
 
-        const isReturnLink = title === 'Returns & refunds';
-
         return [
             {
                 ...item,
                 title,
-                isReturnLink,
-                icon: isReturnLink ? Undo2 : item.icon,
             },
         ];
     });
 });
 
 function isMobileItemActive(item) {
-    if (item.isReturnLink) {
-        return false;
-    }
-
     return item.title === 'Profile / Settings'
         ? page.component.startsWith('settings/')
         : isCurrentOrParentUrl(item.href);
@@ -151,12 +143,6 @@ function isMobileItemActive(item) {
                                             />
                                             <span>
                                                 {{ item.title }}
-                                                <span
-                                                    v-if="item.isReturnLink"
-                                                    class="text-muted-foreground block text-xs font-normal"
-                                                    >Manage returns from an
-                                                    order</span
-                                                >
                                             </span>
                                             <span
                                                 v-if="

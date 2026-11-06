@@ -3,7 +3,10 @@
 namespace App\Services;
 
 use App\Models\Order;
+use App\Models\User;
 use App\Support\OperationalRequestReason;
+use Illuminate\Database\Query\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -18,26 +21,46 @@ class CustomerReturnRequestPresenter
     public function forOrder(Order $order, ?array $paymentViews = null): array
     {
         $payments = $paymentViews ?? $this->paymentsForOrder($order);
+
+        return array_values($this->query()
+            ->where('requests.order_id', $order->id)->where('requests.user_id', $order->user_id)
+            ->orderByDesc('requests.id')->get()
+            ->map(fn (stdClass $row): array => $this->present($row, $order, $payments[(int) $row->customer_return_id] ?? []))->all());
+    }
+
+    /** @return LengthAwarePaginator<int, array<string, mixed>> */
+    public function forCustomer(User $customer): LengthAwarePaginator
+    {
+        $requests = $this->query()
+            ->where('requests.user_id', $customer->id)
+            ->whereIn('requests.order_id', $customer->orders()->select('orders.id'))
+            ->orderByDesc('requests.id')->paginate(12);
+        $orders = $customer->orders()
+            ->whereKey($requests->getCollection()->pluck('order_id')->unique())
+            ->get(['id', 'user_id']);
+
+        return $requests->through(fn (stdClass $row): array => $this->present($row, $orders->findOrFail((int) $row->order_id), []));
+    }
+
+    private function query(): Builder
+    {
         $verified = DB::table('customer_refund_payments as payments')
             ->leftJoin('customer_refund_payment_reviews as reviews', 'reviews.customer_refund_payment_id', '=', 'payments.id')
             ->where(fn ($query) => $query->whereNull('reviews.id')->orWhereRaw('reviews.id = (select max(latest.id) from customer_refund_payment_reviews as latest where latest.customer_refund_payment_id = payments.id)'))
             ->select('payments.customer_refund_id')->selectRaw("SUM(CASE WHEN reviews.decision = 'verified' THEN payments.amount ELSE 0 END) as verified_amount, SUM(CASE WHEN reviews.decision = 'voided' THEN 0 ELSE payments.amount END) as recorded_amount")
             ->groupBy('payments.customer_refund_id');
 
-        return array_values(DB::table('customer_return_requests as requests')
+        return DB::table('customer_return_requests as requests')
             ->join('order_items', 'order_items.id', '=', 'requests.order_item_id')
             ->join('products', 'products.id', '=', 'order_items.product_id')
             ->leftJoin('customer_returns as returns', 'returns.id', '=', 'requests.customer_return_id')
             ->leftJoin('customer_refunds as refunds', 'refunds.customer_return_id', '=', 'returns.id')
             ->leftJoin('customer_return_resolutions as resolution', 'resolution.customer_return_id', '=', 'returns.id')
             ->leftJoinSub($verified, 'verified', 'verified.customer_refund_id', '=', 'refunds.id')
-            ->where('requests.order_id', $order->id)->where('requests.user_id', $order->user_id)
             ->select('requests.*', 'order_items.product_id', 'returns.status as return_status', 'returns.created_at as received_at',
                 'refunds.approved_amount', 'verified.verified_amount', 'verified.recorded_amount', 'returns.public_feedback',
                 'resolution.type as resolution_type', 'resolution.completed_at as resolution_completed_at')
-            ->selectRaw('COALESCE(order_items.product_name_at_time, products.name) as product_name')
-            ->orderByDesc('requests.id')->get()
-            ->map(fn (stdClass $row): array => $this->present($row, $order, $payments[(int) $row->customer_return_id] ?? []))->all());
+            ->selectRaw('COALESCE(order_items.product_name_at_time, products.name) as product_name');
     }
 
     /**

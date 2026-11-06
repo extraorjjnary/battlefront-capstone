@@ -12,6 +12,245 @@ const executable = process.env.BATTLEFRONT_UI_BROWSER;
 const widths = [320, 360, 375, 390, 428, 768, 1024, 1440];
 
 test(
+    'customer returns overview fits mobile and desktop with owned-order links and dedicated navigation',
+    { skip: !baseUrl || !executable, timeout: 120000 },
+    async (t) => {
+        const browser = await openBrowser(t);
+        const entry = {
+            id: 42,
+            order_id: 7,
+            order_reference: 'BF-000007',
+            product: {
+                name: 'Purchased keyboard ' + 'LongProductName'.repeat(10),
+            },
+            quantity: 1,
+            reason_label: 'Defective',
+            submitted_at: '2026-11-07T06:30:00Z',
+            status: { value: 'refund_processing', label: 'Refund processing' },
+            feedback: '<script>Private-looking customer feedback</script>',
+            refund: {
+                approved_amount: '99.95',
+                confirmed_paid_amount: '40.25',
+                remaining_amount: '59.70',
+            },
+        };
+        const props = {
+            returnRequests: {
+                data: [
+                    entry,
+                    {
+                        ...entry,
+                        id: 41,
+                        status: {
+                            value: 'submitted',
+                            label: 'Request submitted / Awaiting item receipt',
+                        },
+                        feedback: null,
+                        refund: null,
+                    },
+                ],
+                total: 13,
+                current_page: 1,
+                last_page: 2,
+            },
+        };
+        for (const theme of ['light', 'dark']) {
+            await browser.show('Returns/Index', props, true, theme);
+            for (const width of [320, 375, 768, 1440]) {
+                await browser.resize(width);
+                await assertFits(browser, `returns overview ${theme} ${width}`);
+                const content = await browser.evaluate(
+                    'document.querySelector("main").textContent',
+                );
+                assert.match(content, /Refund processing/);
+                assert.match(content, /Awaiting item receipt/);
+                assert.match(content, /99\.95/);
+                assert.match(content, /40\.25/);
+                assert.match(content, /59\.70/);
+                assert.match(content, /No monetary refund approved/);
+                assert.equal(
+                    await browser.evaluate(
+                        'document.querySelectorAll("main article script").length',
+                    ),
+                    0,
+                );
+                assert.equal(
+                    await browser.evaluate(
+                        'document.querySelector("main article a").getAttribute("href")',
+                    ),
+                    '/orders/7',
+                );
+                const positions = await browser.evaluate(
+                    '[...document.querySelectorAll("main article:first-of-type dd")].map(el => el.getBoundingClientRect().top)',
+                );
+                assert.equal(positions.length, 3);
+                assert.equal(positions[0] === positions[1], width >= 640);
+                assert.equal(
+                    await browser.evaluate(
+                        `document.querySelector('nav[aria-label="Return request pages"] a').getAttribute('href')`,
+                    ),
+                    '/returns?page=2',
+                );
+                if (
+                    process.env.BATTLEFRONT_RETURNS_OVERVIEW_PREVIEW &&
+                    [375, 1440].includes(width)
+                ) {
+                    const { data } = await browser.command(
+                        'Page.captureScreenshot',
+                        { format: 'png' },
+                    );
+                    await writeFile(
+                        join(
+                            process.env.BATTLEFRONT_RETURNS_OVERVIEW_PREVIEW,
+                            `${theme}-${width}.png`,
+                        ),
+                        Buffer.from(data, 'base64'),
+                    );
+                }
+            }
+
+            browser.registerPage('/returns', 'Returns/Index', props, theme);
+            for (const width of [1440, 375]) {
+                await browser.resize(width);
+                const nav =
+                    width >= 1024 ? '[data-sidebar=sidebar]' : '[role=dialog]';
+                if (width < 1024) {
+                    await browser.evaluate(
+                        `document.querySelector('[aria-label="Open navigation menu"]').click()`,
+                    );
+                    await delay(350);
+                }
+                assert.equal(
+                    await browser.evaluate(
+                        `document.querySelector('${nav} a[href="/returns"]').textContent.trim()`,
+                    ),
+                    'Returns & Refunds',
+                );
+                await browser.evaluate(
+                    `document.querySelector('${nav} a[href="/returns"]').click()`,
+                );
+                for (let attempt = 0; attempt < 100; attempt++) {
+                    if (
+                        await browser.evaluate(
+                            'location.pathname === "/returns" && document.querySelector("h1").textContent === "Returns & Refunds"',
+                        )
+                    )
+                        break;
+                    await delay(50);
+                }
+                assert.equal(
+                    await browser.evaluate('location.pathname'),
+                    '/returns',
+                );
+                if (width < 1024) {
+                    await browser.evaluate(
+                        `document.querySelector('[aria-label="Open navigation menu"]').click()`,
+                    );
+                    await delay(350);
+                    assert.equal(
+                        await browser.evaluate(
+                            `document.querySelector('[role=dialog] a[href="/returns"]').getAttribute('aria-current')`,
+                        ),
+                        'page',
+                    );
+                    await browser.command('Input.dispatchKeyEvent', {
+                        type: 'keyDown',
+                        key: 'Escape',
+                        code: 'Escape',
+                        windowsVirtualKeyCode: 27,
+                    });
+                    await delay(350);
+                } else {
+                    assert.equal(
+                        await browser.evaluate(
+                            `document.querySelector('[data-sidebar=sidebar] a[href="/returns"]').getAttribute('data-active')`,
+                        ),
+                        'true',
+                    );
+                }
+            }
+
+            await browser.show(
+                'Returns/Index',
+                {
+                    returnRequests: {
+                        data: [],
+                        total: 0,
+                        current_page: 1,
+                        last_page: 1,
+                    },
+                },
+                true,
+                theme,
+            );
+            for (const width of [320, 1440]) {
+                await browser.resize(width);
+                await assertFits(
+                    browser,
+                    `empty returns overview ${theme} ${width}`,
+                );
+                assert.match(
+                    await browser.evaluate(
+                        'document.querySelector("main").textContent',
+                    ),
+                    /No return requests to show/,
+                );
+                assert.equal(
+                    await browser.evaluate(
+                        'document.querySelector("main section a").getAttribute("href")',
+                    ),
+                    '/orders',
+                );
+            }
+        }
+        await browser.show(
+            'Products/Index',
+            {
+                products: { data: [], total: 0, current_page: 1, last_page: 1 },
+                filters: { sort: 'featured' },
+                filter_options: { categories: [], brands: [], tags: [] },
+                recommendations: [],
+            },
+            'owner',
+            'light',
+            {},
+            { viewOrders: true, browseProductCatalog: true },
+        );
+        await browser.resize(1440);
+        assert.equal(
+            await browser.evaluate(
+                `document.querySelectorAll('[data-sidebar=sidebar] a[href="/returns"]').length`,
+            ),
+            0,
+        );
+        assert.equal(
+            await browser.evaluate(
+                `document.querySelectorAll('[data-sidebar=sidebar] a[href="/administration/customer-returns"]').length`,
+            ),
+            1,
+        );
+        await browser.resize(375);
+        await browser.evaluate(
+            `document.querySelector('[data-sidebar=trigger]').click()`,
+        );
+        await delay(350);
+        assert.equal(
+            await browser.evaluate(
+                `document.querySelectorAll('[role=dialog] a[href="/returns"]').length`,
+            ),
+            0,
+        );
+        assert.equal(
+            await browser.evaluate(
+                `document.querySelectorAll('[role=dialog] a[href="/administration/customer-returns"]').length`,
+            ),
+            1,
+        );
+        assert.deepEqual(browser.exceptions, []);
+    },
+);
+
+test(
     'customer and guest navigation, dashboard and appearance fit the requested responsive breakpoints',
     { skip: !baseUrl || !executable, timeout: 120000 },
     async (t) => {
@@ -183,7 +422,7 @@ test(
                                       'My Wishlist',
                                       'My Cart',
                                       'My Orders',
-                                      'Returns & refunds Manage returns from an order',
+                                      'Returns & Refunds',
                                       'Profile / Settings',
                                       'Log out',
                                   ]
@@ -196,10 +435,10 @@ test(
                                   ],
                         );
                         assert.equal(
-                            items.find((item) =>
-                                item.text.startsWith('Returns & refunds'),
+                            items.find(
+                                (item) => item.text === 'Returns & Refunds',
                             )?.href,
-                            customer ? '/orders' : undefined,
+                            customer ? '/returns' : undefined,
                         );
                         assert.equal(
                             await browser.evaluate(

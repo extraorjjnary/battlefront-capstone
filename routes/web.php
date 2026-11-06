@@ -184,6 +184,8 @@ Route::get('delivery-locations', [DeliveryLocationController::class, 'index'])
 
 // customer orders
 Route::middleware(['auth', 'can:use-customer-cart'])->group(function () {
+    Route::get('returns', [CustomerReturnRequestController::class, 'index'])
+        ->name('returns.index');
     Route::get('notifications', [CustomerNotificationController::class, 'index'])->name('notifications.index');
     Route::get('notifications/summary', [CustomerNotificationController::class, 'summary'])->name('notifications.summary');
     Route::patch('notifications/read-all', [CustomerNotificationController::class, 'readAll'])->name('notifications.read-all');

@@ -57,6 +57,7 @@ import { index as branchIndex } from '@/routes/branches';
 import { index as cartIndex } from '@/routes/cart';
 import { index as pcBuilderIndex } from '@/routes/pc-builder';
 import { index as orderIndex } from '@/routes/orders';
+import { index as returnsIndex } from '@/routes/returns';
 import { index as productIndex } from '@/routes/products';
 import { edit as editProfile } from '@/routes/profile';
 import { index as wishlistIndex } from '@/routes/wishlist';
@@ -271,6 +272,11 @@ export function useAppNavigation() {
                 href: orderIndex(),
                 icon: ReceiptText,
                 activeRoutes: [orderIndex()],
+            });
+            items.push({
+                title: 'Returns & Refunds',
+                href: returnsIndex(),
+                icon: Undo2,
             });
             items.push({
                 title: 'Cart',
