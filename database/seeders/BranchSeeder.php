@@ -27,7 +27,7 @@ class BranchSeeder extends Seeder
             ],
             [
                 'name' => 'Battlefront Computer Trading',
-                'address' => 'National Road, Barangay Balintawak, Escalante City, 6124',
+                'address' => 'National Road, Barangay Balintawak, Escalante City, Negros Occidental 6124, Philippines',
                 'city' => 'Escalante City',
                 'contact_number' => null,
                 'latitude' => 10.84283002809064,
