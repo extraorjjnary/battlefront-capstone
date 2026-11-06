@@ -1,6 +1,7 @@
 ---
 paths:
-    - '**'
+  - '**'
+  - vite.config.js
 ---
 
 # General
@@ -17,3 +18,6 @@ The latest developer-approved forecasting revision and completed EXT-40/42/43/45
 ## Forecasting selector readiness is convenience only
 
 EXT-84 lists only products currently ready under the shared EXT-42 monthly preparation rules, including covered all-zero and eligible inactive products. Search and pagination count only ready products; evaluate candidates in bounded batches before forming visible pages. Generation must independently prepare fresh history and recheck readiness before calculating or persisting; never trust selector results or weaken coverage/sparse eligibility. Preserve saved review for stale selections and legacy records.
+
+## Keep generated runtime storage out of the Vite watcher
+Large isolated test disks under storage/framework/testing can register tens of thousands of Windows filesystem watchers, starve SSR module loading, and cause the 60-second transport timeout. Keep generated runtime/upload directories excluded while retaining storage/framework/views for Blade/Tailwind. Use a strict development port so accidentally starting another Vite server fails instead of changing the shared public/hot target.

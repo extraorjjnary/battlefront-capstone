@@ -31,6 +31,8 @@ export default defineConfig({
         }),
     ]),
     server: {
+        port: 5173,
+        strictPort: true,
         watch: {
             ignored: [
                 '**/.agents/**',
@@ -38,6 +40,12 @@ export default defineConfig({
                 '**/.cursor/**',
                 '**/.junie/**',
                 '**/vendor/**',
+                '**/storage/app/**',
+                '**/storage/framework/cache/**',
+                '**/storage/framework/sessions/**',
+                '**/storage/framework/testing/**',
+                '**/storage/logs/**',
+                '**/public/storage/**',
             ],
         },
     },
