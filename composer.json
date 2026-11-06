@@ -59,7 +59,7 @@
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "@php artisan dev"
+            "@php artisan dev --no-restart"
         ],
         "dev:herd": [
             "Composer\\Config::disableProcessTimeout",

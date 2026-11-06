@@ -22,6 +22,6 @@ class DevHerdCommand extends Command
             return $this->call('dev:list', ['--json' => true]);
         }
 
-        return $this->call('dev');
+        return $this->call('dev', ['--no-restart' => true]);
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Console\Command;
 use Illuminate\Foundation\DevCommands;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Process;
@@ -22,3 +23,34 @@ test('development process previews include shopping workers and recovery without
         DevCommands::except();
     }
 })->with(['standard development' => false, 'Herd development' => true]);
+
+test('combined development entrypoints disable automatic child restarts', function (string $script) {
+    Process::fake();
+    $devCommand = new class extends Command
+    {
+        protected $signature = 'dev {--no-restart}';
+
+        public bool $childRestartDisabled = false;
+
+        public function handle(): int
+        {
+            $this->childRestartDisabled = (bool) $this->option('no-restart');
+
+            return self::SUCCESS;
+        }
+    };
+    Artisan::registerCommand($devCommand);
+    $composer = json_decode(file_get_contents(base_path('composer.json')), true, flags: JSON_THROW_ON_ERROR);
+    $invocation = collect($composer['scripts'][$script])
+        ->first(fn (string $step): bool => str_starts_with($step, '@php artisan '));
+
+    try {
+        $exitCode = Artisan::call(substr($invocation, strlen('@php artisan ')));
+
+        expect($exitCode)->toBe(0);
+        expect($devCommand->childRestartDisabled)->toBeTrue();
+        Process::assertNothingRan();
+    } finally {
+        DevCommands::except();
+    }
+})->with(['standard development' => 'dev', 'Herd development' => 'dev:herd']);
