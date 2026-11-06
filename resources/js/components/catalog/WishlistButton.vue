@@ -1,10 +1,10 @@
 <script setup>
-import { Form, Link, usePage } from '@inertiajs/vue3';
+import { Form, usePage } from '@inertiajs/vue3';
 import { Heart, LoaderCircle } from '@lucide/vue';
 import { computed } from 'vue';
 import { useWishlistInteractions } from '@/composables/useWishlistInteractions';
 import WishlistController from '@/actions/App/Http/Controllers/WishlistController';
-import { login } from '@/routes';
+import { store as storePendingWishlistIntent } from '@/actions/App/Http/Controllers/PendingWishlistIntentController';
 import { Button } from '@/components/ui/button';
 
 const props = defineProps({
@@ -74,17 +74,25 @@ const isBusy = computed(() => wishlist.isBusy(props.productId));
             {{ wishlist.error(productId) }}
         </p>
     </Form>
-    <Button
+    <Form
         v-else-if="!page.props.auth?.user"
-        as-child
-        variant="outline"
-        :size="compact ? 'icon' : 'default'"
-        :aria-label="compact ? 'Log in to save to wishlist' : undefined"
+        v-bind="storePendingWishlistIntent.form()"
+        v-slot="{ processing, errors }"
+        :show-progress="false"
     >
-        <Link :href="login()"
-            ><Heart class="size-4" aria-hidden="true" /><span v-if="!compact"
-                >Log in to save</span
-            ></Link
+        <input type="hidden" name="product_id" :value="productId" />
+        <Button
+            type="submit"
+            variant="outline"
+            :size="compact ? 'icon' : 'default'"
+            :disabled="processing"
+            :aria-label="compact ? 'Log in to save to wishlist' : undefined"
         >
-    </Button>
+            <Heart class="size-4" aria-hidden="true" />
+            <span v-if="!compact">Log in to save</span>
+        </Button>
+        <p v-if="errors.product_id" role="alert">
+            {{ errors.product_id }}
+        </p>
+    </Form>
 </template>

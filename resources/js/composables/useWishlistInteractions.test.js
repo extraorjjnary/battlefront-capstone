@@ -268,6 +268,14 @@ function renderComponent(h, path, props) {
             '@/actions/App/Http/Controllers/WishlistController': {
                 default: { store: route, destroy: route },
             },
+            '@/actions/App/Http/Controllers/PendingWishlistIntentController': {
+                store: {
+                    form: () => ({
+                        action: '/wishlist/intent',
+                        method: 'post',
+                    }),
+                },
+            },
             '@/actions/App/Http/Controllers/CartItemController': {
                 default: { store: route },
             },
@@ -303,16 +311,62 @@ function renderComponent(h, path, props) {
     );
 }
 
-function nodes(node, predicate) {
+function nodes(node, predicate, formState = { processing: false, errors: {} }) {
     if (!node || typeof node !== 'object') return [];
     const children = Array.isArray(node.children)
         ? node.children
-        : (node.children?.default?.({ processing: false }) ?? []);
+        : (node.children?.default?.(formState) ?? []);
     return [
         ...(predicate(node) ? [node] : []),
-        ...children.flatMap((child) => nodes(child, predicate)),
+        ...children.flatMap((child) => nodes(child, predicate, formState)),
     ];
 }
+
+test('guest hearts post the selected product before login and show pending or validation state', (t) => {
+    const h = harness(t);
+    h.page.props.auth.user = null;
+    const render = renderComponent(
+        h,
+        '../components/catalog/WishlistButton.vue',
+        {
+            productId: 7,
+            productName: 'Graphics card',
+            canWishlist: false,
+            compact: true,
+        },
+    );
+    const form = nodes(render({}, []), (node) => node.type === Form)[0];
+    assert.equal(form.props.action, '/wishlist/intent');
+    assert.equal(form.props.method, 'post');
+    const input = nodes(form, (node) => node.type === 'input')[0];
+    assert.equal(input.props.name, 'product_id');
+    assert.equal(input.props.value, 7);
+    assert.equal(
+        nodes(form, (node) => node.type === Button, {
+            processing: true,
+            errors: {},
+        })[0].props.disabled,
+        true,
+    );
+    const error = nodes(form, (node) => node.props?.role === 'alert', {
+        processing: false,
+        errors: { product_id: 'Select a valid product.' },
+    })[0];
+    assert.equal(error.children, 'Select a valid product.');
+});
+
+test('administrator hearts do not expose the guest wishlist form', (t) => {
+    const h = harness(t);
+    const render = renderComponent(
+        h,
+        '../components/catalog/WishlistButton.vue',
+        {
+            productId: 7,
+            canWishlist: false,
+        },
+    );
+    assert.equal(nodes(render({}, []), (node) => node.type === Form).length, 0);
+});
 
 test('heart components use shared request options and local loading without page-wide progress', (t) => {
     const h = harness(t);
@@ -452,7 +506,7 @@ test('unavailable wishlist entries keep View cart and removal accessible', (t) =
     );
 });
 
-test('guests receive the existing login link without a wishlist mutation form', (t) => {
+test('full size guest hearts retain their login label while submitting a pending selection', (t) => {
     const h = harness(t);
     h.page.props.auth = { user: null, can: { useCustomerCart: false } };
     const render = renderComponent(
@@ -464,6 +518,10 @@ test('guests receive the existing login link without a wishlist mutation form', 
             compact: false,
         },
     );
-    assert.equal(nodes(render({}, []), (node) => node.type === Form).length, 0);
-    assert.equal(nodes(render({}, []), (node) => node.type === Link).length, 1);
+    assert.equal(nodes(render({}, []), (node) => node.type === Form).length, 1);
+    assert.equal(nodes(render({}, []), (node) => node.type === Link).length, 0);
+    assert.equal(
+        nodes(render({}, []), (node) => node.type === 'span')[0].children,
+        'Log in to save',
+    );
 });

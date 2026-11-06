@@ -6,6 +6,7 @@ use App\Actions\Cart\ResumePendingCartIntent;
 use App\Actions\Fortify\AttemptVerifiedAuthentication;
 use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
+use App\Actions\Wishlist\ResumePendingWishlistIntent;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Responses\PendingEmailVerificationResponse;
 use App\Models\User;
@@ -37,14 +38,16 @@ class FortifyServiceProvider extends ServiceProvider
         $this->app->bind(FortifyRegisteredUserController::class, RegisteredUserController::class);
         $this->app->bind(AttemptToAuthenticate::class, AttemptVerifiedAuthentication::class);
 
-        $this->app->singleton(LoginResponseContract::class, fn (Application $app) => new class($app->make(ResumePendingCartIntent::class)) extends LoginResponse
+        $this->app->singleton(LoginResponseContract::class, fn (Application $app) => new class($app->make(ResumePendingCartIntent::class), $app->make(ResumePendingWishlistIntent::class)) extends LoginResponse
         {
-            public function __construct(private ResumePendingCartIntent $resumePendingCartIntent) {}
+            public function __construct(private ResumePendingCartIntent $resumePendingCartIntent, private ResumePendingWishlistIntent $resumePendingWishlistIntent) {}
 
             /** @param Request $request */
             public function toResponse(mixed $request): Response
             {
-                return $this->resumePendingCartIntent->execute($request) ?? parent::toResponse($request);
+                $cartResponse = $this->resumePendingCartIntent->execute($request);
+
+                return $this->resumePendingWishlistIntent->execute($request) ?? $cartResponse ?? parent::toResponse($request);
             }
         });
 
