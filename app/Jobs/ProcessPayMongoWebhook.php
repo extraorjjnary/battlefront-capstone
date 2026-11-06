@@ -45,7 +45,16 @@ class ProcessPayMongoWebhook implements ShouldQueue
                 ->when(is_string($intentId), fn ($query) => $query->orWhere('payment_intent_id', $intentId)->orWhereHas('attempts', fn ($attempt) => $attempt->where('payment_intent_id', $intentId)))
                 ->first();
 
-            if ($flow === null) {
+            if ($flow === null && $inbox->event_type === 'payment.paid'
+                && is_string($inbox->resource_id) && $inbox->resource_id !== '') {
+                $flow = PayMongoFlow::query()
+                    ->where('mode', $inbox->mode)
+                    ->where('payment_id', $inbox->resource_id)
+                    ->when(is_string($intentId), fn ($query) => $query->whereNull('payment_intent_id'))
+                    ->first();
+            }
+
+            if ($flow === null || $flow->mode !== $inbox->mode) {
                 $inbox->update(['status' => 'unmatched', 'next_check_at' => now()->addMinute()]);
 
                 return;

@@ -6,7 +6,9 @@ use App\Enums\PaymentMethod;
 use App\Events\OrderNotificationOccurred;
 use App\Jobs\ProcessPayMongoWebhook;
 use App\Jobs\ReconcilePayMongoOrder;
+use App\Models\Inventory;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\PayMongoFlow;
 use App\Models\PayMongoOperation;
 use App\Models\PayMongoWebhookInbox;
@@ -195,6 +197,229 @@ test('an invalid signature is rejected without persisting the event', function (
     ], '{"data":{}}')->assertBadRequest();
 
     $this->assertDatabaseCount('paymongo_webhook_inbox', 0);
+});
+
+test('duplicate payment.paid webhooks recognize the recorded payment without repeating business effects', function (?string $intentId, ?string $savedIntentId) {
+    Bus::fake([ProcessPayMongoWebhook::class]);
+    config(['services.paymongo.mode' => 'test', 'services.paymongo.webhook_secret' => 'whsk_test_fake']);
+    $order = Order::factory()->create([
+        'payment_method' => PaymentMethod::Online, 'payment_origin' => 'paymongo',
+        'hosted_payment_method' => 'gcash', 'total_amount' => '250.00',
+    ]);
+    $stock = Inventory::factory()->create(['quantity' => 7]);
+    OrderItem::factory()->for($order)->create(['product_id' => $stock->product_id, 'quantity' => 2, 'price_at_time' => '125.00']);
+    $flow = PayMongoFlow::query()->create([
+        'order_id' => $order->id, 'mode' => 'test', 'channel' => 'hosted_checkout',
+        'status' => 'open', 'checkout_session_id' => 'cs_test_duplicate',
+        'payment_intent_id' => $savedIntentId,
+        'amount_minor' => 25000, 'currency' => 'PHP', 'merchant_cutoff_at' => now()->addDay(),
+    ]);
+    $payment = ['id' => 'pay_test_duplicate', 'status' => 'paid', 'amount' => 25000,
+        'net_amount' => 24000, 'currency' => 'PHP', 'method' => 'gcash'];
+    $checkoutInbox = PayMongoWebhookInbox::query()->create([
+        'mode' => 'test', 'event_id' => 'evt_test_checkout_duplicate',
+        'event_type' => 'checkout_session.payment.paid', 'resource_id' => 'cs_test_duplicate',
+        'verified_data' => ['attributes' => ['payments' => [$payment]]], 'received_at' => now(),
+    ]);
+    $earlyInbox = PayMongoWebhookInbox::query()->create([
+        'mode' => 'test', 'event_id' => 'evt_test_payment_early',
+        'event_type' => 'payment.paid', 'resource_id' => 'pay_test_duplicate',
+        'verified_data' => ['attributes' => ['payment_intent_id' => $intentId, 'payments' => [$payment]]], 'received_at' => now(),
+    ]);
+
+    app()->call([new ProcessPayMongoWebhook($earlyInbox->id), 'handle']);
+    expect($earlyInbox->fresh()->status)->toBe('unmatched');
+    expect($flow->fresh()->status)->toBe('open');
+    $this->assertDatabaseCount('notifications', 0);
+    app()->call([new ProcessPayMongoWebhook($checkoutInbox->id), 'handle']);
+
+    expect($checkoutInbox->fresh()->status)->toBe('processed');
+    expect($flow->fresh()->payment_id)->toBe('pay_test_duplicate');
+    $paidAt = $flow->fresh()->paid_at;
+    $notificationIds = $order->user->notifications()->pluck('id')->all();
+    expect($notificationIds)->toHaveCount(1);
+
+    app()->call([new ProcessPayMongoWebhook($earlyInbox->id), 'handle']);
+    expect($earlyInbox->fresh()->status)->toBe('processed');
+
+    foreach (['evt_test_payment_duplicate', 'evt_test_payment_duplicate_again'] as $eventId) {
+        $timestamp = (string) now()->timestamp;
+        $payload = json_encode(['data' => [
+            'id' => $eventId, 'type' => 'event', 'attributes' => [
+                'type' => 'payment.paid', 'livemode' => false, 'data' => [
+                    'id' => 'pay_test_duplicate', 'type' => 'payment', 'attributes' => [
+                        'status' => 'paid', 'amount' => 25000, 'net_amount' => 24000,
+                        'payment_intent_id' => $intentId,
+                        'currency' => 'PHP', 'source' => ['type' => 'gcash'],
+                    ],
+                ],
+            ],
+        ]], JSON_THROW_ON_ERROR);
+        $headers = ['HTTP_PAYMONGO_SIGNATURE' => 't='.$timestamp.',te='.hash_hmac('sha256', $timestamp.'.'.$payload, 'whsk_test_fake').',li=',
+            'CONTENT_TYPE' => 'application/json'];
+
+        $this->call('POST', '/api/paymongo/webhook', [], [], [], $headers, $payload)->assertAccepted();
+        $inbox = PayMongoWebhookInbox::query()->where('event_id', $eventId)->firstOrFail();
+        expect(data_get($inbox->verified_data, 'attributes.payment_intent_id'))->toBe($intentId);
+        app()->call([new ProcessPayMongoWebhook($inbox->id), 'handle']);
+        app()->call([new ProcessPayMongoWebhook($inbox->id), 'handle']);
+        $this->call('POST', '/api/paymongo/webhook', [], [], [], $headers, $payload)->assertOk();
+
+        expect($inbox->fresh()->status)->toBe('processed');
+        expect($inbox->fresh()->processed_at)->not->toBeNull();
+    }
+
+    expect($order->fresh()->payment_status->value)->toBe('verified');
+    expect($order->fresh()->status->value)->toBe('pending');
+    expect($flow->fresh()->status)->toBe('paid');
+    expect($flow->fresh()->paid_at->equalTo($paidAt))->toBeTrue();
+    expect($stock->fresh()->quantity)->toBe(7);
+    expect($order->user->notifications()->pluck('id')->all())->toBe($notificationIds);
+    $this->assertDatabaseCount('paymongo_flows', 1);
+    $this->assertDatabaseCount('paymongo_operations', 0);
+    $this->assertDatabaseCount('paymongo_webhook_inbox', 4);
+    Bus::assertDispatchedTimes(ProcessPayMongoWebhook::class, 2);
+})->with(['without an event intent' => [null, 'pi_test_duplicate'], 'without a saved intent' => ['pi_test_duplicate', null]]);
+
+test('payment.paid leaves unknown provider IDs unmatched despite local order hints', function (string $reference) {
+    $order = Order::factory()->create([
+        'payment_method' => PaymentMethod::Online, 'payment_origin' => 'paymongo',
+        'payment_status' => 'verified', 'total_amount' => '250.00',
+    ]);
+    $flow = PayMongoFlow::query()->create([
+        'order_id' => $order->id, 'mode' => 'test', 'channel' => 'hosted_checkout',
+        'status' => 'paid', 'checkout_session_id' => 'cs_test_known', 'payment_id' => 'pay_test_known',
+        'amount_minor' => 25000, 'currency' => 'PHP', 'merchant_cutoff_at' => now()->addDay(),
+    ]);
+    $paymentId = match ($reference) {
+        'order_id' => (string) $order->id,
+        'flow_id' => (string) $flow->id,
+        'order_reference' => $order->reference,
+        default => 'pay_test_unknown',
+    };
+    $inbox = PayMongoWebhookInbox::query()->create([
+        'mode' => 'test', 'event_id' => 'evt_test_unknown', 'event_type' => 'payment.paid',
+        'resource_id' => $paymentId, 'received_at' => now(), 'verified_data' => ['attributes' => [
+            'reference_number' => $order->reference, 'metadata' => ['order_id' => $order->id],
+            'payments' => [['id' => $paymentId, 'status' => 'paid', 'amount' => 25000, 'currency' => 'PHP', 'method' => 'gcash']],
+        ]],
+    ]);
+
+    app()->call([new ProcessPayMongoWebhook($inbox->id), 'handle']);
+
+    expect($inbox->fresh()->status)->toBe('unmatched');
+    expect($inbox->fresh()->next_check_at)->not->toBeNull();
+    expect($inbox->fresh()->processed_at)->toBeNull();
+    expect($flow->fresh()->payment_id)->toBe('pay_test_known');
+    expect($flow->fresh()->status)->toBe('paid');
+    expect($order->fresh()->payment_status->value)->toBe('verified');
+    $this->assertDatabaseCount('paymongo_operations', 0);
+    $this->assertDatabaseCount('notifications', 0);
+})->with(['unknown' => ['unknown'], 'numeric order ID' => ['order_id'], 'numeric flow ID' => ['flow_id'], 'BF order reference' => ['order_reference']]);
+
+test('payment.paid still quarantines invalid evidence for an already recorded payment', function (array $changes, string $orderStatus, ?string $intentId = null) {
+    $order = Order::factory()->create([
+        'payment_method' => PaymentMethod::Online, 'payment_origin' => 'paymongo',
+        'hosted_payment_method' => 'gcash', 'payment_status' => 'verified',
+        'status' => $orderStatus, 'total_amount' => '250.00',
+    ]);
+    $flow = PayMongoFlow::query()->create([
+        'order_id' => $order->id, 'mode' => 'test', 'channel' => 'hosted_checkout',
+        'status' => 'paid', 'payment_id' => 'pay_test_recorded', 'payment_intent_id' => 'pi_test_recorded',
+        'amount_minor' => 25000, 'currency' => 'PHP', 'merchant_cutoff_at' => now()->addDay(),
+    ]);
+    $payment = array_replace(['id' => 'pay_test_recorded', 'status' => 'paid', 'amount' => 25000,
+        'net_amount' => 24000, 'currency' => 'PHP', 'method' => 'gcash'], $changes);
+    $inbox = PayMongoWebhookInbox::query()->create([
+        'mode' => 'test', 'event_id' => 'evt_test_conflict', 'event_type' => 'payment.paid',
+        'resource_id' => $payment['id'], 'received_at' => now(), 'verified_data' => ['attributes' => [
+            'payment_intent_id' => $intentId,
+            'payments' => [$payment],
+        ]],
+    ]);
+
+    app()->call([new ProcessPayMongoWebhook($inbox->id), 'handle']);
+
+    expect($inbox->fresh()->status)->toBe('quarantined');
+    expect($flow->fresh()->payment_id)->toBe('pay_test_recorded');
+    expect($flow->fresh()->status)->toBe('reconciliation_required');
+    expect($flow->fresh()->requires_attention)->toBeTrue();
+    expect($order->fresh()->payment_status->value)->toBe('verified');
+    expect($order->fresh()->status->value)->toBe($orderStatus);
+    $this->assertDatabaseHas('paymongo_operations', ['paymongo_flow_id' => $flow->id, 'kind' => 'payment_anomaly', 'provider_reference' => $payment['id']]);
+    $this->assertDatabaseCount('notifications', 0);
+})->with([
+    'wrong amount' => [['amount' => 24999], 'pending'],
+    'wrong currency' => [['currency' => 'USD'], 'pending'],
+    'wrong method' => [['method' => 'card'], 'pending'],
+    'cancelled order' => [[], 'cancelled'],
+    'conflicting payment ID on the same intent' => [['id' => 'pay_test_conflicting'], 'pending', 'pi_test_recorded'],
+]);
+
+test('payment.paid cannot use a recorded payment to override conflicting mode or intent references', function (string $mode, ?string $intentId) {
+    $order = Order::factory()->create(['payment_method' => PaymentMethod::Online, 'payment_origin' => 'paymongo', 'payment_status' => 'verified']);
+    $flow = PayMongoFlow::query()->create([
+        'order_id' => $order->id, 'mode' => $mode, 'channel' => 'hosted_checkout',
+        'status' => 'paid', 'payment_id' => 'pay_test_reference', 'payment_intent_id' => 'pi_test_reference',
+        'amount_minor' => 25000, 'currency' => 'PHP', 'merchant_cutoff_at' => now()->addDay(),
+    ]);
+    $inbox = PayMongoWebhookInbox::query()->create([
+        'mode' => 'test', 'event_id' => 'evt_test_reference', 'event_type' => 'payment.paid',
+        'resource_id' => 'pay_test_reference', 'received_at' => now(), 'verified_data' => ['attributes' => [
+            'payment_intent_id' => $intentId,
+            'payments' => [['id' => 'pay_test_reference', 'status' => 'paid', 'amount' => 25000, 'currency' => 'PHP', 'method' => 'gcash']],
+        ]],
+    ]);
+
+    app()->call([new ProcessPayMongoWebhook($inbox->id), 'handle']);
+
+    expect($inbox->fresh()->status)->toBe('unmatched');
+    expect($flow->fresh()->status)->toBe('paid');
+    expect($flow->fresh()->payment_id)->toBe('pay_test_reference');
+    $this->assertDatabaseCount('paymongo_operations', 0);
+    $this->assertDatabaseCount('notifications', 0);
+})->with([
+    'different mode without intent' => ['live', null],
+    'different mode with matching intent' => ['live', 'pi_test_reference'],
+    'unknown conflicting intent' => ['test', 'pi_test_unrelated'],
+]);
+
+test('payment.paid cannot assign another orders recorded payment through a conflicting intent', function () {
+    $paidOrder = Order::factory()->create([
+        'payment_method' => PaymentMethod::Online, 'payment_origin' => 'paymongo',
+        'payment_status' => 'verified', 'total_amount' => '250.00',
+    ]);
+    $paidFlow = PayMongoFlow::query()->create([
+        'order_id' => $paidOrder->id, 'mode' => 'test', 'channel' => 'hosted_checkout',
+        'status' => 'paid', 'payment_id' => 'pay_test_other_order', 'payment_intent_id' => 'pi_test_other_order',
+        'amount_minor' => 25000, 'currency' => 'PHP', 'merchant_cutoff_at' => now()->addDay(),
+    ]);
+    $unpaidOrder = Order::factory()->create([
+        'payment_method' => PaymentMethod::Online, 'payment_origin' => 'paymongo', 'total_amount' => '250.00',
+    ]);
+    $unpaidFlow = PayMongoFlow::query()->create([
+        'order_id' => $unpaidOrder->id, 'mode' => 'test', 'channel' => 'hosted_checkout',
+        'status' => 'open', 'payment_intent_id' => 'pi_test_unpaid_order',
+        'amount_minor' => 25000, 'currency' => 'PHP', 'merchant_cutoff_at' => now()->addDay(),
+    ]);
+    $inbox = PayMongoWebhookInbox::query()->create([
+        'mode' => 'test', 'event_id' => 'evt_test_cross_order', 'event_type' => 'payment.paid',
+        'resource_id' => 'pay_test_other_order', 'received_at' => now(), 'verified_data' => ['attributes' => [
+            'payment_intent_id' => 'pi_test_unpaid_order',
+            'payments' => [['id' => 'pay_test_other_order', 'status' => 'paid', 'amount' => 25000, 'currency' => 'PHP', 'method' => 'gcash']],
+        ]],
+    ]);
+
+    app()->call([new ProcessPayMongoWebhook($inbox->id), 'handle']);
+
+    expect($inbox->fresh()->status)->toBe('quarantined');
+    expect($unpaidFlow->fresh()->payment_id)->toBeNull();
+    expect($unpaidFlow->fresh()->status)->toBe('reconciliation_required');
+    expect($unpaidOrder->fresh()->payment_status->value)->toBe('pending');
+    expect($paidFlow->fresh()->payment_id)->toBe('pay_test_other_order');
+    expect($paidFlow->fresh()->status)->toBe('paid');
+    expect($paidOrder->fresh()->payment_status->value)->toBe('verified');
+    $this->assertDatabaseCount('notifications', 0);
 });
 
 test('hosted checkout persists an operation before sending the exact saved total', function () {
