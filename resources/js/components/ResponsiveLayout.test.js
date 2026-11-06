@@ -12,6 +12,314 @@ const executable = process.env.BATTLEFRONT_UI_BROWSER;
 const widths = [320, 360, 375, 390, 428, 768, 1024, 1440];
 
 test(
+    'customer and guest navigation, dashboard and appearance fit the requested responsive breakpoints',
+    { skip: !baseUrl || !executable, timeout: 120000 },
+    async (t) => {
+        const browser = await openBrowser(t);
+        const catalog = {
+            products: {
+                data: [product],
+                total: 1,
+                current_page: 1,
+                last_page: 1,
+            },
+            filters: { sort: 'featured' },
+            filter_options: { categories: [], brands: [], tags: [] },
+            recommendations: [],
+        };
+        const dashboard = {
+            dashboard: {
+                summary: {
+                    cart_items: 1,
+                    cart_units: 2,
+                    active_orders: 3,
+                    total_orders: 4,
+                },
+                latest_order: null,
+            },
+            recommendations: [
+                {
+                    product,
+                    reasons: [{ code: 'popular', value: 'Popular hardware' }],
+                },
+            ],
+        };
+        const menuButton = '[aria-label="Open navigation menu"]';
+        const dialog = '[role=dialog][data-slot=sheet-content]';
+        const toggle = '[role=switch].appearance-toggle';
+        async function waitFor(expression) {
+            for (let attempt = 0; attempt < 100; attempt++) {
+                if (await browser.evaluate(expression)) return;
+                await delay(50);
+            }
+            assert.fail(expression + '; ' + browser.exceptions.join('; '));
+        }
+        async function openMenu() {
+            await browser.evaluate(
+                `document.querySelector('${menuButton}').click()`,
+            );
+            await waitFor(`!!document.querySelector('${dialog}')`);
+            await delay(350);
+        }
+        async function closeMenu() {
+            await browser.command('Input.dispatchKeyEvent', {
+                type: 'keyDown',
+                key: 'Escape',
+                code: 'Escape',
+                windowsVirtualKeyCode: 27,
+            });
+            await waitFor(`!document.querySelector('${dialog}')`);
+        }
+
+        for (const theme of ['light', 'dark']) {
+            for (const customer of [false, true]) {
+                const component = customer
+                    ? 'Dashboard/Customer'
+                    : 'Products/Index';
+                const props = customer ? dashboard : catalog;
+                await browser.show(component, props, customer, theme);
+                browser.registerPage(
+                    '/dashboard',
+                    'Dashboard/Customer',
+                    dashboard,
+                    theme,
+                );
+                browser.registerPage(
+                    '/products',
+                    'Products/Index',
+                    catalog,
+                    theme,
+                );
+                browser.registerPage(
+                    '/branches',
+                    'Branches/Index',
+                    { branches: [] },
+                    theme,
+                );
+                await browser.evaluate(
+                    `document.querySelector('#app').__vue_app__.config.globalProperties.$inertia.visit('${customer ? '/dashboard' : '/products'}')`,
+                );
+                await waitFor(
+                    `location.pathname === '${customer ? '/dashboard' : '/products'}'`,
+                );
+
+                for (const width of [320, 375, 768, 1023, 1024, 1280]) {
+                    await browser.resize(width);
+                    await waitFor(`!!document.querySelector('${toggle}')`);
+                    await assertFits(browser, `${component} ${theme} ${width}`);
+                    const appearance = await browser.evaluate(`(() => {
+                        const control = document.querySelector('${toggle}');
+                        return { label: control.getAttribute('aria-label'), icons: control.querySelectorAll('svg').length, icon: control.querySelector('svg').classList.contains('lucide-${theme === 'dark' ? 'sun' : 'moon'}') };
+                    })()`);
+                    assert.deepEqual(appearance, {
+                        label: `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`,
+                        icons: 1,
+                        icon: true,
+                    });
+
+                    if (customer) {
+                        const layout = await browser.evaluate(`(() => {
+                            const stats = [...document.querySelectorAll('[aria-labelledby="shopping-summary-heading"] dl > div')].map(el => el.getBoundingClientRect());
+                            const actions = [...document.querySelectorAll('[data-page-header] a')].map(el => ({ width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height }));
+                            return { stats: stats.map(rect => ({ x: rect.x, y: rect.y })), actions, popular: document.body.textContent.includes('Popular products'), sidebar: !!document.querySelector('[data-sidebar=sidebar]') };
+                        })()`);
+                        assert.equal(layout.popular, true);
+                        assert.equal(layout.sidebar, width >= 1024);
+                        if (width < 1024) {
+                            assert.equal(layout.stats[0].y, layout.stats[1].y);
+                            assert.equal(layout.stats[2].y, layout.stats[3].y);
+                            assert.ok(layout.stats[2].y > layout.stats[0].y);
+                            assert.equal(layout.stats[0].x, layout.stats[2].x);
+                            assert.equal(
+                                layout.actions[1].width,
+                                layout.actions[2].width,
+                            );
+                            assert.equal(
+                                layout.actions[1].height,
+                                layout.actions[2].height,
+                            );
+                            assert.ok(
+                                layout.actions[0].width >
+                                    layout.actions[1].width,
+                            );
+                        } else {
+                            assert.ok(
+                                layout.stats.every(
+                                    (stat) => stat.y === layout.stats[0].y,
+                                ),
+                            );
+                        }
+                    }
+
+                    if (
+                        process.env.BATTLEFRONT_NAV_PREVIEW &&
+                        [320, 1024].includes(width)
+                    ) {
+                        const shot = await browser.command(
+                            'Page.captureScreenshot',
+                            {
+                                format: 'png',
+                                captureBeyondViewport: false,
+                            },
+                        );
+                        await writeFile(
+                            `${process.env.BATTLEFRONT_NAV_PREVIEW}-${customer ? 'customer' : 'guest'}-${theme}-${width}.png`,
+                            Buffer.from(shot.data, 'base64'),
+                        );
+                    }
+
+                    if (width < 1024) {
+                        await openMenu();
+                        const items = await browser.evaluate(
+                            `[...document.querySelectorAll('${dialog} nav a, ${dialog} nav button')].map(el => ({ text: el.textContent.trim().replace(/\\s+/g, ' '), href: el.getAttribute('href') }))`,
+                        );
+                        assert.deepEqual(
+                            items.map((item) => item.text),
+                            customer
+                                ? [
+                                      'Dashboard',
+                                      'Shop Products',
+                                      'PC Builder',
+                                      'My Wishlist',
+                                      'My Cart',
+                                      'My Orders',
+                                      'Returns & refunds Manage returns from an order',
+                                      'Profile / Settings',
+                                      'Log out',
+                                  ]
+                                : [
+                                      'Build a PC',
+                                      'Shop Products',
+                                      'Our Stores',
+                                      'Log in',
+                                      'Create Account',
+                                  ],
+                        );
+                        assert.equal(
+                            items.find((item) =>
+                                item.text.startsWith('Returns & refunds'),
+                            )?.href,
+                            customer ? '/orders' : undefined,
+                        );
+                        assert.equal(
+                            await browser.evaluate(
+                                `document.querySelector('${dialog} [aria-current=page]')?.textContent.trim()`,
+                            ),
+                            customer ? 'Dashboard' : 'Shop Products',
+                        );
+                        const unobscured = await browser.evaluate(`(() => {
+                            const item = document.querySelector('${dialog} nav a:last-of-type');
+                            const box = item.getBoundingClientRect();
+                            return Boolean(document.elementFromPoint(box.x + 10, box.y + box.height / 2)?.closest('[role=dialog]'));
+                        })()`);
+                        assert.equal(
+                            unobscured,
+                            true,
+                            'The drawer stays above the chatbot',
+                        );
+                        await assertFits(
+                            browser,
+                            `drawer ${customer} ${theme} ${width}`,
+                        );
+                        if (
+                            process.env.BATTLEFRONT_NAV_PREVIEW &&
+                            width === 320
+                        ) {
+                            const shot = await browser.command(
+                                'Page.captureScreenshot',
+                                {
+                                    format: 'png',
+                                    captureBeyondViewport: false,
+                                },
+                            );
+                            await writeFile(
+                                `${process.env.BATTLEFRONT_NAV_PREVIEW}-${customer ? 'customer' : 'guest'}-${theme}-drawer.png`,
+                                Buffer.from(shot.data, 'base64'),
+                            );
+                        }
+                        await closeMenu();
+                        assert.equal(
+                            await browser.evaluate(
+                                `document.activeElement?.getAttribute('aria-label')`,
+                            ),
+                            'Open navigation menu',
+                        );
+                    } else {
+                        assert.equal(
+                            await browser.evaluate(
+                                `!!document.querySelector('${menuButton}')?.getBoundingClientRect().width`,
+                            ),
+                            false,
+                        );
+                        if (!customer) {
+                            assert.deepEqual(
+                                await browser.evaluate(
+                                    `[...document.querySelectorAll('header nav[aria-label=Primary] > a')].filter(el => el.getBoundingClientRect().width).map(el => el.innerText.trim())`,
+                                ),
+                                [
+                                    'Build a PC',
+                                    'Products',
+                                    'Our stores',
+                                    'Log in',
+                                    'Register',
+                                ],
+                            );
+                        }
+                    }
+                }
+
+                await browser.resize(375);
+                await openMenu();
+                await browser.evaluate(
+                    `document.querySelector('${dialog} a[href="${customer ? '/products' : '/branches'}"]').click()`,
+                );
+                if (!customer) {
+                    await waitFor(
+                        `location.pathname === '/branches' && !document.querySelector('${dialog}')`,
+                    );
+                    await openMenu();
+                    assert.equal(
+                        await browser.evaluate(
+                            `document.querySelector('${dialog} [aria-current=page]')?.textContent.trim()`,
+                        ),
+                        'Our Stores',
+                    );
+                    await browser.resize(1024);
+                    await waitFor(`!document.querySelector('${dialog}')`);
+                } else {
+                    await waitFor(
+                        `location.pathname === '/products' && !document.querySelector('${dialog}')`,
+                    );
+                    await openMenu();
+                    assert.equal(
+                        await browser.evaluate(
+                            `document.querySelector('${dialog} [aria-current=page]')?.textContent.trim()`,
+                        ),
+                        'Shop Products',
+                    );
+                    browser.registerForm('/logout', catalog);
+                    const previousRequests = browser.formRequests.length;
+                    await browser.evaluate(
+                        `document.querySelector('${dialog} [data-test=logout-button]').click()`,
+                    );
+                    await waitFor(`!document.querySelector('${dialog}')`);
+                    assert.equal(
+                        browser.formRequests.length,
+                        previousRequests + 1,
+                    );
+                    assert.equal(browser.formRequests.at(-1).method, 'POST');
+                    assert.equal(
+                        new URL(browser.formRequests.at(-1).url).pathname,
+                        '/logout',
+                    );
+                }
+            }
+        }
+        assert.deepEqual(browser.exceptions, []);
+    },
+);
+
+test(
     'mobile viewport matrix fits public, customer and administration pages in both themes',
     { skip: !baseUrl || !executable, timeout: 240000 },
     async (t) => {
@@ -4195,12 +4503,12 @@ test(
         );
 
         await t.test(
-            'navigation opens on phones and uses the desktop sidebar at the tablet breakpoint',
+            'customer navigation uses a drawer below the desktop breakpoint',
             async () => {
                 await browser.show('Cart/Index', { cart });
                 await browser.resize(320);
                 await browser.evaluate(
-                    `document.querySelector('[data-sidebar=trigger]').click()`,
+                    `document.querySelector('[aria-label="Open navigation menu"]').click()`,
                 );
                 await delay(300);
                 assert.ok(
@@ -4218,15 +4526,15 @@ test(
                 await delay(400);
                 await browser.resize(768);
                 await browser.evaluate(
-                    `document.querySelector('[data-sidebar=trigger]').click()`,
+                    `document.querySelector('[aria-label="Open navigation menu"]').click()`,
                 );
                 await delay(300);
                 assert.equal(
                     await browser.evaluate(
                         `!!document.querySelector('[role=dialog]')`,
                     ),
-                    false,
-                    '768px toggles the desktop sidebar',
+                    true,
+                    '768px opens the customer navigation drawer',
                 );
             },
         );
@@ -5348,7 +5656,7 @@ test(
         const before = await browser.evaluate(readCharts);
         assert.equal(before.length, 3);
         await browser.evaluate(
-            `document.querySelector('[role=switch][aria-label="Dark mode"]').click()`,
+            `document.querySelector('[role=switch].appearance-toggle').click()`,
         );
         for (let attempt = 0; attempt < 30; attempt++) {
             if (
@@ -5437,7 +5745,7 @@ test(
         }
         async function assertAppearance(selected) {
             const state = await browser.evaluate(
-                `({ dark: document.documentElement.classList.contains('dark'), checked: document.querySelector('[role=switch][aria-label="Dark mode"]').getAttribute('aria-checked'), theme: document.querySelector('[data-sonner-toaster]')?.dataset.theme, documentPreserved: window.appearanceNavigationDocument === true })`,
+                `({ dark: document.documentElement.classList.contains('dark'), checked: document.querySelector('[role=switch].appearance-toggle').getAttribute('aria-checked'), theme: document.querySelector('[data-sonner-toaster]')?.dataset.theme, documentPreserved: window.appearanceNavigationDocument === true })`,
             );
             assert.deepEqual(state, {
                 dark: selected === 'dark',
@@ -5501,7 +5809,7 @@ test(
                 'Orders must mount',
             );
             await browser.evaluate(
-                `document.querySelector('[role=switch][aria-label="Dark mode"]').click()`,
+                `document.querySelector('[role=switch].appearance-toggle').click()`,
             );
             await waitFor(
                 `!!document.querySelector('[data-sonner-toast]')`,
@@ -5515,7 +5823,7 @@ test(
             );
             await assertAppearance(selected);
             await browser.evaluate(
-                `document.querySelector('a.surface-card[href$="/products/7"]').click()`,
+                `document.querySelector('.surface-card a[href$="/products/7"]').click()`,
             );
             await waitFor(
                 `location.pathname === '/products/7' && !!document.querySelector('form button[type=submit]')`,
@@ -5821,7 +6129,7 @@ test(
             filter_options: { categories: [], brands: [], tags: [] },
             recommendations: [],
         };
-        const readAppearance = `({ dark: document.documentElement.classList.contains('dark'), checked: document.querySelector('[role=switch][aria-label="Dark mode"]')?.getAttribute('aria-checked'), stored: localStorage.getItem('${key}'), beforeApp: window.appearanceBeforeApp })`;
+        const readAppearance = `({ dark: document.documentElement.classList.contains('dark'), checked: document.querySelector('[role=switch].appearance-toggle')?.getAttribute('aria-checked'), stored: localStorage.getItem('${key}'), beforeApp: window.appearanceBeforeApp })`;
         async function waitFor(expression, message) {
             for (let attempt = 0; attempt < 100; attempt++) {
                 if (await browser.evaluate(expression)) return;

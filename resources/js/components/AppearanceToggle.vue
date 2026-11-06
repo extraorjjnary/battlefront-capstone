@@ -31,30 +31,17 @@ function toggleAppearance() {
                     role="switch"
                     variant="ghost"
                     size="icon"
-                    class="appearance-toggle group focus-visible:ring-ring h-9 w-12 cursor-pointer rounded-full p-0 hover:bg-transparent motion-reduce:transition-none dark:hover:bg-transparent"
-                    aria-label="Dark mode"
+                    class="appearance-toggle focus-visible:ring-ring h-9 w-11 cursor-pointer motion-reduce:transition-none"
+                    :aria-label="label"
                     :aria-checked="resolvedAppearance === 'dark'"
                     @click="toggleAppearance"
                 >
-                    <span
-                        class="border-input bg-muted group-hover:border-ring relative h-6 w-10 rounded-full border transition-colors duration-200 motion-reduce:transition-none"
+                    <Sun
+                        v-if="resolvedAppearance === 'dark'"
+                        class="size-5"
                         aria-hidden="true"
-                    >
-                        <span
-                            class="bg-background text-foreground absolute top-1/2 left-0.5 flex size-4.5 -translate-y-1/2 items-center justify-center rounded-full transition-transform duration-200 ease-in-out motion-reduce:transition-none"
-                            :class="
-                                resolvedAppearance === 'dark'
-                                    ? 'translate-x-4'
-                                    : 'translate-x-0'
-                            "
-                        >
-                            <Moon
-                                v-if="resolvedAppearance === 'dark'"
-                                class="size-3"
-                            />
-                            <Sun v-else class="size-3" />
-                        </span>
-                    </span>
+                    />
+                    <Moon v-else class="size-5" aria-hidden="true" />
                 </Button>
             </TooltipTrigger>
             <TooltipContent>{{ label }}</TooltipContent>

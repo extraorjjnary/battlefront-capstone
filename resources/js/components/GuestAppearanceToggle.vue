@@ -12,7 +12,7 @@ onMounted(() => {
     <AppearanceToggle v-if="isMounted" />
     <span
         v-else
-        class="inline-flex h-11 w-12 shrink-0 md:h-9"
+        class="inline-flex h-11 w-11 shrink-0 md:h-9"
         aria-hidden="true"
     />
 </template>

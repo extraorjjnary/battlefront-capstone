@@ -1,6 +1,6 @@
 <script setup>
-import { Link, usePage } from '@inertiajs/vue3';
-import { Menu } from '@lucide/vue';
+import { Link, router, usePage } from '@inertiajs/vue3';
+import { LogOut, Menu, Undo2 } from '@lucide/vue';
 import { computed } from 'vue';
 import AppearanceToggle from '@/components/AppearanceToggle.vue';
 import AppLogo from '@/components/AppLogo.vue';
@@ -22,7 +22,9 @@ import {
 } from '@/components/ui/navigation-menu';
 import {
     Sheet,
+    SheetClose,
     SheetContent,
+    SheetDescription,
     SheetHeader,
     SheetTitle,
     SheetTrigger,
@@ -31,19 +33,64 @@ import UserMenuContent from '@/components/UserMenuContent.vue';
 import { useAppNavigation } from '@/composables/useAppNavigation';
 import { useCurrentUrl } from '@/composables/useCurrentUrl';
 import { getInitials } from '@/composables/useInitials';
-import { dashboard } from '@/routes';
+import { dashboard, logout } from '@/routes';
 const props = defineProps({
     breadcrumbs: { type: Array, default: () => [] },
 });
 const page = usePage();
 const auth = computed(() => page.props.auth);
-const { isCurrentUrl, whenCurrentUrl } = useCurrentUrl();
-const { mainNavItems } = useAppNavigation();
+const { isCurrentUrl, isCurrentOrParentUrl, whenCurrentUrl } = useCurrentUrl();
+const { isAdministrator, mainNavItems } = useAppNavigation();
 const activeItemStyles = 'bg-accent text-accent-foreground';
+const mobileNavItems = computed(() => {
+    if (isAdministrator.value) {
+        return mainNavItems.value;
+    }
+
+    return [
+        ['Dashboard', 'Dashboard'],
+        ['Products', 'Shop Products'],
+        ['Build a PC', 'PC Builder'],
+        ['Wishlist', 'My Wishlist'],
+        ['Cart', 'My Cart'],
+        ['Orders', 'My Orders'],
+        ['Orders', 'Returns & refunds'],
+        ['Account', 'Profile / Settings'],
+    ].flatMap(([sourceTitle, title]) => {
+        const item = mainNavItems.value.find(
+            (item) => item.title === sourceTitle,
+        );
+
+        if (!item) {
+            return [];
+        }
+
+        const isReturnLink = title === 'Returns & refunds';
+
+        return [
+            {
+                ...item,
+                title,
+                isReturnLink,
+                icon: isReturnLink ? Undo2 : item.icon,
+            },
+        ];
+    });
+});
+
+function isMobileItemActive(item) {
+    if (item.isReturnLink) {
+        return false;
+    }
+
+    return item.title === 'Profile / Settings'
+        ? page.component.startsWith('settings/')
+        : isCurrentOrParentUrl(item.href);
+}
 </script>
 
 <template>
-    <div>
+    <header>
         <div class="border-border bg-background/95 border-b backdrop-blur">
             <div class="mx-auto flex h-18 items-center px-4 md:max-w-7xl">
                 <!-- Mobile Menu -->
@@ -54,39 +101,94 @@ const activeItemStyles = 'bg-accent text-accent-foreground';
                                 variant="ghost"
                                 size="icon"
                                 class="mr-2 h-9 w-9"
+                                aria-label="Open navigation menu"
                             >
-                                <Menu class="h-5 w-5" />
+                                <Menu class="h-5 w-5" aria-hidden="true" />
                             </Button>
                         </SheetTrigger>
-                        <SheetContent side="left" class="w-75 p-6">
+                        <SheetContent
+                            side="left"
+                            class="w-75 max-w-[calc(100%-1rem)] overflow-y-auto p-6"
+                        >
                             <SheetTitle class="sr-only"
                                 >Navigation menu</SheetTitle
                             >
                             <SheetHeader class="flex justify-start text-left">
                                 <AppLogoIcon class="size-12" />
+                                <SheetDescription class="sr-only">
+                                    Navigate your Battlefront account.
+                                </SheetDescription>
                             </SheetHeader>
-                            <div class="flex h-full flex-1 flex-col gap-4 py-6">
-                                <nav class="-mx-3 space-y-1">
-                                    <Link
-                                        v-for="item in mainNavItems"
+                            <div class="flex flex-1 flex-col gap-4 py-4">
+                                <nav
+                                    class="-mx-3 space-y-1"
+                                    aria-label="Account navigation"
+                                >
+                                    <SheetClose
+                                        v-for="item in mobileNavItems"
                                         :key="item.title"
-                                        :href="item.href"
-                                        class="hover:bg-accent flex items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium"
-                                        :class="
-                                            whenCurrentUrl(
-                                                item.href,
-                                                activeItemStyles,
-                                            )
-                                        "
+                                        as-child
                                     >
-                                        <component
-                                            v-if="item.icon"
-                                            :is="item.icon"
-                                            aria-hidden="true"
-                                            class="h-5 w-5"
-                                        />
-                                        {{ item.title }}
-                                    </Link>
+                                        <Link
+                                            :href="item.href"
+                                            class="hover:bg-accent focus-visible:ring-ring flex min-h-11 items-center gap-x-3 rounded-lg px-3 py-2 text-sm font-medium focus-visible:ring-2 focus-visible:outline-none"
+                                            :class="
+                                                isMobileItemActive(item)
+                                                    ? activeItemStyles
+                                                    : undefined
+                                            "
+                                            :aria-current="
+                                                isMobileItemActive(item)
+                                                    ? 'page'
+                                                    : undefined
+                                            "
+                                        >
+                                            <component
+                                                v-if="item.icon"
+                                                :is="item.icon"
+                                                aria-hidden="true"
+                                                class="h-5 w-5 shrink-0"
+                                            />
+                                            <span>
+                                                {{ item.title }}
+                                                <span
+                                                    v-if="item.isReturnLink"
+                                                    class="text-muted-foreground block text-xs font-normal"
+                                                    >Manage returns from an
+                                                    order</span
+                                                >
+                                            </span>
+                                            <span
+                                                v-if="
+                                                    (item.badgeCount ??
+                                                        item.pendingCount) > 0
+                                                "
+                                                class="bg-secondary ml-auto rounded-full px-2 py-0.5 text-xs tabular-nums"
+                                                >{{
+                                                    item.badgeCount ??
+                                                    item.pendingCount
+                                                }}</span
+                                            >
+                                        </Link>
+                                    </SheetClose>
+                                    <SheetClose
+                                        v-if="!isAdministrator"
+                                        as-child
+                                    >
+                                        <Link
+                                            :href="logout()"
+                                            as="button"
+                                            class="hover:bg-accent focus-visible:ring-ring flex min-h-11 w-full items-center gap-x-3 rounded-lg px-3 py-2 text-left text-sm font-medium focus-visible:ring-2 focus-visible:outline-none"
+                                            data-test="logout-button"
+                                            @click="router.flushAll()"
+                                        >
+                                            <LogOut
+                                                class="size-5"
+                                                aria-hidden="true"
+                                            />
+                                            Log out
+                                        </Link>
+                                    </SheetClose>
                                 </nav>
                             </div>
                         </SheetContent>
@@ -149,6 +251,11 @@ const activeItemStyles = 'bg-accent text-accent-foreground';
                                 variant="ghost"
                                 size="icon"
                                 class="focus-within:ring-primary relative size-10 w-auto rounded-full p-1 focus-within:ring-2"
+                                :class="
+                                    !isAdministrator
+                                        ? 'max-lg:hidden'
+                                        : undefined
+                                "
                             >
                                 <Avatar
                                     class="size-8 overflow-hidden rounded-full"
@@ -184,5 +291,5 @@ const activeItemStyles = 'bg-accent text-accent-foreground';
                 <Breadcrumbs :breadcrumbs="breadcrumbs" />
             </div>
         </div>
-    </div>
+    </header>
 </template>

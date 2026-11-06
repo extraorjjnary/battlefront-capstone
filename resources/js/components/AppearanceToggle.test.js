@@ -169,16 +169,17 @@ function appearanceHarness({
 }
 
 for (const [initial, next, icon] of [
-    ['light', 'dark', 'sun'],
-    ['dark', 'light', 'moon'],
+    ['light', 'dark', 'moon'],
+    ['dark', 'light', 'sun'],
 ]) {
-    test(`${initial} mode shows its icon and switches immediately to ${next} through the existing preference endpoint`, async () => {
+    test(`${initial} mode shows the destination icon and switches immediately to ${next} through the existing preference endpoint`, async () => {
         const harness = appearanceHarness({ preference: initial });
         const html = await harness.render();
         assert.match(html, new RegExp(`lucide-${icon}`));
-        assert.match(html, /<svg\b[^>]*class="[^"]*\bsize-3(?:\s|")/);
+        assert.match(html, /<svg\b[^>]*class="[^"]*\bsize-5(?:\s|")/);
         assert.match(html, /role="switch"/);
-        assert.match(html, /aria-label="Dark mode"/);
+        assert.match(html, new RegExp(`aria-label="Switch to ${next} mode"`));
+        assert.equal((html.match(/<svg\b/g) ?? []).length, 1);
         assert.match(html, new RegExp(`aria-checked="${initial === 'dark'}"`));
         assert.match(html, new RegExp(`>Switch to ${next} mode<`));
         assert.match(html, /type="button"/);
@@ -210,7 +211,7 @@ for (const systemDark of [false, true]) {
             const harness = appearanceHarness({ preference, systemDark });
             assert.equal(harness.appearance.value, 'light');
             assert.equal(harness.classes.has('dark'), false);
-            assert.match(await harness.render(), /lucide-sun/);
+            assert.match(await harness.render(), /lucide-moon/);
             assert.doesNotMatch(
                 await harness.renderTabs(),
                 />System<|lucide-monitor/,
@@ -248,14 +249,14 @@ test('settings choices synchronize the toggle while navigation and refresh resto
 
     settings.updateAppearance('dark');
 
-    assert.match(await harness.render(), /lucide-moon/);
+    assert.match(await harness.render(), /lucide-sun/);
     assert.equal(harness.classes.has('dark'), true);
     harness.navigate('dark');
     assert.equal(harness.appearance.value, 'dark');
     const refreshed = appearanceHarness({ preference: 'dark' });
-    assert.match(await refreshed.render(), /lucide-moon/);
+    assert.match(await refreshed.render(), /lucide-sun/);
     settings.updateAppearance('light');
-    assert.match(await harness.render(), /lucide-sun/);
+    assert.match(await harness.render(), /lucide-moon/);
     assert.match(
         activeAppearanceTab(await harness.renderTabs()),
         />Light<\/span>/,
@@ -275,7 +276,7 @@ test('failed saves restore both controls and the applied theme including a legac
         assert.equal(harness.classes.has('dark'), expected === 'dark');
         assert.match(
             await harness.render(),
-            expected === 'dark' ? /lucide-moon/ : /lucide-sun/,
+            expected === 'dark' ? /lucide-sun/ : /lucide-moon/,
         );
         const label = expected === 'dark' ? 'Dark' : 'Light';
         assert.match(
@@ -348,7 +349,7 @@ test('logout and account changes discard local selections and late failures from
     harness.navigate('dark', { id: 2 });
     harness.requests[0].options.onError();
     assert.equal(harness.appearance.value, 'dark');
-    assert.match(await harness.render(), /lucide-moon/);
+    assert.match(await harness.render(), /lucide-sun/);
     harness.navigate('light', { id: 3 });
     assert.equal(harness.classes.has('dark'), false);
 });
@@ -394,7 +395,10 @@ test('both authenticated header variants render the toggle directly beside notif
             },
         };
         harness.modules['@/composables/useAppNavigation'] = {
-            useAppNavigation: () => ({ mainNavItems: [] }),
+            useAppNavigation: () => ({
+                mainNavItems: Vue.ref([]),
+                isAdministrator: Vue.ref(administrator),
+            }),
         };
         harness.modules['@/composables/useCurrentUrl'] = {
             useCurrentUrl: () => ({ isCurrentUrl: () => false }),
@@ -404,6 +408,7 @@ test('both authenticated header variants render the toggle directly beside notif
         };
         harness.modules['@/routes'] = {
             dashboard: () => ({ url: '/dashboard' }),
+            logout: () => ({ url: '/logout', method: 'post' }),
         };
         for (const path of ['./AppSidebarHeader.vue', './AppHeader.vue']) {
             const source = readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -427,7 +432,7 @@ test('both authenticated header variants render the toggle directly beside notif
 
             const html = await renderToString(Vue.h(harness.component(path)));
 
-            assert.match(html, /aria-label="Dark mode"/);
+            assert.match(html, /aria-label="Switch to dark mode"/);
             assert.match(
                 html,
                 /Switch to dark mode<\/div><\/div><\/div><button aria-label="Notifications"/,
@@ -439,9 +444,9 @@ test('both authenticated header variants render the toggle directly beside notif
 test('server rendering follows each account without leaking appearance between requests', async () => {
     const harness = appearanceHarness({ preference: 'dark', server: true });
     assert.equal(harness.appearance.value, 'dark');
-    assert.match(await harness.render(), /lucide-moon/);
-    harness.page.props.appearance = 'system';
     assert.match(await harness.render(), /lucide-sun/);
+    harness.page.props.appearance = 'system';
+    assert.match(await harness.render(), /lucide-moon/);
     assert.equal(
         harness.modules['@/composables/useAppearance'].useAppearance()
             .appearance.value,
@@ -540,7 +545,7 @@ test('guest server rendering reserves the switch space until mounting to avoid h
         Vue.h(harness.component('./GuestAppearanceToggle.vue')),
     );
     assert.match(html, /aria-hidden="true"/);
-    assert.doesNotMatch(html, /role="switch"|lucide-moon|lucide-sun/);
+    assert.doesNotMatch(html, /role="switch"|lucide-sun|lucide-moon/);
 });
 
 const earlyThemeScript = readFileSync(

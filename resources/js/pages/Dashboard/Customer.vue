@@ -67,24 +67,34 @@ defineOptions({
                 heading-id="customer-dashboard-heading"
             >
                 <template #actions>
-                    <Button as-child>
-                        <Link :href="productIndex()">
-                            <PackageSearch aria-hidden="true" />
-                            Browse products
-                        </Link>
-                    </Button>
-                    <Button variant="outline" as-child>
-                        <Link :href="cartIndex()">
-                            <ShoppingCart aria-hidden="true" />
-                            View cart
-                        </Link>
-                    </Button>
-                    <Button variant="outline" as-child>
-                        <Link :href="orderIndex()">
-                            <ReceiptText aria-hidden="true" />
-                            View orders
-                        </Link>
-                    </Button>
+                    <div class="grid w-full grid-cols-2 gap-2 lg:contents">
+                        <Button as-child class="col-span-2 w-full lg:w-auto">
+                            <Link :href="productIndex()">
+                                <PackageSearch aria-hidden="true" />
+                                Browse products
+                            </Link>
+                        </Button>
+                        <Button
+                            variant="outline"
+                            as-child
+                            class="w-full lg:w-auto"
+                        >
+                            <Link :href="cartIndex()">
+                                <ShoppingCart aria-hidden="true" />
+                                View cart
+                            </Link>
+                        </Button>
+                        <Button
+                            variant="outline"
+                            as-child
+                            class="w-full lg:w-auto"
+                        >
+                            <Link :href="orderIndex()">
+                                <ReceiptText aria-hidden="true" />
+                                View orders
+                            </Link>
+                        </Button>
+                    </div>
                 </template>
             </PageHeader>
 
@@ -100,20 +110,20 @@ defineOptions({
                     <template #fallback>
                         <div
                             aria-hidden="true"
-                            class="surface-panel border-border bg-card grid border sm:grid-cols-2 lg:grid-cols-4"
+                            class="surface-panel border-border bg-card grid grid-cols-2 border lg:grid-cols-4"
                         >
                             <StatSkeleton
                                 v-for="stat in 4"
                                 :key="stat"
-                                class="border-border border-b sm:border-r lg:border-b-0"
+                                class="border-border min-w-0 border-b odd:border-r lg:border-r lg:border-b-0"
                             />
                         </div>
                     </template>
                     <dl
-                        class="surface-panel border-border bg-card grid border sm:grid-cols-2 lg:grid-cols-4"
+                        class="surface-panel border-border bg-card grid grid-cols-2 border lg:grid-cols-4"
                     >
                         <div
-                            class="border-border border-b p-5 sm:border-r lg:border-b-0"
+                            class="border-border min-w-0 border-r border-b p-5 lg:border-b-0"
                         >
                             <dt class="text-muted-foreground text-sm">
                                 Products in cart
@@ -126,7 +136,7 @@ defineOptions({
                             </p>
                         </div>
                         <div
-                            class="border-border border-b p-5 sm:border-r-0 lg:border-r lg:border-b-0"
+                            class="border-border min-w-0 border-b p-5 lg:border-r lg:border-b-0"
                         >
                             <dt class="text-muted-foreground text-sm">
                                 Units in cart
@@ -138,9 +148,7 @@ defineOptions({
                                 Total quantity selected
                             </p>
                         </div>
-                        <div
-                            class="border-border border-b p-5 sm:border-r sm:border-b-0"
-                        >
+                        <div class="border-border min-w-0 border-r p-5">
                             <dt class="text-muted-foreground text-sm">
                                 Active orders
                             </dt>
@@ -151,7 +159,7 @@ defineOptions({
                                 Pending or being prepared
                             </p>
                         </div>
-                        <div class="p-5">
+                        <div class="min-w-0 p-5">
                             <dt class="text-muted-foreground text-sm">
                                 Order history
                             </dt>
