@@ -11,10 +11,26 @@ it('updates a customer password using the guarded mobile endpoint', function () 
     $token = $customer->createToken('mobile')->plainTextToken;
     $this->withToken($token)->putJson('/api/v1/profile/password', [
         'current_password' => 'password',
+        'password' => 'New-secure-password',
+        'password_confirmation' => 'New-secure-password',
+    ])->assertOk()->assertJsonPath('message', 'Password updated.');
+    expect(Hash::check('New-secure-password', $customer->fresh()->password))->toBeTrue();
+});
+
+it('returns 422 without changing the mobile customer password when the shared policy is not met', function () {
+    $customer = User::factory()->customer()->create();
+    $originalPasswordHash = $customer->password;
+    $token = $customer->createToken('mobile')->plainTextToken;
+
+    $this->withToken($token)->putJson('/api/v1/profile/password', [
+        'current_password' => 'password',
         'password' => 'new-secure-password',
         'password_confirmation' => 'new-secure-password',
-    ])->assertOk()->assertJsonPath('message', 'Password updated.');
-    expect(Hash::check('new-secure-password', $customer->fresh()->password))->toBeTrue();
+    ])->assertUnprocessable()->assertJsonValidationErrors([
+        'password' => 'The password field must contain at least one uppercase and one lowercase letter.',
+    ]);
+
+    expect($customer->fresh()->password)->toBe($originalPasswordHash);
 });
 
 it('requires a valid customer token to change a password', function () {

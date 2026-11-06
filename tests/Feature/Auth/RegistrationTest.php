@@ -5,8 +5,12 @@ use App\Mail\VerifyEmailOtp;
 use App\Models\GuestRecommendationProfile;
 use App\Models\Product;
 use App\Models\User;
+use Illuminate\Contracts\Validation\UncompromisedVerifier;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rules\Password;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Fortify\Features;
 
@@ -17,8 +21,72 @@ beforeEach(function () {
 test('registration screen can be rendered', function () {
     $response = $this->get(route('register'));
 
-    $response->assertOk();
+    $response->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('auth/Register')
+        ->where('passwordRules', 'minlength: 12; required: lower; required: upper; required: special;'));
 });
+
+test('web and mobile registration accept the revised password policy without a breach check', function (string $registrationRoute, string $password) {
+    Mail::fake();
+    $this->mock(UncompromisedVerifier::class)->shouldNotReceive('verify');
+
+    $this->postJson(route($registrationRoute), [
+        'name' => 'New Customer',
+        'email' => 'password-policy@example.test',
+        'password' => $password,
+        'password_confirmation' => $password,
+        'device_name' => 'Password policy test',
+    ])->assertCreated()->assertJsonPath('data.status', 'verification_required')
+        ->assertJsonMissingPath('data.token');
+
+    $customer = User::query()->where('email', 'password-policy@example.test')->sole();
+    expect(Hash::check($password, $customer->password))->toBeTrue();
+    expect($customer->email_verified_at)->toBeNull();
+    $this->assertGuest();
+    $this->assertDatabaseCount('personal_access_tokens', 0);
+    Mail::assertSent(VerifyEmailOtp::class, fn (VerifyEmailOtp $mail): bool => $mail->hasTo($customer->email));
+})->with(['web' => 'register.store', 'mobile' => 'api.v1.auth.register'])->with([
+    '12 characters without numbers' => 'Abcdefghijk!',
+    '12 characters with a number' => 'Abcdefghij1!',
+    'special characters count toward 12' => 'Aa!@#$%^&*()',
+    'longer password without numbers' => 'CorrectHorseBatteryStaple!',
+]);
+
+test('web and mobile registration return 422 for passwords that fail the revised policy', function (string $registrationRoute, string $password, string $confirmation, string $message) {
+    Mail::fake();
+
+    $this->postJson(route($registrationRoute), [
+        'name' => 'New Customer',
+        'email' => 'password-policy@example.test',
+        'password' => $password,
+        'password_confirmation' => $confirmation,
+        'device_name' => 'Password policy test',
+    ])->assertUnprocessable()->assertJsonValidationErrors(['password' => $message]);
+
+    $this->assertGuest();
+    $this->assertDatabaseCount('users', 0);
+    $this->assertDatabaseCount('email_otp_challenges', 0);
+    $this->assertDatabaseCount('personal_access_tokens', 0);
+    Mail::assertNothingSent();
+})->with(['web' => 'register.store', 'mobile' => 'api.v1.auth.register'])->with([
+    '11 characters' => ['Abcdefghij!', 'Abcdefghij!', 'The password field must be at least 12 characters.'],
+    'missing uppercase' => ['abcdefghijk!', 'abcdefghijk!', 'The password field must contain at least one uppercase and one lowercase letter.'],
+    'missing lowercase' => ['ABCDEFGHIJK!', 'ABCDEFGHIJK!', 'The password field must contain at least one uppercase and one lowercase letter.'],
+    'missing special character' => ['Abcdefghijk1', 'Abcdefghijk1', 'The password field must contain at least one symbol.'],
+    'missing password' => ['', '', 'The password field is required.'],
+    'confirmation mismatch' => ['Abcdefghijk!', 'DifferentPassword!', 'The password field confirmation does not match.'],
+]);
+
+test('the shared password policy applies in every environment', function (string $environment) {
+    $this->app->instance('env', $environment);
+    $this->mock(UncompromisedVerifier::class)->shouldNotReceive('verify');
+
+    $validPassword = Validator::make(['password' => 'Abcdefghijk!'], ['password' => Password::defaults()]);
+    $shortPassword = Validator::make(['password' => 'Abcdefghij!'], ['password' => Password::defaults()]);
+
+    expect($validPassword->passes())->toBeTrue();
+    expect($shortPassword->fails())->toBeTrue();
+})->with(['local', 'testing', 'production']);
 
 test('storefront activity does not consume registration attempts', function (string $registrationRoute) {
     Mail::fake();
@@ -31,8 +99,8 @@ test('storefront activity does not consume registration attempts', function (str
     $this->postJson(route($registrationRoute), [
         'name' => 'New Customer',
         'email' => 'after-browsing@example.test',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
         'device_name' => 'Registration test',
     ])->assertCreated()->assertJsonPath('data.status', 'verification_required');
 
@@ -69,8 +137,8 @@ test('new customers sign in only after verifying email in their registration ses
     $response = $this->post(route('register.store'), [
         'name' => 'Test User',
         'email' => 'test@example.com',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
         'remember' => true,
     ]);
 
@@ -128,8 +196,8 @@ test('new customers inherit guest recommendation history when verification signs
         ->post(route('register.store'), [
             'name' => 'New Customer',
             'email' => 'new-customer@example.com',
-            'password' => 'password',
-            'password_confirmation' => 'password',
+            'password' => 'RegistrationPass!',
+            'password_confirmation' => 'RegistrationPass!',
         ]);
 
     $response->assertRedirectToRoute('verification.notice');
@@ -141,7 +209,7 @@ test('new customers inherit guest recommendation history when verification signs
 
     if ($returnThroughLogin) {
         $this->withCookie('battlefront_recommendation_profile', $token)
-            ->post(route('login.store'), ['email' => $customer->email, 'password' => 'password'])
+            ->post(route('login.store'), ['email' => $customer->email, 'password' => 'RegistrationPass!'])
             ->assertRedirectToRoute('verification.notice');
         $this->assertGuest();
     }
@@ -167,8 +235,8 @@ test('registration cannot create an administrator', function () {
     $response = $this->post(route('register.store'), [
         'name' => 'Test User',
         'email' => 'customer@example.com',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
         'role' => UserRole::Administrator->value,
     ]);
 
@@ -190,8 +258,8 @@ test('registration continuation cannot transfer guest history to another account
     $this->withCookie('battlefront_recommendation_profile', $token)->post(route('register.store'), [
         'name' => 'New Customer',
         'email' => 'continuation@example.test',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
     ])->assertRedirectToRoute('verification.notice');
 
     $this->withCookie('battlefront_recommendation_profile', $token)
@@ -209,8 +277,8 @@ test('customer registration still requires a valid unique email', function (arra
 
     $this->post(route('register.store'), [
         'name' => 'New Customer',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
         ...$emailInput,
     ])->assertSessionHasErrors('email');
 

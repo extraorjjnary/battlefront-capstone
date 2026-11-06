@@ -105,8 +105,8 @@ test('registration verification never signs in with an invalid expired or exhaus
     $this->post(route('register.store'), [
         'name' => 'New Customer',
         'email' => 'new-customer@example.test',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
     ])->assertRedirectToRoute('verification.notice');
     $customer = User::query()->where('email', 'new-customer@example.test')->sole();
     $code = Mail::sent(VerifyEmailOtp::class)->sole()->code;
@@ -135,8 +135,8 @@ test('registration resend retains automatic sign in eligibility for the replacem
     $this->post(route('register.store'), [
         'name' => 'New Customer',
         'email' => 'resend-registration@example.test',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
     ])->assertRedirectToRoute('verification.notice');
     $customer = User::query()->where('email', 'resend-registration@example.test')->sole();
     $this->travel(60)->seconds();
@@ -155,14 +155,14 @@ test('returning through login allows automatic sign in after completing registra
     $this->post(route('register.store'), [
         'name' => 'New Customer',
         'email' => 'recovered-registration@example.test',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
     ])->assertRedirectToRoute('verification.notice');
     $customer = User::query()->where('email', 'recovered-registration@example.test')->sole();
     if ($freshSession) {
         session()->flush();
     }
-    $this->post(route('login.store'), ['email' => $customer->email, 'password' => 'password'])
+    $this->post(route('login.store'), ['email' => $customer->email, 'password' => 'RegistrationPass!'])
         ->assertRedirectToRoute('verification.notice');
 
     $this->post(route('verification.verify'), ['code' => Mail::sent(VerifyEmailOtp::class)->sole()->code])
@@ -278,8 +278,8 @@ test('replacing a registration context cannot automatically sign in its verified
     $this->post(route('register.store'), [
         'name' => 'New Customer',
         'email' => 'original-registration@example.test',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
     ])->assertRedirectToRoute('verification.notice');
     $registeredCustomer = User::query()->where('email', 'original-registration@example.test')->sole();
     $target = $differentAccount ? User::factory()->customer()->unverified()->create() : $registeredCustomer;
@@ -302,8 +302,8 @@ test('changed registration credentials or role prevent automatic sign in after o
     $this->post(route('register.store'), [
         'name' => 'New Customer',
         'email' => 'changed-registration@example.test',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
     ])->assertRedirectToRoute('verification.notice');
     $customer = User::query()->where('email', 'changed-registration@example.test')->sole();
     $changeAccount($customer);
@@ -324,8 +324,8 @@ test('deactivated registration accounts cannot verify or automatically sign in',
     $this->post(route('register.store'), [
         'name' => 'New Customer',
         'email' => 'inactive-registration@example.test',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
     ])->assertRedirectToRoute('verification.notice');
     $customer = User::query()->where('email', 'inactive-registration@example.test')->sole();
     $customer->forceFill(['is_active' => false])->save();
@@ -343,8 +343,8 @@ test('consumed registration verification cannot restore authentication after log
     $this->post(route('register.store'), [
         'name' => 'New Customer',
         'email' => 'consumed-registration@example.test',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
     ])->assertRedirectToRoute('verification.notice');
     $pending = session('email_verification');
     $code = Mail::sent(VerifyEmailOtp::class)->sole()->code;
@@ -469,8 +469,8 @@ test('registration delivery failures retain an unverified account and show safe 
     $this->post(route('register.store'), [
         'name' => 'Mail Failure Customer',
         'email' => 'mail-failure@example.test',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
     ])->assertRedirectToRoute('verification.notice');
     $customer = User::query()->where('email', 'mail-failure@example.test')->sole();
 

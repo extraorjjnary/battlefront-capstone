@@ -31,6 +31,7 @@ test('guests can view the confirmed branch information', function () {
             ->where('branches.1.longitude', 122.9470409)
             ->where('branches.1.email', 'battlefrontbacolod@gmail.com')
             ->where('branches.2.city', 'Escalante City')
+            ->where('branches.2.address', 'National Road, Barangay Balintawak, Escalante City, Negros Occidental 6124, Philippines')
             ->where('branches.2.is_operational', false)
             ->where('branches.2.latitude', 10.84283)
             ->where('branches.2.longitude', 123.4985395)
@@ -51,7 +52,6 @@ test('unconfirmed branch details remain null', function () {
 
     $response->assertInertia(fn (Assert $page) => $page
         ->where('branches.2.city', 'Escalante City')
-        ->where('branches.2.address', null)
         ->where('branches.2.contact_number', null)
         ->where('branches.2.email', null)
         ->where('branches.4.city', 'San Carlos City')

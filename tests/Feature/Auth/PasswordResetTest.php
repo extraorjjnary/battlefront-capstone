@@ -54,8 +54,8 @@ test('password can be reset with valid token', function () {
         $response = $this->post(route('password.update'), [
             'token' => $notification->token,
             'email' => $user->email,
-            'password' => 'password',
-            'password_confirmation' => 'password',
+            'password' => 'RegistrationPass!',
+            'password_confirmation' => 'RegistrationPass!',
         ]);
 
         $response
@@ -72,8 +72,8 @@ test('password cannot be reset with invalid token', function () {
     $response = $this->post(route('password.update'), [
         'token' => 'invalid-token',
         'email' => $user->email,
-        'password' => 'newpassword123',
-        'password_confirmation' => 'newpassword123',
+        'password' => 'NewPassword!123',
+        'password_confirmation' => 'NewPassword!123',
     ]);
 
     $response->assertSessionHasErrors('email');
@@ -89,14 +89,14 @@ test('resetting a password does not verify an unverified account or allow login'
     $this->post(route('password.update'), [
         'token' => $notification->token,
         'email' => $user->email,
-        'password' => 'newpassword123',
-        'password_confirmation' => 'newpassword123',
+        'password' => 'NewPassword!123',
+        'password_confirmation' => 'NewPassword!123',
     ])->assertRedirectToRoute('login')->assertSessionHasNoErrors();
 
     expect($user->fresh()->email_verified_at)->toBeNull();
-    expect(Hash::check('newpassword123', $user->fresh()->password))->toBeTrue();
+    expect(Hash::check('NewPassword!123', $user->fresh()->password))->toBeTrue();
     $this->assertGuest();
-    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'newpassword123'])
+    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'NewPassword!123'])
         ->assertRedirectToRoute('verification.notice');
     $this->assertGuest();
     Notification::assertSentTo($user, ResetPassword::class);

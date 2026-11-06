@@ -9,8 +9,8 @@ test('mobile email verification allows a subsequent login without issuing a prem
     $registration = $this->postJson('/api/v1/auth/register', [
         'name' => 'Mobile Customer',
         'email' => 'mobile@example.test',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
         'device_name' => 'Pixel 8',
     ])->assertCreated()->assertJsonMissingPath('data.token');
     $user = User::query()->where('email', 'mobile@example.test')->sole();
@@ -28,7 +28,7 @@ test('mobile email verification allows a subsequent login without issuing a prem
 
     $this->postJson('/api/v1/auth/login', [
         'email' => $user->email,
-        'password' => 'password',
+        'password' => 'RegistrationPass!',
         'device_name' => 'Pixel 8',
     ])->assertOk()->assertJsonPath('data.user.id', $user->id)->assertJsonPath('data.token_type', 'Bearer');
 
@@ -146,8 +146,8 @@ test('mobile registration preserves an unverified account when email delivery fa
     $this->postJson('/api/v1/auth/register', [
         'name' => 'Mobile Customer',
         'email' => 'undelivered@example.test',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
         'device_name' => 'Pixel 8',
     ])->assertCreated()->assertJsonPath('data.delivery_status', 'failed')
         ->assertJsonPath('data.expires_at', null)->assertJsonMissingPath('data.token');

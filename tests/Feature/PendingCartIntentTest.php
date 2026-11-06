@@ -135,15 +135,15 @@ test('registration preserves a pending selection until verification signs the ne
     $this->post(route('register.store'), [
         'name' => 'New Customer',
         'email' => 'pending-cart@example.com',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
     ])->assertRedirectToRoute('verification.notice')
         ->assertSessionHas('pending_cart_intent.quantity', 4);
 
     $this->assertGuest();
     $this->assertDatabaseCount('carts', 0);
     if ($returnThroughLogin) {
-        $this->post(route('login.store'), ['email' => 'pending-cart@example.com', 'password' => 'password'])
+        $this->post(route('login.store'), ['email' => 'pending-cart@example.com', 'password' => 'RegistrationPass!'])
             ->assertRedirectToRoute('verification.notice')->assertSessionHas('pending_cart_intent.quantity', 4);
         $this->assertGuest();
     }
@@ -182,7 +182,7 @@ test('failed authentication retains the intent for a successful retry', function
 test('expired intent is discarded and preserves normal authentication redirects', function (string $routeName) {
     Mail::fake();
     $this->freezeTime();
-    $customer = User::factory()->customer()->make();
+    $customer = User::factory()->customer()->make(['password' => 'RegistrationPass!']);
     if ($routeName === 'login.store') {
         $customer->save();
     }
@@ -193,8 +193,8 @@ test('expired intent is discarded and preserves normal authentication redirects'
     $response = $this->withSession(['url.intended' => route('products.index')])->post(route($routeName), [
         'name' => $customer->name,
         'email' => $customer->email,
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
     ]);
     if ($routeName === 'register.store') {
         $response->assertRedirectToRoute('verification.notice');
@@ -244,8 +244,8 @@ test('JSON registration returns verification status without authentication or a 
     $this->postJson(route('register.store'), [
         'name' => 'New Customer',
         'email' => 'normal-json@example.com',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
     ])->assertCreated()->assertJsonPath('data.status', 'verification_required')
         ->assertJsonMissingPath('data.registration')
         ->assertJsonMissingPath('data.password_fingerprint')
@@ -297,8 +297,8 @@ test('deleted pending products do not interrupt successful registration', functi
     $this->post(route('register.store'), [
         'name' => 'New Customer',
         'email' => 'deleted-product@example.com',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
     ])->assertRedirectToRoute('verification.notice');
     $this->post(route('verification.verify'), ['code' => Mail::sent(VerifyEmailOtp::class)->sole()->code])
         ->assertRedirectToRoute('cart.index')
@@ -346,7 +346,7 @@ test('a consumed intent cannot add again from a stale authentication session sna
 
 test('normal authentication retains intended redirects without an intent', function (string $routeName) {
     Mail::fake();
-    $customer = User::factory()->customer()->make();
+    $customer = User::factory()->customer()->make(['password' => 'RegistrationPass!']);
     if ($routeName === 'login.store') {
         $customer->save();
     }
@@ -354,8 +354,8 @@ test('normal authentication retains intended redirects without an intent', funct
     $response = $this->withSession(['url.intended' => route('products.index')])->post(route($routeName), [
         'name' => $customer->name,
         'email' => $customer->email,
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
     ]);
     if ($routeName === 'register.store') {
         $response->assertRedirectToRoute('verification.notice');

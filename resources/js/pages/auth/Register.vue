@@ -69,7 +69,13 @@ defineOptions({
                     name="password"
                     placeholder="Password"
                     :passwordrules="passwordRules"
+                    aria-describedby="password-guidance"
                 />
+                <p id="password-guidance" class="text-muted-foreground text-sm">
+                    Use at least 12 characters, including an uppercase letter, a
+                    lowercase letter, and a special character. All characters
+                    count toward the minimum. Numbers are optional.
+                </p>
                 <InputError :message="errors.password" />
             </div>
 

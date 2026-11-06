@@ -14,8 +14,8 @@ test('registration does not send an email verification notification', function (
     $this->post(route('register.store'), [
         'name' => 'Test Customer',
         'email' => 'customer@example.com',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
     ]);
 
     $customer = User::where('email', 'customer@example.com')->firstOrFail();

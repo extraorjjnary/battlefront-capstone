@@ -14,8 +14,8 @@ test('registration creates an unverified customer without a bearer token', funct
     $response = $this->postJson('/api/v1/auth/register', [
         'name' => 'Mobile Customer',
         'email' => 'MOBILE@EXAMPLE.COM',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
         'device_name' => 'Pixel 8',
         'role' => UserRole::Administrator->value,
     ]);
@@ -42,7 +42,7 @@ test('registration returns 422 validation errors without creating a user', funct
     $this->post('/api/v1/auth/register', [
         'name' => '',
         'email' => 'invalid',
-        'password' => 'password',
+        'password' => 'RegistrationPass!',
         'password_confirmation' => 'different',
     ])->assertUnprocessable()
         ->assertJsonStructure(['message', 'errors' => ['name', 'email', 'password', 'device_name']]);
@@ -56,8 +56,8 @@ test('mobile registration still requires a valid unique email', function (array 
 
     $this->postJson('/api/v1/auth/register', [
         'name' => 'New Customer',
-        'password' => 'password',
-        'password_confirmation' => 'password',
+        'password' => 'RegistrationPass!',
+        'password_confirmation' => 'RegistrationPass!',
         'device_name' => 'Pixel 8',
         ...$emailInput,
     ])->assertUnprocessable()->assertJsonValidationErrors('email');

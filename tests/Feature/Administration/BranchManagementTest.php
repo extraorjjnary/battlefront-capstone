@@ -238,9 +238,8 @@ test('branch edits preserve identity and publication updates reach both director
 });
 
 test('legacy missing details can remain published but require verification on republication', function () {
-    $this->seed(BranchSeeder::class);
     $administrator = User::factory()->administrator()->create();
-    $branch = Branch::query()->where('city', 'Escalante City')->sole();
+    $branch = Branch::factory()->create(['city' => 'Legacy City', 'address' => null]);
     $details = ['name' => $branch->name, 'city' => $branch->city, 'operating_hours' => $branch->operating_hours];
 
     $this->actingAs($administrator)->put(route('administration.branches.update', $branch), [...$details, 'email' => 'verified@example.test'])
